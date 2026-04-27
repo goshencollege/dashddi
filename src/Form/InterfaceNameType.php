@@ -2,7 +2,9 @@
 
 namespace App\Form;
 
+use App\Entity\Domain;
 use App\Entity\InterfaceName;
+use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
@@ -16,9 +18,12 @@ class InterfaceNameType extends AbstractType
             ->add('name', TextType::class, [
                 'attr' => ['placeholder' => 'e.g. web-server-01'],
             ])
-            ->add('dnsDomain', TextType::class, [
-                'label' => 'DNS Domain',
-                'attr' => ['placeholder' => 'e.g. example.com'],
+            ->add('domain', EntityType::class, [
+                'class'        => Domain::class,
+                'choice_label' => 'name',
+                'placeholder'  => '-- Select a domain --',
+                'required'     => false,
+                'label'        => 'Domain',
             ]);
     }
 

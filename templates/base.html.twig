@@ -37,6 +37,12 @@
                         <i class="bi bi-diagram-2 me-1"></i>Subnets
                     </a>
                 </li>
+                <li class="nav-item">
+                    <a class="nav-link {{ app.request.attributes.get('_route') starts with 'domain' ? 'active' }}"
+                       href="{{ path('domain_index') }}">
+                        <i class="bi bi-globe me-1"></i>Domains
+                    </a>
+                </li>
             </ul>
             {% if app.user %}
             <ul class="navbar-nav ms-auto">

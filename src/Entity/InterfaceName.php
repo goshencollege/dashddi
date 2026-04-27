@@ -24,14 +24,9 @@ class InterfaceName
     )]
     private string $name = '';
 
-    #[ORM\Column(length: 255)]
-    #[Assert\NotBlank]
-    #[Assert\Length(max: 255)]
-    #[Assert\Regex(
-        pattern: '/^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/',
-        message: 'Must be a valid DNS domain name (e.g. example.com)'
-    )]
-    private string $dnsDomain = '';
+    #[ORM\ManyToOne(targetEntity: Domain::class, inversedBy: 'interfaceNames')]
+    #[ORM\JoinColumn(nullable: true)]
+    private ?Domain $domain = null;
 
     #[ORM\ManyToOne(targetEntity: NetworkInterface::class, inversedBy: 'names')]
     #[ORM\JoinColumn(nullable: false)]
@@ -42,15 +37,18 @@ class InterfaceName
     public function getName(): string { return $this->name; }
     public function setName(string $name): static { $this->name = $name; return $this; }
 
-    public function getDnsDomain(): string { return $this->dnsDomain; }
-    public function setDnsDomain(string $dnsDomain): static { $this->dnsDomain = $dnsDomain; return $this; }
+    public function getDomain(): ?Domain { return $this->domain; }
+    public function setDomain(?Domain $domain): static { $this->domain = $domain; return $this; }
 
     public function getNetworkInterface(): ?NetworkInterface { return $this->networkInterface; }
     public function setNetworkInterface(?NetworkInterface $networkInterface): static { $this->networkInterface = $networkInterface; return $this; }
 
     public function getFullyQualifiedName(): string
     {
-        return $this->name . '.' . $this->dnsDomain;
+        if (!$this->domain) {
+            return $this->name;
+        }
+        return $this->name . '.' . $this->domain->getName();
     }
 
     public function __toString(): string { return $this->getFullyQualifiedName(); }
