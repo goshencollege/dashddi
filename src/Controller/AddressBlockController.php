@@ -96,8 +96,8 @@ class AddressBlockController extends AbstractController
         if (!$start) return 'Start IP is not a valid IP address.';
         if (!$end)   return 'End IP is not a valid IP address.';
 
-        $startVersion = $start->getAddressType()->getVersion();
-        $endVersion   = $end->getAddressType()->getVersion();
+        $startVersion = $start->getAddressType();
+        $endVersion   = $end->getAddressType();
 
         if ($startVersion !== $endVersion) {
             return 'Start and End IP must be the same protocol (both IPv4 or both IPv6).';
