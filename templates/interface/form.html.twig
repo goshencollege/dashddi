@@ -90,7 +90,8 @@
                     <i class="bi bi-plus-lg me-1"></i>Add Name
                 </button>
             </div>
-            <div class="card-body" id="names-collection">
+            <div class="card-body" id="names-collection"
+                 data-prototype="{{ form_widget(form.names.vars.prototype)|e('html_attr') }}">
                 {% for nameForm in form.names %}
                     <div class="name-entry border rounded p-3 mb-2">
                         <div class="row g-2">
@@ -176,19 +177,15 @@
     const addBtn = document.getElementById('add-name-btn');
     let index = collection.querySelectorAll('.name-entry').length;
 
-    const prototype = {{ form.names.vars.prototype|json_encode|raw }};
-
     addBtn.addEventListener('click', function () {
         document.getElementById('no-names-msg')?.remove();
+        const prototype = collection.dataset.prototype;
         const html = prototype.replace(/__name__/g, index++);
         const div = document.createElement('div');
         div.innerHTML = html;
         const entry = div.firstElementChild;
         entry.classList.add('name-entry', 'border', 'rounded', 'p-3', 'mb-2');
 
-        // Wrap fields in row layout
-        const fields = entry.querySelectorAll('div');
-        // Add remove button
         const removeBtn = document.createElement('button');
         removeBtn.type = 'button';
         removeBtn.className = 'btn btn-sm btn-outline-danger mt-2';
