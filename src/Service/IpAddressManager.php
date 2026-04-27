@@ -6,6 +6,7 @@ use App\Entity\IpAddress;
 use App\Entity\Ipv6Address;
 use App\Entity\NetworkInterface;
 use App\Entity\Subnet;
+use App\Repository\AddressBlockRepository;
 use App\Repository\IpAddressRepository;
 use App\Repository\Ipv6AddressRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -17,37 +18,42 @@ class IpAddressManager
         private readonly EntityManagerInterface $em,
         private readonly IpAddressRepository $ipRepo,
         private readonly Ipv6AddressRepository $ipv6Repo,
+        private readonly AddressBlockRepository $blockRepo,
     ) {}
 
-    /** Returns up to $limit available IPv4 addresses in the subnet, excluding first (network) and last (broadcast). */
+    /** Returns up to $limit available IPv4 addresses, restricted to Fixed blocks when defined. */
     public function getAvailableIpv4(Subnet $subnet, int $limit = 100): array
     {
         if (!$subnet->getIpv4Cidr()) {
             return [];
         }
 
+        $allocated   = array_flip($this->ipRepo->findAllocatedAddressesForSubnet($subnet->getId()));
+        $fixedBlocks = array_filter(
+            $this->blockRepo->findFixedBySubnet($subnet->getId()),
+            fn($b) => !str_contains($b->getStartIp(), ':')
+        );
+
+        if (!empty($fixedBlocks)) {
+            return $this->availableInBlocks($fixedBlocks, $allocated, $limit);
+        }
+
+        // No blocks defined — fall back to full subnet range
         $range = Factory::parseRangeString($subnet->getIpv4Cidr());
         if (!$range) {
             return [];
         }
 
-        $allocated = array_flip($this->ipRepo->findAllocatedAddressesForSubnet($subnet->getId()));
         $available = [];
-
-        $start = $range->getStartAddress();
-        $end   = $range->getEndAddress();
-
-        // Skip network address
-        $current = $start->getNextAddress();
+        $end       = $range->getEndAddress();
+        $current   = $range->getStartAddress()->getNextAddress(); // skip network address
 
         while ($current !== null && count($available) < $limit) {
-            $str = (string) $current;
-            // Stop before broadcast
-            if ($current->toString() === $end->toString()) {
+            if ($current->toString() === $end->toString()) { // stop before broadcast
                 break;
             }
-            if (!isset($allocated[$str])) {
-                $available[] = $str;
+            if (!isset($allocated[$current->toString()])) {
+                $available[] = $current->toString();
             }
             $current = $current->getNextAddress();
         }
@@ -55,32 +61,72 @@ class IpAddressManager
         return $available;
     }
 
-    /** Returns up to $limit available IPv6 addresses in the subnet. */
+    /** Returns up to $limit available IPv6 addresses, restricted to Fixed blocks when defined. */
     public function getAvailableIpv6(Subnet $subnet, int $limit = 50): array
     {
         if (!$subnet->getIpv6Cidr()) {
             return [];
         }
 
+        $allocated   = array_flip($this->ipv6Repo->findAllocatedAddressesForSubnet($subnet->getId()));
+        $fixedBlocks = array_filter(
+            $this->blockRepo->findFixedBySubnet($subnet->getId()),
+            fn($b) => str_contains($b->getStartIp(), ':')
+        );
+
+        if (!empty($fixedBlocks)) {
+            return $this->availableInBlocks($fixedBlocks, $allocated, $limit);
+        }
+
+        // No blocks defined — fall back to full subnet range
         $range = Factory::parseRangeString($subnet->getIpv6Cidr());
         if (!$range) {
             return [];
         }
 
-        $allocated = array_flip($this->ipv6Repo->findAllocatedAddressesForSubnet($subnet->getId()));
         $available = [];
-
-        $current = $range->getStartAddress()->getNextAddress();
+        $current   = $range->getStartAddress()->getNextAddress();
 
         while ($current !== null && count($available) < $limit) {
             if (!$range->contains($current)) {
                 break;
             }
-            $str = $current->toString();
-            if (!isset($allocated[$str])) {
-                $available[] = $str;
+            if (!isset($allocated[$current->toString()])) {
+                $available[] = $current->toString();
             }
             $current = $current->getNextAddress();
+        }
+
+        return $available;
+    }
+
+    /** Iterates through a set of AddressBlocks and returns unallocated addresses up to $limit. */
+    private function availableInBlocks(array $blocks, array $allocated, int $limit): array
+    {
+        $available = [];
+
+        foreach ($blocks as $block) {
+            $start = Factory::parseAddressString($block->getStartIp());
+            $end   = Factory::parseAddressString($block->getEndIp());
+            if (!$start || !$end) {
+                continue;
+            }
+
+            $current = $start;
+            while ($current !== null && count($available) < $limit) {
+                $str = $current->toString();
+                if (!isset($allocated[$str])) {
+                    $available[] = $str;
+                }
+                if ($str === $end->toString()) {
+                    break;
+                }
+                $current = $current->getNextAddress();
+            }
+
+            if (count($available) >= $limit) {
+                break;
+            }
         }
 
         return $available;
@@ -97,8 +143,15 @@ class IpAddressManager
         if ($macAddress && $subnet->getIpv6Cidr()) {
             $eui64 = $this->macToEui64($macAddress, $subnet->getIpv6Cidr());
             if ($eui64) {
-                $allocated = array_flip($this->ipv6Repo->findAllocatedAddressesForSubnet($subnet->getId()));
-                if (!isset($allocated[$eui64])) {
+                $allocated   = array_flip($this->ipv6Repo->findAllocatedAddressesForSubnet($subnet->getId()));
+                $fixedBlocks = array_filter(
+                    $this->blockRepo->findFixedBySubnet($subnet->getId()),
+                    fn($b) => str_contains($b->getStartIp(), ':')
+                );
+
+                $inFixedBlock = empty($fixedBlocks) || $this->isInBlocks($eui64, $fixedBlocks);
+
+                if (!isset($allocated[$eui64]) && $inFixedBlock) {
                     return $eui64;
                 }
             }
@@ -106,6 +159,28 @@ class IpAddressManager
 
         $available = $this->getAvailableIpv6($subnet, 1);
         return $available[0] ?? null;
+    }
+
+    private function isInBlocks(string $ip, array $blocks): bool
+    {
+        $addr = Factory::parseAddressString($ip);
+        if (!$addr) {
+            return false;
+        }
+
+        foreach ($blocks as $block) {
+            $start = Factory::parseAddressString($block->getStartIp());
+            $end   = Factory::parseAddressString($block->getEndIp());
+            if (!$start || !$end) {
+                continue;
+            }
+            if ($addr->getComparableString() >= $start->getComparableString()
+                && $addr->getComparableString() <= $end->getComparableString()) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function assignIpv4(NetworkInterface $interface, string $address): IpAddress

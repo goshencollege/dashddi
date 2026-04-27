@@ -3,6 +3,7 @@
 namespace App\Entity;
 
 use App\Entity\Trait\AuditableTrait;
+use App\Repository\AddressBlockRepository;
 use App\Repository\SubnetRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -57,11 +58,16 @@ class Subnet
     #[ORM\OneToMany(targetEntity: NetworkInterface::class, mappedBy: 'subnet')]
     private Collection $interfaces;
 
+    #[ORM\OneToMany(targetEntity: AddressBlock::class, mappedBy: 'subnet', cascade: ['persist', 'remove'], orphanRemoval: true)]
+    #[ORM\OrderBy(['startIp' => 'ASC'])]
+    private Collection $addressBlocks;
+
     public function __construct()
     {
         $this->ipAddresses = new ArrayCollection();
         $this->ipv6Addresses = new ArrayCollection();
         $this->interfaces = new ArrayCollection();
+        $this->addressBlocks = new ArrayCollection();
     }
 
     public function getId(): ?int { return $this->id; }
@@ -87,6 +93,7 @@ class Subnet
     public function getIpAddresses(): Collection { return $this->ipAddresses; }
     public function getIpv6Addresses(): Collection { return $this->ipv6Addresses; }
     public function getInterfaces(): Collection { return $this->interfaces; }
+    public function getAddressBlocks(): Collection { return $this->addressBlocks; }
 
     public function __toString(): string
     {
