@@ -101,9 +101,9 @@
                                 {{ form_errors(nameForm.name) }}
                             </div>
                             <div class="col-md-5">
-                                {{ form_label(nameForm.dnsDomain, null, {label_attr: {class: 'form-label small fw-semibold'}}) }}
-                                {{ form_widget(nameForm.dnsDomain, {attr: {class: 'form-control form-control-sm font-monospace'}}) }}
-                                {{ form_errors(nameForm.dnsDomain) }}
+                                {{ form_label(nameForm.domain, null, {label_attr: {class: 'form-label small fw-semibold'}}) }}
+                                {{ form_widget(nameForm.domain, {attr: {class: 'form-select form-select-sm'}}) }}
+                                {{ form_errors(nameForm.domain) }}
                             </div>
                             <div class="col-md-2 d-flex align-items-end">
                                 <button type="button" class="btn btn-sm btn-outline-danger remove-name-btn w-100">
