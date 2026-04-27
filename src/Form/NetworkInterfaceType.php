@@ -75,8 +75,9 @@ class NetworkInterfaceType extends AbstractType
                     'placeholder' => 'Select or type an IPv6 address',
                     'autocomplete' => 'off',
                 ],
-            ])
-            ->add('names', CollectionType::class, [
+            ]);
+        if ($options['show_names']) {
+            $builder->add('names', CollectionType::class, [
                 'entry_type' => InterfaceNameType::class,
                 'allow_add' => true,
                 'allow_delete' => true,
@@ -84,6 +85,7 @@ class NetworkInterfaceType extends AbstractType
                 'label' => 'DNS Names',
                 'entry_options' => ['label' => false],
             ]);
+        }
     }
 
     public function configureOptions(OptionsResolver $resolver): void
@@ -91,7 +93,9 @@ class NetworkInterfaceType extends AbstractType
         $resolver->setDefaults([
             'data_class' => NetworkInterface::class,
             'is_edit'    => false,
+            'show_names' => true,
         ]);
         $resolver->setAllowedTypes('is_edit', 'bool');
+        $resolver->setAllowedTypes('show_names', 'bool');
     }
 }

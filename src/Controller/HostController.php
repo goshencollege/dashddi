@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Entity\Host;
 use App\Form\HostType;
 use App\Repository\HostRepository;
+use App\Service\IpAddressManager;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -14,6 +15,10 @@ use Symfony\Component\Routing\Attribute\Route;
 #[Route('/hosts')]
 class HostController extends AbstractController
 {
+    public function __construct(
+        private readonly IpAddressManager $ipManager,
+    ) {}
+
     #[Route('', name: 'host_index', methods: ['GET'])]
     public function index(Request $request, HostRepository $repo): Response
     {
@@ -30,20 +35,55 @@ class HostController extends AbstractController
     public function new(Request $request, EntityManagerInterface $em): Response
     {
         $host = new Host();
-        $form = $this->createForm(HostType::class, $host);
+        $form = $this->createForm(HostType::class, $host, ['embed_interface' => true]);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            $em->persist($host);
-            $em->flush();
-            $this->addFlash('success', 'Host "' . $host->getName() . '" created.');
-            return $this->redirectToRoute('host_show', ['id' => $host->getId()]);
+            $ifaceForm = $form->get('interface');
+            $interface = $ifaceForm->getData();
+            $subnet    = $interface->getSubnet();
+
+            $errors = [];
+            if ($ifaceForm->get('ipv4Assignment')->getData() === 'select' && $subnet) {
+                $ip = trim((string) $ifaceForm->get('ipv4AddressInput')->getData());
+                if ($ip !== '') {
+                    $err = $this->ipManager->validateSpecifiedIpv4($ip, $subnet);
+                    if ($err) {
+                        $errors[] = $err;
+                    }
+                }
+            }
+            if ($ifaceForm->get('ipv6Assignment')->getData() === 'select' && $subnet) {
+                $ip = trim((string) $ifaceForm->get('ipv6AddressInput')->getData());
+                if ($ip !== '') {
+                    $err = $this->ipManager->validateSpecifiedIpv6($ip, $subnet);
+                    if ($err) {
+                        $errors[] = $err;
+                    }
+                }
+            }
+
+            if ($errors) {
+                foreach ($errors as $error) {
+                    $this->addFlash('danger', $error);
+                }
+            } else {
+                $interface->setHost($host);
+                $this->assignIps($ifaceForm, $interface);
+
+                $em->persist($host);
+                $em->persist($interface);
+                $em->flush();
+                $this->addFlash('success', 'Host "' . $host->getName() . '" created.');
+                return $this->redirectToRoute('host_show', ['id' => $host->getId()]);
+            }
         }
 
         return $this->render('host/form.html.twig', [
-            'form'  => $form,
-            'host'  => $host,
-            'title' => 'New Host',
+            'form'            => $form,
+            'host'            => $host,
+            'title'           => 'New Host',
+            'embed_interface' => true,
         ]);
     }
 
@@ -66,9 +106,10 @@ class HostController extends AbstractController
         }
 
         return $this->render('host/form.html.twig', [
-            'form'  => $form,
-            'host'  => $host,
-            'title' => 'Edit Host: ' . $host->getName(),
+            'form'            => $form,
+            'host'            => $host,
+            'title'           => 'Edit Host: ' . $host->getName(),
+            'embed_interface' => false,
         ]);
     }
 
@@ -81,5 +122,36 @@ class HostController extends AbstractController
             $this->addFlash('success', 'Host deleted.');
         }
         return $this->redirectToRoute('host_index');
+    }
+
+    private function assignIps(\Symfony\Component\Form\FormInterface $ifaceForm, \App\Entity\NetworkInterface $interface): void
+    {
+        $subnet = $interface->getSubnet();
+
+        $ipv4Mode = $ifaceForm->get('ipv4Assignment')->getData();
+        if ($ipv4Mode === 'auto' && $subnet?->getIpv4Cidr()) {
+            $ip = $this->ipManager->findNextAvailableIpv4($subnet);
+            if ($ip) {
+                $this->ipManager->assignIpv4($interface, $ip);
+            }
+        } elseif ($ipv4Mode === 'select') {
+            $ip = trim((string) $ifaceForm->get('ipv4AddressInput')->getData());
+            if ($ip !== '' && $subnet) {
+                $this->ipManager->assignIpv4($interface, $ip);
+            }
+        }
+
+        $ipv6Mode = $ifaceForm->get('ipv6Assignment')->getData();
+        if ($ipv6Mode === 'auto' && $subnet?->getIpv6Cidr()) {
+            $ip = $this->ipManager->findNextAvailableIpv6($subnet, $interface->getMacAddress());
+            if ($ip) {
+                $this->ipManager->assignIpv6($interface, $ip);
+            }
+        } elseif ($ipv6Mode === 'select') {
+            $ip = trim((string) $ifaceForm->get('ipv6AddressInput')->getData());
+            if ($ip !== '' && $subnet) {
+                $this->ipManager->assignIpv6($interface, $ip);
+            }
+        }
     }
 }
