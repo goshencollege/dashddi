@@ -50,9 +50,12 @@
                     {% endfor %}
                 </div>
                 <div id="ipv4-input-section" class="mt-2" style="display:none">
-                    {{ form_label(form.ipv4AddressInput, null, {label_attr: {class: 'form-label small'}}) }}
-                    {{ form_widget(form.ipv4AddressInput, {attr: {class: 'form-control font-monospace'}}) }}
-                    <datalist id="available-ipv4-list"></datalist>
+                    <label for="ipv4_address_input" class="form-label small">IPv4 Address</label>
+                    <select id="ipv4_address_input"
+                            name="{{ form.ipv4AddressInput.vars.full_name }}"
+                            class="form-select font-monospace">
+                        <option value="">— select a subnet first —</option>
+                    </select>
                 </div>
             </div>
         </div>
@@ -76,8 +79,7 @@
                 </div>
                 <div id="ipv6-input-section" class="mt-2" style="display:none">
                     {{ form_label(form.ipv6AddressInput, null, {label_attr: {class: 'form-label small'}}) }}
-                    {{ form_widget(form.ipv6AddressInput, {attr: {class: 'form-control font-monospace'}}) }}
-                    <datalist id="available-ipv6-list"></datalist>
+                    {{ form_widget(form.ipv6AddressInput, {attr: {class: 'form-control font-monospace', placeholder: 'e.g. 2001:db8::1'}}) }}
                 </div>
             </div>
         </div>
@@ -150,23 +152,32 @@
     bindIpRadios('ipv4', 'ipv4-input-section');
     bindIpRadios('ipv6', 'ipv6-input-section');
 
-    // Fetch available IPs when subnet changes
+    // Populate IPv4 <select> with available addresses when subnet changes
     const subnetSelect = document.getElementById('interface_subnet');
+    const ipv4Select   = document.getElementById('ipv4_address_input');
+    const currentIpv4  = {{ interface.ipAddress ? ('"' ~ interface.ipAddress.address ~ '"') : 'null' }};
+
     function loadAvailableIps(subnetId) {
         if (!subnetId) return;
+
+        ipv4Select.innerHTML = '<option value="">— loading… —</option>';
         fetch('/api/subnets/' + subnetId + '/available-ips')
             .then(r => r.json())
             .then(ips => {
-                const dl = document.getElementById('available-ipv4-list');
-                dl.innerHTML = ips.map(ip => '<option value="' + ip + '">').join('');
-            });
-        fetch('/api/subnets/' + subnetId + '/available-ipv6')
-            .then(r => r.json())
-            .then(ips => {
-                const dl = document.getElementById('available-ipv6-list');
-                dl.innerHTML = ips.map(ip => '<option value="' + ip + '">').join('');
+                // Always include the currently-assigned address so it stays selected on edit
+                const all = (currentIpv4 && !ips.includes(currentIpv4))
+                    ? [currentIpv4, ...ips] : ips;
+                if (all.length === 0) {
+                    ipv4Select.innerHTML = '<option value="">— no available addresses —</option>';
+                } else {
+                    ipv4Select.innerHTML = '<option value="">— select an address —</option>'
+                        + all.map(ip => '<option value="' + ip + '"'
+                            + (ip === currentIpv4 ? ' selected' : '') + '>'
+                            + ip + '</option>').join('');
+                }
             });
     }
+
     if (subnetSelect) {
         subnetSelect.addEventListener('change', () => loadAvailableIps(subnetSelect.value));
         if (subnetSelect.value) loadAvailableIps(subnetSelect.value);
