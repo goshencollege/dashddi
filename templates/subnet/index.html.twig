@@ -1,0 +1,69 @@
+{% extends 'base.html.twig' %}
+{% block title %}Subnets{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0"><i class="bi bi-diagram-2 me-2"></i>Subnets</h1>
+    <a href="{{ path('subnet_new') }}" class="btn btn-primary">
+        <i class="bi bi-plus-lg me-1"></i>Add Subnet
+    </a>
+</div>
+
+{% if subnets is empty %}
+    <div class="card">
+        <div class="card-body text-center text-muted py-5">
+            <i class="bi bi-diagram-2 fs-1 d-block mb-3 opacity-25"></i>
+            No subnets yet. <a href="{{ path('subnet_new') }}">Add the first one →</a>
+        </div>
+    </div>
+{% else %}
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Name</th>
+                        <th>IPv4 CIDR</th>
+                        <th>IPv6 CIDR</th>
+                        <th>VLAN</th>
+                        <th>Gateway</th>
+                        <th>Assigned IPs</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for subnet in subnets %}
+                        <tr>
+                            <td>
+                                <a href="{{ path('subnet_show', {id: subnet.id}) }}" class="fw-semibold text-decoration-none">
+                                    {{ subnet.name }}
+                                </a>
+                            </td>
+                            <td class="ip-address">{{ subnet.ipv4Cidr ?: '—' }}</td>
+                            <td class="ip-address small">{{ subnet.ipv6Cidr ?: '—' }}</td>
+                            <td>{{ subnet.vlan ?: '—' }}</td>
+                            <td class="ip-address">{{ subnet.gateway ?: '—' }}</td>
+                            <td>
+                                <span class="badge bg-info text-dark">{{ subnet.ipAddresses|length }} v4</span>
+                                <span class="badge bg-warning text-dark ms-1">{{ subnet.ipv6Addresses|length }} v6</span>
+                            </td>
+                            <td class="text-end">
+                                <a href="{{ path('subnet_edit', {id: subnet.id}) }}" class="btn btn-sm btn-outline-secondary me-1">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <form method="post" action="{{ path('subnet_delete', {id: subnet.id}) }}" class="d-inline"
+                                      onsubmit="return confirm('Delete subnet {{ subnet.name|e('js') }}?')">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('delete_subnet_' ~ subnet.id) }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endif %}
+{% endblock %}
