@@ -38,6 +38,24 @@
                     </a>
                 </li>
             </ul>
+            {% if app.user %}
+            <ul class="navbar-nav ms-auto">
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
+                        <i class="bi bi-person-circle me-1"></i>{{ app.user.displayName }}
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><span class="dropdown-item-text text-muted small">{{ app.user.email }}</span></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                            <a href="{{ path('saml_logout') }}" class="dropdown-item">
+                                <i class="bi bi-box-arrow-right me-1"></i>Logout
+                            </a>
+                        </li>
+                    </ul>
+                </li>
+            </ul>
+            {% endif %}
         </div>
     </div>
 </nav>

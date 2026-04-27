@@ -1,0 +1,24 @@
+security:
+    providers:
+        saml_provider:
+            id: App\Security\SamlUserProvider
+
+    firewalls:
+        dev:
+            pattern: ^/(_(profiler|wdt)|assets|build)/
+            security: false
+
+        main:
+            lazy: true
+            provider: saml_provider
+            custom_authenticators:
+                - App\Security\SamlAuthenticator
+            entry_point: App\Security\SamlAuthenticator
+            logout:
+                path: saml_logout
+                target: saml_login
+                invalidate_session: true
+
+    access_control:
+        - { path: ^/saml, roles: PUBLIC_ACCESS }
+        - { path: ^/, roles: ROLE_USER }
