@@ -21,3 +21,15 @@ services:
 
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones
+
+    App\Security\SamlSettings:
+        arguments:
+            $spEntityId:   '%env(SAML_SP_ENTITY_ID)%'
+            $spAcsUrl:     '%env(SAML_SP_ACS_URL)%'
+            $spSloUrl:     '%env(SAML_SP_SLO_URL)%'
+            $spCert:       '%env(SAML_SP_CERT)%'
+            $spPrivateKey: '%env(SAML_SP_PRIVATE_KEY)%'
+            $idpEntityId:  '%env(SAML_IDP_ENTITY_ID)%'
+            $idpSsoUrl:    '%env(SAML_IDP_SSO_URL)%'
+            $idpCert:      '%env(SAML_IDP_CERT)%'
+            $debug:        '%kernel.debug%'
