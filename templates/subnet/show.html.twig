@@ -55,6 +55,63 @@
     {% endif %}
 </div>
 
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-grid me-1"></i>Address Blocks ({{ subnet.addressBlocks|length }})</span>
+        <a href="{{ path('block_new', {subnetId: subnet.id}) }}" class="btn btn-sm btn-primary">
+            <i class="bi bi-plus-lg me-1"></i>Add Block
+        </a>
+    </div>
+    {% if subnet.addressBlocks is empty %}
+        <div class="card-body text-center text-muted py-3">
+            No blocks defined — all addresses in the subnet are available for assignment.
+        </div>
+    {% else %}
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Type</th>
+                        <th>Label</th>
+                        <th>Start IP</th>
+                        <th>End IP</th>
+                        <th>Modified</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ab in subnet.addressBlocks %}
+                        <tr>
+                            <td>
+                                <span class="badge bg-{{ ab.type.badgeClass() }}">{{ ab.type.label() }}</span>
+                            </td>
+                            <td class="text-muted">{{ ab.label ?: '—' }}</td>
+                            <td><code>{{ ab.startIp }}</code></td>
+                            <td><code>{{ ab.endIp }}</code></td>
+                            <td class="text-muted small">
+                                {{ ab.updatedAt|date('Y-m-d H:i') }}
+                                {% if ab.updatedBy %}<br>{{ ab.updatedBy }}{% endif %}
+                            </td>
+                            <td class="text-end">
+                                <a href="{{ path('block_edit', {id: ab.id}) }}" class="btn btn-sm btn-outline-secondary me-1">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <form method="post" action="{{ path('block_delete', {id: ab.id}) }}" class="d-inline"
+                                      onsubmit="return confirm('Delete this block?')">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('delete_block_' ~ ab.id) }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+</div>
+
 <div class="row g-3">
     {% if subnet.ipv4Cidr %}
     <div class="col-lg-6">

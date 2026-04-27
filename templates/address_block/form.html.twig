@@ -1,0 +1,59 @@
+{% extends 'base.html.twig' %}
+{% block title %}{{ block.id ? 'Edit Block' : 'Add Block' }} – {{ subnet.name }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ path('subnet_index') }}">Subnets</a></li>
+        <li class="breadcrumb-item"><a href="{{ path('subnet_show', {id: subnet.id}) }}">{{ subnet.name }}</a></li>
+        <li class="breadcrumb-item active">{{ block.id ? 'Edit Block' : 'Add Block' }}</li>
+    </ol>
+</nav>
+
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-grid me-1"></i>{{ block.id ? 'Edit Block' : 'Add Address Block' }}
+            </div>
+            <div class="card-body">
+                {{ form_start(form) }}
+                <div class="mb-3">
+                    {{ form_label(form.type) }}
+                    {{ form_widget(form.type, {attr: {class: 'form-select'}}) }}
+                    {{ form_errors(form.type) }}
+                    <div class="form-text">
+                        <strong>Fixed</strong> — addresses assignable to interfaces.
+                        <strong>Dynamic</strong> — DHCP pool (tracked for reference only).
+                        <strong>Reserved</strong> — infrastructure or excluded addresses.
+                    </div>
+                </div>
+                <div class="mb-3">
+                    {{ form_label(form.label) }}
+                    {{ form_widget(form.label, {attr: {class: 'form-control'}}) }}
+                    {{ form_errors(form.label) }}
+                </div>
+                <div class="row g-3 mb-3">
+                    <div class="col">
+                        {{ form_label(form.startIp) }}
+                        {{ form_widget(form.startIp, {attr: {class: 'form-control font-monospace'}}) }}
+                        {{ form_errors(form.startIp) }}
+                    </div>
+                    <div class="col">
+                        {{ form_label(form.endIp) }}
+                        {{ form_widget(form.endIp, {attr: {class: 'form-control font-monospace'}}) }}
+                        {{ form_errors(form.endIp) }}
+                    </div>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <a href="{{ path('subnet_show', {id: subnet.id}) }}" class="btn btn-outline-secondary">Cancel</a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg me-1"></i>{{ block.id ? 'Save Changes' : 'Add Block' }}
+                    </button>
+                </div>
+                {{ form_end(form) }}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
