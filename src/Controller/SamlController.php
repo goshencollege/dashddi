@@ -12,7 +12,7 @@ class SamlController extends AbstractController
 {
     public function __construct(private readonly SamlSettings $samlSettings) {}
 
-    /** Initiates the SAML SSO flow by redirecting to the IdP. */
+    /** Login page — shows "Sign in with Okta" button and any error flash messages. */
     #[Route('/saml/login', name: 'saml_login')]
     public function login(): Response
     {
@@ -20,6 +20,13 @@ class SamlController extends AbstractController
             return $this->redirectToRoute('dashboard');
         }
 
+        return $this->render('saml/login.html.twig');
+    }
+
+    /** Initiates the SAML SSO flow by redirecting to the IdP. */
+    #[Route('/saml/initiate', name: 'saml_initiate')]
+    public function initiate(): Response
+    {
         $auth = new Auth($this->samlSettings->toArray());
         $ssoUrl = $auth->login(returnTo: null, parameters: [], forceAuthn: false, isPassive: false, stay: true);
 

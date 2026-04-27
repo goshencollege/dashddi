@@ -3,6 +3,7 @@
 namespace App\Security;
 
 use OneLogin\Saml2\Auth;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -23,6 +24,7 @@ class SamlAuthenticator extends AbstractAuthenticator implements AuthenticationE
     public function __construct(
         private readonly SamlSettings $samlSettings,
         private readonly UrlGeneratorInterface $urlGenerator,
+        private readonly LoggerInterface $logger,
     ) {}
 
     public function supports(Request $request): ?bool
@@ -42,9 +44,9 @@ class SamlAuthenticator extends AbstractAuthenticator implements AuthenticationE
 
         $errors = $auth->getErrors();
         if (!empty($errors) || !$auth->isAuthenticated()) {
-            throw new AuthenticationException(
-                'SAML error: ' . ($auth->getLastErrorReason() ?? implode(', ', $errors))
-            );
+            $reason = $auth->getLastErrorReason() ?? implode(', ', $errors);
+            $this->logger->error('SAML authentication failed', ['reason' => $reason, 'errors' => $errors]);
+            throw new AuthenticationException('SAML error: ' . $reason);
         }
 
         $identifier = $auth->getNameId();
@@ -63,7 +65,7 @@ class SamlAuthenticator extends AbstractAuthenticator implements AuthenticationE
 
     public function onAuthenticationFailure(Request $request, AuthenticationException $exception): ?Response
     {
-        $request->getSession()->set('saml_error', strtr($exception->getMessageKey(), $exception->getMessageData()));
+        $request->getSession()->getFlashBag()->add('danger', $exception->getMessage());
         return new RedirectResponse($this->urlGenerator->generate('saml_login'));
     }
 
