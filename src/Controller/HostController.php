@@ -15,10 +15,14 @@ use Symfony\Component\Routing\Attribute\Route;
 class HostController extends AbstractController
 {
     #[Route('', name: 'host_index', methods: ['GET'])]
-    public function index(HostRepository $repo): Response
+    public function index(Request $request, HostRepository $repo): Response
     {
+        $query = trim($request->query->getString('q'));
+        $hosts = $query ? $repo->search($query) : $repo->findBy([], ['name' => 'ASC']);
+
         return $this->render('host/index.html.twig', [
-            'hosts' => $repo->findBy([], ['name' => 'ASC']),
+            'hosts' => $hosts,
+            'query' => $query,
         ]);
     }
 
