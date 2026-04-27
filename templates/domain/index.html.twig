@@ -1,0 +1,67 @@
+{% extends 'base.html.twig' %}
+{% block title %}Domains{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0"><i class="bi bi-globe me-2"></i>Domains</h1>
+    <a href="{{ path('domain_new') }}" class="btn btn-primary">
+        <i class="bi bi-plus-lg me-1"></i>Add Domain
+    </a>
+</div>
+
+{% if domains is empty %}
+    <div class="card">
+        <div class="card-body text-center text-muted py-5">
+            <i class="bi bi-globe fs-1 d-block mb-3 opacity-25"></i>
+            No domains yet. <a href="{{ path('domain_new') }}">Add the first one →</a>
+        </div>
+    </div>
+{% else %}
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Name</th>
+                        <th>Description</th>
+                        <th>Records</th>
+                        <th>Interface Names</th>
+                        <th>Last Modified</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for domain in domains %}
+                        <tr>
+                            <td>
+                                <a href="{{ path('domain_show', {id: domain.id}) }}" class="fw-semibold text-decoration-none">
+                                    {{ domain.name }}
+                                </a>
+                            </td>
+                            <td class="text-muted">{{ domain.description ?: '—' }}</td>
+                            <td><span class="badge bg-secondary rounded-pill">{{ domain.records|length }}</span></td>
+                            <td><span class="badge bg-secondary rounded-pill">{{ domain.interfaceNames|length }}</span></td>
+                            <td class="text-muted small">
+                                {{ domain.updatedAt|date('Y-m-d H:i') }}
+                                {% if domain.updatedBy %}<br>{{ domain.updatedBy }}{% endif %}
+                            </td>
+                            <td class="text-end">
+                                <a href="{{ path('domain_edit', {id: domain.id}) }}" class="btn btn-sm btn-outline-secondary me-1">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <form method="post" action="{{ path('domain_delete', {id: domain.id}) }}" class="d-inline"
+                                      onsubmit="return confirm('Delete domain {{ domain.name|e('js') }}?')">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('delete_domain_' ~ domain.id) }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endif %}
+{% endblock %}
