@@ -4,6 +4,7 @@ namespace App\Entity;
 
 use App\Entity\Trait\AuditableTrait;
 use App\Repository\NetworkInterfaceRepository;
+use App\Validator\UniqueMacAddress;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
@@ -11,6 +12,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: NetworkInterfaceRepository::class)]
 #[ORM\Table(name: 'network_interface')]
+#[UniqueMacAddress]
 class NetworkInterface
 {
     use AuditableTrait;
