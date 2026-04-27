@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use App\Entity\Trait\AuditableTrait;
 use App\Repository\NetworkInterfaceRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -12,6 +13,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\Table(name: 'network_interface')]
 class NetworkInterface
 {
+    use AuditableTrait;
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]

@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use App\Entity\Trait\AuditableTrait;
 use App\Repository\HostRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -10,9 +11,9 @@ use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: HostRepository::class)]
 #[ORM\Table(name: 'host')]
-#[ORM\HasLifecycleCallbacks]
 class Host
 {
+    use AuditableTrait;
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
@@ -27,26 +28,12 @@ class Host
     #[Assert\Length(max: 255)]
     private ?string $location = null;
 
-    #[ORM\Column]
-    private \DateTimeImmutable $createdAt;
-
-    #[ORM\Column]
-    private \DateTimeImmutable $updatedAt;
-
     #[ORM\OneToMany(targetEntity: NetworkInterface::class, mappedBy: 'host', cascade: ['persist', 'remove'], orphanRemoval: true)]
     private Collection $interfaces;
 
     public function __construct()
     {
         $this->interfaces = new ArrayCollection();
-        $this->createdAt = new \DateTimeImmutable();
-        $this->updatedAt = new \DateTimeImmutable();
-    }
-
-    #[ORM\PreUpdate]
-    public function onPreUpdate(): void
-    {
-        $this->updatedAt = new \DateTimeImmutable();
     }
 
     public function getId(): ?int { return $this->id; }
@@ -56,9 +43,6 @@ class Host
 
     public function getLocation(): ?string { return $this->location; }
     public function setLocation(?string $location): static { $this->location = $location; return $this; }
-
-    public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
-    public function getUpdatedAt(): \DateTimeImmutable { return $this->updatedAt; }
 
     public function getInterfaces(): Collection { return $this->interfaces; }
 

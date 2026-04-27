@@ -51,6 +51,7 @@
                         <th>Subnet</th>
                         <th>IPv4</th>
                         <th>IPv6</th>
+                        <th>Last Modified</th>
                         <th class="text-end">Actions</th>
                     </tr>
                 </thead>
@@ -72,6 +73,10 @@
                             <td>{{ iface.subnet ? iface.subnet.name : '—' }}</td>
                             <td class="ip-address">{{ iface.ipAddress ? iface.ipAddress.address : '—' }}</td>
                             <td class="ip-address small">{{ iface.ipv6Address ? iface.ipv6Address.address : '—' }}</td>
+                            <td class="text-muted small">
+                                {{ iface.updatedAt|date('Y-m-d H:i') }}
+                                {% if iface.updatedBy %}<br>{{ iface.updatedBy }}{% endif %}
+                            </td>
                             <td class="text-end">
                                 <a href="{{ path('interface_edit', {id: iface.id}) }}" class="btn btn-sm btn-outline-secondary me-1">
                                     <i class="bi bi-pencil"></i>
@@ -93,6 +98,7 @@
 </div>
 
 <div class="text-muted small">
-    Created {{ host.createdAt|date('Y-m-d H:i') }} &middot; Updated {{ host.updatedAt|date('Y-m-d H:i') }}
+    Created {{ host.createdAt|date('Y-m-d H:i') }}{% if host.createdBy %} by {{ host.createdBy }}{% endif %}
+    &middot; Updated {{ host.updatedAt|date('Y-m-d H:i') }}{% if host.updatedBy %} by {{ host.updatedBy }}{% endif %}
 </div>
 {% endblock %}
