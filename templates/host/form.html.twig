@@ -13,32 +13,208 @@
 </nav>
 
 <div class="row justify-content-center">
-    <div class="col-md-6">
+    <div class="{{ embed_interface ? 'col-lg-8' : 'col-md-6' }}">
         <div class="card">
             <div class="card-header"><h5 class="mb-0">{{ title }}</h5></div>
             <div class="card-body">
                 {{ form_start(form) }}
-                    <div class="mb-3">
-                        {{ form_label(form.name, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
-                        {{ form_widget(form.name, {attr: {class: 'form-control' ~ (form.name.vars.errors|length ? ' is-invalid' : '')}}) }}
-                        {{ form_errors(form.name) }}
+
+                {# Host fields #}
+                <div class="mb-3">
+                    {{ form_label(form.name, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                    {{ form_widget(form.name, {attr: {class: 'form-control' ~ (form.name.vars.errors|length ? ' is-invalid' : '')}}) }}
+                    {{ form_errors(form.name) }}
+                </div>
+                <div class="mb-4">
+                    {{ form_label(form.location, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                    {{ form_widget(form.location, {attr: {class: 'form-control' ~ (form.location.vars.errors|length ? ' is-invalid' : '')}}) }}
+                    {{ form_errors(form.location) }}
+                </div>
+
+                {% if embed_interface %}
+                <hr class="my-4">
+                <h6 class="fw-semibold mb-3"><i class="bi bi-hdd-network me-1"></i>Initial Interface</h6>
+
+                {# MAC Address #}
+                <div class="mb-3">
+                    {{ form_label(form.interface.macAddress, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                    {{ form_widget(form.interface.macAddress, {attr: {class: 'form-control font-monospace' ~ (form.interface.macAddress.vars.errors|length ? ' is-invalid' : '')}}) }}
+                    {{ form_errors(form.interface.macAddress) }}
+                </div>
+
+                {# Subnet #}
+                <div class="mb-4">
+                    {{ form_label(form.interface.subnet, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                    {{ form_widget(form.interface.subnet, {attr: {class: 'form-select'}}) }}
+                </div>
+
+                {# IPv4 Assignment #}
+                <div class="card mb-3">
+                    <div class="card-header fw-semibold">
+                        <i class="bi bi-4-square me-1"></i>IPv4 Assignment
                     </div>
-                    <div class="mb-4">
-                        {{ form_label(form.location, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
-                        {{ form_widget(form.location, {attr: {class: 'form-control' ~ (form.location.vars.errors|length ? ' is-invalid' : '')}}) }}
-                        {{ form_errors(form.location) }}
+                    <div class="card-body">
+                        <div class="mb-2">
+                            {% for child in form.interface.ipv4Assignment %}
+                                <div class="form-check">
+                                    {{ form_widget(child, {attr: {class: 'form-check-input', id: 'ipv4_' ~ loop.index}}) }}
+                                    {{ form_label(child, null, {label_attr: {class: 'form-check-label', for: 'ipv4_' ~ loop.index}}) }}
+                                </div>
+                            {% endfor %}
+                        </div>
+                        <div id="ipv4-input-section" class="mt-2" style="display:none">
+                            {{ form_label(form.interface.ipv4AddressInput, null, {label_attr: {class: 'form-label small'}}) }}
+                            {{ form_widget(form.interface.ipv4AddressInput, {attr: {class: 'form-control font-monospace'}}) }}
+                            <datalist id="available-ipv4-list"></datalist>
+                        </div>
                     </div>
-                    <div class="d-flex gap-2">
-                        <button type="submit" class="btn btn-primary">
-                            <i class="bi bi-check-lg me-1"></i>Save
+                </div>
+
+                {# IPv6 Assignment #}
+                <div class="card mb-3">
+                    <div class="card-header fw-semibold">
+                        <i class="bi bi-6-square me-1"></i>IPv6 Assignment
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-2">
+                            {% for child in form.interface.ipv6Assignment %}
+                                <div class="form-check">
+                                    {{ form_widget(child, {attr: {class: 'form-check-input', id: 'ipv6_' ~ loop.index}}) }}
+                                    {{ form_label(child, null, {label_attr: {class: 'form-check-label', for: 'ipv6_' ~ loop.index}}) }}
+                                </div>
+                            {% endfor %}
+                        </div>
+                        <div id="ipv6-input-section" class="mt-2" style="display:none">
+                            {{ form_label(form.interface.ipv6AddressInput, null, {label_attr: {class: 'form-label small'}}) }}
+                            {{ form_widget(form.interface.ipv6AddressInput, {attr: {class: 'form-control font-monospace'}}) }}
+                            <datalist id="available-ipv6-list"></datalist>
+                        </div>
+                    </div>
+                </div>
+
+                {# DNS Names #}
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center fw-semibold">
+                        <span><i class="bi bi-globe me-1"></i>DNS Names</span>
+                        <button type="button" class="btn btn-sm btn-outline-primary" id="add-name-btn">
+                            <i class="bi bi-plus-lg me-1"></i>Add Name
                         </button>
-                        <a href="{{ host.id ? path('host_show', {id: host.id}) : path('host_index') }}" class="btn btn-outline-secondary">
-                            Cancel
-                        </a>
                     </div>
+                    <div class="card-body" id="names-collection"
+                         data-prototype="{{ form_widget(form.interface.names.vars.prototype)|e('html_attr') }}">
+                        {% for nameForm in form.interface.names %}
+                            <div class="name-entry border rounded p-3 mb-2">
+                                <div class="row g-2">
+                                    <div class="col-md-5">
+                                        {{ form_label(nameForm.name, null, {label_attr: {class: 'form-label small fw-semibold'}}) }}
+                                        {{ form_widget(nameForm.name, {attr: {class: 'form-control form-control-sm font-monospace'}}) }}
+                                        {{ form_errors(nameForm.name) }}
+                                    </div>
+                                    <div class="col-md-5">
+                                        {{ form_label(nameForm.domain, null, {label_attr: {class: 'form-label small fw-semibold'}}) }}
+                                        {{ form_widget(nameForm.domain, {attr: {class: 'form-select form-select-sm'}}) }}
+                                        {{ form_errors(nameForm.domain) }}
+                                    </div>
+                                    <div class="col-md-2 d-flex align-items-end">
+                                        <button type="button" class="btn btn-sm btn-outline-danger remove-name-btn w-100">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        {% else %}
+                            <p class="text-muted small mb-0" id="no-names-msg">No DNS names added yet.</p>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg me-1"></i>Save
+                    </button>
+                    <a href="{{ host.id ? path('host_show', {id: host.id}) : path('host_index') }}" class="btn btn-outline-secondary">
+                        Cancel
+                    </a>
+                </div>
+
                 {{ form_end(form) }}
             </div>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+{% if embed_interface %}
+<script>
+(function () {
+    // IP assignment radio toggles
+    function bindIpRadios(prefix, sectionId) {
+        const radios = document.querySelectorAll('input[name$="[' + prefix + 'Assignment]"]');
+        const section = document.getElementById(sectionId);
+        function update() {
+            const val = document.querySelector('input[name$="[' + prefix + 'Assignment]"]:checked')?.value;
+            section.style.display = val === 'select' ? '' : 'none';
+        }
+        radios.forEach(r => r.addEventListener('change', update));
+        update();
+    }
+    bindIpRadios('ipv4', 'ipv4-input-section');
+    bindIpRadios('ipv6', 'ipv6-input-section');
+
+    // Load available IPs when subnet changes
+    const subnetSelect = document.getElementById('interface_subnet');
+    function loadAvailableIps(subnetId) {
+        if (!subnetId) return;
+        fetch('/api/subnets/' + subnetId + '/available-ips')
+            .then(r => r.json())
+            .then(ips => {
+                document.getElementById('available-ipv4-list').innerHTML =
+                    ips.map(ip => '<option value="' + ip + '">').join('');
+            });
+        fetch('/api/subnets/' + subnetId + '/available-ipv6')
+            .then(r => r.json())
+            .then(ips => {
+                document.getElementById('available-ipv6-list').innerHTML =
+                    ips.map(ip => '<option value="' + ip + '">').join('');
+            });
+    }
+    if (subnetSelect) {
+        subnetSelect.addEventListener('change', () => loadAvailableIps(subnetSelect.value));
+        if (subnetSelect.value) loadAvailableIps(subnetSelect.value);
+    }
+
+    // DNS name collection: add / remove entries
+    const collection = document.getElementById('names-collection');
+    const addBtn = document.getElementById('add-name-btn');
+    let index = collection.querySelectorAll('.name-entry').length;
+
+    addBtn.addEventListener('click', function () {
+        document.getElementById('no-names-msg')?.remove();
+        const prototype = collection.dataset.prototype;
+        const html = prototype.replace(/__name__/g, index++);
+        const div = document.createElement('div');
+        div.innerHTML = html;
+        const entry = div.firstElementChild;
+        entry.classList.add('name-entry', 'border', 'rounded', 'p-3', 'mb-2');
+
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'btn btn-sm btn-outline-danger mt-2';
+        removeBtn.innerHTML = '<i class="bi bi-trash me-1"></i>Remove';
+        removeBtn.addEventListener('click', () => entry.remove());
+        entry.appendChild(removeBtn);
+
+        collection.appendChild(entry);
+    });
+
+    collection.addEventListener('click', function (e) {
+        if (e.target.closest('.remove-name-btn')) {
+            e.target.closest('.name-entry').remove();
+        }
+    });
+})();
+</script>
+{% endif %}
 {% endblock %}
