@@ -28,6 +28,7 @@
                         <th>VLAN</th>
                         <th>Gateway</th>
                         <th>Assigned IPs</th>
+                        <th>Last Modified</th>
                         <th class="text-end">Actions</th>
                     </tr>
                 </thead>
@@ -46,6 +47,10 @@
                             <td>
                                 <span class="badge bg-info text-dark">{{ subnet.ipAddresses|length }} v4</span>
                                 <span class="badge bg-warning text-dark ms-1">{{ subnet.ipv6Addresses|length }} v6</span>
+                            </td>
+                            <td class="text-muted small">
+                                {{ subnet.updatedAt|date('Y-m-d H:i') }}
+                                {% if subnet.updatedBy %}<br>{{ subnet.updatedBy }}{% endif %}
                             </td>
                             <td class="text-end">
                                 <a href="{{ path('subnet_edit', {id: subnet.id}) }}" class="btn btn-sm btn-outline-secondary me-1">

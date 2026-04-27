@@ -26,6 +26,7 @@
                         <th>Location</th>
                         <th>Interfaces</th>
                         <th>Added</th>
+                        <th>Last Modified</th>
                         <th class="text-end">Actions</th>
                     </tr>
                 </thead>
@@ -41,7 +42,14 @@
                             <td>
                                 <span class="badge bg-secondary rounded-pill">{{ host.interfaces|length }}</span>
                             </td>
-                            <td class="text-muted small">{{ host.createdAt|date('Y-m-d') }}</td>
+                            <td class="text-muted small">
+                                {{ host.createdAt|date('Y-m-d') }}
+                                {% if host.createdBy %}<br><span class="text-muted">{{ host.createdBy }}</span>{% endif %}
+                            </td>
+                            <td class="text-muted small">
+                                {{ host.updatedAt|date('Y-m-d H:i') }}
+                                {% if host.updatedBy %}<br><span class="text-muted">{{ host.updatedBy }}</span>{% endif %}
+                            </td>
                             <td class="text-end">
                                 <a href="{{ path('host_edit', {id: host.id}) }}" class="btn btn-sm btn-outline-secondary me-1">
                                     <i class="bi bi-pencil"></i>
