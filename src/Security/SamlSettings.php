@@ -15,11 +15,17 @@ class SamlSettings
         string $idpEntityId,
         string $idpSsoUrl,
         string $idpCert,
-        bool $debug,
     ) {
+        $parsed  = parse_url($spAcsUrl);
+        $baseUrl = $parsed['scheme'] . '://' . $parsed['host'];
+        if (isset($parsed['port'])) {
+            $baseUrl .= ':' . $parsed['port'];
+        }
+
         $this->settings = [
-            'strict' => true,
-            'debug'  => $debug,
+            'strict'   => true,
+            'debug'    => false,
+            'baseurl'  => $baseUrl,
             'sp' => [
                 'entityId' => $spEntityId,
                 'assertionConsumerService' => [

@@ -32,4 +32,3 @@ services:
             $idpEntityId:  '%env(SAML_IDP_ENTITY_ID)%'
             $idpSsoUrl:    '%env(SAML_IDP_SSO_URL)%'
             $idpCert:      '%env(SAML_IDP_CERT)%'
-            $debug:        '%kernel.debug%'
