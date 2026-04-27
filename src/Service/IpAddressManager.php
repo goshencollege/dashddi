@@ -183,6 +183,78 @@ class IpAddressManager
         return false;
     }
 
+    /**
+     * Validates a manually-specified IPv4 address. Returns an error string or null.
+     * Passes if the address belongs to $currentInterface (edit keeping same IP).
+     */
+    public function validateSpecifiedIpv4(string $ip, Subnet $subnet, ?NetworkInterface $currentInterface = null): ?string
+    {
+        $parsed = Factory::parseAddressString($ip);
+        if (!$parsed || $parsed->getAddressType() !== 4) {
+            return sprintf('"%s" is not a valid IPv4 address.', $ip);
+        }
+
+        $normalized    = $parsed->toString();
+        $fixedBlocks   = array_filter(
+            $this->blockRepo->findFixedBySubnet($subnet->getId()),
+            fn($b) => !str_contains($b->getStartIp(), ':')
+        );
+
+        if (!empty($fixedBlocks)) {
+            if (!$this->isInBlocks($normalized, $fixedBlocks)) {
+                return sprintf('"%s" does not fall within any Fixed block in this subnet.', $normalized);
+            }
+        } else {
+            $range = Factory::parseRangeString($subnet->getIpv4Cidr() ?? '');
+            if (!$range || !$range->contains($parsed)) {
+                return sprintf('"%s" is not within the subnet CIDR %s.', $normalized, $subnet->getIpv4Cidr());
+            }
+        }
+
+        $existing = $this->ipRepo->findOneBy(['address' => $normalized]);
+        if ($existing && $existing->getId() !== $currentInterface?->getIpAddress()?->getId()) {
+            return sprintf('"%s" is already assigned to another interface.', $normalized);
+        }
+
+        return null;
+    }
+
+    /**
+     * Validates a manually-specified IPv6 address. Returns an error string or null.
+     * Passes if the address belongs to $currentInterface (edit keeping same IP).
+     */
+    public function validateSpecifiedIpv6(string $ip, Subnet $subnet, ?NetworkInterface $currentInterface = null): ?string
+    {
+        $parsed = Factory::parseAddressString($ip);
+        if (!$parsed || $parsed->getAddressType() !== 6) {
+            return sprintf('"%s" is not a valid IPv6 address.', $ip);
+        }
+
+        $normalized  = $parsed->toString();
+        $fixedBlocks = array_filter(
+            $this->blockRepo->findFixedBySubnet($subnet->getId()),
+            fn($b) => str_contains($b->getStartIp(), ':')
+        );
+
+        if (!empty($fixedBlocks)) {
+            if (!$this->isInBlocks($normalized, $fixedBlocks)) {
+                return sprintf('"%s" does not fall within any Fixed block in this subnet.', $normalized);
+            }
+        } else {
+            $range = Factory::parseRangeString($subnet->getIpv6Cidr() ?? '');
+            if (!$range || !$range->contains($parsed)) {
+                return sprintf('"%s" is not within the subnet CIDR %s.', $normalized, $subnet->getIpv6Cidr());
+            }
+        }
+
+        $existing = $this->ipv6Repo->findOneBy(['address' => $normalized]);
+        if ($existing && $existing->getId() !== $currentInterface?->getIpv6Address()?->getId()) {
+            return sprintf('"%s" is already assigned to another interface.', $normalized);
+        }
+
+        return null;
+    }
+
     public function assignIpv4(NetworkInterface $interface, string $address): IpAddress
     {
         $ip = new IpAddress();
