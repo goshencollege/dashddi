@@ -19,12 +19,12 @@ class NetworkInterfaceType extends AbstractType
         $isEdit = $options['is_edit'];
 
         $ipv4Choices = $isEdit
-            ? ['Keep current assignment' => 'keep', 'Remove IPv4 address' => 'none', 'Select available IP' => 'select', 'Auto-assign next available' => 'auto']
-            : ['No IPv4 address' => 'none', 'Select available IP' => 'select', 'Auto-assign next available' => 'auto'];
+            ? ['Keep current assignment' => 'keep', 'Remove IPv4 address' => 'none', 'Specify IP' => 'select', 'Auto-assign next available' => 'auto']
+            : ['No IPv4 address' => 'none', 'Specify IP' => 'select', 'Auto-assign next available' => 'auto'];
 
         $ipv6Choices = $isEdit
-            ? ['Keep current assignment' => 'keep', 'Remove IPv6 address' => 'none', 'Select available IP' => 'select', 'Auto-assign (EUI-64 from MAC)' => 'auto']
-            : ['No IPv6 address' => 'none', 'Select available IP' => 'select', 'Auto-assign (EUI-64 from MAC)' => 'auto'];
+            ? ['Keep current assignment' => 'keep', 'Remove IPv6 address' => 'none', 'Specify IP' => 'select', 'Auto-assign (EUI-64 from MAC)' => 'auto']
+            : ['No IPv6 address' => 'none', 'Specify IP' => 'select', 'Auto-assign (EUI-64 from MAC)' => 'auto'];
 
         $builder
             ->add('macAddress', TextType::class, [
