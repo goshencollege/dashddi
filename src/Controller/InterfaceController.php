@@ -32,11 +32,18 @@ class InterfaceController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            $this->handleIpAssignment($form, $interface);
-            $em->persist($interface);
-            $em->flush();
-            $this->addFlash('success', 'Interface added.');
-            return $this->redirectToRoute('host_show', ['id' => $host->getId()]);
+            $errors = $this->validateIpInputs($form, $interface->getSubnet(), null);
+            if ($errors) {
+                foreach ($errors as $error) {
+                    $this->addFlash('danger', $error);
+                }
+            } else {
+                $this->handleIpAssignment($form, $interface);
+                $em->persist($interface);
+                $em->flush();
+                $this->addFlash('success', 'Interface added.');
+                return $this->redirectToRoute('host_show', ['id' => $host->getId()]);
+            }
         }
 
         return $this->render('interface/form.html.twig', [
@@ -60,10 +67,17 @@ class InterfaceController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            $this->handleIpAssignment($form, $interface, isEdit: true);
-            $em->flush();
-            $this->addFlash('success', 'Interface updated.');
-            return $this->redirectToRoute('interface_show', ['id' => $interface->getId()]);
+            $errors = $this->validateIpInputs($form, $interface->getSubnet(), $interface);
+            if ($errors) {
+                foreach ($errors as $error) {
+                    $this->addFlash('danger', $error);
+                }
+            } else {
+                $this->handleIpAssignment($form, $interface, isEdit: true);
+                $em->flush();
+                $this->addFlash('success', 'Interface updated.');
+                return $this->redirectToRoute('interface_show', ['id' => $interface->getId()]);
+            }
         }
 
         return $this->render('interface/form.html.twig', [
@@ -150,6 +164,33 @@ class InterfaceController extends AbstractController
     public function availableIpv6(\App\Entity\Subnet $subnet): JsonResponse
     {
         return $this->json($this->ipManager->getAvailableIpv6($subnet, 50));
+    }
+
+    private function validateIpInputs(\Symfony\Component\Form\FormInterface $form, ?\App\Entity\Subnet $subnet, ?NetworkInterface $current): array
+    {
+        $errors = [];
+
+        if ($form->get('ipv4Assignment')->getData() === 'select' && $subnet) {
+            $ip = trim((string) $form->get('ipv4AddressInput')->getData());
+            if ($ip !== '') {
+                $err = $this->ipManager->validateSpecifiedIpv4($ip, $subnet, $current);
+                if ($err) {
+                    $errors[] = $err;
+                }
+            }
+        }
+
+        if ($form->get('ipv6Assignment')->getData() === 'select' && $subnet) {
+            $ip = trim((string) $form->get('ipv6AddressInput')->getData());
+            if ($ip !== '') {
+                $err = $this->ipManager->validateSpecifiedIpv6($ip, $subnet, $current);
+                if ($err) {
+                    $errors[] = $err;
+                }
+            }
+        }
+
+        return $errors;
     }
 
     private function handleIpAssignment(\Symfony\Component\Form\FormInterface $form, NetworkInterface $interface, bool $isEdit = false): void
