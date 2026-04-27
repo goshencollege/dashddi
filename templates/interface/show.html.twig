@@ -81,9 +81,7 @@
                     {% for name in interface.names %}
                         <div class="list-group-item d-flex justify-content-between align-items-center">
                             <div>
-                                <strong>{{ name.name }}</strong>
-                                <span class="text-muted">.</span>
-                                <span class="text-muted">{{ name.dnsDomain }}</span>
+                                <strong>{{ name.fullyQualifiedName }}</strong>
                             </div>
                             <div>
                                 <a href="{{ path('interface_name_edit', {interfaceId: interface.id, id: name.id}) }}"
