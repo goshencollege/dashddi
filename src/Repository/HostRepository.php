@@ -19,9 +19,8 @@ class HostRepository extends ServiceEntityRepository
     /** @return Host[] */
     public function search(string $query): array
     {
-        $q = '%' . $query . '%';
-
-        return $this->createQueryBuilder('h')
+        $q  = '%' . $query . '%';
+        $qb = $this->createQueryBuilder('h')
             ->leftJoin('h.interfaces', 'i')
             ->leftJoin('i.subnet', 's')
             ->leftJoin('i.ipAddress', 'ip4')
@@ -32,7 +31,17 @@ class HostRepository extends ServiceEntityRepository
             ->orWhere('ip4.address LIKE :q')
             ->orWhere('ip6.address LIKE :q')
             ->orWhere('i.macAddress LIKE :q')
-            ->setParameter('q', $q)
+            ->setParameter('q', $q);
+
+        // If the query is (or contains) a MAC in any delimiter/case style,
+        // also match the normalized colon-separated form stored in the DB.
+        $hex = preg_replace('/[^0-9a-fA-F]/', '', $query);
+        if (strlen($hex) === 12) {
+            $normalized = implode(':', str_split(strtolower($hex), 2));
+            $qb->orWhere('i.macAddress = :mac')->setParameter('mac', $normalized);
+        }
+
+        return $qb
             ->distinct()
             ->orderBy('h.name', 'ASC')
             ->getQuery()

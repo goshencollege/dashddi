@@ -29,7 +29,7 @@ class NetworkInterfaceType extends AbstractType
         $builder
             ->add('macAddress', TextType::class, [
                 'label' => 'MAC Address',
-                'attr' => ['placeholder' => 'aa:bb:cc:dd:ee:ff'],
+                'attr' => ['placeholder' => 'e.g. aabbccddeeff  or  aa:bb:cc:dd:ee:ff  or  AA-BB-CC-DD-EE-FF'],
             ])
             ->add('subnet', EntityType::class, [
                 'class' => Subnet::class,

@@ -56,7 +56,14 @@ class NetworkInterface
     public function getId(): ?int { return $this->id; }
 
     public function getMacAddress(): string { return $this->macAddress; }
-    public function setMacAddress(string $macAddress): static { $this->macAddress = strtolower($macAddress); return $this; }
+    public function setMacAddress(string $macAddress): static
+    {
+        $hex = preg_replace('/[^0-9a-fA-F]/', '', $macAddress);
+        $this->macAddress = strlen($hex) === 12
+            ? implode(':', str_split(strtolower($hex), 2))
+            : strtolower($macAddress);
+        return $this;
+    }
 
     public function getHost(): ?Host { return $this->host; }
     public function setHost(?Host $host): static { $this->host = $host; return $this; }
