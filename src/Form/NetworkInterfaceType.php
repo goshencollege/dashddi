@@ -33,7 +33,7 @@ class NetworkInterfaceType extends AbstractType
             ])
             ->add('subnet', EntityType::class, [
                 'class' => Subnet::class,
-                'choice_label' => '__toString',
+                'choice_label' => fn($subnet) => (string) $subnet,
                 'placeholder' => '-- Select a subnet --',
                 'required' => false,
                 'attr' => ['id' => 'interface_subnet'],
