@@ -1,0 +1,42 @@
+services:
+  app:
+    build: .
+    volumes:
+      - .:/var/www/html
+    environment:
+      APP_ENV: dev
+      APP_SECRET: changeme_in_production_32chars_min
+      DATABASE_URL: "mysql://ipam:ipam_password@db:3306/ipam?serverVersion=8.0&charset=utf8mb4"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - .:/var/www/html
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - app
+
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_DATABASE: ipam
+      MYSQL_USER: ipam
+      MYSQL_PASSWORD: ipam_password
+      MYSQL_ROOT_PASSWORD: root_password
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "ipam", "-pipam_password"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "3306:3306"
+
+volumes:
+  mysql_data:
