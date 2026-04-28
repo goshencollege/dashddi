@@ -44,7 +44,7 @@
     {% else %}
         <div class="table-responsive">
             <table class="table table-hover mb-0">
-                <thead class="table-light">
+                <thead class="">
                     <tr>
                         <th>MAC Address</th>
                         <th>DNS Names</th>
@@ -65,7 +65,7 @@
                             </td>
                             <td>
                                 {% for name in iface.names %}
-                                    <span class="badge bg-light text-dark border me-1">{{ name.fullyQualifiedName }}</span>
+                                    <span class="badge text-bg-secondary me-1">{{ name.fullyQualifiedName }}</span>
                                 {% else %}
                                     <span class="text-muted">—</span>
                                 {% endfor %}
