@@ -47,6 +47,11 @@
                             {{ form_errors(form.vlan) }}
                         </div>
                     </div>
+                    <div class="mb-3">
+                        {{ form_label(form.vrf, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                        {{ form_widget(form.vrf, {attr: {class: 'form-select' ~ (form.vrf.vars.errors|length ? ' is-invalid' : '')}}) }}
+                        {{ form_errors(form.vrf) }}
+                    </div>
                     <div class="mb-4">
                         {{ form_label(form.description, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
                         {{ form_widget(form.description, {attr: {class: 'form-control'}}) }}
