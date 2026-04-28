@@ -2,6 +2,11 @@
 .idea/
 .vscode/
 
+# TLS certificates — generate with: make cert
+/docker/ssl/*.pem
+/docker/ssl/*.crt
+/docker/ssl/*.key
+
 ###> symfony/framework-bundle ###
 /.env.local
 /.env.local.php
