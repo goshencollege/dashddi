@@ -43,6 +43,7 @@ class NetworkInterfaceType extends AbstractType
                 'label' => 'IPv4 Assignment',
                 'choices' => $ipv4Choices,
                 'expanded' => true,
+                'placeholder' => false,
                 'data' => $isEdit ? 'keep' : 'none',
                 'required' => false,
             ])
@@ -62,6 +63,7 @@ class NetworkInterfaceType extends AbstractType
                 'label' => 'IPv6 Assignment',
                 'choices' => $ipv6Choices,
                 'expanded' => true,
+                'placeholder' => false,
                 'data' => $isEdit ? 'keep' : 'none',
                 'required' => false,
             ])
