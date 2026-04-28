@@ -102,10 +102,18 @@ document.getElementById('push-btn')?.addEventListener('click', function () {
                 if (!ok) anyFail = true;
 
                 let reloadBadge = '';
+                let reloadDetail = '';
                 if (info.reload !== null) {
-                    const rOk   = info.reload.success;
-                    const rIcon = rOk ? 'bi-arrow-clockwise text-success' : 'bi-arrow-clockwise text-danger';
-                    reloadBadge = ` <span class="badge ${rOk ? 'bg-success' : 'bg-danger'} ms-1" title="${info.reload.response}">reload ${rOk ? 'ok' : 'failed'}</span>`;
+                    const r = info.reload;
+                    reloadBadge = `<span class="badge ${r.success ? 'bg-success' : 'bg-danger'} ms-1">${r.stage ?? 'reload'} ${r.success ? 'ok' : 'failed'}</span>`;
+                    if (!r.success) {
+                        reloadDetail += `<div class="text-danger small font-monospace mt-1">${r.response}</div>`;
+                        if (r.restored) {
+                            reloadDetail += `<div class="text-warning small mt-1"><i class="bi bi-arrow-counterclockwise me-1"></i>Previous config restored.</div>`;
+                        } else if (r.restore_error) {
+                            reloadDetail += `<div class="text-danger small mt-1"><i class="bi bi-exclamation-triangle me-1"></i>Restore failed: ${r.restore_error}</div>`;
+                        }
+                    }
                 }
 
                 html += `<li class="list-group-item d-flex align-items-start gap-2">
@@ -116,7 +124,7 @@ document.getElementById('push-btn')?.addEventListener('click', function () {
                         <span class="text-muted ms-1 font-monospace small">${info.file}</span>
                         ${reloadBadge}
                         ${info.output ? `<div class="text-danger small font-monospace mt-1">${info.output}</div>` : ''}
-                        ${info.reload && !info.reload.success ? `<div class="text-danger small font-monospace mt-1">Reload: ${info.reload.response}</div>` : ''}
+                        ${reloadDetail}
                     </div>
                 </li>`;
             }
