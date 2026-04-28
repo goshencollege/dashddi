@@ -4,7 +4,9 @@ namespace App\Form;
 
 use App\Entity\AddressBlock;
 use App\Entity\Subnet;
+use App\Entity\Vrf;
 use App\Enum\BlockType;
+use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\IntegerType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
@@ -42,6 +44,13 @@ class SubnetType extends AbstractType
             ->add('description', TextareaType::class, [
                 'required' => false,
                 'attr' => ['rows' => 3],
+            ])
+            ->add('vrf', EntityType::class, [
+                'class'        => Vrf::class,
+                'choice_label' => 'name',
+                'placeholder'  => '-- None --',
+                'required'     => false,
+                'label'        => 'VRF',
             ]);
 
         if ($options['embed_blocks']) {

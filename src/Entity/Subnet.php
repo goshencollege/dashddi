@@ -49,6 +49,10 @@ class Subnet
     #[ORM\Column(length: 50, nullable: true)]
     private ?string $gateway = null;
 
+    #[ORM\ManyToOne(targetEntity: Vrf::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?Vrf $vrf = null;
+
     #[ORM\OneToMany(targetEntity: IpAddress::class, mappedBy: 'subnet', cascade: ['persist', 'remove'], orphanRemoval: true)]
     private Collection $ipAddresses;
 
@@ -89,6 +93,9 @@ class Subnet
 
     public function getGateway(): ?string { return $this->gateway; }
     public function setGateway(?string $gateway): static { $this->gateway = $gateway; return $this; }
+
+    public function getVrf(): ?Vrf { return $this->vrf; }
+    public function setVrf(?Vrf $vrf): static { $this->vrf = $vrf; return $this; }
 
     public function getIpAddresses(): Collection { return $this->ipAddresses; }
     public function getIpv6Addresses(): Collection { return $this->ipv6Addresses; }

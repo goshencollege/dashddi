@@ -23,6 +23,7 @@
                 <thead class="">
                     <tr>
                         <th>Name</th>
+                        <th>VRF</th>
                         <th>IPv4 CIDR</th>
                         <th>IPv6 CIDR</th>
                         <th>VLAN</th>
@@ -40,6 +41,7 @@
                                     {{ subnet.name }}
                                 </a>
                             </td>
+                            <td>{{ subnet.vrf ? subnet.vrf.name : '—' }}</td>
                             <td class="ip-address">{{ subnet.ipv4Cidr ?: '—' }}</td>
                             <td class="ip-address small">{{ subnet.ipv6Cidr ?: '—' }}</td>
                             <td>{{ subnet.vlan ?: '—' }}</td>
@@ -59,6 +61,57 @@
                                 <form method="post" action="{{ path('subnet_delete', {id: subnet.id}) }}" class="d-inline"
                                       onsubmit="return confirm('Delete subnet {{ subnet.name|e('js') }}?')">
                                     <input type="hidden" name="_token" value="{{ csrf_token('delete_subnet_' ~ subnet.id) }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endif %}
+
+<div class="d-flex justify-content-between align-items-center mt-5 mb-3">
+    <h2 class="h5 mb-0"><i class="bi bi-signpost-split me-2"></i>VRFs</h2>
+    <a href="{{ path('vrf_new') }}" class="btn btn-sm btn-primary">
+        <i class="bi bi-plus-lg me-1"></i>Add VRF
+    </a>
+</div>
+
+{% if vrfs is empty %}
+    <div class="card">
+        <div class="card-body text-center text-muted py-4">
+            No VRFs defined yet. <a href="{{ path('vrf_new') }}">Add the first one →</a>
+        </div>
+    </div>
+{% else %}
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Route Distinguisher</th>
+                        <th>Description</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for vrf in vrfs %}
+                        <tr>
+                            <td class="fw-semibold">{{ vrf.name }}</td>
+                            <td class="font-monospace">{{ vrf.routeDistinguisher ?: '—' }}</td>
+                            <td class="text-muted">{{ vrf.description ?: '—' }}</td>
+                            <td class="text-end">
+                                <a href="{{ path('vrf_edit', {id: vrf.id}) }}" class="btn btn-sm btn-outline-secondary me-1">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <form method="post" action="{{ path('vrf_delete', {id: vrf.id}) }}" class="d-inline"
+                                      onsubmit="return confirm('Delete VRF {{ vrf.name|e('js') }}?')">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('delete_vrf_' ~ vrf.id) }}">
                                     <button type="submit" class="btn btn-sm btn-outline-danger">
                                         <i class="bi bi-trash"></i>
                                     </button>

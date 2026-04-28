@@ -7,6 +7,7 @@ use App\Entity\Subnet;
 use App\Enum\BlockType;
 use App\Form\SubnetType;
 use App\Repository\SubnetRepository;
+use App\Repository\VrfRepository;
 use App\Service\IpAddressManager;
 use IPLib\Factory;
 use Doctrine\ORM\EntityManagerInterface;
@@ -19,10 +20,11 @@ use Symfony\Component\Routing\Attribute\Route;
 class SubnetController extends AbstractController
 {
     #[Route('', name: 'subnet_index', methods: ['GET'])]
-    public function index(SubnetRepository $repo): Response
+    public function index(SubnetRepository $repo, VrfRepository $vrfRepo): Response
     {
         return $this->render('subnet/index.html.twig', [
             'subnets' => $repo->findBy([], ['name' => 'ASC']),
+            'vrfs'    => $vrfRepo->findBy([], ['name' => 'ASC']),
         ]);
     }
 
