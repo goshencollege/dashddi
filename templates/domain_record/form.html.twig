@@ -39,6 +39,23 @@
                     {{ form_widget(form.ttl, {attr: {class: 'form-control'}}) }}
                     {{ form_errors(form.ttl) }}
                 </div>
+                {% if form.views is defined %}
+                <div class="mb-4">
+                    {{ form_label(form.views, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                    {% if form.views|length > 0 %}
+                        <div class="d-flex flex-wrap gap-3">
+                            {% for viewWidget in form.views %}
+                                <div class="form-check">
+                                    {{ form_widget(viewWidget, {attr: {class: 'form-check-input'}}) }}
+                                    {{ form_label(viewWidget, null, {label_attr: {class: 'form-check-label'}}) }}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-muted small mb-0">No views configured for this domain.</p>
+                    {% endif %}
+                </div>
+                {% endif %}
                 <div class="d-flex justify-content-between">
                     <a href="{{ path('domain_show', {id: domain.id}) }}" class="btn btn-outline-secondary">Cancel</a>
                     <button type="submit" class="btn btn-primary">

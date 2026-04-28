@@ -3,6 +3,8 @@
 namespace App\Entity;
 
 use App\Repository\InterfaceNameRepository;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Validator\Constraints as Assert;
 
@@ -32,6 +34,15 @@ class InterfaceName
     #[ORM\JoinColumn(nullable: false)]
     private ?NetworkInterface $networkInterface = null;
 
+    #[ORM\ManyToMany(targetEntity: DnsView::class)]
+    #[ORM\JoinTable(name: 'interface_name_dns_view')]
+    private Collection $views;
+
+    public function __construct()
+    {
+        $this->views = new ArrayCollection();
+    }
+
     public function getId(): ?int { return $this->id; }
 
     public function getName(): string { return $this->name; }
@@ -42,6 +53,22 @@ class InterfaceName
 
     public function getNetworkInterface(): ?NetworkInterface { return $this->networkInterface; }
     public function setNetworkInterface(?NetworkInterface $networkInterface): static { $this->networkInterface = $networkInterface; return $this; }
+
+    public function getViews(): Collection { return $this->views; }
+
+    public function addView(DnsView $view): static
+    {
+        if (!$this->views->contains($view)) {
+            $this->views->add($view);
+        }
+        return $this;
+    }
+
+    public function removeView(DnsView $view): static
+    {
+        $this->views->removeElement($view);
+        return $this;
+    }
 
     public function getFullyQualifiedName(): string
     {

@@ -41,10 +41,15 @@ class Domain
     #[ORM\OneToMany(targetEntity: InterfaceName::class, mappedBy: 'domain')]
     private Collection $interfaceNames;
 
+    #[ORM\ManyToMany(targetEntity: DnsView::class)]
+    #[ORM\JoinTable(name: 'domain_dns_view')]
+    private Collection $views;
+
     public function __construct()
     {
         $this->records        = new ArrayCollection();
         $this->interfaceNames = new ArrayCollection();
+        $this->views          = new ArrayCollection();
     }
 
     public function getId(): ?int { return $this->id; }
@@ -57,6 +62,22 @@ class Domain
 
     public function getRecords(): Collection { return $this->records; }
     public function getInterfaceNames(): Collection { return $this->interfaceNames; }
+
+    public function getViews(): Collection { return $this->views; }
+
+    public function addView(DnsView $view): static
+    {
+        if (!$this->views->contains($view)) {
+            $this->views->add($view);
+        }
+        return $this;
+    }
+
+    public function removeView(DnsView $view): static
+    {
+        $this->views->removeElement($view);
+        return $this;
+    }
 
     public function __toString(): string { return $this->name; }
 }
