@@ -215,6 +215,12 @@ class InterfaceController extends AbstractController
             if ($ipv6Mode === 'auto' && $subnet?->getIpv6Cidr()) {
                 $ip = $this->ipManager->findNextAvailableIpv6($subnet, $interface->getMacAddress());
                 if ($ip) $this->ipManager->assignIpv6($interface, $ip);
+            } elseif ($ipv6Mode === 'auto_v4' && $subnet?->getIpv6Cidr()) {
+                $ipv4 = $interface->getIpAddress()?->getAddress();
+                if ($ipv4) {
+                    $ip = $this->ipManager->findIpv6FromIpv4($subnet, $ipv4);
+                    if ($ip) $this->ipManager->assignIpv6($interface, $ip);
+                }
             } elseif ($ipv6Mode === 'select') {
                 $ip = trim((string) $form->get('ipv6AddressInput')->getData());
                 if ($ip !== '' && $subnet) $this->ipManager->assignIpv6($interface, $ip);

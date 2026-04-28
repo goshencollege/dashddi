@@ -138,6 +138,61 @@ class IpAddressManager
         return $available[0] ?? null;
     }
 
+    /**
+     * Derives an IPv6 address from the last octet of $ipv4, placed as the last byte of the
+     * subnet's network address. Returns null if the result is already allocated or outside
+     * any Fixed block defined on the subnet.
+     */
+    public function findIpv6FromIpv4(Subnet $subnet, string $ipv4): ?string
+    {
+        if (!$subnet->getIpv6Cidr()) {
+            return null;
+        }
+
+        $octets = explode('.', $ipv4);
+        if (count($octets) !== 4) {
+            return null;
+        }
+        $lastOctet = (int) $octets[3];
+
+        $range = Factory::parseRangeString($subnet->getIpv6Cidr());
+        if (!$range) {
+            return null;
+        }
+
+        $raw = inet_pton($range->getStartAddress()->toString());
+        if ($raw === false || strlen($raw) !== 16) {
+            return null;
+        }
+
+        $raw[15] = chr($lastOctet);
+        $ipv6Str = inet_ntop($raw);
+        if ($ipv6Str === false) {
+            return null;
+        }
+
+        $parsed = Factory::parseAddressString($ipv6Str);
+        if (!$parsed) {
+            return null;
+        }
+        $normalized = $parsed->toString();
+
+        $fixedBlocks = array_filter(
+            $this->blockRepo->findFixedBySubnet($subnet->getId()),
+            fn($b) => str_contains($b->getStartIp(), ':')
+        );
+        if (!empty($fixedBlocks) && !$this->isInBlocks($normalized, $fixedBlocks)) {
+            return null;
+        }
+
+        $allocated = array_flip($this->ipv6Repo->findAllocatedAddressesForSubnet($subnet->getId()));
+        if (isset($allocated[$normalized])) {
+            return null;
+        }
+
+        return $normalized;
+    }
+
     public function findNextAvailableIpv6(Subnet $subnet, ?string $macAddress = null): ?string
     {
         if ($macAddress && $subnet->getIpv6Cidr()) {
