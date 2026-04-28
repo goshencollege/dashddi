@@ -25,10 +25,17 @@
                     {{ form_widget(form.name, {attr: {class: 'form-control' ~ (form.name.vars.errors|length ? ' is-invalid' : '')}}) }}
                     {{ form_errors(form.name) }}
                 </div>
-                <div class="mb-4">
-                    {{ form_label(form.location, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
-                    {{ form_widget(form.location, {attr: {class: 'form-control' ~ (form.location.vars.errors|length ? ' is-invalid' : '')}}) }}
-                    {{ form_errors(form.location) }}
+                <div class="row g-3 mb-4">
+                    <div class="col-md-8">
+                        {{ form_label(form.building, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                        {{ form_widget(form.building, {attr: {class: 'form-select' ~ (form.building.vars.errors|length ? ' is-invalid' : '')}}) }}
+                        {{ form_errors(form.building) }}
+                    </div>
+                    <div class="col-md-4">
+                        {{ form_label(form.room, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                        {{ form_widget(form.room, {attr: {class: 'form-control' ~ (form.room.vars.errors|length ? ' is-invalid' : '')}}) }}
+                        {{ form_errors(form.room) }}
+                    </div>
                 </div>
 
                 {% if embed_interface %}

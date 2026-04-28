@@ -24,9 +24,13 @@ class Host
     #[Assert\Length(max: 255)]
     private string $name = '';
 
-    #[ORM\Column(length: 255, nullable: true)]
-    #[Assert\Length(max: 255)]
-    private ?string $location = null;
+    #[ORM\ManyToOne(targetEntity: Building::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?Building $building = null;
+
+    #[ORM\Column(length: 50, nullable: true)]
+    #[Assert\Length(max: 50)]
+    private ?string $room = null;
 
     #[ORM\OneToMany(targetEntity: NetworkInterface::class, mappedBy: 'host', cascade: ['persist', 'remove'], orphanRemoval: true)]
     private Collection $interfaces;
@@ -41,8 +45,17 @@ class Host
     public function getName(): string { return $this->name; }
     public function setName(string $name): static { $this->name = $name; return $this; }
 
-    public function getLocation(): ?string { return $this->location; }
-    public function setLocation(?string $location): static { $this->location = $location; return $this; }
+    public function getBuilding(): ?Building { return $this->building; }
+    public function setBuilding(?Building $building): static { $this->building = $building; return $this; }
+
+    public function getRoom(): ?string { return $this->room; }
+    public function setRoom(?string $room): static { $this->room = $room; return $this; }
+
+    public function getLocation(): ?string
+    {
+        if (!$this->building) return null;
+        return $this->building->getName() . ($this->room ?? '');
+    }
 
     public function getInterfaces(): Collection { return $this->interfaces; }
 
