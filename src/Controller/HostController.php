@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Entity\Host;
 use App\Form\HostType;
 use App\Repository\HostRepository;
+use App\Repository\SubnetRepository;
 use App\Service\IpAddressManager;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -20,14 +21,34 @@ class HostController extends AbstractController
     ) {}
 
     #[Route('', name: 'host_index', methods: ['GET'])]
-    public function index(Request $request, HostRepository $repo): Response
+    public function index(Request $request, HostRepository $repo, SubnetRepository $subnetRepo): Response
     {
         $query = trim($request->query->getString('q'));
-        $hosts = $query ? $repo->search($query) : $repo->findBy([], ['name' => 'ASC']);
+
+        $advancedFields = ['name', 'location', 'subnet', 'ip', 'mac', 'dns'];
+        $criteria = [];
+        foreach ($advancedFields as $field) {
+            $val = trim($request->query->getString($field));
+            if ($val !== '') {
+                $criteria[$field] = $val;
+            }
+        }
+        $isAdvanced = !empty($criteria);
+
+        if ($isAdvanced) {
+            $hosts = $repo->advancedSearch($criteria);
+        } elseif ($query !== '') {
+            $hosts = $repo->search($query);
+        } else {
+            $hosts = $repo->findBy([], ['name' => 'ASC']);
+        }
 
         return $this->render('host/index.html.twig', [
-            'hosts' => $hosts,
-            'query' => $query,
+            'hosts'      => $hosts,
+            'query'      => $query,
+            'criteria'   => $criteria,
+            'isAdvanced' => $isAdvanced,
+            'subnets'    => $subnetRepo->findBy([], ['name' => 'ASC']),
         ]);
     }
 
