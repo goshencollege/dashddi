@@ -8,6 +8,7 @@ use App\Entity\InterfaceName;
 use App\Repository\DnsViewRepository;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
+use Symfony\Component\Form\Extension\Core\Type\IntegerType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
@@ -28,6 +29,11 @@ class InterfaceNameType extends AbstractType
                 'placeholder'  => '-- Select a domain --',
                 'required'     => false,
                 'label'        => 'Domain',
+            ])
+            ->add('ttl', IntegerType::class, [
+                'required' => false,
+                'label'    => 'TTL (seconds)',
+                'attr'     => ['placeholder' => 'e.g. 3600'],
             ])
             ->add('views', EntityType::class, [
                 'class'        => DnsView::class,

@@ -34,6 +34,31 @@ class Domain
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $description = null;
 
+    #[ORM\Column(length: 255, nullable: true)]
+    #[Assert\Length(max: 255)]
+    private ?string $soaNameserver = null;
+
+    #[ORM\Column(length: 255, nullable: true)]
+    #[Assert\Length(max: 255)]
+    #[Assert\Email]
+    private ?string $soaEmail = null;
+
+    #[ORM\Column(nullable: true)]
+    #[Assert\PositiveOrZero]
+    private ?int $soaRefresh = 3600;
+
+    #[ORM\Column(nullable: true)]
+    #[Assert\PositiveOrZero]
+    private ?int $soaRetry = 900;
+
+    #[ORM\Column(nullable: true)]
+    #[Assert\PositiveOrZero]
+    private ?int $soaExpire = 604800;
+
+    #[ORM\Column(nullable: true)]
+    #[Assert\PositiveOrZero]
+    private ?int $soaTtl = 3600;
+
     #[ORM\OneToMany(targetEntity: DomainRecord::class, mappedBy: 'domain', cascade: ['persist', 'remove'], orphanRemoval: true)]
     #[ORM\OrderBy(['hostname' => 'ASC'])]
     private Collection $records;
@@ -59,6 +84,24 @@ class Domain
 
     public function getDescription(): ?string { return $this->description; }
     public function setDescription(?string $description): static { $this->description = $description; return $this; }
+
+    public function getSoaNameserver(): ?string { return $this->soaNameserver; }
+    public function setSoaNameserver(?string $soaNameserver): static { $this->soaNameserver = $soaNameserver; return $this; }
+
+    public function getSoaEmail(): ?string { return $this->soaEmail; }
+    public function setSoaEmail(?string $soaEmail): static { $this->soaEmail = $soaEmail; return $this; }
+
+    public function getSoaRefresh(): ?int { return $this->soaRefresh; }
+    public function setSoaRefresh(?int $soaRefresh): static { $this->soaRefresh = $soaRefresh; return $this; }
+
+    public function getSoaRetry(): ?int { return $this->soaRetry; }
+    public function setSoaRetry(?int $soaRetry): static { $this->soaRetry = $soaRetry; return $this; }
+
+    public function getSoaExpire(): ?int { return $this->soaExpire; }
+    public function setSoaExpire(?int $soaExpire): static { $this->soaExpire = $soaExpire; return $this; }
+
+    public function getSoaTtl(): ?int { return $this->soaTtl; }
+    public function setSoaTtl(?int $soaTtl): static { $this->soaTtl = $soaTtl; return $this; }
 
     public function getRecords(): Collection { return $this->records; }
     public function getInterfaceNames(): Collection { return $this->interfaceNames; }

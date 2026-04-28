@@ -34,6 +34,10 @@ class InterfaceName
     #[ORM\JoinColumn(nullable: false)]
     private ?NetworkInterface $networkInterface = null;
 
+    #[ORM\Column(nullable: true)]
+    #[Assert\Positive]
+    private ?int $ttl = null;
+
     #[ORM\ManyToMany(targetEntity: DnsView::class)]
     #[ORM\JoinTable(name: 'interface_name_dns_view')]
     private Collection $views;
@@ -53,6 +57,9 @@ class InterfaceName
 
     public function getNetworkInterface(): ?NetworkInterface { return $this->networkInterface; }
     public function setNetworkInterface(?NetworkInterface $networkInterface): static { $this->networkInterface = $networkInterface; return $this; }
+
+    public function getTtl(): ?int { return $this->ttl; }
+    public function setTtl(?int $ttl): static { $this->ttl = $ttl; return $this; }
 
     public function getViews(): Collection { return $this->views; }
 

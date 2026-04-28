@@ -25,6 +25,43 @@
                     {{ form_widget(form.description, {attr: {class: 'form-control'}}) }}
                     {{ form_errors(form.description) }}
                 </div>
+                <hr class="my-3">
+                <h6 class="text-muted mb-3">SOA Record</h6>
+                <div class="mb-3">
+                    {{ form_label(form.soaNameserver) }}
+                    {{ form_widget(form.soaNameserver, {attr: {class: 'form-control'}}) }}
+                    {{ form_errors(form.soaNameserver) }}
+                </div>
+                <div class="mb-3">
+                    {{ form_label(form.soaEmail) }}
+                    {{ form_widget(form.soaEmail, {attr: {class: 'form-control'}}) }}
+                    {{ form_errors(form.soaEmail) }}
+                </div>
+                <div class="row g-3 mb-3">
+                    <div class="col-6">
+                        {{ form_label(form.soaRefresh) }}
+                        {{ form_widget(form.soaRefresh, {attr: {class: 'form-control'}}) }}
+                        {{ form_errors(form.soaRefresh) }}
+                    </div>
+                    <div class="col-6">
+                        {{ form_label(form.soaRetry) }}
+                        {{ form_widget(form.soaRetry, {attr: {class: 'form-control'}}) }}
+                        {{ form_errors(form.soaRetry) }}
+                    </div>
+                </div>
+                <div class="row g-3 mb-4">
+                    <div class="col-6">
+                        {{ form_label(form.soaExpire) }}
+                        {{ form_widget(form.soaExpire, {attr: {class: 'form-control'}}) }}
+                        {{ form_errors(form.soaExpire) }}
+                    </div>
+                    <div class="col-6">
+                        {{ form_label(form.soaTtl) }}
+                        {{ form_widget(form.soaTtl, {attr: {class: 'form-control'}}) }}
+                        {{ form_errors(form.soaTtl) }}
+                    </div>
+                </div>
+                <hr class="my-3">
                 <div class="mb-4">
                     <label class="form-label fw-semibold">BIND9 Views</label>
                     <div class="d-flex flex-wrap gap-3">
