@@ -13,7 +13,7 @@
 </nav>
 
 <div class="row justify-content-center">
-    <div class="col-md-7">
+    <div class="{{ embed_blocks ? 'col-lg-8' : 'col-md-7' }}">
         <div class="card">
             <div class="card-header"><h5 class="mb-0">{{ title }}</h5></div>
             <div class="card-body">
@@ -51,6 +51,37 @@
                         {{ form_label(form.description, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
                         {{ form_widget(form.description, {attr: {class: 'form-control'}}) }}
                     </div>
+                    {% if embed_blocks %}
+                    <hr class="my-4">
+
+                    {% for block in [
+                        {field: 'reservedBlock', label: 'Reserved Block', icon: 'bi-slash-circle'},
+                        {field: 'fixedBlock',    label: 'Fixed Block',    icon: 'bi-pin-map'}
+                    ] %}
+                    <div class="mb-4">
+                        <h6 class="fw-semibold mb-3">
+                            <i class="bi {{ block.icon }} me-1"></i>{{ block.label }}
+                        </h6>
+                        <div class="row g-3">
+                            <div class="col-md-5">
+                                {{ form_label(form[block.field].startIp, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                                {{ form_widget(form[block.field].startIp, {attr: {class: 'form-control font-monospace'}}) }}
+                                {{ form_errors(form[block.field].startIp) }}
+                            </div>
+                            <div class="col-md-5">
+                                {{ form_label(form[block.field].endIp, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                                {{ form_widget(form[block.field].endIp, {attr: {class: 'form-control font-monospace'}}) }}
+                                {{ form_errors(form[block.field].endIp) }}
+                            </div>
+                            <div class="col-md-2">
+                                {{ form_label(form[block.field].label, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                                {{ form_widget(form[block.field].label, {attr: {class: 'form-control'}}) }}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                    {% endif %}
+
                     <div class="d-flex gap-2">
                         <button type="submit" class="btn btn-primary">
                             <i class="bi bi-check-lg me-1"></i>Save
