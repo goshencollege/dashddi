@@ -56,7 +56,7 @@ class KeaDeployService
         return proc_close($proc);
     }
 
-    public function deployToServer(DhcpServer $server): array
+    public function deployToServer(DhcpServer $server, bool $reload = true): array
     {
         $files = $this->generateFiles('/tmp/kea');
         $results = [];
@@ -78,9 +78,13 @@ class KeaDeployService
                 'reload'  => null,
             ];
 
-            if ($result['success'] && $server->getControlUrl()) {
-                $service = $type === 'dhcp4' ? 'dhcp4' : 'dhcp6';
-                $result['reload'] = $this->reloadKea($server, $service);
+            if ($reload && $result['success'] && $server->getControlUrl()) {
+                $result['reload'] = $this->reloadKea(
+                    $server->getControlUrl(),
+                    $type === 'dhcp4' ? 'dhcp4' : 'dhcp6',
+                    $server->getControlUser(),
+                    $server->getControlPassword(),
+                );
             }
 
             $results[$type] = $result;
@@ -89,14 +93,14 @@ class KeaDeployService
         return $results;
     }
 
-    private function reloadKea(DhcpServer $server, string $service): array
+    public function reloadKea(string $controlUrl, string $service, ?string $user = null, ?string $password = null): array
     {
-        $url     = rtrim($server->getControlUrl(), '/');
+        $url     = rtrim($controlUrl, '/');
         $payload = json_encode(['command' => 'config-reload', 'service' => [$service]]);
 
         $headers = "Content-Type: application/json\r\nContent-Length: " . strlen($payload);
-        if ($server->getControlUser() !== null) {
-            $credentials = base64_encode($server->getControlUser() . ':' . ($server->getControlPassword() ?? ''));
+        if ($user !== null) {
+            $credentials = base64_encode($user . ':' . ($password ?? ''));
             $headers .= "\r\nAuthorization: Basic $credentials";
         }
 
