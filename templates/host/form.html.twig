@@ -1,6 +1,10 @@
 {% extends 'base.html.twig' %}
 {% block title %}{{ title }}{% endblock %}
 
+{% block stylesheets %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css">
+{% endblock %}
+
 {% block content %}
 <nav aria-label="breadcrumb" class="mb-3">
     <ol class="breadcrumb">
@@ -25,7 +29,7 @@
                     {{ form_widget(form.name, {attr: {class: 'form-control' ~ (form.name.vars.errors|length ? ' is-invalid' : '')}}) }}
                     {{ form_errors(form.name) }}
                 </div>
-                <div class="row g-3 mb-4">
+                <div class="row g-3 mb-3">
                     <div class="col-md-8">
                         {{ form_label(form.building, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
                         {{ form_widget(form.building, {attr: {class: 'form-select' ~ (form.building.vars.errors|length ? ' is-invalid' : '')}}) }}
@@ -36,6 +40,11 @@
                         {{ form_widget(form.room, {attr: {class: 'form-control' ~ (form.room.vars.errors|length ? ' is-invalid' : '')}}) }}
                         {{ form_errors(form.room) }}
                     </div>
+                </div>
+                <div class="mb-4">
+                    {{ form_label(form.tags, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                    {{ form_widget(form.tags, {attr: {class: 'form-select', id: 'host_tags'}}) }}
+                    {{ form_errors(form.tags) }}
                 </div>
 
                 {% if embed_interface %}
@@ -181,6 +190,49 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
+<script>
+(function () {
+    const select = document.getElementById('host_tags');
+    if (!select) return;
+
+    // Remove unselected options so the dropdown is empty until the user types;
+    // selected options (edit mode) stay so Tom Select knows what's already chosen.
+    Array.from(select.options).forEach(opt => { if (!opt.selected) opt.remove(); });
+
+    new TomSelect(select, {
+        plugins: ['remove_button'],
+        valueField: 'value',
+        labelField: 'text',
+        searchField: 'text',
+        persist: false,
+        load: function (query, callback) {
+            fetch('/api/tags?q=' + encodeURIComponent(query))
+                .then(r => r.json())
+                .then(callback)
+                .catch(() => callback());
+        },
+        create: function (input, callback) {
+            fetch('/api/tags', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: input }),
+            })
+                .then(r => r.json())
+                .then(callback)
+                .catch(() => callback());
+        },
+        render: {
+            option_create: function (data, escape) {
+                return '<div class="create">Create tag <strong>' + escape(data.input) + '</strong></div>';
+            },
+            no_results: function (data, escape) {
+                return '<div class="no-results">No tags matching <strong>' + escape(data.input) + '</strong></div>';
+            },
+        },
+    });
+})();
+</script>
 {% if embed_interface %}
 <script>
 (function () {

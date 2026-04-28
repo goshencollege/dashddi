@@ -35,9 +35,15 @@ class Host
     #[ORM\OneToMany(targetEntity: NetworkInterface::class, mappedBy: 'host', cascade: ['persist', 'remove'], orphanRemoval: true)]
     private Collection $interfaces;
 
+    #[ORM\ManyToMany(targetEntity: Tag::class, inversedBy: 'hosts')]
+    #[ORM\JoinTable(name: 'host_tag')]
+    #[ORM\OrderBy(['name' => 'ASC'])]
+    private Collection $tags;
+
     public function __construct()
     {
         $this->interfaces = new ArrayCollection();
+        $this->tags       = new ArrayCollection();
     }
 
     public function getId(): ?int { return $this->id; }
@@ -55,6 +61,22 @@ class Host
     {
         if (!$this->building) return null;
         return $this->building->getName() . ($this->room ?? '');
+    }
+
+    public function getTags(): Collection { return $this->tags; }
+
+    public function addTag(Tag $tag): static
+    {
+        if (!$this->tags->contains($tag)) {
+            $this->tags->add($tag);
+        }
+        return $this;
+    }
+
+    public function removeTag(Tag $tag): static
+    {
+        $this->tags->removeElement($tag);
+        return $this;
     }
 
     public function getInterfaces(): Collection { return $this->interfaces; }

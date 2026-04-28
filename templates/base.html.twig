@@ -43,11 +43,25 @@
                         <i class="bi bi-globe me-1"></i>Domains
                     </a>
                 </li>
-                <li class="nav-item">
-                    <a class="nav-link {{ app.request.attributes.get('_route') starts with 'building' ? 'active' }}"
-                       href="{{ path('building_index') }}">
-                        <i class="bi bi-building me-1"></i>Buildings
+                {% set settingsActive = app.request.attributes.get('_route') starts with 'building' or app.request.attributes.get('_route') starts with 'tag' %}
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle {{ settingsActive ? 'active' }}" href="#" data-bs-toggle="dropdown">
+                        <i class="bi bi-gear me-1"></i>Other Settings
                     </a>
+                    <ul class="dropdown-menu">
+                        <li>
+                            <a class="dropdown-item {{ app.request.attributes.get('_route') starts with 'building' ? 'active' }}"
+                               href="{{ path('building_index') }}">
+                                <i class="bi bi-building me-1"></i>Buildings
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item {{ app.request.attributes.get('_route') starts with 'tag' ? 'active' }}"
+                               href="{{ path('tag_index') }}">
+                                <i class="bi bi-tags me-1"></i>Tags
+                            </a>
+                        </li>
+                    </ul>
                 </li>
             </ul>
             {% if app.user %}

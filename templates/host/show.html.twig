@@ -13,7 +13,14 @@
     <div>
         <h1 class="h3 mb-1"><i class="bi bi-pc-display me-2"></i>{{ host.name }}</h1>
         {% if host.location %}
-            <p class="text-muted mb-0"><i class="bi bi-geo-alt me-1"></i>{{ host.location }}</p>
+            <p class="text-muted mb-1"><i class="bi bi-geo-alt me-1"></i>{{ host.location }}</p>
+        {% endif %}
+        {% if host.tags is not empty %}
+            <div>
+                {% for tag in host.tags %}
+                    <span class="badge bg-secondary me-1">{{ tag.name }}</span>
+                {% endfor %}
+            </div>
         {% endif %}
     </div>
     <div>
