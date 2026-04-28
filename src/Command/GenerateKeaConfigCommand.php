@@ -2,6 +2,7 @@
 
 namespace App\Command;
 
+use App\Repository\DhcpServerRepository;
 use App\Service\KeaDeployService;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -12,12 +13,13 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 
 #[AsCommand(
     name: 'app:generate-kea-config',
-    description: 'Generate Kea DHCP4/DHCP6 subnet JSON files from IPAM data',
+    description: 'Generate and deploy Kea DHCP subnet JSON files from IPAM data',
 )]
 class GenerateKeaConfigCommand extends Command
 {
     public function __construct(
         private readonly KeaDeployService $deployer,
+        private readonly DhcpServerRepository $serverRepo,
     ) {
         parent::__construct();
     }
@@ -26,18 +28,15 @@ class GenerateKeaConfigCommand extends Command
     {
         $this
             ->addOption('output-dir', 'd', InputOption::VALUE_REQUIRED, 'Directory to write config files', '/tmp/kea')
-            ->addOption('scp-target', 's', InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY,
-                'SCP destination(s): user@host:/remote/path  (repeatable)')
-            ->addOption('ssh-key', 'i', InputOption::VALUE_REQUIRED, 'SSH private key for SCP')
+            ->addOption('reload', null, InputOption::VALUE_NONE, 'Reload Kea via the Control Agent after deploying')
         ;
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $io         = new SymfonyStyle($input, $output);
-        $outputDir  = rtrim((string) $input->getOption('output-dir'), '/');
-        $scpTargets = (array) $input->getOption('scp-target');
-        $sshKey     = $input->getOption('ssh-key');
+        $io        = new SymfonyStyle($input, $output);
+        $outputDir = rtrim((string) $input->getOption('output-dir'), '/');
+        $reload    = (bool) $input->getOption('reload');
 
         try {
             $files = $this->deployer->generateFiles($outputDir);
@@ -50,29 +49,42 @@ class GenerateKeaConfigCommand extends Command
             $io->success(basename($file) . ' written → ' . $file);
         }
 
-        if ($scpTargets) {
-            $io->section('Deploying via SCP');
-            $failed = false;
+        $servers = $this->serverRepo->findBy([], ['name' => 'ASC']);
 
-            foreach ($scpTargets as $target) {
-                foreach ($files as $file) {
-                    $dest     = rtrim($target, '/') . '/' . basename($file);
-                    $exitCode = $this->deployer->scpFile($file, $dest, $sshKey, $scpOutput);
-                    if ($exitCode === 0) {
-                        $io->writeln(sprintf('  <info>✓</info> %s → %s', basename($file), $target));
-                    } else {
-                        $io->writeln(sprintf('  <error>✗</error> %s → %s', basename($file), $target));
-                        if ($scpOutput) {
-                            $io->writeln("    $scpOutput");
-                        }
-                        $failed = true;
-                    }
-                }
-            }
-
-            return $failed ? Command::FAILURE : Command::SUCCESS;
+        if (empty($servers)) {
+            $io->note('No DHCP servers configured — skipping deploy. Add servers via the web UI.');
+            return Command::SUCCESS;
         }
 
-        return Command::SUCCESS;
+        $io->section('Deploying');
+        $failed = false;
+
+        foreach ($servers as $server) {
+            $results = $this->deployer->deployToServer($server, $reload);
+
+            foreach ($results as $type => $result) {
+                $label = $type === 'dhcp4' ? 'DHCPv4' : 'DHCPv6';
+
+                if ($result['success']) {
+                    $reloadNote = '';
+                    if ($result['reload'] !== null) {
+                        $reloadNote = $result['reload']['success']
+                            ? ' <info>(reloaded)</info>'
+                            : sprintf(' <comment>(reload failed: %s)</comment>', $result['reload']['response']);
+                    }
+                    $io->writeln(sprintf('  <info>✓</info> %s  %s → %s%s',
+                        $server->getName(), $result['file'], $label, $reloadNote));
+                } else {
+                    $io->writeln(sprintf('  <error>✗</error> %s  %s → %s',
+                        $server->getName(), $result['file'], $label));
+                    if ($result['output']) {
+                        $io->writeln('    ' . $result['output']);
+                    }
+                    $failed = true;
+                }
+            }
+        }
+
+        return $failed ? Command::FAILURE : Command::SUCCESS;
     }
 }
