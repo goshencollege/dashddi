@@ -2,10 +2,13 @@
 
 namespace App\Controller;
 
+use App\Entity\AddressBlock;
 use App\Entity\Subnet;
+use App\Enum\BlockType;
 use App\Form\SubnetType;
 use App\Repository\SubnetRepository;
 use App\Service\IpAddressManager;
+use IPLib\Factory;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -27,20 +30,44 @@ class SubnetController extends AbstractController
     public function new(Request $request, EntityManagerInterface $em): Response
     {
         $subnet = new Subnet();
-        $form = $this->createForm(SubnetType::class, $subnet);
+        $form = $this->createForm(SubnetType::class, $subnet, ['embed_blocks' => true]);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
             $em->persist($subnet);
-            $em->flush();
-            $this->addFlash('success', 'Subnet "' . $subnet->getName() . '" created.');
-            return $this->redirectToRoute('subnet_show', ['id' => $subnet->getId()]);
+
+            $errors = [];
+            foreach (['reservedBlock' => BlockType::Reserved, 'fixedBlock' => BlockType::Fixed] as $field => $type) {
+                $block = $form->get($field)->getData();
+                if ($block->getStartIp() === '' || $block->getEndIp() === '') {
+                    continue;
+                }
+                $block->setSubnet($subnet);
+                $block->setType($type);
+                $error = $this->validateBlock($block, $subnet);
+                if ($error) {
+                    $errors[] = $error;
+                } else {
+                    $em->persist($block);
+                }
+            }
+
+            if ($errors) {
+                foreach ($errors as $error) {
+                    $this->addFlash('danger', $error);
+                }
+            } else {
+                $em->flush();
+                $this->addFlash('success', 'Subnet "' . $subnet->getName() . '" created.');
+                return $this->redirectToRoute('subnet_show', ['id' => $subnet->getId()]);
+            }
         }
 
         return $this->render('subnet/form.html.twig', [
-            'form'   => $form,
-            'subnet' => $subnet,
-            'title'  => 'New Subnet',
+            'form'         => $form,
+            'subnet'       => $subnet,
+            'title'        => 'New Subnet',
+            'embed_blocks' => true,
         ]);
     }
 
@@ -67,10 +94,41 @@ class SubnetController extends AbstractController
         }
 
         return $this->render('subnet/form.html.twig', [
-            'form'   => $form,
-            'subnet' => $subnet,
-            'title'  => 'Edit Subnet: ' . $subnet->getName(),
+            'form'         => $form,
+            'subnet'       => $subnet,
+            'title'        => 'Edit Subnet: ' . $subnet->getName(),
+            'embed_blocks' => false,
         ]);
+    }
+
+    private function validateBlock(AddressBlock $block, Subnet $subnet): ?string
+    {
+        $start = Factory::parseAddressString($block->getStartIp());
+        $end   = Factory::parseAddressString($block->getEndIp());
+
+        if (!$start) return 'Start IP is not a valid IP address.';
+        if (!$end)   return 'End IP is not a valid IP address.';
+
+        $version = $start->getAddressType();
+        if ($version !== $end->getAddressType()) {
+            return 'Start and End IP must be the same protocol.';
+        }
+
+        $cidr = $version === 4 ? $subnet->getIpv4Cidr() : $subnet->getIpv6Cidr();
+        if (!$cidr) {
+            return sprintf('This subnet has no IPv%d CIDR defined.', $version);
+        }
+
+        $range = Factory::parseRangeString($cidr);
+        if (!$range->contains($start) || !$range->contains($end)) {
+            return sprintf('Block IPs must fall within %s.', $cidr);
+        }
+
+        if ($start->getComparableString() > $end->getComparableString()) {
+            return 'Start IP must be less than or equal to End IP.';
+        }
+
+        return null;
     }
 
     #[Route('/{id}/delete', name: 'subnet_delete', methods: ['POST'])]
