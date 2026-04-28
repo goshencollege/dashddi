@@ -123,8 +123,9 @@
                                 {% endfor %}
                             </div>
                         </div>
-                        {% endif %}
+                        {% else %}
                         <div class="d-none">{{ form_widget(nameForm.views) }}</div>
+                        {% endif %}
                     </div>
                 {% else %}
                     <p class="text-muted small mb-0" id="no-names-msg">No DNS names added yet.</p>
