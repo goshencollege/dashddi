@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\Host;
 use App\Form\HostType;
+use App\Repository\BuildingRepository;
 use App\Repository\HostRepository;
 use App\Repository\SubnetRepository;
 use App\Service\IpAddressManager;
@@ -21,11 +22,11 @@ class HostController extends AbstractController
     ) {}
 
     #[Route('', name: 'host_index', methods: ['GET'])]
-    public function index(Request $request, HostRepository $repo, SubnetRepository $subnetRepo): Response
+    public function index(Request $request, HostRepository $repo, SubnetRepository $subnetRepo, BuildingRepository $buildingRepo): Response
     {
         $query = trim($request->query->getString('q'));
 
-        $advancedFields = ['name', 'location', 'subnet', 'ip', 'mac', 'dns'];
+        $advancedFields = ['name', 'building', 'room', 'subnet', 'ip', 'mac', 'dns'];
         $criteria = [];
         foreach ($advancedFields as $field) {
             $val = trim($request->query->getString($field));
@@ -49,6 +50,7 @@ class HostController extends AbstractController
             'criteria'   => $criteria,
             'isAdvanced' => $isAdvanced,
             'subnets'    => $subnetRepo->findBy([], ['name' => 'ASC']),
+            'buildings'  => $buildingRepo->findBy([], ['name' => 'ASC']),
         ]);
     }
 

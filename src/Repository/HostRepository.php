@@ -20,6 +20,7 @@ class HostRepository extends ServiceEntityRepository
     public function advancedSearch(array $criteria): array
     {
         $qb = $this->createQueryBuilder('h')
+            ->leftJoin('h.building', 'b')
             ->leftJoin('h.interfaces', 'i')
             ->leftJoin('i.ipAddress', 'ip4')
             ->leftJoin('i.ipv6Address', 'ip6')
@@ -30,9 +31,13 @@ class HostRepository extends ServiceEntityRepository
             $qb->andWhere('h.name LIKE :name')
                ->setParameter('name', $this->toLike($criteria['name']));
         }
-        if (!empty($criteria['location'])) {
-            $qb->andWhere('h.location LIKE :location')
-               ->setParameter('location', $this->toLike($criteria['location']));
+        if (!empty($criteria['building'])) {
+            $qb->andWhere('h.building = :building')
+               ->setParameter('building', (int) $criteria['building']);
+        }
+        if (!empty($criteria['room'])) {
+            $qb->andWhere('h.room LIKE :room')
+               ->setParameter('room', $this->toLike($criteria['room']));
         }
         if (!empty($criteria['subnet'])) {
             $qb->andWhere('i.subnet = :subnet')
@@ -70,6 +75,7 @@ class HostRepository extends ServiceEntityRepository
     {
         $q  = '%' . $query . '%';
         $qb = $this->createQueryBuilder('h')
+            ->leftJoin('h.building', 'b')
             ->leftJoin('h.interfaces', 'i')
             ->leftJoin('i.subnet', 's')
             ->leftJoin('i.ipAddress', 'ip4')
@@ -77,7 +83,9 @@ class HostRepository extends ServiceEntityRepository
             ->leftJoin('i.names', 'n')
             ->leftJoin('n.domain', 'nd')
             ->where('h.name LIKE :q')
-            ->orWhere('h.location LIKE :q')
+            ->orWhere('b.name LIKE :q')
+            ->orWhere('h.room LIKE :q')
+            ->orWhere("CONCAT(COALESCE(b.name, ''), COALESCE(h.room, '')) LIKE :q")
             ->orWhere('s.name LIKE :q')
             ->orWhere('ip4.address LIKE :q')
             ->orWhere('ip6.address LIKE :q')

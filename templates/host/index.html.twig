@@ -31,13 +31,22 @@
         <form method="get" action="{{ path('host_index') }}">
             <div class="card card-body">
                 <div class="row g-2 mb-2">
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <label class="form-label small fw-semibold mb-1">Host Name</label>
                         <input type="text" name="name" class="form-control form-control-sm" value="{{ criteria.name ?? '' }}" placeholder="e.g. web* or server-01">
                     </div>
-                    <div class="col-md-4">
-                        <label class="form-label small fw-semibold mb-1">Location</label>
-                        <input type="text" name="location" class="form-control form-control-sm" value="{{ criteria.location ?? '' }}" placeholder="e.g. datacenter*">
+                    <div class="col-md-3">
+                        <label class="form-label small fw-semibold mb-1">Building</label>
+                        <select name="building" class="form-select form-select-sm">
+                            <option value="">— Any —</option>
+                            {% for b in buildings %}
+                                <option value="{{ b.id }}" {{ (criteria.building ?? '') == (b.id ~ '') ? 'selected' }}>{{ b.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small fw-semibold mb-1">Room</label>
+                        <input type="text" name="room" class="form-control form-control-sm" value="{{ criteria.room ?? '' }}" placeholder="e.g. 101 or 1*">
                     </div>
                     <div class="col-md-4">
                         <label class="form-label small fw-semibold mb-1">Subnet</label>

@@ -1,0 +1,52 @@
+{% extends 'base.html.twig' %}
+{% block title %}Buildings{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3 mb-0"><i class="bi bi-building me-2"></i>Buildings</h1>
+    <a href="{{ path('building_new') }}" class="btn btn-primary">
+        <i class="bi bi-plus-lg me-1"></i>Add Building
+    </a>
+</div>
+
+{% if buildings is empty %}
+    <div class="card">
+        <div class="card-body text-center text-muted py-5">
+            <i class="bi bi-building fs-1 d-block mb-3 opacity-25"></i>
+            No buildings yet. <a href="{{ path('building_new') }}">Add the first one →</a>
+        </div>
+    </div>
+{% else %}
+    <div class="card">
+        <table class="table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Description</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for building in buildings %}
+                    <tr>
+                        <td class="fw-semibold">{{ building.name }}</td>
+                        <td class="text-muted">{{ building.description ?: '—' }}</td>
+                        <td class="text-end">
+                            <a href="{{ path('building_edit', {id: building.id}) }}" class="btn btn-sm btn-outline-secondary me-1">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            <form method="post" action="{{ path('building_delete', {id: building.id}) }}" class="d-inline"
+                                  onsubmit="return confirm('Delete building {{ building.name|e('js') }}?')">
+                                <input type="hidden" name="_token" value="{{ csrf_token('delete_building_' ~ building.id) }}">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endif %}
+{% endblock %}
