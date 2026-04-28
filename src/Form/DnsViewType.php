@@ -3,40 +3,29 @@
 namespace App\Form;
 
 use App\Entity\DnsView;
-use App\Entity\Domain;
-use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
-class DomainType extends AbstractType
+class DnsViewType extends AbstractType
 {
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
         $builder
             ->add('name', TextType::class, [
-                'label' => 'Domain Name',
-                'attr'  => ['placeholder' => 'e.g. example.com'],
+                'label' => 'View Name',
+                'attr'  => ['placeholder' => 'e.g. internal'],
             ])
             ->add('description', TextareaType::class, [
                 'required' => false,
                 'attr'     => ['rows' => 3],
-            ])
-            ->add('views', EntityType::class, [
-                'class'        => DnsView::class,
-                'choice_label' => 'name',
-                'multiple'     => true,
-                'expanded'     => true,
-                'required'     => false,
-                'label'        => 'BIND9 Views',
-                'by_reference' => false,
             ]);
     }
 
     public function configureOptions(OptionsResolver $resolver): void
     {
-        $resolver->setDefaults(['data_class' => Domain::class]);
+        $resolver->setDefaults(['data_class' => DnsView::class]);
     }
 }

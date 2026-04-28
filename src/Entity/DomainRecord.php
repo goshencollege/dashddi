@@ -5,6 +5,8 @@ namespace App\Entity;
 use App\Entity\Trait\AuditableTrait;
 use App\Enum\RecordType;
 use App\Repository\DomainRecordRepository;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Validator\Constraints as Assert;
 
@@ -39,6 +41,15 @@ class DomainRecord
     #[Assert\Positive]
     private ?int $ttl = null;
 
+    #[ORM\ManyToMany(targetEntity: DnsView::class)]
+    #[ORM\JoinTable(name: 'domain_record_dns_view')]
+    private Collection $views;
+
+    public function __construct()
+    {
+        $this->views = new ArrayCollection();
+    }
+
     public function getId(): ?int { return $this->id; }
 
     public function getDomain(): ?Domain { return $this->domain; }
@@ -55,4 +66,20 @@ class DomainRecord
 
     public function getTtl(): ?int { return $this->ttl; }
     public function setTtl(?int $ttl): static { $this->ttl = $ttl; return $this; }
+
+    public function getViews(): Collection { return $this->views; }
+
+    public function addView(DnsView $view): static
+    {
+        if (!$this->views->contains($view)) {
+            $this->views->add($view);
+        }
+        return $this;
+    }
+
+    public function removeView(DnsView $view): static
+    {
+        $this->views->removeElement($view);
+        return $this;
+    }
 }
