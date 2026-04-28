@@ -32,6 +32,12 @@
                         {{ form_widget(form.domain, {attr: {class: 'form-select' ~ (form.domain.vars.errors|length ? ' is-invalid' : '')}}) }}
                         {{ form_errors(form.domain) }}
                     </div>
+                    <div class="mb-3">
+                        {{ form_label(form.ttl, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                        {{ form_widget(form.ttl, {attr: {class: 'form-control' ~ (form.ttl.vars.errors|length ? ' is-invalid' : '')}}) }}
+                        {{ form_errors(form.ttl) }}
+                        <div class="form-text">Leave blank to use the domain default.</div>
+                    </div>
                     {% if form.views is defined %}
                     <div class="mb-4">
                         {{ form_label(form.views, null, {label_attr: {class: 'form-label fw-semibold'}}) }}

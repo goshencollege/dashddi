@@ -26,6 +26,10 @@ class DomainRecordController extends AbstractController
         $record = new DomainRecord();
         $record->setDomain($domain);
 
+        foreach ($domain->getViews() as $view) {
+            $record->addView($view);
+        }
+
         $form = $this->createForm(DomainRecordType::class, $record);
         $form->handleRequest($request);
 

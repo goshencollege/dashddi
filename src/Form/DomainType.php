@@ -6,6 +6,7 @@ use App\Entity\DnsView;
 use App\Entity\Domain;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
+use Symfony\Component\Form\Extension\Core\Type\IntegerType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
@@ -23,6 +24,32 @@ class DomainType extends AbstractType
             ->add('description', TextareaType::class, [
                 'required' => false,
                 'attr'     => ['rows' => 3],
+            ])
+            ->add('soaNameserver', TextType::class, [
+                'label'    => 'Primary Nameserver (MNAME)',
+                'required' => false,
+                'attr'     => ['placeholder' => 'e.g. ns1.example.com'],
+            ])
+            ->add('soaEmail', TextType::class, [
+                'label'    => 'Responsible Email (RNAME)',
+                'required' => false,
+                'attr'     => ['placeholder' => 'e.g. hostmaster@example.com'],
+            ])
+            ->add('soaRefresh', IntegerType::class, [
+                'label'    => 'Refresh (seconds)',
+                'required' => false,
+            ])
+            ->add('soaRetry', IntegerType::class, [
+                'label'    => 'Retry (seconds)',
+                'required' => false,
+            ])
+            ->add('soaExpire', IntegerType::class, [
+                'label'    => 'Expire (seconds)',
+                'required' => false,
+            ])
+            ->add('soaTtl', IntegerType::class, [
+                'label'    => 'Minimum TTL (seconds)',
+                'required' => false,
             ])
             ->add('views', EntityType::class, [
                 'class'        => DnsView::class,

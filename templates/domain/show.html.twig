@@ -37,6 +37,44 @@
     </div>
 </div>
 
+{% if domain.soaNameserver or domain.soaEmail %}
+<div class="card mb-4">
+    <div class="card-header"><i class="bi bi-file-earmark-code me-1"></i>SOA Record</div>
+    <div class="card-body">
+        <div class="row g-3">
+            {% if domain.soaNameserver %}
+            <div class="col-md-6">
+                <div class="text-muted small">Primary Nameserver (MNAME)</div>
+                <div class="font-monospace">{{ domain.soaNameserver }}</div>
+            </div>
+            {% endif %}
+            {% if domain.soaEmail %}
+            <div class="col-md-6">
+                <div class="text-muted small">Responsible Email (RNAME)</div>
+                <div class="font-monospace">{{ domain.soaEmail }}</div>
+            </div>
+            {% endif %}
+            <div class="col-6 col-md-3">
+                <div class="text-muted small">Refresh</div>
+                <div>{{ domain.soaRefresh ?? 3600 }}s</div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="text-muted small">Retry</div>
+                <div>{{ domain.soaRetry ?? 900 }}s</div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="text-muted small">Expire</div>
+                <div>{{ domain.soaExpire ?? 604800 }}s</div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="text-muted small">Minimum TTL</div>
+                <div>{{ domain.soaTtl ?? 3600 }}s</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 {# Standalone DNS Records #}
 <div class="card mb-4">
     <div class="card-header d-flex justify-content-between align-items-center">
@@ -59,6 +97,7 @@
                         <th>Value</th>
                         <th>TTL</th>
                         <th>Modified</th>
+                        <th>Views</th>
                         <th class="text-end">Actions</th>
                     </tr>
                 </thead>
@@ -72,6 +111,13 @@
                             <td class="text-muted small">
                                 {{ record.updatedAt|date('Y-m-d H:i') }}
                                 {% if record.updatedBy %}<br>{{ record.updatedBy }}{% endif %}
+                            </td>
+                            <td>
+                                {% for view in record.views %}
+                                    <span class="badge bg-secondary me-1">{{ view.name }}</span>
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endfor %}
                             </td>
                             <td class="text-end">
                                 <a href="{{ path('domain_record_edit', {id: record.id}) }}" class="btn btn-sm btn-outline-secondary me-1">
@@ -100,7 +146,7 @@
     <div class="table-responsive">
         <table class="table table-sm table-hover mb-0">
             <thead class="">
-                <tr><th>FQDN</th><th>Host</th><th>IPv4</th><th>IPv6</th><th>Views</th></tr>
+                <tr><th>FQDN</th><th>Host</th><th>IPv4</th><th>IPv6</th><th>TTL</th><th>Views</th></tr>
             </thead>
             <tbody>
                 {% for ifaceName in domain.interfaceNames %}
@@ -122,6 +168,7 @@
                                 {{ iface.ipv6Address.address }}
                             {% else %}—{% endif %}
                         </td>
+                        <td class="text-muted small">{{ ifaceName.ttl ?: '—' }}</td>
                         <td>
                             {% for view in ifaceName.views %}
                                 <span class="badge bg-secondary me-1">{{ view.name }}</span>
