@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\Domain;
 use App\Form\DomainType;
+use App\Repository\DnsViewRepository;
 use App\Repository\DomainRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -15,10 +16,11 @@ use Symfony\Component\Routing\Attribute\Route;
 class DomainController extends AbstractController
 {
     #[Route('', name: 'domain_index', methods: ['GET'])]
-    public function index(DomainRepository $repo): Response
+    public function index(DomainRepository $repo, DnsViewRepository $viewRepo): Response
     {
         return $this->render('domain/index.html.twig', [
             'domains' => $repo->findBy([], ['name' => 'ASC']),
+            'views'   => $viewRepo->findBy([], ['name' => 'ASC']),
         ]);
     }
 
