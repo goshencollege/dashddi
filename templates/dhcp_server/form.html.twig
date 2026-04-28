@@ -1,0 +1,38 @@
+{% extends 'base.html.twig' %}
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ path('dhcp_server_index') }}">DHCP Servers</a></li>
+        <li class="breadcrumb-item active">{{ title }}</li>
+    </ol>
+</nav>
+
+<div class="row justify-content-center">
+    <div class="col-md-7">
+        <div class="card">
+            <div class="card-header"><h5 class="mb-0">{{ title }}</h5></div>
+            <div class="card-body">
+                {{ form_start(form) }}
+
+                {% for field in ['name', 'hostname', 'sshUser', 'remotePath', 'sshKeyPath', 'controlUrl', 'controlUser', 'controlPassword', 'description'] %}
+                    <div class="mb-3">
+                        {{ form_label(form[field], null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                        {{ form_widget(form[field], {attr: {class: 'form-control' ~ (form[field].vars.errors|length ? ' is-invalid' : '')}}) }}
+                        {{ form_errors(form[field]) }}
+                    </div>
+                {% endfor %}
+
+                <div class="d-flex gap-2 mt-4">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg me-1"></i>Save
+                    </button>
+                    <a href="{{ path('dhcp_server_index') }}" class="btn btn-outline-secondary">Cancel</a>
+                </div>
+                {{ form_end(form) }}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
