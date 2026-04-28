@@ -147,6 +147,14 @@ class HostController extends AbstractController
             if ($ip) {
                 $this->ipManager->assignIpv6($interface, $ip);
             }
+        } elseif ($ipv6Mode === 'auto_v4' && $subnet?->getIpv6Cidr()) {
+            $ipv4 = $interface->getIpAddress()?->getAddress();
+            if ($ipv4) {
+                $ip = $this->ipManager->findIpv6FromIpv4($subnet, $ipv4);
+                if ($ip) {
+                    $this->ipManager->assignIpv6($interface, $ip);
+                }
+            }
         } elseif ($ipv6Mode === 'select') {
             $ip = trim((string) $ifaceForm->get('ipv6AddressInput')->getData());
             if ($ip !== '' && $subnet) {
