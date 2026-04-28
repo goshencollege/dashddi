@@ -69,7 +69,7 @@
     {% else %}
         <div class="table-responsive">
             <table class="table table-sm table-hover mb-0">
-                <thead class="table-light">
+                <thead class="">
                     <tr>
                         <th>Type</th>
                         <th>Label</th>
@@ -125,7 +125,7 @@
             {% else %}
                 <div class="table-responsive">
                     <table class="table table-sm mb-0">
-                        <thead class="table-light"><tr><th>Address</th><th>Interface</th><th>Host</th></tr></thead>
+                        <thead class=""><tr><th>Address</th><th>Interface</th><th>Host</th></tr></thead>
                         <tbody>
                             {% for ip in subnet.ipAddresses %}
                                 {% set iface = subnet.interfaces|filter(i => i.ipAddress and i.ipAddress.id == ip.id)|first %}
@@ -171,7 +171,7 @@
             {% else %}
                 <div class="table-responsive">
                     <table class="table table-sm mb-0">
-                        <thead class="table-light"><tr><th>Address</th><th>Interface</th></tr></thead>
+                        <thead class=""><tr><th>Address</th><th>Interface</th></tr></thead>
                         <tbody>
                             {% for ip in subnet.ipv6Addresses %}
                                 {% set iface = subnet.interfaces|filter(i => i.ipv6Address and i.ipv6Address.id == ip.id)|first %}
