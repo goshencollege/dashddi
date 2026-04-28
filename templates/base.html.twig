@@ -38,15 +38,9 @@
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link {{ app.request.attributes.get('_route') starts with 'domain' ? 'active' }}"
+                    <a class="nav-link {{ app.request.attributes.get('_route') starts with 'domain' or app.request.attributes.get('_route') starts with 'dns_view' ? 'active' }}"
                        href="{{ path('domain_index') }}">
                         <i class="bi bi-globe me-1"></i>Domains
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link {{ app.request.attributes.get('_route') starts with 'dns_view' ? 'active' }}"
-                       href="{{ path('dns_view_index') }}">
-                        <i class="bi bi-eye me-1"></i>Views
                     </a>
                 </li>
                 <li class="nav-item">
