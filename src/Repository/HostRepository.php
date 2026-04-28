@@ -21,6 +21,7 @@ class HostRepository extends ServiceEntityRepository
     {
         $qb = $this->createQueryBuilder('h')
             ->leftJoin('h.building', 'b')
+            ->leftJoin('h.tags', 'tg')
             ->leftJoin('h.interfaces', 'i')
             ->leftJoin('i.ipAddress', 'ip4')
             ->leftJoin('i.ipv6Address', 'ip6')
@@ -51,6 +52,10 @@ class HostRepository extends ServiceEntityRepository
             $qb->andWhere('i.macAddress LIKE :mac')
                ->setParameter('mac', $this->toLike($criteria['mac']));
         }
+        if (!empty($criteria['tag'])) {
+            $qb->andWhere('tg.id = :tag')
+               ->setParameter('tag', (int) $criteria['tag']);
+        }
         if (!empty($criteria['dns'])) {
             $qb->andWhere($qb->expr()->orX(
                 'n.name LIKE :dns',
@@ -76,6 +81,7 @@ class HostRepository extends ServiceEntityRepository
         $q  = '%' . $query . '%';
         $qb = $this->createQueryBuilder('h')
             ->leftJoin('h.building', 'b')
+            ->leftJoin('h.tags', 'tg')
             ->leftJoin('h.interfaces', 'i')
             ->leftJoin('i.subnet', 's')
             ->leftJoin('i.ipAddress', 'ip4')
@@ -93,6 +99,7 @@ class HostRepository extends ServiceEntityRepository
             ->orWhere('n.name LIKE :q')
             ->orWhere('nd.name LIKE :q')
             ->orWhere("CONCAT(n.name, '.', nd.name) LIKE :q")
+            ->orWhere('tg.name LIKE :q')
             ->setParameter('q', $q);
 
         // If the query is (or contains) a MAC in any delimiter/case style,

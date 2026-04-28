@@ -5,6 +5,7 @@ namespace App\Form;
 use App\Entity\Building;
 use App\Entity\Host;
 use App\Entity\NetworkInterface;
+use App\Entity\Tag;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
@@ -30,6 +31,15 @@ class HostType extends AbstractType
                 'required' => false,
                 'label'    => 'Room',
                 'attr'     => ['placeholder' => 'e.g. 024'],
+            ])
+            ->add('tags', EntityType::class, [
+                'class'        => Tag::class,
+                'choice_label' => 'name',
+                'multiple'     => true,
+                'expanded'     => false,
+                'required'     => false,
+                'label'        => 'Tags',
+                'by_reference' => false,
             ]);
 
         if ($options['embed_interface']) {

@@ -7,6 +7,7 @@ use App\Form\HostType;
 use App\Repository\BuildingRepository;
 use App\Repository\HostRepository;
 use App\Repository\SubnetRepository;
+use App\Repository\TagRepository;
 use App\Service\IpAddressManager;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -22,11 +23,11 @@ class HostController extends AbstractController
     ) {}
 
     #[Route('', name: 'host_index', methods: ['GET'])]
-    public function index(Request $request, HostRepository $repo, SubnetRepository $subnetRepo, BuildingRepository $buildingRepo): Response
+    public function index(Request $request, HostRepository $repo, SubnetRepository $subnetRepo, BuildingRepository $buildingRepo, TagRepository $tagRepo): Response
     {
         $query = trim($request->query->getString('q'));
 
-        $advancedFields = ['name', 'building', 'room', 'subnet', 'ip', 'mac', 'dns'];
+        $advancedFields = ['name', 'building', 'room', 'subnet', 'ip', 'mac', 'dns', 'tag'];
         $criteria = [];
         foreach ($advancedFields as $field) {
             $val = trim($request->query->getString($field));
@@ -51,6 +52,7 @@ class HostController extends AbstractController
             'isAdvanced' => $isAdvanced,
             'subnets'    => $subnetRepo->findBy([], ['name' => 'ASC']),
             'buildings'  => $buildingRepo->findBy([], ['name' => 'ASC']),
+            'tags'       => $tagRepo->findBy([], ['name' => 'ASC']),
         ]);
     }
 
