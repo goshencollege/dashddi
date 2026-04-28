@@ -70,9 +70,9 @@ class GenerateKeaConfigCommand extends Command
                     if ($result['reload'] !== null) {
                         $r = $result['reload'];
                         if ($r['success']) {
-                            $reloadNote = sprintf(' <info>(%s ok)</info>', $r['stage']);
+                            $reloadNote = ' <info>(reloaded)</info>';
                         } else {
-                            $reloadNote = sprintf(' <error>(%s failed: %s)</error>', $r['stage'], $r['response']);
+                            $reloadNote = sprintf(' <error>(reload failed: %s)</error>', $r['response']);
                             if (!empty($r['restored'])) {
                                 $reloadNote .= ' <comment>[previous config restored]</comment>';
                             } elseif (!empty($r['restore_error'])) {
