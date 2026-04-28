@@ -166,6 +166,14 @@ class InterfaceController extends AbstractController
         return $this->json($this->ipManager->getAvailableIpv6($subnet, 50));
     }
 
+    #[Route('/api/domains/{id}/views', name: 'api_domain_views', methods: ['GET'])]
+    public function domainViews(\App\Entity\Domain $domain): JsonResponse
+    {
+        return $this->json(
+            $domain->getViews()->map(fn($v) => ['id' => $v->getId(), 'name' => $v->getName()])->toArray()
+        );
+    }
+
     private function validateIpInputs(\Symfony\Component\Form\FormInterface $form, ?\App\Entity\Subnet $subnet, ?NetworkInterface $current): array
     {
         $errors = [];
@@ -227,4 +235,5 @@ class InterfaceController extends AbstractController
             }
         }
     }
+
 }

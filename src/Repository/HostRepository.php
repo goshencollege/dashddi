@@ -17,6 +17,55 @@ class HostRepository extends ServiceEntityRepository
     }
 
     /** @return Host[] */
+    public function advancedSearch(array $criteria): array
+    {
+        $qb = $this->createQueryBuilder('h')
+            ->leftJoin('h.interfaces', 'i')
+            ->leftJoin('i.ipAddress', 'ip4')
+            ->leftJoin('i.ipv6Address', 'ip6')
+            ->leftJoin('i.names', 'n')
+            ->leftJoin('n.domain', 'nd');
+
+        if (!empty($criteria['name'])) {
+            $qb->andWhere('h.name LIKE :name')
+               ->setParameter('name', $this->toLike($criteria['name']));
+        }
+        if (!empty($criteria['location'])) {
+            $qb->andWhere('h.location LIKE :location')
+               ->setParameter('location', $this->toLike($criteria['location']));
+        }
+        if (!empty($criteria['subnet'])) {
+            $qb->andWhere('i.subnet = :subnet')
+               ->setParameter('subnet', (int) $criteria['subnet']);
+        }
+        if (!empty($criteria['ip'])) {
+            $qb->andWhere($qb->expr()->orX('ip4.address LIKE :ip', 'ip6.address LIKE :ip'))
+               ->setParameter('ip', $this->toLike($criteria['ip']));
+        }
+        if (!empty($criteria['mac'])) {
+            $qb->andWhere('i.macAddress LIKE :mac')
+               ->setParameter('mac', $this->toLike($criteria['mac']));
+        }
+        if (!empty($criteria['dns'])) {
+            $qb->andWhere($qb->expr()->orX(
+                'n.name LIKE :dns',
+                'nd.name LIKE :dns',
+                "CONCAT(n.name, '.', nd.name) LIKE :dns"
+            ))->setParameter('dns', $this->toLike($criteria['dns']));
+        }
+
+        return $qb->distinct()->orderBy('h.name', 'ASC')->getQuery()->getResult();
+    }
+
+    private function toLike(string $value): string
+    {
+        // * is the user-facing wildcard; if none present, do a contains search
+        return str_contains($value, '*')
+            ? str_replace('*', '%', $value)
+            : '%' . $value . '%';
+    }
+
+    /** @return Host[] */
     public function search(string $query): array
     {
         $q  = '%' . $query . '%';
@@ -25,12 +74,17 @@ class HostRepository extends ServiceEntityRepository
             ->leftJoin('i.subnet', 's')
             ->leftJoin('i.ipAddress', 'ip4')
             ->leftJoin('i.ipv6Address', 'ip6')
+            ->leftJoin('i.names', 'n')
+            ->leftJoin('n.domain', 'nd')
             ->where('h.name LIKE :q')
             ->orWhere('h.location LIKE :q')
             ->orWhere('s.name LIKE :q')
             ->orWhere('ip4.address LIKE :q')
             ->orWhere('ip6.address LIKE :q')
             ->orWhere('i.macAddress LIKE :q')
+            ->orWhere('n.name LIKE :q')
+            ->orWhere('nd.name LIKE :q')
+            ->orWhere("CONCAT(n.name, '.', nd.name) LIKE :q")
             ->setParameter('q', $q);
 
         // If the query is (or contains) a MAC in any delimiter/case style,

@@ -90,42 +90,55 @@
                     <i class="bi bi-plus-lg me-1"></i>Add Name
                 </button>
             </div>
+            {% set proto = form.names.vars.prototype %}
+            {% set proto_html %}
+            <div class="name-entry border rounded p-2 mb-2 d-flex align-items-center gap-2 flex-wrap">
+                <div class="flex-fill" style="min-width:7rem">
+                    {{ form_widget(proto.name, {attr: {class: 'form-control form-control-sm font-monospace'}}) }}
+                    {{ form_errors(proto.name) }}
+                </div>
+                <span class="fw-semibold">.</span>
+                <div class="flex-fill" style="min-width:10rem">
+                    {{ form_widget(proto.domain, {attr: {class: 'form-select form-select-sm'}}) }}
+                    {{ form_errors(proto.domain) }}
+                </div>
+                {% for viewWidget in proto.views %}
+                    <div class="form-check form-check-inline mb-0">
+                        {{ form_widget(viewWidget, {attr: {class: 'form-check-input'}}) }}
+                        {{ form_label(viewWidget, null, {label_attr: {class: 'form-check-label small'}}) }}
+                    </div>
+                {% else %}
+                    <div class="d-none">{{ form_widget(proto.views) }}</div>
+                {% endfor %}
+                <button type="button" class="btn btn-sm btn-outline-danger remove-name-btn ms-auto">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
+            {% endset %}
             <div class="card-body" id="names-collection"
-                 data-prototype="{{ form_widget(form.names.vars.prototype)|e('html_attr') }}">
+                 data-prototype="{{ proto_html|e('html_attr') }}">
                 {% for nameForm in form.names %}
-                    <div class="name-entry border rounded p-3 mb-2">
-                        <div class="row g-2">
-                            <div class="col-md-5">
-                                {{ form_label(nameForm.name, null, {label_attr: {class: 'form-label small fw-semibold'}}) }}
-                                {{ form_widget(nameForm.name, {attr: {class: 'form-control form-control-sm font-monospace'}}) }}
-                                {{ form_errors(nameForm.name) }}
-                            </div>
-                            <div class="col-md-5">
-                                {{ form_label(nameForm.domain, null, {label_attr: {class: 'form-label small fw-semibold'}}) }}
-                                {{ form_widget(nameForm.domain, {attr: {class: 'form-select form-select-sm'}}) }}
-                                {{ form_errors(nameForm.domain) }}
-                            </div>
-                            <div class="col-md-2 d-flex align-items-end">
-                                <button type="button" class="btn btn-sm btn-outline-danger remove-name-btn w-100">
-                                    <i class="bi bi-trash"></i>
-                                </button>
-                            </div>
+                    <div class="name-entry border rounded p-2 mb-2 d-flex align-items-center gap-2 flex-wrap">
+                        <div class="flex-fill" style="min-width:7rem">
+                            {{ form_widget(nameForm.name, {attr: {class: 'form-control form-control-sm font-monospace'}}) }}
+                            {{ form_errors(nameForm.name) }}
                         </div>
-                        {% if nameForm.views|length > 0 %}
-                        <div class="mt-2 pt-2 border-top">
-                            <label class="form-label small fw-semibold mb-1">Views</label>
-                            <div class="d-flex flex-wrap gap-2">
-                                {% for viewWidget in nameForm.views %}
-                                    <div class="form-check form-check-inline">
-                                        {{ form_widget(viewWidget, {attr: {class: 'form-check-input'}}) }}
-                                        {{ form_label(viewWidget, null, {label_attr: {class: 'form-check-label small'}}) }}
-                                    </div>
-                                {% endfor %}
-                            </div>
+                        <span class="fw-semibold">.</span>
+                        <div class="flex-fill" style="min-width:10rem">
+                            {{ form_widget(nameForm.domain, {attr: {class: 'form-select form-select-sm'}}) }}
+                            {{ form_errors(nameForm.domain) }}
                         </div>
+                        {% for viewWidget in nameForm.views %}
+                            <div class="form-check form-check-inline mb-0">
+                                {{ form_widget(viewWidget, {attr: {class: 'form-check-input'}}) }}
+                                {{ form_label(viewWidget, null, {label_attr: {class: 'form-check-label small'}}) }}
+                            </div>
                         {% else %}
-                        <div class="d-none">{{ form_widget(nameForm.views) }}</div>
-                        {% endif %}
+                            <div class="d-none">{{ form_widget(nameForm.views) }}</div>
+                        {% endfor %}
+                        <button type="button" class="btn btn-sm btn-outline-danger remove-name-btn ms-auto">
+                            <i class="bi bi-trash"></i>
+                        </button>
                     </div>
                 {% else %}
                     <p class="text-muted small mb-0" id="no-names-msg">No DNS names added yet.</p>
@@ -194,20 +207,10 @@
 
     addBtn.addEventListener('click', function () {
         document.getElementById('no-names-msg')?.remove();
-        const prototype = collection.dataset.prototype;
-        const html = prototype.replace(/__name__/g, index++);
         const div = document.createElement('div');
-        div.innerHTML = html;
+        div.innerHTML = collection.dataset.prototype.replace(/__name__/g, index++);
         const entry = div.firstElementChild;
-        entry.classList.add('name-entry', 'border', 'rounded', 'p-3', 'mb-2');
-
-        const removeBtn = document.createElement('button');
-        removeBtn.type = 'button';
-        removeBtn.className = 'btn btn-sm btn-outline-danger mt-2';
-        removeBtn.innerHTML = '<i class="bi bi-trash me-1"></i>Remove';
-        removeBtn.addEventListener('click', () => entry.remove());
-        entry.appendChild(removeBtn);
-
+        entry.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = true);
         collection.appendChild(entry);
     });
 
@@ -216,6 +219,7 @@
             e.target.closest('.name-entry').remove();
         }
     });
+
 })();
 </script>
 {% endblock %}
