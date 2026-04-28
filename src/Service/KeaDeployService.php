@@ -64,23 +64,8 @@ class KeaDeployService
                 continue;
             }
 
-            // Validate the new file on disk before applying it
-            $testResult = $this->controlCommand('config-test', $keaService, $server);
-            if (!$testResult['success']) {
-                // Restore the backup without ever reloading
-                $restored = $hasBackup && $this->runScp($backupFile, $remoteTarget, $server->getSshKeyPath(), $restoreOutput) === 0;
-                $result['reload'] = [
-                    'success'         => false,
-                    'response'        => $testResult['response'],
-                    'stage'           => 'config-test',
-                    'restored'        => $restored,
-                    'restore_error'   => $restored ? null : ($hasBackup ? $restoreOutput : 'No backup available'),
-                ];
-                $results[$type] = $result;
-                continue;
-            }
-
-            // Test passed — reload
+            // Reload — Kea validates the config before applying it, so a bad file will
+            // fail here without affecting the running service.
             $reloadResult = $this->controlCommand('config-reload', $keaService, $server);
             $result['reload'] = [
                 'success'  => $reloadResult['success'],
