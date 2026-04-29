@@ -66,12 +66,42 @@ class Subnet
     #[ORM\OrderBy(['startIp' => 'ASC'])]
     private Collection $addressBlocks;
 
+    #[ORM\ManyToMany(targetEntity: DnsView::class)]
+    #[ORM\JoinTable(name: 'subnet_dns_view')]
+    private Collection $views;
+
+    #[ORM\Column(length: 255, nullable: true)]
+    #[Assert\Length(max: 255)]
+    private ?string $soaNameserver = null;
+
+    #[ORM\Column(length: 255, nullable: true)]
+    #[Assert\Length(max: 255)]
+    #[Assert\Email]
+    private ?string $soaEmail = null;
+
+    #[ORM\Column(nullable: true)]
+    #[Assert\PositiveOrZero]
+    private ?int $soaRefresh = 3600;
+
+    #[ORM\Column(nullable: true)]
+    #[Assert\PositiveOrZero]
+    private ?int $soaRetry = 900;
+
+    #[ORM\Column(nullable: true)]
+    #[Assert\PositiveOrZero]
+    private ?int $soaExpire = 604800;
+
+    #[ORM\Column(nullable: true)]
+    #[Assert\PositiveOrZero]
+    private ?int $soaTtl = 3600;
+
     public function __construct()
     {
         $this->ipAddresses = new ArrayCollection();
         $this->ipv6Addresses = new ArrayCollection();
         $this->interfaces = new ArrayCollection();
         $this->addressBlocks = new ArrayCollection();
+        $this->views = new ArrayCollection();
     }
 
     public function getId(): ?int { return $this->id; }
@@ -101,6 +131,39 @@ class Subnet
     public function getIpv6Addresses(): Collection { return $this->ipv6Addresses; }
     public function getInterfaces(): Collection { return $this->interfaces; }
     public function getAddressBlocks(): Collection { return $this->addressBlocks; }
+    public function getSoaNameserver(): ?string { return $this->soaNameserver; }
+    public function setSoaNameserver(?string $v): static { $this->soaNameserver = $v; return $this; }
+
+    public function getSoaEmail(): ?string { return $this->soaEmail; }
+    public function setSoaEmail(?string $v): static { $this->soaEmail = $v; return $this; }
+
+    public function getSoaRefresh(): ?int { return $this->soaRefresh; }
+    public function setSoaRefresh(?int $v): static { $this->soaRefresh = $v; return $this; }
+
+    public function getSoaRetry(): ?int { return $this->soaRetry; }
+    public function setSoaRetry(?int $v): static { $this->soaRetry = $v; return $this; }
+
+    public function getSoaExpire(): ?int { return $this->soaExpire; }
+    public function setSoaExpire(?int $v): static { $this->soaExpire = $v; return $this; }
+
+    public function getSoaTtl(): ?int { return $this->soaTtl; }
+    public function setSoaTtl(?int $v): static { $this->soaTtl = $v; return $this; }
+
+    public function getViews(): Collection { return $this->views; }
+
+    public function addView(DnsView $view): static
+    {
+        if (!$this->views->contains($view)) {
+            $this->views->add($view);
+        }
+        return $this;
+    }
+
+    public function removeView(DnsView $view): static
+    {
+        $this->views->removeElement($view);
+        return $this;
+    }
 
     public function __toString(): string
     {

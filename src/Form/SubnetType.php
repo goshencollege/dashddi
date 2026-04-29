@@ -3,9 +3,11 @@
 namespace App\Form;
 
 use App\Entity\AddressBlock;
+use App\Entity\DnsView;
 use App\Entity\Subnet;
 use App\Entity\Vrf;
 use App\Enum\BlockType;
+use App\Repository\DnsViewRepository;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\IntegerType;
@@ -16,6 +18,8 @@ use Symfony\Component\OptionsResolver\OptionsResolver;
 
 class SubnetType extends AbstractType
 {
+    public function __construct(private readonly DnsViewRepository $viewRepo) {}
+
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
         $builder
@@ -51,6 +55,42 @@ class SubnetType extends AbstractType
                 'placeholder'  => '-- None --',
                 'required'     => false,
                 'label'        => 'VRF',
+            ])
+            ->add('soaNameserver', TextType::class, [
+                'label'    => 'Primary Nameserver (MNAME)',
+                'required' => false,
+                'attr'     => ['placeholder' => 'e.g. ns1.example.com'],
+            ])
+            ->add('soaEmail', TextType::class, [
+                'label'    => 'Responsible Email (RNAME)',
+                'required' => false,
+                'attr'     => ['placeholder' => 'e.g. hostmaster@example.com'],
+            ])
+            ->add('soaRefresh', IntegerType::class, [
+                'label'    => 'Refresh (seconds)',
+                'required' => false,
+            ])
+            ->add('soaRetry', IntegerType::class, [
+                'label'    => 'Retry (seconds)',
+                'required' => false,
+            ])
+            ->add('soaExpire', IntegerType::class, [
+                'label'    => 'Expire (seconds)',
+                'required' => false,
+            ])
+            ->add('soaTtl', IntegerType::class, [
+                'label'    => 'Minimum TTL (seconds)',
+                'required' => false,
+            ])
+            ->add('views', EntityType::class, [
+                'class'        => DnsView::class,
+                'choices'      => $this->viewRepo->findBy([], ['name' => 'ASC']),
+                'choice_label' => 'name',
+                'multiple'     => true,
+                'expanded'     => true,
+                'required'     => false,
+                'label'        => 'DNS Views (reverse zone)',
+                'by_reference' => false,
             ]);
 
         if ($options['embed_blocks']) {
