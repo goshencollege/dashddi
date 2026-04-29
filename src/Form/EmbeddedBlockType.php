@@ -14,14 +14,16 @@ class EmbeddedBlockType extends AbstractType
     {
         $builder
             ->add('startIp', TextType::class, [
-                'label'    => 'Start IP',
-                'required' => false,
-                'attr'     => ['placeholder' => 'e.g. 192.168.1.1', 'class' => 'font-monospace'],
+                'label'      => 'Start IP',
+                'required'   => false,
+                'empty_data' => '',
+                'attr'       => ['placeholder' => 'e.g. 192.168.1.1', 'class' => 'font-monospace'],
             ])
             ->add('endIp', TextType::class, [
-                'label'    => 'End IP',
-                'required' => false,
-                'attr'     => ['placeholder' => 'e.g. 192.168.1.10', 'class' => 'font-monospace'],
+                'label'      => 'End IP',
+                'required'   => false,
+                'empty_data' => '',
+                'attr'       => ['placeholder' => 'e.g. 192.168.1.10', 'class' => 'font-monospace'],
             ])
             ->add('label', TextType::class, [
                 'required' => false,
