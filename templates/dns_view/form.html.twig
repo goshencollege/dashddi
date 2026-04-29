@@ -10,30 +10,111 @@
 </nav>
 
 <div class="row justify-content-center">
-    <div class="col-lg-6">
-        <div class="card">
+    <div class="col-lg-7">
+        {{ form_start(form) }}
+
+        <div class="card mb-3">
             <div class="card-header"><i class="bi bi-eye me-1"></i>{{ title }}</div>
             <div class="card-body">
-                {{ form_start(form) }}
                 <div class="mb-3">
                     {{ form_label(form.name) }}
                     {{ form_widget(form.name, {attr: {class: 'form-control'}}) }}
                     {{ form_errors(form.name) }}
                 </div>
-                <div class="mb-3">
+                <div class="mb-0">
                     {{ form_label(form.description) }}
                     {{ form_widget(form.description, {attr: {class: 'form-control'}}) }}
                     {{ form_errors(form.description) }}
                 </div>
-                <div class="d-flex justify-content-between">
-                    <a href="{{ path('dns_view_index') }}" class="btn btn-outline-secondary">Cancel</a>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-check-lg me-1"></i>Save
-                    </button>
-                </div>
-                {{ form_end(form) }}
             </div>
         </div>
+
+        <div class="card mb-3">
+            <div class="card-header"><i class="bi bi-shield-lock me-1"></i>Access Control</div>
+            <div class="card-body">
+                {% set acl_fields = [
+                    {field: form.matchClients,  id: 'match-clients',  label: 'match-clients',  hint: 'Clients matched to this view (e.g. 192.168.1.0/24, localnets, any)'},
+                    {field: form.allowQuery,    id: 'allow-query',    label: 'allow-query',    hint: 'Who may query this view (e.g. any, none, 10.0.0.0/8)'},
+                    {field: form.allowTransfer, id: 'allow-transfer', label: 'allow-transfer', hint: 'Who may do zone transfers (e.g. none, 10.0.0.1)'},
+                    {field: form.alsoNotify,    id: 'also-notify',    label: 'also-notify',    hint: 'Additional servers to notify on zone changes'},
+                ] %}
+
+                {% for acl in acl_fields %}
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">
+                            <code>{{ acl.label }}</code>
+                        </label>
+                        <div class="form-text mb-2 mt-0">{{ acl.hint }}</div>
+                        <div id="{{ acl.id }}-container"
+                             data-prototype="{{ form_widget(acl.field.vars.prototype, {attr: {class: 'form-control', placeholder: 'e.g. any'}})|e('html_attr') }}"
+                             data-index="{{ acl.field|length }}">
+                            {% for entry in acl.field %}
+                                <div class="input-group mb-2 acl-entry">
+                                    {{ form_widget(entry, {attr: {class: 'form-control'}}) }}
+                                    <button type="button" class="btn btn-outline-danger remove-acl-entry" title="Remove">
+                                        <i class="bi bi-x-lg"></i>
+                                    </button>
+                                </div>
+                            {% endfor %}
+                        </div>
+                        <button type="button" class="btn btn-outline-secondary btn-sm add-acl-entry"
+                                data-target="{{ acl.id }}-container">
+                            <i class="bi bi-plus-lg me-1"></i>Add entry
+                        </button>
+                        {{ form_errors(acl.field) }}
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header"><i class="bi bi-code-square me-1"></i>Additional Options</div>
+            <div class="card-body">
+                <div class="mb-0">
+                    <div class="form-text mb-2">Raw BIND statements inserted verbatim inside the view block.</div>
+                    {{ form_widget(form.extraOptions, {attr: {class: 'form-control font-monospace', rows: 5}}) }}
+                    {{ form_errors(form.extraOptions) }}
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-between">
+            <a href="{{ path('dns_view_index') }}" class="btn btn-outline-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-check-lg me-1"></i>Save
+            </button>
+        </div>
+
+        {{ form_end(form) }}
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+{{ parent() }}
+<script>
+document.querySelectorAll('.add-acl-entry').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+        const container = document.getElementById(this.dataset.target);
+        const index     = parseInt(container.dataset.index, 10);
+        const html      = container.dataset.prototype.replace(/__name__/g, index);
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'input-group mb-2 acl-entry';
+        wrapper.innerHTML = html +
+            '<button type="button" class="btn btn-outline-danger remove-acl-entry" title="Remove">' +
+            '<i class="bi bi-x-lg"></i></button>';
+
+        container.appendChild(wrapper);
+        container.dataset.index = index + 1;
+    });
+});
+
+document.addEventListener('click', function (e) {
+    const btn = e.target.closest('.remove-acl-entry');
+    if (btn) {
+        btn.closest('.acl-entry').remove();
+    }
+});
+</script>
 {% endblock %}

@@ -191,6 +191,27 @@ class DnsConfigGenerator
 
             $lines[] = 'view "' . $view->getName() . '" {';
 
+            foreach ([
+                'match-clients'  => $view->getMatchClients(),
+                'allow-query'    => $view->getAllowQuery(),
+                'allow-transfer' => $view->getAllowTransfer(),
+                'also-notify'    => $view->getAlsoNotify(),
+            ] as $directive => $entries) {
+                if (!empty($entries)) {
+                    $lines[] = '    ' . $directive . ' { ' . implode('; ', $entries) . '; };';
+                }
+            }
+
+            if ($view->getExtraOptions()) {
+                foreach (explode("\n", rtrim($view->getExtraOptions())) as $optLine) {
+                    $lines[] = '    ' . $optLine;
+                }
+            }
+
+            if (!empty($domains) || !empty($subnets)) {
+                $lines[] = '';
+            }
+
             foreach ($domains as $domain) {
                 $file    = $zonePath . '/' . $view->getName() . '/' . $domain->getName() . '.zone';
                 $lines[] = '    zone "' . $domain->getName() . '" IN {';
