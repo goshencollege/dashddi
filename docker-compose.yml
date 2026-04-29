@@ -1,8 +1,13 @@
 services:
   app:
     build: .
+    read_only: true
     volumes:
-      - .:/var/www/html
+      - .:/var/www/html:ro
+      - symfony_var:/var/www/html/var
+    tmpfs:
+      - /tmp
+      - /usr/local/var/run
     environment:
       APP_ENV: dev
       APP_SECRET: changeme_in_production_32chars_min
@@ -13,18 +18,24 @@ services:
 
   nginx:
     image: nginx:alpine
+    read_only: true
     ports:
       - "80:80"
       - "443:443"
     volumes:
-      - .:/var/www/html
+      - .:/var/www/html:ro
       - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
       - ./docker/ssl:/etc/nginx/ssl:ro
+    tmpfs:
+      - /var/cache/nginx
+      - /var/run
+      - /tmp
     depends_on:
       - app
 
   db:
     image: mysql:8.0
+    read_only: true
     environment:
       MYSQL_DATABASE: ipam
       MYSQL_USER: ipam
@@ -32,6 +43,9 @@ services:
       MYSQL_ROOT_PASSWORD: root_password
     volumes:
       - mysql_data:/var/lib/mysql
+    tmpfs:
+      - /var/run/mysqld
+      - /tmp
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "ipam", "-pipam_password"]
       interval: 5s
@@ -42,3 +56,4 @@ services:
 
 volumes:
   mysql_data:
+  symfony_var:
