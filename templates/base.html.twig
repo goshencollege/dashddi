@@ -124,11 +124,40 @@
                         <i class="bi bi-diagram-2 me-1"></i>Subnets
                     </a>
                 </li>
-                <li class="nav-item">
-                    <a class="nav-link {{ app.request.attributes.get('_route') starts with 'domain' or app.request.attributes.get('_route') starts with 'dns_view' or app.request.attributes.get('_route') starts with 'dnssec_policy' ? 'active' }}"
-                       href="{{ path('domain_index') }}">
-                        <i class="bi bi-globe me-1"></i>Domains
+                {% set dnsActive = app.request.attributes.get('_route') starts with 'domain'
+                    or app.request.attributes.get('_route') starts with 'dns_view'
+                    or app.request.attributes.get('_route') starts with 'dns_acl'
+                    or app.request.attributes.get('_route') starts with 'dnssec_policy' %}
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle {{ dnsActive ? 'active' }}" href="#" data-bs-toggle="dropdown">
+                        <i class="bi bi-globe me-1"></i>DNS
                     </a>
+                    <ul class="dropdown-menu">
+                        <li>
+                            <a class="dropdown-item {{ app.request.attributes.get('_route') starts with 'domain' ? 'active' }}"
+                               href="{{ path('domain_index') }}">
+                                <i class="bi bi-globe me-1"></i>Domains
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item {{ app.request.attributes.get('_route') starts with 'dns_view' ? 'active' }}"
+                               href="{{ path('dns_view_index') }}">
+                                <i class="bi bi-eye me-1"></i>Views
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item {{ app.request.attributes.get('_route') starts with 'dns_acl' ? 'active' }}"
+                               href="{{ path('dns_acl_index') }}">
+                                <i class="bi bi-list-check me-1"></i>ACLs
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item {{ app.request.attributes.get('_route') starts with 'dnssec_policy' ? 'active' }}"
+                               href="{{ path('dnssec_policy_index') }}">
+                                <i class="bi bi-shield-check me-1"></i>DNSSEC Policies
+                            </a>
+                        </li>
+                    </ul>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link {{ app.request.attributes.get('_route') starts with 'dhcp_server' or app.request.attributes.get('_route') starts with 'dns_server' or app.request.attributes.get('_route') starts with 'servers' ? 'active' }}"
