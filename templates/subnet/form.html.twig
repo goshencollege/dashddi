@@ -107,6 +107,27 @@
                         <div class="form-text">Reverse zones for this subnet will be generated for the selected views.</div>
                     </div>
                     {% endif %}
+                    <hr class="my-3">
+                    <h6 class="text-muted mb-3"><i class="bi bi-shield-check me-1"></i>DNSSEC</h6>
+                    <div class="mb-3">
+                        {{ form_label(form.dnssecPolicy, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                        {{ form_widget(form.dnssecPolicy, {attr: {class: 'form-select'}}) }}
+                        <div class="form-text">
+                            Policy must be defined under <a href="{{ path('dnssec_policy_index') }}">DNSSEC Policies</a>.
+                        </div>
+                        {{ form_errors(form.dnssecPolicy) }}
+                    </div>
+                    <div class="mb-3">
+                        {{ form_label(form.keyDirectory, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                        {{ form_widget(form.keyDirectory, {attr: {class: 'form-control font-monospace'}}) }}
+                        {{ form_errors(form.keyDirectory) }}
+                    </div>
+                    <div class="mb-4">
+                        <div class="form-check">
+                            {{ form_widget(form.dnssecInlineSigning, {attr: {class: 'form-check-input'}}) }}
+                            {{ form_label(form.dnssecInlineSigning, null, {label_attr: {class: 'form-check-label'}}) }}
+                        </div>
+                    </div>
                     {% if embed_blocks %}
                     <hr class="my-4">
 

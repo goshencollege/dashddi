@@ -4,12 +4,14 @@ namespace App\Form;
 
 use App\Entity\AddressBlock;
 use App\Entity\DnsView;
+use App\Entity\DnssecPolicy;
 use App\Entity\Subnet;
 use App\Entity\Vrf;
 use App\Enum\BlockType;
 use App\Repository\DnsViewRepository;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
+use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
 use Symfony\Component\Form\Extension\Core\Type\IntegerType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
@@ -91,6 +93,22 @@ class SubnetType extends AbstractType
                 'required'     => false,
                 'label'        => 'DNS Views (reverse zone)',
                 'by_reference' => false,
+            ])
+            ->add('dnssecPolicy', EntityType::class, [
+                'class'        => DnssecPolicy::class,
+                'choice_label' => 'name',
+                'placeholder'  => '— None —',
+                'required'     => false,
+                'label'        => 'DNSSEC Policy',
+            ])
+            ->add('dnssecInlineSigning', CheckboxType::class, [
+                'label'    => 'Enable inline signing',
+                'required' => false,
+            ])
+            ->add('keyDirectory', TextType::class, [
+                'label'    => 'Key Directory',
+                'required' => false,
+                'attr'     => ['placeholder' => 'e.g. /etc/bind/keys'],
             ]);
 
         if ($options['embed_blocks']) {

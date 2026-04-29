@@ -7,14 +7,16 @@ use App\Entity\DnsServer;
 use App\Entity\DnsView;
 use App\Entity\NetworkInterface;
 use App\Entity\Subnet;
+use App\Repository\DnssecPolicyRepository;
 use App\Repository\DomainRepository;
 use App\Repository\SubnetRepository;
 
 class DnsConfigGenerator
 {
     public function __construct(
-        private readonly DomainRepository $domainRepo,
-        private readonly SubnetRepository $subnetRepo,
+        private readonly DomainRepository      $domainRepo,
+        private readonly SubnetRepository      $subnetRepo,
+        private readonly DnssecPolicyRepository $policyRepo,
     ) {}
 
     /** @return Domain[] */
@@ -185,6 +187,37 @@ class DnsConfigGenerator
         $lines[] = '// Include in named.conf:  include "' . $zonePath . '/views.conf";';
         $lines[] = '';
 
+        foreach ($this->policyRepo->findBy([], ['name' => 'ASC']) as $policy) {
+            $lines[] = 'dnssec-policy "' . $policy->getName() . '" {';
+            if ($policy->getDnskeyTtl() !== null) {
+                $lines[] = '    dnskey-ttl ' . $policy->getDnskeyTtl() . ';';
+            }
+            if ($policy->getMaxZoneTtl() !== null) {
+                $lines[] = '    max-zone-ttl ' . $policy->getMaxZoneTtl() . ';';
+            }
+            if ($policy->getSignaturesValidity()) {
+                $lines[] = '    signatures-validity ' . $policy->getSignaturesValidity() . ';';
+            }
+            if ($policy->getSignaturesRefresh()) {
+                $lines[] = '    signatures-refresh ' . $policy->getSignaturesRefresh() . ';';
+            }
+            $keys = $policy->getKeys();
+            if (!empty($keys)) {
+                $lines[] = '    keys {';
+                foreach ($keys as $key) {
+                    $lines[] = '        ' . $key['type'] . ' lifetime ' . $key['lifetime'] . ' algorithm ' . $key['algorithm'] . ';';
+                }
+                $lines[] = '    };';
+            }
+            if ($policy->getExtraOptions()) {
+                foreach (explode("\n", rtrim($policy->getExtraOptions())) as $optLine) {
+                    $lines[] = '    ' . $optLine;
+                }
+            }
+            $lines[] = '};';
+            $lines[] = '';
+        }
+
         foreach ($server->getViews() as $view) {
             $domains = $this->domainsForView($view);
             $subnets = $this->subnetsForView($view);
@@ -217,6 +250,15 @@ class DnsConfigGenerator
                 $lines[] = '    zone "' . $domain->getName() . '" IN {';
                 $lines[] = '        type master;';
                 $lines[] = '        file "' . $file . '";';
+                if ($domain->getDnssecPolicy()) {
+                    $lines[] = '        dnssec-policy "' . $domain->getDnssecPolicy()->getName() . '";';
+                }
+                if ($domain->isDnssecInlineSigning()) {
+                    $lines[] = '        inline-signing yes;';
+                }
+                if ($domain->getKeyDirectory()) {
+                    $lines[] = '        key-directory "' . $domain->getKeyDirectory() . '";';
+                }
                 $lines[] = '    };';
             }
 
@@ -227,6 +269,15 @@ class DnsConfigGenerator
                     $lines[] = '    zone "' . $zoneName . '" IN {';
                     $lines[] = '        type master;';
                     $lines[] = '        file "' . $file . '";';
+                    if ($subnet->getDnssecPolicy()) {
+                        $lines[] = '        dnssec-policy "' . $subnet->getDnssecPolicy()->getName() . '";';
+                    }
+                    if ($subnet->isDnssecInlineSigning()) {
+                        $lines[] = '        inline-signing yes;';
+                    }
+                    if ($subnet->getKeyDirectory()) {
+                        $lines[] = '        key-directory "' . $subnet->getKeyDirectory() . '";';
+                    }
                     $lines[] = '    };';
                 }
             }
