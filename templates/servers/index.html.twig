@@ -182,8 +182,9 @@
                     results.style.display = '';
                     return;
                 }
-                results.innerHTML = buildDhcpResults(data);
+                results.innerHTML = buildDhcpResults(data, resultsId);
                 results.style.display = '';
+                bindCollapse('dhcp-collapse-body');
             })
             .catch(err => {
                 results.innerHTML = `<div class="alert alert-danger">Request failed: ${err}</div>`;
@@ -196,8 +197,27 @@
         });
     }
 
-    function buildDhcpResults(data) {
-        let html = '<div class="card"><div class="card-header fw-semibold">Push Results</div><ul class="list-group list-group-flush">';
+    function resultsHeader(collapseId, containerId) {
+        return `<div class="card-header d-flex justify-content-between align-items-center">
+            <button class="btn btn-link p-0 fw-semibold text-body text-decoration-none d-flex align-items-center gap-1"
+                    data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="true">
+                <i class="bi bi-chevron-down me-1 results-chevron" style="transition:transform .2s"></i>Push Results
+            </button>
+            <button class="btn-close" title="Dismiss"
+                    onclick="var el=document.getElementById('${containerId}');el.innerHTML='';el.style.display='none'"></button>
+        </div><div id="${collapseId}" class="collapse show"><ul class="list-group list-group-flush">`;
+    }
+
+    function bindCollapse(collapseId) {
+        const el      = document.getElementById(collapseId);
+        if (!el) return;
+        const chevron = el.closest('.card').querySelector('.results-chevron');
+        el.addEventListener('hide.bs.collapse', () => { if (chevron) chevron.style.transform = 'rotate(-90deg)'; });
+        el.addEventListener('show.bs.collapse', () => { if (chevron) chevron.style.transform = ''; });
+    }
+
+    function buildDhcpResults(data, containerId) {
+        let html = `<div class="card">${resultsHeader('dhcp-collapse-body', containerId)}`;
         for (const [serverName, files] of Object.entries(data)) {
             for (const [type, info] of Object.entries(files)) {
                 const ok    = info.success;
@@ -226,11 +246,11 @@
                 </li>`;
             }
         }
-        return html + '</ul></div>';
+        return html + '</ul></div></div></div>';
     }
 
-    function buildDnsResults(data) {
-        let html = '<div class="card"><div class="card-header fw-semibold">Push Results</div><ul class="list-group list-group-flush">';
+    function buildDnsResults(data, containerId) {
+        let html = `<div class="card">${resultsHeader('dns-collapse-body', containerId)}`;
         for (const [serverName, result] of Object.entries(data)) {
             for (const [viewName, viewResult] of Object.entries(result.views ?? {})) {
                 if (viewResult.mkdir && !viewResult.mkdir.success) {
@@ -274,7 +294,7 @@
                 </li>`;
             }
         }
-        return html + '</ul></div>';
+        return html + '</ul></div></div></div>';
     }
 
     bindPushButton('dhcp-push-btn', 'dhcp-push-results', '{{ path('dhcp_server_push') }}');
@@ -299,8 +319,9 @@
                     dnsResults.style.display = '';
                     return;
                 }
-                dnsResults.innerHTML = buildDnsResults(data);
+                dnsResults.innerHTML = buildDnsResults(data, 'dns-push-results');
                 dnsResults.style.display = '';
+                bindCollapse('dns-collapse-body');
             })
             .catch(err => {
                 dnsResults.innerHTML = `<div class="alert alert-danger">Request failed: ${err}</div>`;
