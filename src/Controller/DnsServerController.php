@@ -17,11 +17,9 @@ use Symfony\Component\Routing\Attribute\Route;
 class DnsServerController extends AbstractController
 {
     #[Route('', name: 'dns_server_index', methods: ['GET'])]
-    public function index(DnsServerRepository $repo): Response
+    public function index(): Response
     {
-        return $this->render('dns_server/index.html.twig', [
-            'servers' => $repo->findBy([], ['name' => 'ASC']),
-        ]);
+        return $this->redirectToRoute('servers_index');
     }
 
     #[Route('/new', name: 'dns_server_new', methods: ['GET', 'POST'])]

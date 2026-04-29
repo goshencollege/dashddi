@@ -1,0 +1,307 @@
+{% extends 'base.html.twig' %}
+{% block title %}Servers{% endblock %}
+
+{% block content %}
+
+{# ── DHCP Servers ─────────────────────────────────────────────────────────── #}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="h5 mb-0"><i class="bi bi-hdd-network me-2"></i>DHCP Servers</h2>
+    <div class="d-flex gap-2">
+        <button id="dhcp-push-btn" class="btn btn-sm btn-success" {% if dhcpServers is empty %}disabled{% endif %}>
+            <i class="bi bi-cloud-upload me-1"></i>Push to All
+        </button>
+        <a href="{{ path('dhcp_server_new') }}" class="btn btn-sm btn-primary">
+            <i class="bi bi-plus-lg me-1"></i>Add Server
+        </a>
+    </div>
+</div>
+
+<div id="dhcp-push-results" class="mb-3" style="display:none"></div>
+
+{% if dhcpServers is empty %}
+    <div class="card mb-5">
+        <div class="card-body text-center text-muted py-4">
+            <i class="bi bi-hdd-network fs-1 d-block mb-3 opacity-25"></i>
+            No DHCP servers configured yet. <a href="{{ path('dhcp_server_new') }}">Add the first one →</a>
+        </div>
+    </div>
+{% else %}
+    <div class="card mb-5">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Hostname / IP</th>
+                        <th>SSH User</th>
+                        <th>Remote Path</th>
+                        <th>SSH Key</th>
+                        <th>Description</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for server in dhcpServers %}
+                        <tr>
+                            <td class="fw-semibold">{{ server.name }}</td>
+                            <td class="font-monospace">{{ server.hostname }}</td>
+                            <td class="font-monospace">{{ server.sshUser }}</td>
+                            <td class="font-monospace">{{ server.remotePath }}</td>
+                            <td class="font-monospace small text-muted">{{ server.sshKeyPath }}</td>
+                            <td class="text-muted">{{ server.description ?: '—' }}</td>
+                            <td class="text-end">
+                                <div class="d-flex gap-1 justify-content-end align-items-center">
+                                    <a href="{{ path('dhcp_server_edit', {id: server.id}) }}" class="btn btn-sm btn-outline-secondary">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <form method="post" action="{{ path('dhcp_server_delete', {id: server.id}) }}"
+                                          onsubmit="return confirm('Remove {{ server.name|e('js') }}?')">
+                                        <input type="hidden" name="_token" value="{{ csrf_token('delete_dhcp_server_' ~ server.id) }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endif %}
+
+{# ── DNS Servers ──────────────────────────────────────────────────────────── #}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="h5 mb-0"><i class="bi bi-globe2 me-2"></i>DNS Servers</h2>
+    <div class="d-flex gap-2">
+        <button id="dns-push-btn" class="btn btn-sm btn-success" {% if dnsServers is empty %}disabled{% endif %}>
+            <i class="bi bi-cloud-upload me-1"></i>Push to All
+        </button>
+        <a href="{{ path('dns_server_new') }}" class="btn btn-sm btn-primary">
+            <i class="bi bi-plus-lg me-1"></i>Add Server
+        </a>
+    </div>
+</div>
+
+<div id="dns-push-results" class="mb-3" style="display:none"></div>
+
+{% if dnsServers is empty %}
+    <div class="card">
+        <div class="card-body text-center text-muted py-4">
+            <i class="bi bi-globe2 fs-1 d-block mb-3 opacity-25"></i>
+            No DNS servers configured yet. <a href="{{ path('dns_server_new') }}">Add the first one →</a>
+        </div>
+    </div>
+{% else %}
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Hostname / IP</th>
+                        <th>SSH User</th>
+                        <th>Remote Zone Path</th>
+                        <th>Views</th>
+                        <th>Description</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for server in dnsServers %}
+                        <tr>
+                            <td class="fw-semibold">{{ server.name }}</td>
+                            <td class="font-monospace">{{ server.hostname }}</td>
+                            <td class="font-monospace">{{ server.sshUser }}</td>
+                            <td class="font-monospace small">{{ server.remoteZonePath }}</td>
+                            <td>
+                                {% for view in server.views %}
+                                    <span class="badge bg-secondary me-1">{{ view.name }}</span>
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endfor %}
+                            </td>
+                            <td class="text-muted">{{ server.description ?: '—' }}</td>
+                            <td class="text-end">
+                                <div class="d-flex gap-1 justify-content-end align-items-center">
+                                    <a href="{{ path('dns_server_edit', {id: server.id}) }}" class="btn btn-sm btn-outline-secondary">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <form method="post" action="{{ path('dns_server_delete', {id: server.id}) }}"
+                                          onsubmit="return confirm('Remove {{ server.name|e('js') }}?')">
+                                        <input type="hidden" name="_token" value="{{ csrf_token('delete_dns_server_' ~ server.id) }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    function bindPushButton(btnId, resultsId, endpoint) {
+        const btn     = document.getElementById(btnId);
+        const results = document.getElementById(resultsId);
+        if (!btn) return;
+
+        btn.addEventListener('click', function () {
+            btn.disabled  = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Pushing…';
+            results.style.display = 'none';
+            results.innerHTML = '';
+
+            fetch(endpoint, {
+                method: 'POST',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) {
+                    results.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+                    results.style.display = '';
+                    return;
+                }
+                results.innerHTML = buildDhcpResults(data);
+                results.style.display = '';
+            })
+            .catch(err => {
+                results.innerHTML = `<div class="alert alert-danger">Request failed: ${err}</div>`;
+                results.style.display = '';
+            })
+            .finally(() => {
+                btn.disabled  = false;
+                btn.innerHTML = '<i class="bi bi-cloud-upload me-1"></i>Push to All';
+            });
+        });
+    }
+
+    function buildDhcpResults(data) {
+        let html = '<div class="card"><div class="card-header fw-semibold">Push Results</div><ul class="list-group list-group-flush">';
+        for (const [serverName, files] of Object.entries(data)) {
+            for (const [type, info] of Object.entries(files)) {
+                const ok    = info.success;
+                const icon  = ok ? 'bi-check-circle-fill text-success' : 'bi-x-circle-fill text-danger';
+                const label = type === 'dhcp4' ? 'DHCPv4' : 'DHCPv6';
+                let reloadBadge = '', reloadDetail = '';
+                if (info.reload !== null && info.reload !== undefined) {
+                    const r = info.reload;
+                    reloadBadge = `<span class="badge ${r.success ? 'bg-success' : 'bg-danger'} ms-1">${r.stage ?? 'reload'} ${r.success ? 'ok' : 'failed'}</span>`;
+                    if (!r.success) {
+                        reloadDetail += `<div class="text-danger small font-monospace mt-1">${r.response}</div>`;
+                        if (r.restored)       reloadDetail += `<div class="text-warning small mt-1"><i class="bi bi-arrow-counterclockwise me-1"></i>Previous config restored.</div>`;
+                        else if (r.restore_error) reloadDetail += `<div class="text-danger small mt-1"><i class="bi bi-exclamation-triangle me-1"></i>Restore failed: ${r.restore_error}</div>`;
+                    }
+                }
+                html += `<li class="list-group-item d-flex align-items-start gap-2">
+                    <i class="bi ${icon} mt-1 flex-shrink-0"></i>
+                    <div>
+                        <span class="fw-semibold">${serverName}</span>
+                        <span class="badge bg-secondary ms-1">${label}</span>
+                        <span class="text-muted ms-1 font-monospace small">${info.file}</span>
+                        ${reloadBadge}
+                        ${info.output ? `<div class="text-danger small font-monospace mt-1">${info.output}</div>` : ''}
+                        ${reloadDetail}
+                    </div>
+                </li>`;
+            }
+        }
+        return html + '</ul></div>';
+    }
+
+    function buildDnsResults(data) {
+        let html = '<div class="card"><div class="card-header fw-semibold">Push Results</div><ul class="list-group list-group-flush">';
+        for (const [serverName, result] of Object.entries(data)) {
+            for (const [viewName, viewResult] of Object.entries(result.views ?? {})) {
+                if (viewResult.mkdir && !viewResult.mkdir.success) {
+                    html += `<li class="list-group-item d-flex align-items-start gap-2">
+                        <i class="bi bi-x-circle-fill text-danger mt-1 flex-shrink-0"></i>
+                        <div><span class="fw-semibold">${serverName}</span>
+                        <span class="badge bg-secondary ms-1">${viewName}</span>
+                        <span class="text-danger ms-1 small">mkdir failed: ${viewResult.mkdir.output}</span></div>
+                    </li>`;
+                }
+                for (const [domainName, zone] of Object.entries(viewResult.zones ?? {})) {
+                    const icon = zone.success ? 'bi-check-circle-fill text-success' : 'bi-x-circle-fill text-danger';
+                    html += `<li class="list-group-item d-flex align-items-start gap-2">
+                        <i class="bi ${icon} mt-1 flex-shrink-0"></i>
+                        <div><span class="fw-semibold">${serverName}</span>
+                        <span class="badge bg-secondary ms-1">${viewName}</span>
+                        <span class="text-muted mx-1">→</span>
+                        <span class="font-monospace small">${zone.file}</span>
+                        ${zone.output ? `<div class="text-danger small font-monospace mt-1">${zone.output}</div>` : ''}</div>
+                    </li>`;
+                }
+            }
+            if (result.conf !== null && result.conf !== undefined) {
+                const icon = result.conf.success ? 'bi-check-circle-fill text-success' : 'bi-x-circle-fill text-danger';
+                html += `<li class="list-group-item d-flex align-items-start gap-2">
+                    <i class="bi ${icon} mt-1 flex-shrink-0"></i>
+                    <div><span class="fw-semibold">${serverName}</span>
+                    <span class="text-muted mx-1">→</span>
+                    <span class="font-monospace small">views.conf</span>
+                    ${result.conf.output ? `<div class="text-danger small font-monospace mt-1">${result.conf.output}</div>` : ''}</div>
+                </li>`;
+            }
+            if (result.reload !== null && result.reload !== undefined) {
+                const r    = result.reload;
+                const icon = r.success ? 'bi-arrow-repeat text-success' : 'bi-x-circle-fill text-danger';
+                html += `<li class="list-group-item d-flex align-items-start gap-2">
+                    <i class="bi ${icon} mt-1 flex-shrink-0"></i>
+                    <div><span class="fw-semibold">${serverName}</span>
+                    <span class="badge ${r.success ? 'bg-success' : 'bg-danger'} ms-1">rndc reload</span>
+                    ${r.output ? `<div class="small font-monospace mt-1 ${r.success ? 'text-muted' : 'text-danger'}">${r.output}</div>` : ''}</div>
+                </li>`;
+            }
+        }
+        return html + '</ul></div>';
+    }
+
+    bindPushButton('dhcp-push-btn', 'dhcp-push-results', '{{ path('dhcp_server_push') }}');
+
+    const dnsBtn     = document.getElementById('dns-push-btn');
+    const dnsResults = document.getElementById('dns-push-results');
+    if (dnsBtn) {
+        dnsBtn.addEventListener('click', function () {
+            dnsBtn.disabled  = true;
+            dnsBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Pushing…';
+            dnsResults.style.display = 'none';
+            dnsResults.innerHTML = '';
+
+            fetch('{{ path('dns_server_push') }}', {
+                method: 'POST',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) {
+                    dnsResults.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+                    dnsResults.style.display = '';
+                    return;
+                }
+                dnsResults.innerHTML = buildDnsResults(data);
+                dnsResults.style.display = '';
+            })
+            .catch(err => {
+                dnsResults.innerHTML = `<div class="alert alert-danger">Request failed: ${err}</div>`;
+                dnsResults.style.display = '';
+            })
+            .finally(() => {
+                dnsBtn.disabled  = false;
+                dnsBtn.innerHTML = '<i class="bi bi-cloud-upload me-1"></i>Push to All';
+            });
+        });
+    }
+})();
+</script>
+{% endblock %}

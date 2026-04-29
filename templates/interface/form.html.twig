@@ -13,71 +13,75 @@
 </nav>
 
 <div class="row justify-content-center">
-<div class="col-lg-8">
+<div class="col-xl-10">
 <div class="card">
     <div class="card-header"><h5 class="mb-0">{{ title }}</h5></div>
     <div class="card-body">
         {{ form_start(form) }}
 
-        {# MAC Address #}
-        <div class="mb-3">
-            {{ form_label(form.macAddress, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
-            {{ form_widget(form.macAddress, {attr: {class: 'form-control font-monospace' ~ (form.macAddress.vars.errors|length ? ' is-invalid' : '')}}) }}
-            {{ form_errors(form.macAddress) }}
-        </div>
-
-        {# Subnet #}
-        <div class="mb-4">
-            {{ form_label(form.subnet, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
-            {{ form_widget(form.subnet, {attr: {class: 'form-select'}}) }}
-        </div>
-
-        {# IPv4 Assignment #}
-        <div class="card mb-3">
-            <div class="card-header fw-semibold">
-                <i class="bi bi-4-square me-1"></i>IPv4 Assignment
-                {% if interface.ipAddress %}
-                    <span class="badge bg-success ms-2">Currently: <code class="text-white">{{ interface.ipAddress.address }}</code></span>
-                {% endif %}
+        {# MAC Address + Subnet #}
+        <div class="row g-3 mb-4">
+            <div class="col-md-6">
+                {{ form_label(form.macAddress, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                {{ form_widget(form.macAddress, {attr: {class: 'form-control font-monospace' ~ (form.macAddress.vars.errors|length ? ' is-invalid' : '')}}) }}
+                {{ form_errors(form.macAddress) }}
             </div>
-            <div class="card-body">
-                <div class="mb-2">
-                    {% for child in form.ipv4Assignment %}
-                        <div class="form-check">
-                            {{ form_widget(child, {attr: {class: 'form-check-input', id: 'ipv4_' ~ loop.index}}) }}
-                            {{ form_label(child, null, {label_attr: {class: 'form-check-label', for: 'ipv4_' ~ loop.index}}) }}
+            <div class="col-md-6">
+                {{ form_label(form.subnet, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                {{ form_widget(form.subnet, {attr: {class: 'form-select'}}) }}
+            </div>
+        </div>
+
+        {# IPv4 + IPv6 Assignment #}
+        <div class="row g-3 mb-4">
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header fw-semibold">
+                        <i class="bi bi-4-square me-1"></i>IPv4 Assignment
+                        {% if interface.ipAddress %}
+                            <span class="badge bg-success ms-2">Currently: <code class="text-white">{{ interface.ipAddress.address }}</code></span>
+                        {% endif %}
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-2">
+                            {% for child in form.ipv4Assignment %}
+                                <div class="form-check">
+                                    {{ form_widget(child, {attr: {class: 'form-check-input', id: 'ipv4_' ~ loop.index}}) }}
+                                    {{ form_label(child, null, {label_attr: {class: 'form-check-label', for: 'ipv4_' ~ loop.index}}) }}
+                                </div>
+                            {% endfor %}
                         </div>
-                    {% endfor %}
-                </div>
-                <div id="ipv4-input-section" class="mt-2" style="display:none">
-                    {{ form_label(form.ipv4AddressInput, null, {label_attr: {class: 'form-label small'}}) }}
-                    {{ form_widget(form.ipv4AddressInput, {attr: {class: 'form-control font-monospace'}}) }}
-                    <datalist id="available-ipv4-list"></datalist>
-                </div>
-            </div>
-        </div>
-
-        {# IPv6 Assignment #}
-        <div class="card mb-4">
-            <div class="card-header fw-semibold">
-                <i class="bi bi-6-square me-1"></i>IPv6 Assignment
-                {% if interface.ipv6Address %}
-                    <span class="badge bg-success ms-2">Currently: <code class="text-white">{{ interface.ipv6Address.address }}</code></span>
-                {% endif %}
-            </div>
-            <div class="card-body">
-                <div class="mb-2">
-                    {% for child in form.ipv6Assignment %}
-                        <div class="form-check">
-                            {{ form_widget(child, {attr: {class: 'form-check-input', id: 'ipv6_' ~ loop.index}}) }}
-                            {{ form_label(child, null, {label_attr: {class: 'form-check-label', for: 'ipv6_' ~ loop.index}}) }}
+                        <div id="ipv4-input-section" class="mt-2" style="display:none">
+                            {{ form_label(form.ipv4AddressInput, null, {label_attr: {class: 'form-label small'}}) }}
+                            {{ form_widget(form.ipv4AddressInput, {attr: {class: 'form-control font-monospace'}}) }}
+                            <datalist id="available-ipv4-list"></datalist>
                         </div>
-                    {% endfor %}
+                    </div>
                 </div>
-                <div id="ipv6-input-section" class="mt-2" style="display:none">
-                    {{ form_label(form.ipv6AddressInput, null, {label_attr: {class: 'form-label small'}}) }}
-                    {{ form_widget(form.ipv6AddressInput, {attr: {class: 'form-control font-monospace'}}) }}
-                    <datalist id="available-ipv6-list"></datalist>
+            </div>
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header fw-semibold">
+                        <i class="bi bi-6-square me-1"></i>IPv6 Assignment
+                        {% if interface.ipv6Address %}
+                            <span class="badge bg-success ms-2">Currently: <code class="text-white">{{ interface.ipv6Address.address }}</code></span>
+                        {% endif %}
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-2">
+                            {% for child in form.ipv6Assignment %}
+                                <div class="form-check">
+                                    {{ form_widget(child, {attr: {class: 'form-check-input', id: 'ipv6_' ~ loop.index}}) }}
+                                    {{ form_label(child, null, {label_attr: {class: 'form-check-label', for: 'ipv6_' ~ loop.index}}) }}
+                                </div>
+                            {% endfor %}
+                        </div>
+                        <div id="ipv6-input-section" class="mt-2" style="display:none">
+                            {{ form_label(form.ipv6AddressInput, null, {label_attr: {class: 'form-label small'}}) }}
+                            {{ form_widget(form.ipv6AddressInput, {attr: {class: 'form-control font-monospace'}}) }}
+                            <datalist id="available-ipv6-list"></datalist>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

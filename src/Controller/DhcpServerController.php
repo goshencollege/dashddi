@@ -17,11 +17,9 @@ use Symfony\Component\Routing\Attribute\Route;
 class DhcpServerController extends AbstractController
 {
     #[Route('', name: 'dhcp_server_index', methods: ['GET'])]
-    public function index(DhcpServerRepository $repo): Response
+    public function index(): Response
     {
-        return $this->render('dhcp_server/index.html.twig', [
-            'servers' => $repo->findBy([], ['name' => 'ASC']),
-        ]);
+        return $this->redirectToRoute('servers_index');
     }
 
     #[Route('/new', name: 'dhcp_server_new', methods: ['GET', 'POST'])]
