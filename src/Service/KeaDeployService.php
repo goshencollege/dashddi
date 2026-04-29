@@ -150,7 +150,7 @@ class KeaDeployService
     {
         $keyFlag = $sshKey ? '-i ' . escapeshellarg($sshKey) . ' ' : '';
         $cmd = sprintf(
-            'scp -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o UpdateHostKeys=no %s%s %s 2>&1',
+            'scp -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o UpdateHostKeys=no -o ConnectTimeout=10 %s%s %s 2>&1',
             $keyFlag,
             escapeshellarg($source),
             escapeshellarg($dest),

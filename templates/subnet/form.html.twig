@@ -52,10 +52,61 @@
                         {{ form_widget(form.vrf, {attr: {class: 'form-select' ~ (form.vrf.vars.errors|length ? ' is-invalid' : '')}}) }}
                         {{ form_errors(form.vrf) }}
                     </div>
-                    <div class="mb-4">
+                    <div class="mb-3">
                         {{ form_label(form.description, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
                         {{ form_widget(form.description, {attr: {class: 'form-control'}}) }}
                     </div>
+                    <hr class="my-3">
+                    <h6 class="text-muted mb-3">Reverse Zone SOA</h6>
+                    <div class="mb-3">
+                        {{ form_label(form.soaNameserver, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                        {{ form_widget(form.soaNameserver, {attr: {class: 'form-control' ~ (form.soaNameserver.vars.errors|length ? ' is-invalid' : '')}}) }}
+                        {{ form_errors(form.soaNameserver) }}
+                    </div>
+                    <div class="mb-3">
+                        {{ form_label(form.soaEmail, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                        {{ form_widget(form.soaEmail, {attr: {class: 'form-control' ~ (form.soaEmail.vars.errors|length ? ' is-invalid' : '')}}) }}
+                        {{ form_errors(form.soaEmail) }}
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-6">
+                            {{ form_label(form.soaRefresh, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                            {{ form_widget(form.soaRefresh, {attr: {class: 'form-control'}}) }}
+                            {{ form_errors(form.soaRefresh) }}
+                        </div>
+                        <div class="col-6">
+                            {{ form_label(form.soaRetry, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                            {{ form_widget(form.soaRetry, {attr: {class: 'form-control'}}) }}
+                            {{ form_errors(form.soaRetry) }}
+                        </div>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-6">
+                            {{ form_label(form.soaExpire, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                            {{ form_widget(form.soaExpire, {attr: {class: 'form-control'}}) }}
+                            {{ form_errors(form.soaExpire) }}
+                        </div>
+                        <div class="col-6">
+                            {{ form_label(form.soaTtl, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                            {{ form_widget(form.soaTtl, {attr: {class: 'form-control'}}) }}
+                            {{ form_errors(form.soaTtl) }}
+                        </div>
+                    </div>
+                    <hr class="my-3">
+                    {% if form.views|length > 0 %}
+                    <div class="mb-4">
+                        {{ form_label(form.views, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                        <div class="d-flex flex-wrap gap-3">
+                            {% for viewWidget in form.views %}
+                                <div class="form-check">
+                                    {{ form_widget(viewWidget, {attr: {class: 'form-check-input'}}) }}
+                                    {{ form_label(viewWidget, null, {label_attr: {class: 'form-check-label'}}) }}
+                                </div>
+                            {% endfor %}
+                        </div>
+                        <div class="form-text">Reverse zones for this subnet will be generated for the selected views.</div>
+                    </div>
+                    {% endif %}
                     {% if embed_blocks %}
                     <hr class="my-4">
 
