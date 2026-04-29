@@ -6,6 +6,7 @@ use App\Entity\DnssecKskRollover;
 use App\Enum\KskRolloverStatus;
 use App\Form\KskRolloverStartType;
 use App\Repository\DnssecKskRolloverRepository;
+use App\Repository\DnsServerRepository;
 use App\Service\KskRolloverService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -25,9 +26,11 @@ class DnssecKskRolloverController extends AbstractController
     }
 
     #[Route('/start', name: 'ksk_rollover_start', methods: ['GET', 'POST'])]
-    public function start(Request $request, EntityManagerInterface $em, KskRolloverService $svc, DnssecKskRolloverRepository $repo): Response
+    public function start(Request $request, EntityManagerInterface $em, KskRolloverService $svc, DnssecKskRolloverRepository $repo, DnsServerRepository $serverRepo): Response
     {
-        $form = $this->createForm(KskRolloverStartType::class);
+        $firstServer = $serverRepo->findOneBy([], ['name' => 'ASC']);
+
+        $form = $this->createForm(KskRolloverStartType::class, null, ['first_server' => $firstServer]);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
@@ -35,22 +38,23 @@ class DnssecKskRolloverController extends AbstractController
             $domain = $data['domain'];
             $server = $data['dnsServer'];
 
-            // Prevent duplicate active rollovers
             if ($repo->findActiveForDomain($domain)) {
                 $this->addFlash('danger', 'An active KSK rollover already exists for "' . $domain->getName() . '".');
                 return $this->redirectToRoute('ksk_rollover_index');
             }
 
-            $keyDir = $data['keyDirectory'] ?: $domain->getKeyDirectory();
+            $keyDir = $domain->getKeyDirectory();
             if (!$keyDir) {
-                $this->addFlash('danger', 'No key directory specified and none set on the domain.');
+                $this->addFlash('danger', 'No key directory is set on domain "' . $domain->getName() . '". Edit the domain to set one.');
                 return $this->redirectToRoute('ksk_rollover_start');
             }
+
+            $algorithm = $this->kskAlgorithm($domain);
 
             $rollover = new DnssecKskRollover();
             $rollover->setDomain($domain);
             $rollover->setDnsServer($server);
-            $rollover->setAlgorithm($data['algorithm']);
+            $rollover->setAlgorithm($algorithm);
             $rollover->setKeyDirectory($keyDir);
 
             $em->persist($rollover);
@@ -77,10 +81,6 @@ class DnssecKskRolloverController extends AbstractController
         return $this->render('dnssec_ksk_rollover/show.html.twig', ['rollover' => $rollover]);
     }
 
-    /**
-     * POST-only endpoint to advance the wizard one step.
-     * The 'action' request param controls which transition to make.
-     */
     #[Route('/{id}/advance', name: 'ksk_rollover_advance', methods: ['POST'])]
     public function advance(Request $request, DnssecKskRollover $rollover, EntityManagerInterface $em, KskRolloverService $svc): Response
     {
@@ -105,6 +105,20 @@ class DnssecKskRolloverController extends AbstractController
     }
 
     // -------------------------------------------------------------------------
+
+    /** Returns the KSK algorithm from the domain's DNSSEC policy, or a safe default. */
+    private function kskAlgorithm(\App\Entity\Domain $domain): string
+    {
+        $policy = $domain->getDnssecPolicy();
+        if ($policy) {
+            foreach ($policy->getKeys() as $key) {
+                if (($key['type'] ?? '') === 'ksk' && !empty($key['algorithm'])) {
+                    return strtolower($key['algorithm']);
+                }
+            }
+        }
+        return 'ecdsap256sha256';
+    }
 
     private function transition(DnssecKskRollover $rollover, KskRolloverStatus $status, string $logMsg, EntityManagerInterface $em, bool $completedAt = false): void
     {
