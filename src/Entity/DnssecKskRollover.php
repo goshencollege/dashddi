@@ -34,13 +34,13 @@ class DnssecKskRollover
     private string $keyDirectory = '';
 
     /** Key file base name without extension, e.g. Kexample.com.+013+12345 */
-    #[ORM\Column(length: 128, nullable: true)]
+    #[ORM\Column(length: 255, nullable: true)]
     private ?string $oldKeyFile = null;
 
     #[ORM\Column(nullable: true)]
     private ?int $oldKeyTag = null;
 
-    #[ORM\Column(length: 128, nullable: true)]
+    #[ORM\Column(length: 255, nullable: true)]
     private ?string $newKeyFile = null;
 
     #[ORM\Column(nullable: true)]
