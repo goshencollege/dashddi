@@ -44,7 +44,9 @@ class KskRolloverService
             throw new \RuntimeException("dnssec-keygen failed: " . trim((string)$out));
         }
 
-        $newFile = trim((string)$out);
+        // dnssec-keygen prints progress dots + key base name as the last line
+        $lines   = array_values(array_filter(array_map('trim', explode("\n", (string)$out))));
+        $newFile = end($lines);
         if (!$newFile) {
             throw new \RuntimeException('dnssec-keygen produced no output (expected key base name).');
         }
