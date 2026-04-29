@@ -58,7 +58,7 @@ class DnssecPolicy
     private ?string $nsec3param = null;
 
     /** Array of {type: ksk|zsk|csk, algorithm: string, lifetime: string} */
-    #[ORM\Column(type: 'json', nullable: true)]
+    #[ORM\Column(name: 'policy_keys', type: 'json', nullable: true)]
     private ?array $keys = null;
 
     #[ORM\Column(type: 'text', nullable: true)]
