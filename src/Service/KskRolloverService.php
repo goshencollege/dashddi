@@ -4,20 +4,17 @@ namespace App\Service;
 
 use App\Entity\DnssecKskRollover;
 use App\Enum\KskRolloverStatus;
-use Doctrine\ORM\EntityManagerInterface;
 use phpseclib3\Net\SFTP;
 
 class KskRolloverService
 {
     public function __construct(
-        private readonly SshKeyService         $sshKeys,
-        private readonly EntityManagerInterface $em,
+        private readonly SshKeyService $sshKeys,
     ) {}
 
     /**
-     * Step 1: generate a new KSK on the server and call rndc loadkeys.
-     * Populates oldKeyFile/oldKeyTag, newKeyFile/newKeyTag, dnskeyTtlSeconds, dsRecord.
-     * Transitions status to KeyPublished.
+     * Runs SSH operations for step 1: generate new KSK + rndc loadkeys.
+     * Updates the rollover entity but does NOT flush — caller is responsible.
      */
     public function startRollover(DnssecKskRollover $rollover): void
     {
@@ -26,7 +23,6 @@ class KskRolloverService
         $keyDir    = rtrim($rollover->getKeyDirectory(), '/');
         $algorithm = $rollover->getAlgorithm();
 
-        // Find current KSK
         $oldFile = $this->findCurrentKsk($sftp, $keyDir, $zone);
         if ($oldFile) {
             $rollover->setOldKeyFile($oldFile);
@@ -36,7 +32,6 @@ class KskRolloverService
             $rollover->addLog('No existing KSK found — generating fresh.');
         }
 
-        // Generate new KSK
         $out = $sftp->exec(sprintf(
             'cd %s && dnssec-keygen -a %s -f KSK %s 2>&1',
             escapeshellarg($keyDir),
@@ -56,28 +51,24 @@ class KskRolloverService
         $rollover->setNewKeyFile($newFile);
         $rollover->setNewKeyTag($this->tagFromFile($newFile));
 
-        // Read DNSKEY TTL from the zone apex (best-effort)
         $ttl = $this->probeDnskeyTtl($sftp, $zone);
         if ($ttl !== null) {
             $rollover->setDnskeyTtlSeconds($ttl);
         }
 
-        // Get DS record
         $ds = $this->fetchDsRecord($sftp, $keyDir, $newFile);
         $rollover->setDsRecord($ds);
         $rollover->addLog("DS record obtained.");
 
-        // Load keys into BIND
         $rndcOut = $sftp->exec('rndc loadkeys ' . escapeshellarg($zone) . ' 2>&1');
         $rollover->addLog("rndc loadkeys: " . trim((string)$rndcOut));
 
         $rollover->setStatus(KskRolloverStatus::KeyPublished);
-        $this->em->flush();
     }
 
     /**
-     * Step 4: retire the old KSK — set inactive/delete times then rndc sign.
-     * Transitions status to OldKeyRetired.
+     * Runs SSH operations for step 4: dnssec-settime + rndc sign.
+     * Updates the rollover entity but does NOT flush — caller is responsible.
      */
     public function retireOldKey(DnssecKskRollover $rollover): void
     {
@@ -90,8 +81,7 @@ class KskRolloverService
             throw new \RuntimeException('Old key file not set on rollover record.');
         }
 
-        $ttl = $rollover->getDnskeyTtlSeconds() ?? 3600;
-        // Inactive now, delete after 2× TTL to let resolvers flush caches
+        $ttl         = $rollover->getDnskeyTtlSeconds() ?? 3600;
         $deleteDelay = '+' . ($ttl * 2);
 
         $cmd = sprintf(
@@ -110,11 +100,8 @@ class KskRolloverService
         $rollover->addLog("rndc sign: " . trim((string)$signOut));
 
         $rollover->setStatus(KskRolloverStatus::OldKeyRetired);
-        $this->em->flush();
     }
 
-    // -------------------------------------------------------------------------
-    // Private helpers
     // -------------------------------------------------------------------------
 
     private function connect(DnssecKskRollover $rollover): SFTP
@@ -131,8 +118,7 @@ class KskRolloverService
 
     private function findCurrentKsk(SFTP $sftp, string $keyDir, string $zone): ?string
     {
-        // List .key files in the key directory matching this zone, find the KSK (flag 257)
-        $out = $sftp->exec(sprintf(
+        $out  = $sftp->exec(sprintf(
             "grep -l ' 257 ' %s/K%s.+*.key 2>/dev/null | head -1",
             $keyDir,
             $zone
@@ -141,14 +127,11 @@ class KskRolloverService
         if (!$path) {
             return null;
         }
-        // Strip directory and .key extension to get base name
-        $base = basename($path, '.key');
-        return $base ?: null;
+        return basename($path, '.key') ?: null;
     }
 
     private function tagFromFile(string $fileBaseName): int
     {
-        // Base name format: Kzone.com.+013+12345
         if (preg_match('/\+(\d+)$/', $fileBaseName, $m)) {
             return (int)$m[1];
         }
