@@ -64,9 +64,6 @@ class Domain
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
     private ?DnssecPolicy $dnssecPolicy = null;
 
-    #[ORM\Column]
-    private bool $dnssecInlineSigning = false;
-
     #[ORM\Column(length: 255, nullable: true)]
     #[Assert\Length(max: 255)]
     private ?string $keyDirectory = null;
@@ -117,9 +114,6 @@ class Domain
 
     public function getDnssecPolicy(): ?DnssecPolicy { return $this->dnssecPolicy; }
     public function setDnssecPolicy(?DnssecPolicy $v): static { $this->dnssecPolicy = $v; return $this; }
-
-    public function isDnssecInlineSigning(): bool { return $this->dnssecInlineSigning; }
-    public function setDnssecInlineSigning(bool $v): static { $this->dnssecInlineSigning = $v; return $this; }
 
     public function getKeyDirectory(): ?string { return $this->keyDirectory; }
     public function setKeyDirectory(?string $v): static { $this->keyDirectory = $v; return $this; }

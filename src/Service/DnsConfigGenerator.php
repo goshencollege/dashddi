@@ -257,11 +257,11 @@ class DnsConfigGenerator
                 if ($domain->getDnssecPolicy()) {
                     $lines[] = '        dnssec-policy "' . $domain->getDnssecPolicy()->getName() . '";';
                 }
-                if ($domain->isDnssecInlineSigning()) {
-                    $lines[] = '        inline-signing yes;';
-                }
                 if ($domain->getKeyDirectory()) {
                     $lines[] = '        key-directory "' . $domain->getKeyDirectory() . '";';
+                }
+                if ($domain->getDnssecPolicy() && $domain->getKeyDirectory()) {
+                    $lines[] = '        inline-signing yes;';
                 }
                 $lines[] = '    };';
             }
@@ -276,11 +276,11 @@ class DnsConfigGenerator
                     if ($subnet->getDnssecPolicy()) {
                         $lines[] = '        dnssec-policy "' . $subnet->getDnssecPolicy()->getName() . '";';
                     }
-                    if ($subnet->isDnssecInlineSigning()) {
-                        $lines[] = '        inline-signing yes;';
-                    }
                     if ($subnet->getKeyDirectory()) {
                         $lines[] = '        key-directory "' . $subnet->getKeyDirectory() . '";';
+                    }
+                    if ($subnet->getDnssecPolicy() && $subnet->getKeyDirectory()) {
+                        $lines[] = '        inline-signing yes;';
                     }
                     $lines[] = '    };';
                 }

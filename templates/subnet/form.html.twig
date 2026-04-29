@@ -117,16 +117,11 @@
                         </div>
                         {{ form_errors(form.dnssecPolicy) }}
                     </div>
-                    <div class="mb-3">
+                    <div class="mb-4">
                         {{ form_label(form.keyDirectory, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
                         {{ form_widget(form.keyDirectory, {attr: {class: 'form-control font-monospace'}}) }}
+                        <div class="form-text">When both a policy and key directory are set, <code>inline-signing yes</code> is emitted automatically.</div>
                         {{ form_errors(form.keyDirectory) }}
-                    </div>
-                    <div class="mb-4">
-                        <div class="form-check">
-                            {{ form_widget(form.dnssecInlineSigning, {attr: {class: 'form-check-input'}}) }}
-                            {{ form_label(form.dnssecInlineSigning, null, {label_attr: {class: 'form-check-label'}}) }}
-                        </div>
                     </div>
                     {% if embed_blocks %}
                     <hr class="my-4">
