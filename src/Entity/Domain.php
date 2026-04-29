@@ -4,6 +4,7 @@ namespace App\Entity;
 
 use App\Entity\Trait\AuditableTrait;
 use App\Repository\DomainRepository;
+use App\Entity\DnssecPolicy;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
@@ -59,6 +60,17 @@ class Domain
     #[Assert\PositiveOrZero]
     private ?int $soaTtl = 3600;
 
+    #[ORM\ManyToOne(targetEntity: DnssecPolicy::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?DnssecPolicy $dnssecPolicy = null;
+
+    #[ORM\Column]
+    private bool $dnssecInlineSigning = false;
+
+    #[ORM\Column(length: 255, nullable: true)]
+    #[Assert\Length(max: 255)]
+    private ?string $keyDirectory = null;
+
     #[ORM\OneToMany(targetEntity: DomainRecord::class, mappedBy: 'domain', cascade: ['persist', 'remove'], orphanRemoval: true)]
     #[ORM\OrderBy(['hostname' => 'ASC'])]
     private Collection $records;
@@ -102,6 +114,15 @@ class Domain
 
     public function getSoaTtl(): ?int { return $this->soaTtl; }
     public function setSoaTtl(?int $soaTtl): static { $this->soaTtl = $soaTtl; return $this; }
+
+    public function getDnssecPolicy(): ?DnssecPolicy { return $this->dnssecPolicy; }
+    public function setDnssecPolicy(?DnssecPolicy $v): static { $this->dnssecPolicy = $v; return $this; }
+
+    public function isDnssecInlineSigning(): bool { return $this->dnssecInlineSigning; }
+    public function setDnssecInlineSigning(bool $v): static { $this->dnssecInlineSigning = $v; return $this; }
+
+    public function getKeyDirectory(): ?string { return $this->keyDirectory; }
+    public function setKeyDirectory(?string $v): static { $this->keyDirectory = $v; return $this; }
 
     public function getRecords(): Collection { return $this->records; }
     public function getInterfaceNames(): Collection { return $this->interfaceNames; }

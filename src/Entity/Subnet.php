@@ -3,6 +3,7 @@
 namespace App\Entity;
 
 use App\Entity\Trait\AuditableTrait;
+use App\Entity\DnssecPolicy;
 use App\Repository\AddressBlockRepository;
 use App\Repository\SubnetRepository;
 use Doctrine\Common\Collections\ArrayCollection;
@@ -95,6 +96,17 @@ class Subnet
     #[Assert\PositiveOrZero]
     private ?int $soaTtl = 3600;
 
+    #[ORM\ManyToOne(targetEntity: DnssecPolicy::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?DnssecPolicy $dnssecPolicy = null;
+
+    #[ORM\Column]
+    private bool $dnssecInlineSigning = false;
+
+    #[ORM\Column(length: 255, nullable: true)]
+    #[Assert\Length(max: 255)]
+    private ?string $keyDirectory = null;
+
     public function __construct()
     {
         $this->ipAddresses = new ArrayCollection();
@@ -148,6 +160,15 @@ class Subnet
 
     public function getSoaTtl(): ?int { return $this->soaTtl; }
     public function setSoaTtl(?int $v): static { $this->soaTtl = $v; return $this; }
+
+    public function getDnssecPolicy(): ?DnssecPolicy { return $this->dnssecPolicy; }
+    public function setDnssecPolicy(?DnssecPolicy $v): static { $this->dnssecPolicy = $v; return $this; }
+
+    public function isDnssecInlineSigning(): bool { return $this->dnssecInlineSigning; }
+    public function setDnssecInlineSigning(bool $v): static { $this->dnssecInlineSigning = $v; return $this; }
+
+    public function getKeyDirectory(): ?string { return $this->keyDirectory; }
+    public function setKeyDirectory(?string $v): static { $this->keyDirectory = $v; return $this; }
 
     public function getViews(): Collection { return $this->views; }
 
