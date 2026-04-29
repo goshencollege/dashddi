@@ -49,15 +49,17 @@ class DnssecKskRolloverController extends AbstractController
                 return $this->redirectToRoute('ksk_rollover_start');
             }
 
-            $algorithm = $this->kskAlgorithm($domain);
-
             $rollover = new DnssecKskRollover();
             $rollover->setDomain($domain);
             $rollover->setDnsServer($server);
-            $rollover->setAlgorithm($algorithm);
+            $rollover->setAlgorithm($this->kskAlgorithm($domain));
             $rollover->setKeyDirectory($keyDir);
 
+            // Persist first so the record exists in DB before any SSH work.
+            // This keeps the EntityManager clean: SSH exceptions are not DB exceptions
+            // and cannot close the EM, so the subsequent flush always succeeds.
             $em->persist($rollover);
+            $em->flush();
 
             try {
                 $svc->startRollover($rollover);
@@ -65,9 +67,10 @@ class DnssecKskRolloverController extends AbstractController
             } catch (\Throwable $e) {
                 $rollover->setStatus(KskRolloverStatus::Failed);
                 $rollover->addLog('Error: ' . $e->getMessage());
-                $em->flush();
                 $this->addFlash('danger', 'Rollover start failed: ' . $e->getMessage());
             }
+
+            $em->flush();
 
             return $this->redirectToRoute('ksk_rollover_show', ['id' => $rollover->getId()]);
         }
@@ -90,11 +93,14 @@ class DnssecKskRolloverController extends AbstractController
             match ($action) {
                 'dnskey_propagated' => $this->transition($rollover, KskRolloverStatus::DsPending, 'DNSKEY propagation confirmed; please update DS at your registrar.', $em),
                 'ds_submitted'      => $this->transition($rollover, KskRolloverStatus::DsSubmitted, 'DS record submitted to registrar; waiting for propagation.', $em),
-                'retire_old_key'    => $this->retireOldKey($rollover, $svc, $em),
+                'retire_old_key'    => $this->retireOldKey($rollover, $svc),
                 'complete'          => $this->transition($rollover, KskRolloverStatus::Complete, 'Rollover complete.', $em, completedAt: true),
                 'fail'              => $this->transition($rollover, KskRolloverStatus::Failed, 'Rollover marked as failed.', $em, completedAt: true),
                 default             => throw new \InvalidArgumentException("Unknown action: $action"),
             };
+            // retire_old_key updates entity without flushing; flush here covers it.
+            // transition() calls flush itself, so this is a harmless no-op for those.
+            $em->flush();
         } catch (\Throwable $e) {
             $rollover->addLog('Error: ' . $e->getMessage());
             $em->flush();
@@ -130,9 +136,9 @@ class DnssecKskRolloverController extends AbstractController
         $em->flush();
     }
 
-    private function retireOldKey(DnssecKskRollover $rollover, KskRolloverService $svc, EntityManagerInterface $em): void
+    private function retireOldKey(DnssecKskRollover $rollover, KskRolloverService $svc): void
     {
-        $svc->retireOldKey($rollover);
+        $svc->retireOldKey($rollover); // SSH only; entity updated but not flushed — caller flushes
         $this->addFlash('success', 'Old KSK retired; BIND will remove it after cache TTL expires.');
     }
 }
