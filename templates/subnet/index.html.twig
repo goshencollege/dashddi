@@ -29,6 +29,7 @@
                         <th>VLAN</th>
                         <th>Gateway</th>
                         <th>Assigned IPs</th>
+                        <th>DNSSEC</th>
                         <th>Last Modified</th>
                         <th class="text-end">Actions</th>
                     </tr>
@@ -49,6 +50,15 @@
                             <td>
                                 <span class="badge bg-info text-dark">{{ subnet.ipAddresses|length }} v4</span>
                                 <span class="badge bg-warning text-dark ms-1">{{ subnet.ipv6Addresses|length }} v6</span>
+                            </td>
+                            <td>
+                                {% if subnet.dnssecPolicy %}
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle">
+                                        <i class="bi bi-shield-check me-1"></i>{{ subnet.dnssecPolicy.name }}
+                                    </span>
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
                             </td>
                             <td class="text-muted small">
                                 {{ subnet.updatedAt|date('Y-m-d H:i') }}
