@@ -23,15 +23,18 @@ class KskRolloverService
         $keyDir    = rtrim($rollover->getKeyDirectory(), '/');
         $algorithm = $rollover->getAlgorithm();
 
+        // Find existing KSK before generating the new one
         $oldFile = $this->findCurrentKsk($sftp, $keyDir, $zone);
         if ($oldFile) {
             $rollover->setOldKeyFile($oldFile);
-            $rollover->setOldKeyTag($this->tagFromFile($oldFile));
-            $rollover->addLog("Found existing KSK: $oldFile");
+            $oldDs = $this->fetchDsRecord($sftp, $keyDir, $oldFile);
+            $rollover->setOldKeyTag($this->tagFromDs($oldDs) ?? $this->tagFromFile($oldFile));
+            $rollover->addLog("Found existing KSK: $oldFile (tag {$rollover->getOldKeyTag()})");
         } else {
             $rollover->addLog('No existing KSK found — generating fresh.');
         }
 
+        // Generate new KSK
         $out = $sftp->exec(sprintf(
             'cd %s && dnssec-keygen -a %s -f KSK %s 2>&1',
             escapeshellarg($keyDir),
@@ -44,23 +47,26 @@ class KskRolloverService
             throw new \RuntimeException("dnssec-keygen failed: " . trim((string)$out));
         }
 
-        // dnssec-keygen prints progress dots + key base name as the last line
+        // dnssec-keygen prints progress dots before the key base name on the last line
         $lines   = array_values(array_filter(array_map('trim', explode("\n", (string)$out))));
         $newFile = end($lines);
         if (!$newFile) {
             throw new \RuntimeException('dnssec-keygen produced no output (expected key base name).');
         }
         $rollover->setNewKeyFile($newFile);
-        $rollover->setNewKeyTag($this->tagFromFile($newFile));
 
-        $ttl = $this->probeDnskeyTtl($sftp, $zone);
+        // Get DS record — use it as the authoritative source of the key tag
+        $ds = $this->fetchDsRecord($sftp, $keyDir, $newFile);
+        $rollover->setDsRecord($ds);
+        $newTag = $this->tagFromDs($ds) ?? $this->tagFromFile($newFile);
+        $rollover->setNewKeyTag($newTag);
+        $rollover->addLog("DS record obtained (new key tag: $newTag).");
+
+        // DNSKEY TTL: try policy first, fall back to dig
+        $ttl = $this->dnskeyTtlFromPolicy($rollover) ?? $this->probeDnskeyTtl($sftp, $zone);
         if ($ttl !== null) {
             $rollover->setDnskeyTtlSeconds($ttl);
         }
-
-        $ds = $this->fetchDsRecord($sftp, $keyDir, $newFile);
-        $rollover->setDsRecord($ds);
-        $rollover->addLog("DS record obtained.");
 
         $rndcOut = $sftp->exec('rndc loadkeys ' . escapeshellarg($zone) . ' 2>&1');
         $rollover->addLog("rndc loadkeys: " . trim((string)$rndcOut));
@@ -118,10 +124,14 @@ class KskRolloverService
         return $this->sshKeys->connect($server->getHostname(), $server->getSshUser(), $server->getSshPrivateKey());
     }
 
+    /**
+     * Finds the current KSK base name in keyDir for zone.
+     * Uses ls + xargs to avoid glob-expansion failures when no files match.
+     */
     private function findCurrentKsk(SFTP $sftp, string $keyDir, string $zone): ?string
     {
-        $out  = $sftp->exec(sprintf(
-            "grep -l ' 257 ' %s/K%s.+*.key 2>/dev/null | head -1",
+        $out = $sftp->exec(sprintf(
+            'ls %s/K%s.+*.key 2>/dev/null | xargs grep -l " 257 " 2>/dev/null | head -1',
             $keyDir,
             $zone
         ));
@@ -132,12 +142,52 @@ class KskRolloverService
         return basename($path, '.key') ?: null;
     }
 
-    private function tagFromFile(string $fileBaseName): int
+    /**
+     * Parses the key tag from a DS record line.
+     * Format: "zone. TTL IN DS <tag> <alg> <digest-type> <digest>"
+     */
+    private function tagFromDs(string $dsRecord): ?int
+    {
+        if (preg_match('/\sDS\s+(\d+)\s/', $dsRecord, $m)) {
+            return (int)$m[1];
+        }
+        return null;
+    }
+
+    /** Parses the key tag from the file base name (e.g. Kzone.+013+12345 → 12345). */
+    private function tagFromFile(string $fileBaseName): ?int
     {
         if (preg_match('/\+(\d+)$/', $fileBaseName, $m)) {
             return (int)$m[1];
         }
-        return 0;
+        return null;
+    }
+
+    /**
+     * Reads dnskey-ttl from the domain's DNSSEC policy.
+     * The value may be in seconds ("3600") or ISO 8601 ("PT1H").
+     */
+    private function dnskeyTtlFromPolicy(DnssecKskRollover $rollover): ?int
+    {
+        $policy = $rollover->getDomain()->getDnssecPolicy();
+        if (!$policy) {
+            return null;
+        }
+        $raw = $policy->getDnskeyTtl();
+        if ($raw === null || $raw === '') {
+            return null;
+        }
+        if (is_numeric($raw)) {
+            return (int)$raw;
+        }
+        // Parse simple ISO 8601 durations: PT3600S, PT1H, P1D, PT30M, etc.
+        if (preg_match('/^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/', strtoupper($raw), $m)) {
+            return ((int)($m[1] ?? 0)) * 86400
+                 + ((int)($m[2] ?? 0)) * 3600
+                 + ((int)($m[3] ?? 0)) * 60
+                 + ((int)($m[4] ?? 0));
+        }
+        return null;
     }
 
     private function probeDnskeyTtl(SFTP $sftp, string $zone): ?int
