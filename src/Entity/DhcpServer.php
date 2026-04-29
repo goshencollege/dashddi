@@ -34,9 +34,11 @@ class DhcpServer
     #[Assert\NotBlank]
     private string $remotePath = '/etc/kea';
 
-    #[ORM\Column(length: 255)]
-    #[Assert\NotBlank]
-    private string $sshKeyPath = '/var/www/.ssh/id_ed25519';
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $sshPrivateKey = null;
+
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $sshPublicKey = null;
 
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $controlUrl = null;
@@ -64,8 +66,11 @@ class DhcpServer
     public function getRemotePath(): string { return $this->remotePath; }
     public function setRemotePath(string $remotePath): static { $this->remotePath = $remotePath; return $this; }
 
-    public function getSshKeyPath(): string { return $this->sshKeyPath; }
-    public function setSshKeyPath(string $sshKeyPath): static { $this->sshKeyPath = $sshKeyPath; return $this; }
+    public function getSshPrivateKey(): ?string { return $this->sshPrivateKey; }
+    public function setSshPrivateKey(?string $sshPrivateKey): static { $this->sshPrivateKey = $sshPrivateKey; return $this; }
+
+    public function getSshPublicKey(): ?string { return $this->sshPublicKey; }
+    public function setSshPublicKey(?string $sshPublicKey): static { $this->sshPublicKey = $sshPublicKey; return $this; }
 
     public function getControlUrl(): ?string { return $this->controlUrl; }
     public function setControlUrl(?string $controlUrl): static { $this->controlUrl = $controlUrl ?: null; return $this; }

@@ -32,9 +32,11 @@ class DnsServer
     #[Assert\NotBlank]
     private string $sshUser = 'root';
 
-    #[ORM\Column(length: 255)]
-    #[Assert\NotBlank]
-    private string $sshKeyPath = '/var/www/.ssh/id_ed25519';
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $sshPrivateKey = null;
+
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $sshPublicKey = null;
 
     #[ORM\Column(length: 255)]
     #[Assert\NotBlank]
@@ -63,8 +65,11 @@ class DnsServer
     public function getSshUser(): string { return $this->sshUser; }
     public function setSshUser(string $sshUser): static { $this->sshUser = $sshUser; return $this; }
 
-    public function getSshKeyPath(): string { return $this->sshKeyPath; }
-    public function setSshKeyPath(string $sshKeyPath): static { $this->sshKeyPath = $sshKeyPath; return $this; }
+    public function getSshPrivateKey(): ?string { return $this->sshPrivateKey; }
+    public function setSshPrivateKey(?string $sshPrivateKey): static { $this->sshPrivateKey = $sshPrivateKey; return $this; }
+
+    public function getSshPublicKey(): ?string { return $this->sshPublicKey; }
+    public function setSshPublicKey(?string $sshPublicKey): static { $this->sshPublicKey = $sshPublicKey; return $this; }
 
     public function getRemoteZonePath(): string { return $this->remoteZonePath; }
     public function setRemoteZonePath(string $remoteZonePath): static { $this->remoteZonePath = $remoteZonePath; return $this; }

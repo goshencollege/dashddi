@@ -3,11 +3,13 @@
 namespace App\Service;
 
 use App\Entity\DhcpServer;
+use phpseclib3\Net\SFTP;
 
 class KeaDeployService
 {
     public function __construct(
         private readonly KeaConfigGenerator $generator,
+        private readonly SshKeyService $sshKeys,
     ) {}
 
     public function generateFiles(string $outputDir): array
@@ -35,28 +37,29 @@ class KeaDeployService
 
     public function deployToServer(DhcpServer $server, bool $reload = true): array
     {
-        $files = $this->generateFiles('/tmp/kea');
+        $sftp  = $this->getSftp($server);
+        $files = $this->generateFiles(sys_get_temp_dir() . '/kea');
         $results = [];
 
         foreach ($files as $type => $localFile) {
-            $keaService = $type === 'dhcp4' ? 'dhcp4' : 'dhcp6';
             $remotePath = rtrim($server->getRemotePath(), '/') . '/' . basename($localFile);
-            $remoteTarget = sprintf('%s@%s:%s', $server->getSshUser(), $server->getHostname(), $remotePath);
-            $backupFile = $localFile . '.bak';
+            $backupContent = null;
 
             // Download current remote file as a backup before overwriting
-            $hasBackup = false;
             if ($reload && $server->getControlUrl()) {
-                $hasBackup = $this->runScp($remoteTarget, $backupFile, $server->getSshKeyPath(), $dlOutput) === 0;
+                $downloaded = $sftp->get($remotePath);
+                if ($downloaded !== false) {
+                    $backupContent = $downloaded;
+                }
             }
 
             // Upload new file
-            $exitCode = $this->runScp($localFile, $remoteTarget, $server->getSshKeyPath(), $scpOutput);
+            $ok = $sftp->put($remotePath, (string) file_get_contents($localFile));
             $result = [
-                'success'  => $exitCode === 0,
-                'output'   => $scpOutput,
-                'file'     => basename($localFile),
-                'reload'   => null,
+                'success' => $ok,
+                'output'  => $ok ? '' : 'SFTP upload failed',
+                'file'    => basename($localFile),
+                'reload'  => null,
             ];
 
             if (!$result['success'] || !$reload || !$server->getControlUrl()) {
@@ -66,6 +69,7 @@ class KeaDeployService
 
             // Reload — Kea validates the config before applying it, so a bad file will
             // fail here without affecting the running service.
+            $keaService   = $type === 'dhcp4' ? 'dhcp4' : 'dhcp6';
             $reloadResult = $this->controlCommand('config-reload', $keaService, $server);
             $result['reload'] = [
                 'success'  => $reloadResult['success'],
@@ -74,13 +78,13 @@ class KeaDeployService
                 'restored' => false,
             ];
 
-            if (!$reloadResult['success'] && $hasBackup) {
-                $restored = $this->runScp($backupFile, $remoteTarget, $server->getSshKeyPath(), $restoreOutput) === 0;
+            if (!$reloadResult['success'] && $backupContent !== null) {
+                $restored = $sftp->put($remotePath, $backupContent);
                 if ($restored) {
                     $this->controlCommand('config-reload', $keaService, $server);
                 }
                 $result['reload']['restored']      = $restored;
-                $result['reload']['restore_error'] = $restored ? null : $restoreOutput;
+                $result['reload']['restore_error'] = $restored ? null : 'SFTP restore failed';
             }
 
             $results[$type] = $result;
@@ -89,14 +93,18 @@ class KeaDeployService
         return $results;
     }
 
-    public function scpFile(string $localFile, string $target, ?string $sshKey, ?string &$output): int
-    {
-        return $this->runScp($localFile, $target, $sshKey, $output);
-    }
-
     public function reloadKea(string $controlUrl, string $service, ?string $user = null, ?string $password = null): array
     {
         return $this->controlRequest($controlUrl, 'config-reload', $service, $user, $password);
+    }
+
+    private function getSftp(DhcpServer $server): SFTP
+    {
+        if (!$server->getSshPrivateKey()) {
+            throw new \RuntimeException('No SSH key configured for "' . $server->getName() . '". Generate one by editing the server.');
+        }
+
+        return $this->sshKeys->connect($server->getHostname(), $server->getSshUser(), $server->getSshPrivateKey());
     }
 
     private function controlCommand(string $command, string $service, DhcpServer $server): array
@@ -144,28 +152,5 @@ class KeaDeployService
             'success'  => $resultCode === 0,
             'response' => $data[0]['text'] ?? $body,
         ];
-    }
-
-    private function runScp(string $source, string $dest, ?string $sshKey, ?string &$output): int
-    {
-        $keyFlag = $sshKey ? '-i ' . escapeshellarg($sshKey) . ' ' : '';
-        $cmd = sprintf(
-            'scp -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o UpdateHostKeys=no -o ConnectTimeout=10 %s%s %s 2>&1',
-            $keyFlag,
-            escapeshellarg($source),
-            escapeshellarg($dest),
-        );
-
-        $proc = proc_open($cmd, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
-        if (!is_resource($proc)) {
-            $output = 'Failed to spawn scp process';
-            return 1;
-        }
-
-        $output = trim(stream_get_contents($pipes[1]));
-        fclose($pipes[1]);
-        fclose($pipes[2]);
-
-        return proc_close($proc);
     }
 }

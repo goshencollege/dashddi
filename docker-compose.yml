@@ -3,7 +3,6 @@ services:
     build: .
     volumes:
       - .:/var/www/html
-      - ~/.ssh/id_ed25519:/root/.ssh/id_ed25519:ro
     environment:
       APP_ENV: dev
       APP_SECRET: changeme_in_production_32chars_min

@@ -29,9 +29,6 @@ class DnsServerType extends AbstractType
             ->add('sshUser', TextType::class, [
                 'label' => 'SSH User',
             ])
-            ->add('sshKeyPath', TextType::class, [
-                'label' => 'SSH Key Path (inside container)',
-            ])
             ->add('remoteZonePath', TextType::class, [
                 'label' => 'Remote Zone Path',
                 'attr'  => ['placeholder' => 'e.g. /etc/bind/zones'],
