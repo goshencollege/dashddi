@@ -26,7 +26,7 @@ class NetworkInterface
         pattern: '/^([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$/',
         message: 'MAC address must be in format aa:bb:cc:dd:ee:ff'
     )]
-    private string $macAddress = '';
+    private string $macAddress = '00:00:00:00:00:00';
 
     #[ORM\ManyToOne(targetEntity: Host::class, inversedBy: 'interfaces')]
     #[ORM\JoinColumn(nullable: false)]
@@ -58,7 +58,7 @@ class NetworkInterface
     public function setMacAddress(string $macAddress): static
     {
         $hex = preg_replace('/[^0-9a-fA-F]/', '', $macAddress);
-        if ($hex === '') {
+        if (strlen($hex)<12) {
             $hex = '000000000000';
         }
         $this->macAddress = strlen($hex) === 12
