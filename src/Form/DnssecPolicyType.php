@@ -5,7 +5,6 @@ namespace App\Form;
 use App\Entity\DnssecPolicy;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\CollectionType;
-use Symfony\Component\Form\Extension\Core\Type\IntegerType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
@@ -24,15 +23,15 @@ class DnssecPolicyType extends AbstractType
                 'required' => false,
                 'attr'     => ['rows' => 2],
             ])
-            ->add('dnskeyTtl', IntegerType::class, [
-                'label'    => 'DNSKEY TTL (seconds)',
+            ->add('dnskeyTtl', TextType::class, [
+                'label'    => 'DNSKEY TTL',
                 'required' => false,
-                'attr'     => ['placeholder' => 'e.g. 3600'],
+                'attr'     => ['placeholder' => 'e.g. PT1H or 3600'],
             ])
-            ->add('maxZoneTtl', IntegerType::class, [
-                'label'    => 'Max Zone TTL (seconds)',
+            ->add('maxZoneTtl', TextType::class, [
+                'label'    => 'Max Zone TTL',
                 'required' => false,
-                'attr'     => ['placeholder' => 'e.g. 86400'],
+                'attr'     => ['placeholder' => 'e.g. P1D or 86400'],
             ])
             ->add('signaturesValidity', TextType::class, [
                 'label'    => 'Signatures Validity',
@@ -43,6 +42,26 @@ class DnssecPolicyType extends AbstractType
                 'label'    => 'Signatures Refresh',
                 'required' => false,
                 'attr'     => ['placeholder' => 'e.g. P5D'],
+            ])
+            ->add('publishSafety', TextType::class, [
+                'label'    => 'Publish Safety',
+                'required' => false,
+                'attr'     => ['placeholder' => 'e.g. PT1H'],
+            ])
+            ->add('retireSafety', TextType::class, [
+                'label'    => 'Retire Safety',
+                'required' => false,
+                'attr'     => ['placeholder' => 'e.g. PT1H'],
+            ])
+            ->add('purgeKeys', TextType::class, [
+                'label'    => 'Purge Keys',
+                'required' => false,
+                'attr'     => ['placeholder' => 'e.g. P90D'],
+            ])
+            ->add('nsec3param', TextType::class, [
+                'label'    => 'NSEC3 Parameters',
+                'required' => false,
+                'attr'     => ['placeholder' => 'e.g. 0 no 0'],
             ])
             ->add('keys', CollectionType::class, [
                 'label'         => false,

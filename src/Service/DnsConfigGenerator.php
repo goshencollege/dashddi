@@ -189,17 +189,21 @@ class DnsConfigGenerator
 
         foreach ($this->policyRepo->findBy([], ['name' => 'ASC']) as $policy) {
             $lines[] = 'dnssec-policy "' . $policy->getName() . '" {';
-            if ($policy->getDnskeyTtl() !== null) {
-                $lines[] = '    dnskey-ttl ' . $policy->getDnskeyTtl() . ';';
+            foreach ([
+                'dnskey-ttl'          => $policy->getDnskeyTtl(),
+                'max-zone-ttl'        => $policy->getMaxZoneTtl(),
+                'signatures-validity' => $policy->getSignaturesValidity(),
+                'signatures-refresh'  => $policy->getSignaturesRefresh(),
+                'publish-safety'      => $policy->getPublishSafety(),
+                'retire-safety'       => $policy->getRetireSafety(),
+                'purge-keys'          => $policy->getPurgeKeys(),
+            ] as $directive => $value) {
+                if ($value !== null) {
+                    $lines[] = '    ' . $directive . ' ' . $value . ';';
+                }
             }
-            if ($policy->getMaxZoneTtl() !== null) {
-                $lines[] = '    max-zone-ttl ' . $policy->getMaxZoneTtl() . ';';
-            }
-            if ($policy->getSignaturesValidity()) {
-                $lines[] = '    signatures-validity ' . $policy->getSignaturesValidity() . ';';
-            }
-            if ($policy->getSignaturesRefresh()) {
-                $lines[] = '    signatures-refresh ' . $policy->getSignaturesRefresh() . ';';
+            if ($policy->getNsec3param() !== null) {
+                $lines[] = '    nsec3param ' . $policy->getNsec3param() . ';';
             }
             $keys = $policy->getKeys();
             if (!empty($keys)) {
