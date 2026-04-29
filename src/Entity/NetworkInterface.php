@@ -22,7 +22,6 @@ class NetworkInterface
     private ?int $id = null;
 
     #[ORM\Column(length: 17)]
-    #[Assert\NotBlank]
     #[Assert\Regex(
         pattern: '/^([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$/',
         message: 'MAC address must be in format aa:bb:cc:dd:ee:ff'
@@ -59,6 +58,9 @@ class NetworkInterface
     public function setMacAddress(string $macAddress): static
     {
         $hex = preg_replace('/[^0-9a-fA-F]/', '', $macAddress);
+        if ($hex === '') {
+            $hex = '000000000000';
+        }
         $this->macAddress = strlen($hex) === 12
             ? implode(':', str_split(strtolower($hex), 2))
             : strtolower($macAddress);
