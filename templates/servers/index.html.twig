@@ -47,7 +47,13 @@
                             <td class="font-monospace">{{ server.hostname }}</td>
                             <td class="font-monospace">{{ server.sshUser }}</td>
                             <td class="font-monospace">{{ server.remotePath }}</td>
-                            <td class="font-monospace small text-muted">{{ server.sshKeyPath }}</td>
+                            <td>
+                                {% if server.sshPublicKey %}
+                                    <span class="badge bg-success"><i class="bi bi-key-fill me-1"></i>Ready</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">No key</span>
+                                {% endif %}
+                            </td>
                             <td class="text-muted">{{ server.description ?: '—' }}</td>
                             <td class="text-end">
                                 <div class="d-flex gap-1 justify-content-end align-items-center">

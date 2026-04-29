@@ -30,10 +30,6 @@ class DhcpServerType extends AbstractType
                 'label' => 'Remote Path',
                 'attr'  => ['placeholder' => '/etc/kea'],
             ])
-            ->add('sshKeyPath', TextType::class, [
-                'label' => 'SSH Key Path (inside container)',
-                'attr'  => ['placeholder' => '/var/www/.ssh/id_ed25519'],
-            ])
             ->add('controlUrl', TextType::class, [
                 'label'    => 'Control Agent URL',
                 'required' => false,
