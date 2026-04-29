@@ -103,6 +103,13 @@
                 </div>
             </div>
         </div>
+        {% if domain.keyDirectory %}
+        <div class="card-footer">
+            <a href="{{ path('ksk_rollover_start') }}?domain={{ domain.id }}" class="btn btn-sm btn-outline-primary">
+                <i class="bi bi-key me-1"></i>Start KSK Rollover
+            </a>
+        </div>
+        {% endif %}
     </div>
 </div>
 {% endif %}

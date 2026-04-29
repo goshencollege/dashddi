@@ -1,0 +1,52 @@
+{% extends 'base.html.twig' %}
+{% block title %}KSK Rollovers{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3 mb-0"><i class="bi bi-key me-2"></i>KSK Rollovers</h1>
+    <a href="{{ path('ksk_rollover_start') }}" class="btn btn-primary">
+        <i class="bi bi-plus-lg me-1"></i>Start Rollover
+    </a>
+</div>
+
+{% if rollovers is empty %}
+    <div class="alert alert-secondary">No KSK rollovers recorded yet.</div>
+{% else %}
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>Domain</th>
+                    <th>DNS Server</th>
+                    <th>Status</th>
+                    <th>Old Key Tag</th>
+                    <th>New Key Tag</th>
+                    <th>Started</th>
+                    <th>Completed</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for r in rollovers %}
+                <tr>
+                    <td>{{ r.domain.name }}</td>
+                    <td>{{ r.dnsServer ? r.dnsServer.name : '—' }}</td>
+                    <td><span class="badge {{ r.status.badgeClass() }}">{{ r.status.label() }}</span></td>
+                    <td class="font-monospace">{{ r.oldKeyTag ?? '—' }}</td>
+                    <td class="font-monospace">{{ r.newKeyTag ?? '—' }}</td>
+                    <td>{{ r.startedAt|date('Y-m-d H:i') }}</td>
+                    <td>{{ r.completedAt ? r.completedAt|date('Y-m-d H:i') : '—' }}</td>
+                    <td>
+                        <a href="{{ path('ksk_rollover_show', {id: r.id}) }}" class="btn btn-sm btn-outline-secondary">
+                            <i class="bi bi-eye"></i>
+                        </a>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
