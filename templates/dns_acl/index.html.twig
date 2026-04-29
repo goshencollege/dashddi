@@ -1,0 +1,58 @@
+{% extends 'base.html.twig' %}
+{% block title %}DNS ACLs{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0"><i class="bi bi-list-check me-2"></i>DNS ACLs</h1>
+    <a href="{{ path('dns_acl_new') }}" class="btn btn-primary">
+        <i class="bi bi-plus-lg me-1"></i>Add ACL
+    </a>
+</div>
+
+{% if acls is empty %}
+    <div class="card">
+        <div class="card-body text-center text-muted py-5">
+            <i class="bi bi-list-check fs-1 d-block mb-3 opacity-25"></i>
+            No ACLs defined yet. <a href="{{ path('dns_acl_new') }}">Add the first one →</a>
+        </div>
+    </div>
+{% else %}
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Description</th>
+                        <th>Entries</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for acl in acls %}
+                        <tr>
+                            <td class="fw-semibold"><code>{{ acl.name }}</code></td>
+                            <td class="text-muted">{{ acl.description ?: '—' }}</td>
+                            <td class="text-muted small font-monospace">
+                                {{ acl.entries|join('; ') ?: '—' }}
+                            </td>
+                            <td class="text-end">
+                                <a href="{{ path('dns_acl_edit', {id: acl.id}) }}" class="btn btn-sm btn-outline-secondary me-1">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <form method="post" action="{{ path('dns_acl_delete', {id: acl.id}) }}" class="d-inline"
+                                      onsubmit="return confirm('Delete ACL {{ acl.name|e('js') }}?')">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('delete_dns_acl_' ~ acl.id) }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,97 @@
+{% extends 'base.html.twig' %}
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ path('dns_acl_index') }}">DNS ACLs</a></li>
+        <li class="breadcrumb-item active">{{ title }}</li>
+    </ol>
+</nav>
+
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        {{ form_start(form) }}
+
+        <div class="card mb-3">
+            <div class="card-header"><i class="bi bi-list-check me-1"></i>{{ title }}</div>
+            <div class="card-body">
+                <div class="mb-3">
+                    {{ form_label(form.name) }}
+                    {{ form_widget(form.name, {attr: {class: 'form-control'}}) }}
+                    {{ form_errors(form.name) }}
+                </div>
+                <div class="mb-0">
+                    {{ form_label(form.description) }}
+                    {{ form_widget(form.description, {attr: {class: 'form-control'}}) }}
+                    {{ form_errors(form.description) }}
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header"><i class="bi bi-card-list me-1"></i>Entries</div>
+            <div class="card-body">
+                <div class="form-text mb-3">
+                    Each entry is an address match element: an IP, CIDR, ACL name, or keyword
+                    (<code>any</code>, <code>none</code>, <code>localhost</code>, <code>localnets</code>).
+                    Prefix with <code>!</code> to negate.
+                </div>
+                <div id="entries-container"
+                     data-prototype="{{ form_widget(form.entries.vars.prototype, {attr: {class: 'form-control font-monospace', placeholder: 'e.g. 192.168.1.0/24'}})|e('html_attr') }}"
+                     data-index="{{ form.entries|length }}">
+                    {% for entry in form.entries %}
+                        <div class="input-group mb-2 acl-entry">
+                            {{ form_widget(entry, {attr: {class: 'form-control font-monospace'}}) }}
+                            <button type="button" class="btn btn-outline-danger remove-acl-entry" title="Remove">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
+                        </div>
+                    {% endfor %}
+                </div>
+                <button type="button" class="btn btn-outline-secondary btn-sm add-acl-entry"
+                        data-target="entries-container">
+                    <i class="bi bi-plus-lg me-1"></i>Add entry
+                </button>
+                {{ form_errors(form.entries) }}
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-between">
+            <a href="{{ path('dns_acl_index') }}" class="btn btn-outline-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-check-lg me-1"></i>Save
+            </button>
+        </div>
+
+        {{ form_end(form) }}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ parent() }}
+<script>
+document.querySelectorAll('.add-acl-entry').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+        const container = document.getElementById(this.dataset.target);
+        const index     = parseInt(container.dataset.index, 10);
+        const html      = container.dataset.prototype.replace(/__name__/g, index);
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'input-group mb-2 acl-entry';
+        wrapper.innerHTML = html +
+            '<button type="button" class="btn btn-outline-danger remove-acl-entry" title="Remove">' +
+            '<i class="bi bi-x-lg"></i></button>';
+
+        container.appendChild(wrapper);
+        container.dataset.index = index + 1;
+    });
+});
+
+document.addEventListener('click', function (e) {
+    const btn = e.target.closest('.remove-acl-entry');
+    if (btn) btn.closest('.acl-entry').remove();
+});
+</script>
+{% endblock %}
