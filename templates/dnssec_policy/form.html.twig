@@ -32,30 +32,54 @@
         <div class="card mb-3">
             <div class="card-header"><i class="bi bi-clock me-1"></i>Timing</div>
             <div class="card-body">
+                <div class="form-text mb-3">All durations accept ISO 8601 format (e.g. <code>PT1H</code>, <code>P14D</code>) or seconds.</div>
                 <div class="row g-3 mb-3">
                     <div class="col-md-6">
                         {{ form_label(form.dnskeyTtl) }}
-                        {{ form_widget(form.dnskeyTtl, {attr: {class: 'form-control'}}) }}
+                        {{ form_widget(form.dnskeyTtl, {attr: {class: 'form-control font-monospace'}}) }}
                         {{ form_errors(form.dnskeyTtl) }}
                     </div>
                     <div class="col-md-6">
                         {{ form_label(form.maxZoneTtl) }}
-                        {{ form_widget(form.maxZoneTtl, {attr: {class: 'form-control'}}) }}
+                        {{ form_widget(form.maxZoneTtl, {attr: {class: 'form-control font-monospace'}}) }}
                         {{ form_errors(form.maxZoneTtl) }}
                     </div>
                 </div>
-                <div class="row g-3 mb-0">
+                <div class="row g-3 mb-3">
                     <div class="col-md-6">
                         {{ form_label(form.signaturesValidity) }}
                         {{ form_widget(form.signaturesValidity, {attr: {class: 'form-control font-monospace'}}) }}
-                        <div class="form-text">ISO 8601 duration, e.g. <code>P14D</code></div>
                         {{ form_errors(form.signaturesValidity) }}
                     </div>
                     <div class="col-md-6">
                         {{ form_label(form.signaturesRefresh) }}
                         {{ form_widget(form.signaturesRefresh, {attr: {class: 'form-control font-monospace'}}) }}
-                        <div class="form-text">ISO 8601 duration, e.g. <code>P5D</code></div>
                         {{ form_errors(form.signaturesRefresh) }}
+                    </div>
+                </div>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        {{ form_label(form.publishSafety) }}
+                        {{ form_widget(form.publishSafety, {attr: {class: 'form-control font-monospace'}}) }}
+                        {{ form_errors(form.publishSafety) }}
+                    </div>
+                    <div class="col-md-6">
+                        {{ form_label(form.retireSafety) }}
+                        {{ form_widget(form.retireSafety, {attr: {class: 'form-control font-monospace'}}) }}
+                        {{ form_errors(form.retireSafety) }}
+                    </div>
+                </div>
+                <div class="row g-3 mb-0">
+                    <div class="col-md-6">
+                        {{ form_label(form.purgeKeys) }}
+                        {{ form_widget(form.purgeKeys, {attr: {class: 'form-control font-monospace'}}) }}
+                        {{ form_errors(form.purgeKeys) }}
+                    </div>
+                    <div class="col-md-6">
+                        {{ form_label(form.nsec3param) }}
+                        {{ form_widget(form.nsec3param, {attr: {class: 'form-control font-monospace'}}) }}
+                        <div class="form-text">Parameters: <code>iterations optout saltlength</code></div>
+                        {{ form_errors(form.nsec3param) }}
                     </div>
                 </div>
             </div>
