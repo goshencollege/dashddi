@@ -11,7 +11,6 @@ use App\Enum\BlockType;
 use App\Repository\DnsViewRepository;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
-use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
 use Symfony\Component\Form\Extension\Core\Type\IntegerType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
@@ -100,10 +99,6 @@ class SubnetType extends AbstractType
                 'placeholder'  => '— None —',
                 'required'     => false,
                 'label'        => 'DNSSEC Policy',
-            ])
-            ->add('dnssecInlineSigning', CheckboxType::class, [
-                'label'    => 'Enable inline signing',
-                'required' => false,
             ])
             ->add('keyDirectory', TextType::class, [
                 'label'    => 'Key Directory',

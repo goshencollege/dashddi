@@ -75,6 +75,38 @@
 </div>
 {% endif %}
 
+{% if domain.dnssecPolicy or domain.keyDirectory %}
+<div class="card mb-4">
+    <div class="card-header"><i class="bi bi-shield-check me-1"></i>DNSSEC</div>
+    <div class="card-body">
+        <div class="row g-3">
+            {% if domain.dnssecPolicy %}
+            <div class="col-md-4">
+                <div class="text-muted small">Policy</div>
+                <div><a href="{{ path('dnssec_policy_edit', {id: domain.dnssecPolicy.id}) }}" class="fw-semibold text-decoration-none"><code>{{ domain.dnssecPolicy.name }}</code></a></div>
+            </div>
+            {% endif %}
+            {% if domain.keyDirectory %}
+            <div class="col-md-4">
+                <div class="text-muted small">Key Directory</div>
+                <div class="font-monospace">{{ domain.keyDirectory }}</div>
+            </div>
+            {% endif %}
+            <div class="col-md-4">
+                <div class="text-muted small">Inline Signing</div>
+                <div>
+                    {% if domain.dnssecPolicy and domain.keyDirectory %}
+                        <span class="badge bg-success"><i class="bi bi-check-lg me-1"></i>Yes</span>
+                    {% else %}
+                        <span class="badge bg-secondary">No</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 {# Standalone DNS Records #}
 <div class="card mb-4">
     <div class="card-header d-flex justify-content-between align-items-center">
