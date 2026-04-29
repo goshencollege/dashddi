@@ -1,0 +1,60 @@
+{% extends 'base.html.twig' %}
+{% block title %}Start KSK Rollover{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+<div class="col-lg-7">
+
+<div class="d-flex align-items-center mb-3 gap-2">
+    <a href="{{ path('ksk_rollover_index') }}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i>
+    </a>
+    <h1 class="h3 mb-0"><i class="bi bi-key me-2"></i>Start KSK Rollover</h1>
+</div>
+
+<div class="alert alert-info">
+    <strong>What this does:</strong> Generates a new KSK on the DNS server, calls <code>rndc loadkeys</code>, then walks you through the manual registrar DS update and old-key retirement.
+</div>
+
+{{ form_start(form, {attr: {class: 'needs-validation', novalidate: true}}) }}
+
+<div class="card mb-3">
+    <div class="card-header fw-semibold">Rollover Target</div>
+    <div class="card-body row g-3">
+        <div class="col-md-6">
+            {{ form_label(form.domain, 'Domain') }}
+            {{ form_widget(form.domain) }}
+            {{ form_errors(form.domain) }}
+        </div>
+        <div class="col-md-6">
+            {{ form_label(form.dnsServer, 'DNS Server') }}
+            {{ form_widget(form.dnsServer) }}
+            {{ form_errors(form.dnsServer) }}
+        </div>
+        <div class="col-md-6">
+            {{ form_label(form.algorithm, 'Algorithm') }}
+            {{ form_widget(form.algorithm) }}
+            {{ form_errors(form.algorithm) }}
+            <div class="form-text">Must match the algorithm already in use for this zone.</div>
+        </div>
+        <div class="col-md-6">
+            {{ form_label(form.keyDirectory, 'Key Directory Override') }}
+            {{ form_widget(form.keyDirectory) }}
+            {{ form_errors(form.keyDirectory) }}
+            <div class="form-text">Overrides the key-directory set on the domain.</div>
+        </div>
+    </div>
+</div>
+
+<div class="d-flex gap-2">
+    <button type="submit" class="btn btn-primary">
+        <i class="bi bi-play-fill me-1"></i>Generate New KSK &amp; Load Keys
+    </button>
+    <a href="{{ path('ksk_rollover_index') }}" class="btn btn-outline-secondary">Cancel</a>
+</div>
+
+{{ form_end(form) }}
+
+</div>
+</div>
+{% endblock %}

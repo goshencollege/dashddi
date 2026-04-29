@@ -127,7 +127,8 @@
                 {% set dnsActive = app.request.attributes.get('_route') starts with 'domain'
                     or app.request.attributes.get('_route') starts with 'dns_view'
                     or app.request.attributes.get('_route') starts with 'dns_acl'
-                    or app.request.attributes.get('_route') starts with 'dnssec_policy' %}
+                    or app.request.attributes.get('_route') starts with 'dnssec_policy'
+                    or app.request.attributes.get('_route') starts with 'ksk_rollover' %}
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle {{ dnsActive ? 'active' }}" href="#" data-bs-toggle="dropdown">
                         <i class="bi bi-globe me-1"></i>DNS
@@ -155,6 +156,12 @@
                             <a class="dropdown-item {{ app.request.attributes.get('_route') starts with 'dnssec_policy' ? 'active' }}"
                                href="{{ path('dnssec_policy_index') }}">
                                 <i class="bi bi-shield-check me-1"></i>DNSSEC Policies
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item {{ app.request.attributes.get('_route') starts with 'ksk_rollover' ? 'active' }}"
+                               href="{{ path('ksk_rollover_index') }}">
+                                <i class="bi bi-key me-1"></i>KSK Rollovers
                             </a>
                         </li>
                     </ul>

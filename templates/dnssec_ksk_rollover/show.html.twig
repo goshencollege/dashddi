@@ -1,0 +1,235 @@
+{% extends 'base.html.twig' %}
+{% block title %}KSK Rollover – {{ rollover.domain.name }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-3 gap-2">
+    <a href="{{ path('ksk_rollover_index') }}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i>
+    </a>
+    <h1 class="h3 mb-0">
+        <i class="bi bi-key me-2"></i>KSK Rollover — {{ rollover.domain.name }}
+        <span class="badge {{ rollover.status.badgeClass() }} ms-2 fs-6">{{ rollover.status.label() }}</span>
+    </h1>
+</div>
+
+{# ── Overview card ──────────────────────────────────────────────────────── #}
+<div class="row g-3 mb-4">
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header fw-semibold">Details</div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-5">Domain</dt>
+                    <dd class="col-7">{{ rollover.domain.name }}</dd>
+                    <dt class="col-5">DNS Server</dt>
+                    <dd class="col-7">{{ rollover.dnsServer ? rollover.dnsServer.name : '—' }}</dd>
+                    <dt class="col-5">Algorithm</dt>
+                    <dd class="col-7 font-monospace">{{ rollover.algorithm }}</dd>
+                    <dt class="col-5">Key Directory</dt>
+                    <dd class="col-7 font-monospace">{{ rollover.keyDirectory }}</dd>
+                    <dt class="col-5">Old Key Tag</dt>
+                    <dd class="col-7 font-monospace">{{ rollover.oldKeyTag ?? '—' }}</dd>
+                    <dt class="col-5">New Key Tag</dt>
+                    <dd class="col-7 font-monospace">{{ rollover.newKeyTag ?? '—' }}</dd>
+                    <dt class="col-5">DNSKEY TTL</dt>
+                    <dd class="col-7">{{ rollover.dnskeyTtlSeconds ? rollover.dnskeyTtlSeconds ~ ' s' : '—' }}</dd>
+                    <dt class="col-5">Started</dt>
+                    <dd class="col-7">{{ rollover.startedAt|date('Y-m-d H:i:s') }}</dd>
+                    {% if rollover.completedAt %}
+                    <dt class="col-5">Completed</dt>
+                    <dd class="col-7">{{ rollover.completedAt|date('Y-m-d H:i:s') }}</dd>
+                    {% endif %}
+                </dl>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header fw-semibold">DS Record for Registrar</div>
+            <div class="card-body">
+                {% if rollover.dsRecord %}
+                    <pre class="mb-0" style="white-space:pre-wrap;word-break:break-all;font-size:.85rem;">{{ rollover.dsRecord }}</pre>
+                {% else %}
+                    <span class="text-muted">Not yet generated.</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ── Wizard steps ───────────────────────────────────────────────────────── #}
+{% set status = rollover.status.value %}
+{% set active = rollover.status.isActive() %}
+
+<div class="card mb-4">
+    <div class="card-header fw-semibold">Rollover Steps</div>
+    <div class="card-body p-0">
+        <ul class="list-group list-group-flush">
+
+            {# Step 1 — KeyPublished #}
+            {% set done1 = status != 'key_published' and status != 'failed' %}
+            <li class="list-group-item {% if status == 'key_published' %}list-group-item-info{% elseif done1 %}list-group-item-success{% endif %}">
+                <div class="d-flex align-items-start gap-3">
+                    <div class="mt-1">
+                        {% if done1 %}<i class="bi bi-check-circle-fill text-success fs-5"></i>
+                        {% elseif status == 'key_published' %}<i class="bi bi-arrow-right-circle-fill text-info fs-5"></i>
+                        {% else %}<i class="bi bi-circle text-muted fs-5"></i>{% endif %}
+                    </div>
+                    <div class="flex-grow-1">
+                        <strong>1. New KSK Generated &amp; Published</strong>
+                        <p class="mb-1 text-muted small">A new KSK has been generated in <code>{{ rollover.keyDirectory }}</code> and loaded into BIND via <code>rndc loadkeys</code>. Both the old and new DNSKEY records are now in the zone.</p>
+                        {% if status == 'key_published' %}
+                        <div class="alert alert-info mb-2 py-2">
+                            <i class="bi bi-clock me-1"></i>
+                            Wait for the new DNSKEY to propagate to all resolvers. This takes at least one DNSKEY TTL
+                            ({{ rollover.dnskeyTtlSeconds ? rollover.dnskeyTtlSeconds ~ ' seconds' : 'check your zone TTL' }}).
+                            You can verify with:<br>
+                            <code>dig DNSKEY {{ rollover.domain.name }} +short</code><br>
+                            You should see two DNSKEY records with flags 257 (one old, one new).
+                        </div>
+                        <form method="post" action="{{ path('ksk_rollover_advance', {id: rollover.id}) }}">
+                            <input type="hidden" name="action" value="dnskey_propagated">
+                            <button class="btn btn-sm btn-primary">
+                                <i class="bi bi-check me-1"></i>DNSKEY Propagated — Proceed to DS Update
+                            </button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </div>
+            </li>
+
+            {# Step 2 — DsPending #}
+            {% set done2 = status in ['ds_submitted', 'old_retired', 'complete'] %}
+            <li class="list-group-item {% if status == 'ds_pending' %}list-group-item-warning{% elseif done2 %}list-group-item-success{% endif %}">
+                <div class="d-flex align-items-start gap-3">
+                    <div class="mt-1">
+                        {% if done2 %}<i class="bi bi-check-circle-fill text-success fs-5"></i>
+                        {% elseif status == 'ds_pending' %}<i class="bi bi-arrow-right-circle-fill text-warning fs-5"></i>
+                        {% else %}<i class="bi bi-circle text-muted fs-5"></i>{% endif %}
+                    </div>
+                    <div class="flex-grow-1">
+                        <strong>2. Submit New DS Record to Registrar</strong>
+                        <p class="mb-1 text-muted small">Log in to your domain registrar and add the DS record shown above. Do <em>not</em> remove the old DS record yet.</p>
+                        {% if status == 'ds_pending' %}
+                        <div class="alert alert-warning mb-2 py-2">
+                            <i class="bi bi-exclamation-triangle me-1"></i>
+                            <strong>Manual action required.</strong> Add the DS record above to your registrar.
+                            Keep the existing DS record in place alongside the new one.
+                        </div>
+                        <form method="post" action="{{ path('ksk_rollover_advance', {id: rollover.id}) }}">
+                            <input type="hidden" name="action" value="ds_submitted">
+                            <button class="btn btn-sm btn-primary">
+                                <i class="bi bi-check me-1"></i>DS Submitted — Waiting for Propagation
+                            </button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </div>
+            </li>
+
+            {# Step 3 — DsSubmitted #}
+            {% set done3 = status in ['old_retired', 'complete'] %}
+            <li class="list-group-item {% if status == 'ds_submitted' %}list-group-item-warning{% elseif done3 %}list-group-item-success{% endif %}">
+                <div class="d-flex align-items-start gap-3">
+                    <div class="mt-1">
+                        {% if done3 %}<i class="bi bi-check-circle-fill text-success fs-5"></i>
+                        {% elseif status == 'ds_submitted' %}<i class="bi bi-arrow-right-circle-fill text-warning fs-5"></i>
+                        {% else %}<i class="bi bi-circle text-muted fs-5"></i>{% endif %}
+                    </div>
+                    <div class="flex-grow-1">
+                        <strong>3. Confirm DS Propagation &amp; Retire Old KSK</strong>
+                        <p class="mb-1 text-muted small">Wait for the new DS record to propagate globally, then retire the old KSK. Verify the new DS is live:</p>
+                        {% if status == 'ds_submitted' %}
+                        <div class="alert alert-warning mb-2 py-2">
+                            <i class="bi bi-clock me-1"></i>
+                            Verify the new DS record is visible in the parent zone:
+                            <code>dig DS {{ rollover.domain.name }} +short</code><br>
+                            You should see both old and new DS records. Once confirmed, click below to retire the old KSK.
+                            BIND will mark it inactive now and schedule deletion after
+                            {{ rollover.dnskeyTtlSeconds ? (rollover.dnskeyTtlSeconds * 2) ~ ' seconds (2× DNSKEY TTL)' : '2× the DNSKEY TTL' }}.
+                        </div>
+                        <form method="post" action="{{ path('ksk_rollover_advance', {id: rollover.id}) }}"
+                              onsubmit="return confirm('This will run dnssec-settime on the old KSK and rndc sign. Continue?')">
+                            <input type="hidden" name="action" value="retire_old_key">
+                            <button class="btn btn-sm btn-warning text-dark">
+                                <i class="bi bi-key me-1"></i>DS Propagated — Retire Old KSK
+                            </button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </div>
+            </li>
+
+            {# Step 4 — OldKeyRetired #}
+            {% set done4 = status == 'complete' %}
+            <li class="list-group-item {% if status == 'old_retired' %}list-group-item-info{% elseif done4 %}list-group-item-success{% endif %}">
+                <div class="d-flex align-items-start gap-3">
+                    <div class="mt-1">
+                        {% if done4 %}<i class="bi bi-check-circle-fill text-success fs-5"></i>
+                        {% elseif status == 'old_retired' %}<i class="bi bi-arrow-right-circle-fill text-info fs-5"></i>
+                        {% else %}<i class="bi bi-circle text-muted fs-5"></i>{% endif %}
+                    </div>
+                    <div class="flex-grow-1">
+                        <strong>4. Remove Old DS Record &amp; Complete</strong>
+                        <p class="mb-1 text-muted small">Log in to your registrar and remove the old DS record (key tag {{ rollover.oldKeyTag ?? '?' }}). BIND will automatically remove the old DNSKEY from the zone after the deletion time passes.</p>
+                        {% if status == 'old_retired' %}
+                        <div class="alert alert-info mb-2 py-2">
+                            <i class="bi bi-exclamation-triangle me-1"></i>
+                            <strong>Manual action required.</strong> Remove the old DS record (tag {{ rollover.oldKeyTag ?? '?' }}) from your registrar.
+                            Do <em>not</em> remove the new DS record (tag {{ rollover.newKeyTag ?? '?' }}).
+                        </div>
+                        <form method="post" action="{{ path('ksk_rollover_advance', {id: rollover.id}) }}">
+                            <input type="hidden" name="action" value="complete">
+                            <button class="btn btn-sm btn-success">
+                                <i class="bi bi-check-circle me-1"></i>Old DS Removed — Mark Complete
+                            </button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </div>
+            </li>
+
+            {# Complete #}
+            {% if status == 'complete' %}
+            <li class="list-group-item list-group-item-success">
+                <div class="d-flex align-items-start gap-3">
+                    <div class="mt-1"><i class="bi bi-trophy-fill text-success fs-5"></i></div>
+                    <div><strong>Rollover Complete</strong> — the new KSK is the sole active key-signing key.</div>
+                </div>
+            </li>
+            {% endif %}
+
+        </ul>
+    </div>
+</div>
+
+{# ── Fail / Log ─────────────────────────────────────────────────────────── #}
+{% if active %}
+<div class="mb-4">
+    <form method="post" action="{{ path('ksk_rollover_advance', {id: rollover.id}) }}"
+          onsubmit="return confirm('Mark this rollover as failed?')">
+        <input type="hidden" name="action" value="fail">
+        <button class="btn btn-sm btn-outline-danger">
+            <i class="bi bi-x-circle me-1"></i>Mark as Failed
+        </button>
+    </form>
+</div>
+{% endif %}
+
+{% if rollover.log %}
+<div class="card">
+    <div class="card-header fw-semibold">Activity Log</div>
+    <div class="card-body p-0">
+        <ul class="list-group list-group-flush">
+        {% for entry in rollover.log %}
+            <li class="list-group-item">
+                <span class="text-muted small font-monospace me-2">{{ entry.at }}</span>
+                {{ entry.message }}
+            </li>
+        {% endfor %}
+        </ul>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}
