@@ -128,7 +128,6 @@
                         <tr>
                             <th style="min-width: 13rem">Name</th>
                             <th>Tags</th>
-                            <th>Location</th>
                             <th>IP Addresses</th>
                             <th>DNS Names</th>
                             <th>Last Modified</th>
@@ -142,6 +141,9 @@
                                     <a href="{{ path('host_show', {id: host.id}) }}" class="fw-semibold text-decoration-none">
                                         {{ host.name }}
                                     </a>
+                                    {% if host.location %}
+                                        <div class="text-muted small">{{ host.location }}</div>
+                                    {% endif %}
                                 </td>
                                 <td>
                                     {% for tag in host.tags %}
@@ -150,7 +152,6 @@
                                         <span class="text-muted">—</span>
                                     {% endfor %}
                                 </td>
-                                <td class="text-muted">{{ host.location ?: '—' }}</td>
                                 <td class="ip-address small">
                                     {% set ips = [] %}
                                     {% for iface in host.interfaces %}
@@ -220,7 +221,6 @@
                         <tr>
                             <th style="min-width: 11rem">Host</th>
                             <th>Tags</th>
-                            <th>Location</th>
                             <th class="font-monospace" style="min-width: 10rem">MAC Address</th>
                             <th>Subnet</th>
                             <th>IPv4</th>
@@ -238,6 +238,9 @@
                                         <a href="{{ path('host_show', {id: host.id}) }}" class="fw-semibold text-decoration-none">
                                             {{ host.name }}
                                         </a>
+                                        {% if host.location %}
+                                            <div class="text-muted small">{{ host.location }}</div>
+                                        {% endif %}
                                     </td>
                                     <td>
                                         {% for tag in host.tags %}
@@ -246,7 +249,6 @@
                                             <span class="text-muted">—</span>
                                         {% endfor %}
                                     </td>
-                                    <td class="text-muted">{{ host.location ?: '—' }}</td>
                                     <td class="font-monospace small">{{ iface.macAddress }}</td>
                                     <td class="small">{{ iface.subnet ? iface.subnet.name : '—' }}</td>
                                     <td class="ip-address small">
@@ -301,6 +303,9 @@
                                         <a href="{{ path('host_show', {id: host.id}) }}" class="fw-semibold text-decoration-none">
                                             {{ host.name }}
                                         </a>
+                                        {% if host.location %}
+                                            <div class="text-muted small">{{ host.location }}</div>
+                                        {% endif %}
                                     </td>
                                     <td>
                                         {% for tag in host.tags %}
@@ -309,7 +314,6 @@
                                             <span class="text-muted">—</span>
                                         {% endfor %}
                                     </td>
-                                    <td class="text-muted">{{ host.location ?: '—' }}</td>
                                     <td colspan="6" class="text-muted small fst-italic">No interfaces</td>
                                     <td class="text-muted small">
                                         {{ host.updatedAt|date('Y-m-d H:i') }}
