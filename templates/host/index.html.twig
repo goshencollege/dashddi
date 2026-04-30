@@ -295,12 +295,12 @@
                                     </td>
                                     <td class="text-end">
                                         <div class="d-flex gap-1 justify-content-end align-items-center">
-                                            <a href="{{ path('host_edit', {id: host.id}) }}" class="btn btn-sm btn-outline-secondary">
+                                            <a href="{{ path('interface_edit', {id: iface.id}) }}" class="btn btn-sm btn-outline-secondary">
                                                 <i class="bi bi-pencil"></i>
                                             </a>
-                                            <form method="post" action="{{ path('host_delete', {id: host.id}) }}"
-                                                  onsubmit="return confirm('Delete host {{ host.name|e('js') }}?')">
-                                                <input type="hidden" name="_token" value="{{ csrf_token('delete_host_' ~ host.id) }}">
+                                            <form method="post" action="{{ path('interface_delete', {id: iface.id}) }}"
+                                                  onsubmit="return confirm('Delete interface {{ iface.macAddress|e('js') }} from {{ host.name|e('js') }}?')">
+                                                <input type="hidden" name="_token" value="{{ csrf_token('delete_interface_' ~ iface.id) }}">
                                                 <button type="submit" class="btn btn-sm btn-outline-danger">
                                                     <i class="bi bi-trash"></i>
                                                 </button>
