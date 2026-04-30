@@ -1,5 +1,6 @@
 {% extends 'base.html.twig' %}
 {% block title %}Hosts{% endblock %}
+{% block container_class %}container-xxl{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -248,7 +249,7 @@
                                     </td>
                                     <td class="text-muted">{{ host.location ?: '—' }}</td>
                                     <td class="font-monospace small">{{ iface.macAddress }}</td>
-                                    <td class="small">{{ iface.subnet ? iface.subnet : '<span class="text-muted">—</span>'|raw }}</td>
+                                    <td class="small">{{ iface.subnet ? iface.subnet.name : '—' }}</td>
                                     <td class="ip-address small">
                                         {% if iface.ipAddress %}
                                             {{ iface.ipAddress.address }}

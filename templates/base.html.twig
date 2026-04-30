@@ -390,7 +390,7 @@
     </div>
 </nav>
 
-<div class="container mb-5">
+<div class="{% block container_class %}container{% endblock %} mb-5">
     {% for label, messages in app.flashes %}
         {% for message in messages %}
             <div class="alert alert-{{ label == 'success' ? 'success' : 'danger' }} alert-dismissible fade show" role="alert">
