@@ -128,7 +128,8 @@
                         <tr>
                             <th style="min-width: 13rem">Name</th>
                             <th>Tags</th>
-                            <th>IP Addresses</th>
+                            <th>IPv4</th>
+                            <th>IPv6</th>
                             <th>DNS Names</th>
                             <th>Last Modified</th>
                             <th class="text-end">Actions</th>
@@ -153,19 +154,29 @@
                                     {% endfor %}
                                 </td>
                                 <td class="ip-address small">
-                                    {% set ips = [] %}
+                                    {% set ipv4s = [] %}
                                     {% for iface in host.interfaces %}
                                         {% if iface.ipAddress %}
-                                            {% set ips = ips|merge([iface.ipAddress.address]) %}
-                                        {% endif %}
-                                        {% if iface.ipv6Address %}
-                                            {% set ips = ips|merge([iface.ipv6Address.address]) %}
+                                            {% set ipv4s = ipv4s|merge([iface.ipAddress.address]) %}
                                         {% endif %}
                                     {% endfor %}
-                                    {% if ips is empty %}
+                                    {% if ipv4s is empty %}
                                         <span class="text-muted">—</span>
                                     {% else %}
-                                        {% for ip in ips %}<div>{{ ip }}</div>{% endfor %}
+                                        {% for ip in ipv4s %}<div>{{ ip }}</div>{% endfor %}
+                                    {% endif %}
+                                </td>
+                                <td class="ip-address small">
+                                    {% set ipv6s = [] %}
+                                    {% for iface in host.interfaces %}
+                                        {% if iface.ipv6Address %}
+                                            {% set ipv6s = ipv6s|merge([iface.ipv6Address.address]) %}
+                                        {% endif %}
+                                    {% endfor %}
+                                    {% if ipv6s is empty %}
+                                        <span class="text-muted">—</span>
+                                    {% else %}
+                                        {% for ip in ipv6s %}<div>{{ ip }}</div>{% endfor %}
                                     {% endif %}
                                 </td>
                                 <td class="small font-monospace">
