@@ -19,14 +19,19 @@
     <div class="card-body">
         {{ form_start(form) }}
 
-        {# MAC Address + Subnet #}
+        {# Name + MAC Address + Subnet #}
         <div class="row g-3 mb-4">
-            <div class="col-md-6">
+            <div class="col-md-4">
+                {{ form_label(form.name, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                {{ form_widget(form.name, {attr: {class: 'form-control' ~ (form.name.vars.errors|length ? ' is-invalid' : '')}}) }}
+                {{ form_errors(form.name) }}
+            </div>
+            <div class="col-md-4">
                 {{ form_label(form.macAddress, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
                 {{ form_widget(form.macAddress, {attr: {class: 'form-control font-monospace' ~ (form.macAddress.vars.errors|length ? ' is-invalid' : '')}}) }}
                 {{ form_errors(form.macAddress) }}
             </div>
-            <div class="col-md-6">
+            <div class="col-md-4">
                 {{ form_label(form.subnet, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
                 {{ form_widget(form.subnet, {attr: {class: 'form-select'}}) }}
             </div>
