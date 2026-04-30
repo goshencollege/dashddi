@@ -125,21 +125,43 @@ class KskRolloverService
     }
 
     /**
-     * Finds the current KSK base name in keyDir for zone.
-     * Uses ls + xargs to avoid glob-expansion failures when no files match.
+     * Finds the currently active KSK base name in keyDir for zone.
+     * Iterates all KSK files (flag 257) and returns the first one that has no
+     * Inactive time set, meaning it is still the active signer. This correctly
+     * handles leftover key files from previous failed rollovers.
      */
     private function findCurrentKsk(SFTP $sftp, string $keyDir, string $zone): ?string
     {
-        $out = $sftp->exec(sprintf(
-            'ls %s/K%s.+*.key 2>/dev/null | xargs grep -l " 257 " 2>/dev/null | head -1',
+        // Collect all KSK .key files for this zone
+        $listOut = $sftp->exec(sprintf(
+            'ls %s/K%s.+*.key 2>/dev/null | xargs grep -l " 257 " 2>/dev/null',
             $keyDir,
             $zone
         ));
-        $path = trim((string)$out);
-        if (!$path) {
+        $files = array_filter(array_map('trim', explode("\n", (string)$listOut)));
+        if (empty($files)) {
             return null;
         }
-        return basename($path, '.key') ?: null;
+
+        foreach ($files as $path) {
+            $path = trim($path);
+            if (!$path) {
+                continue;
+            }
+            // dnssec-settime -p all prints "Inactive: UNSET" (or "not set") when active
+            $info = $sftp->exec('dnssec-settime -p all ' . escapeshellarg($path) . ' 2>/dev/null');
+            if (preg_match('/^Inactive:\s*(.+)$/im', (string)$info, $m)) {
+                $val = strtolower(trim($m[1]));
+                if (str_contains($val, 'unset') || str_contains($val, 'not set') || $val === '') {
+                    return basename($path, '.key');
+                }
+            } else {
+                // No Inactive line at all — treat as active
+                return basename($path, '.key');
+            }
+        }
+
+        return null;
     }
 
     /**
