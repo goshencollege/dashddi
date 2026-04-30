@@ -1,5 +1,5 @@
 {% extends 'base.html.twig' %}
-{% block title %}KSK Rollover – {{ rollover.domain.name }}{% endblock %}
+{% block title %}KSK Rollover – {{ rollover.zoneName }}{% endblock %}
 
 {% block content %}
 <div class="d-flex align-items-center mb-3 gap-2">
@@ -7,7 +7,7 @@
         <i class="bi bi-arrow-left"></i>
     </a>
     <h1 class="h3 mb-0">
-        <i class="bi bi-key me-2"></i>KSK Rollover — {{ rollover.domain.name }}
+        <i class="bi bi-key me-2"></i>KSK Rollover — {{ rollover.zoneName }}
         <span class="badge {{ rollover.status.badgeClass() }} ms-2 fs-6">{{ rollover.status.label() }}</span>
     </h1>
 </div>
@@ -19,8 +19,8 @@
             <div class="card-header fw-semibold">Details</div>
             <div class="card-body">
                 <dl class="row mb-0">
-                    <dt class="col-5">Domain</dt>
-                    <dd class="col-7">{{ rollover.domain.name }}</dd>
+                    <dt class="col-5">Zone</dt>
+                    <dd class="col-7">{{ rollover.zoneName }}</dd>
                     <dt class="col-5">DNS Server</dt>
                     <dd class="col-7">{{ rollover.dnsServer ? rollover.dnsServer.name : '—' }}</dd>
                     <dt class="col-5">Algorithm</dt>
@@ -84,7 +84,7 @@
                             Wait for the new DNSKEY to propagate to all resolvers. This takes at least one DNSKEY TTL
                             ({{ rollover.dnskeyTtlSeconds ? rollover.dnskeyTtlSeconds ~ ' seconds' : 'check your zone TTL' }}).
                             You can verify with:<br>
-                            <code>dig DNSKEY {{ rollover.domain.name }} +short</code><br>
+                            <code>dig DNSKEY {{ rollover.zoneName }} +short</code><br>
                             You should see two DNSKEY records with flags 257 (one old, one new).
                         </div>
                         <form method="post" action="{{ path('ksk_rollover_advance', {id: rollover.id}) }}">
@@ -143,7 +143,7 @@
                         <div class="alert alert-warning mb-2 py-2">
                             <i class="bi bi-clock me-1"></i>
                             Verify the new DS record is visible in the parent zone:
-                            <code>dig DS {{ rollover.domain.name }} +short</code><br>
+                            <code>dig DS {{ rollover.zoneName }} +short</code><br>
                             You should see both old and new DS records. Once confirmed, click below to retire the old KSK.
                             BIND will mark it inactive now and schedule deletion after
                             {{ rollover.dnskeyTtlSeconds ? (rollover.dnskeyTtlSeconds * 2) ~ ' seconds (2× DNSKEY TTL)' : '2× the DNSKEY TTL' }}.

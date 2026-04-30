@@ -3,6 +3,8 @@
 namespace App\Controller;
 
 use App\Entity\DnssecKskRollover;
+use App\Entity\Domain;
+use App\Entity\Subnet;
 use App\Enum\KskRolloverStatus;
 use App\Form\KskRolloverStartType;
 use App\Repository\DnssecKskRolloverRepository;
@@ -29,30 +31,56 @@ class DnssecKskRolloverController extends AbstractController
     public function start(Request $request, EntityManagerInterface $em, KskRolloverService $svc, DnssecKskRolloverRepository $repo, DnsServerRepository $serverRepo): Response
     {
         $firstServer = $serverRepo->findOneBy([], ['name' => 'ASC']);
+        $zoneChoices = $this->buildZoneChoices($em);
 
-        $form = $this->createForm(KskRolloverStartType::class, null, ['first_server' => $firstServer]);
+        $form = $this->createForm(KskRolloverStartType::class, null, [
+            'first_server' => $firstServer,
+            'zone_choices' => $zoneChoices,
+        ]);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            $data   = $form->getData();
-            $domain = $data['domain'];
-            $server = $data['dnsServer'];
+            $data      = $form->getData();
+            $zoneValue = $data['zone'];   // 'domain:N' or 'subnet:N'
+            $server    = $data['dnsServer'];
 
-            if ($repo->findActiveForDomain($domain)) {
-                $this->addFlash('danger', 'An active KSK rollover already exists for "' . $domain->getName() . '".');
-                return $this->redirectToRoute('ksk_rollover_index');
+            [$type, $id] = explode(':', $zoneValue, 2);
+            $domain = $subnet = null;
+            if ($type === 'domain') {
+                $domain = $em->find(Domain::class, (int) $id);
+            } else {
+                $subnet = $em->find(Subnet::class, (int) $id);
             }
 
-            $keyDir = $domain->getKeyDirectory();
-            if (!$keyDir) {
-                $this->addFlash('danger', 'No key directory is set on domain "' . $domain->getName() . '". Edit the domain to set one.');
+            if (!$domain && !$subnet) {
+                $this->addFlash('danger', 'Selected zone no longer exists.');
                 return $this->redirectToRoute('ksk_rollover_start');
             }
 
             $rollover = new DnssecKskRollover();
-            $rollover->setDomain($domain);
+            if ($domain) {
+                if ($repo->findActiveForDomain($domain)) {
+                    $this->addFlash('danger', 'An active KSK rollover already exists for "' . $domain->getName() . '".');
+                    return $this->redirectToRoute('ksk_rollover_index');
+                }
+                $rollover->setDomain($domain);
+            } else {
+                if ($repo->findActiveForSubnet($subnet)) {
+                    $this->addFlash('danger', 'An active KSK rollover already exists for subnet "' . $subnet->getName() . '".');
+                    return $this->redirectToRoute('ksk_rollover_index');
+                }
+                $rollover->setSubnet($subnet);
+            }
+
+            $keyDir = $rollover->getEffectiveKeyDirectory();
+            if (!$keyDir) {
+                $label = $domain ? "domain \"{$domain->getName()}\"" : "subnet \"{$subnet->getName()}\"";
+                $this->addFlash('danger', "No key directory is set on $label. Edit it to set one.");
+                return $this->redirectToRoute('ksk_rollover_start');
+            }
+
             $rollover->setDnsServer($server);
-            $rollover->setAlgorithm($this->kskAlgorithm($domain));
+            $rollover->setAlgorithm($this->kskAlgorithm($rollover));
             $rollover->setKeyDirectory($keyDir);
 
             // Persist first so the record exists in DB before any SSH work.
@@ -63,7 +91,7 @@ class DnssecKskRolloverController extends AbstractController
 
             try {
                 $svc->startRollover($rollover);
-                $this->addFlash('success', 'New KSK generated and loaded for "' . $domain->getName() . '".');
+                $this->addFlash('success', 'New KSK generated and loaded for "' . $rollover->getZoneName() . '".');
             } catch (\Throwable $e) {
                 $rollover->setStatus(KskRolloverStatus::Failed);
                 $rollover->addLog('Error: ' . $e->getMessage());
@@ -77,6 +105,37 @@ class DnssecKskRolloverController extends AbstractController
         }
 
         return $this->render('dnssec_ksk_rollover/start.html.twig', ['form' => $form]);
+    }
+
+    private function buildZoneChoices(EntityManagerInterface $em): array
+    {
+        $choices = [];
+
+        $domains = $em->getRepository(Domain::class)
+            ->createQueryBuilder('d')
+            ->where('d.dnssecPolicy IS NOT NULL')
+            ->orderBy('d.name', 'ASC')
+            ->getQuery()->getResult();
+
+        foreach ($domains as $d) {
+            $choices['Forward Zones'][$d->getName()] = 'domain:' . $d->getId();
+        }
+
+        $subnets = $em->getRepository(Subnet::class)
+            ->createQueryBuilder('s')
+            ->where('s.dnssecPolicy IS NOT NULL')
+            ->orderBy('s.name', 'ASC')
+            ->getQuery()->getResult();
+
+        foreach ($subnets as $s) {
+            $label  = $s->getName();
+            $label .= $s->getIpv4Cidr() ? ' (' . $s->getIpv4Cidr() . ')' : '';
+            $label .= $s->getIpv6Cidr() ? ' (' . $s->getIpv6Cidr() . ')' : '';
+            $label .= $s->getReverseZoneName() ? ' → ' . $s->getReverseZoneName() : '';
+            $choices['Reverse Zones'][$label] = 'subnet:' . $s->getId();
+        }
+
+        return $choices;
     }
 
     #[Route('/{id}', name: 'ksk_rollover_show', methods: ['GET'])]
@@ -113,10 +172,10 @@ class DnssecKskRolloverController extends AbstractController
 
     // -------------------------------------------------------------------------
 
-    /** Returns the KSK algorithm from the domain's DNSSEC policy, or a safe default. */
-    private function kskAlgorithm(\App\Entity\Domain $domain): string
+    /** Returns the KSK algorithm from the zone's DNSSEC policy, or a safe default. */
+    private function kskAlgorithm(DnssecKskRollover $rollover): string
     {
-        $policy = $domain->getDnssecPolicy();
+        $policy = $rollover->getEffectiveDnssecPolicy();
         if ($policy) {
             foreach ($policy->getKeys() as $key) {
                 if (($key['type'] ?? '') === 'ksk' && !empty($key['algorithm'])) {

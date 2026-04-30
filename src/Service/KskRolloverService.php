@@ -27,7 +27,7 @@ class KskRolloverService
     public function startRollover(DnssecKskRollover $rollover): void
     {
         $sftp      = $this->connect($rollover);
-        $zone      = $rollover->getDomain()->getName();
+        $zone      = $rollover->getZoneName();
         $keyDir    = rtrim($rollover->getKeyDirectory(), '/');
         $algorithm = $rollover->getAlgorithm();
 
@@ -95,7 +95,7 @@ class KskRolloverService
         }
 
         $sftp    = $this->connect($rollover);
-        $zone    = $rollover->getDomain()->getName();
+        $zone    = $rollover->getZoneName();
         $keyDir  = rtrim($rollover->getKeyDirectory(), '/');
         $keyPath = $keyDir . '/' . $newFile;
 
@@ -120,7 +120,7 @@ class KskRolloverService
     public function retireOldKey(DnssecKskRollover $rollover): void
     {
         $sftp    = $this->connect($rollover);
-        $zone    = $rollover->getDomain()->getName();
+        $zone    = $rollover->getZoneName();
         $keyDir  = rtrim($rollover->getKeyDirectory(), '/');
         $oldFile = $rollover->getOldKeyFile();
 
@@ -292,7 +292,7 @@ class KskRolloverService
         }
 
         $names = [];
-        foreach ($rollover->getDomain()->getViews() as $v) {
+        foreach ($rollover->getEffectiveViews() as $v) {
             if (isset($serverViewIds[$v->getId()])) {
                 $names[] = $v->getName();
             }
@@ -348,7 +348,7 @@ class KskRolloverService
      */
     private function dnskeyTtlFromPolicy(DnssecKskRollover $rollover): ?int
     {
-        $policy = $rollover->getDomain()->getDnssecPolicy();
+        $policy = $rollover->getEffectiveDnssecPolicy();
         if (!$policy) {
             return null;
         }

@@ -13,7 +13,7 @@
 </div>
 
 <div class="alert alert-info">
-    <strong>What this does:</strong> Generates a new KSK on the DNS server using the algorithm from the domain's DNSSEC policy, calls <code>rndc loadkeys</code>, then walks you through the manual registrar DS update and old-key retirement.
+    <strong>What this does:</strong> Generates a new KSK on the DNS server using the algorithm from the zone's DNSSEC policy, calls <code>rndc loadkeys</code>, then walks you through the manual registrar DS update and old-key retirement.
 </div>
 
 {{ form_start(form) }}
@@ -22,10 +22,10 @@
     <div class="card-header fw-semibold">Rollover Target</div>
     <div class="card-body row g-3">
         <div class="col-12">
-            {{ form_label(form.domain, 'Domain') }}
-            {{ form_widget(form.domain) }}
-            {{ form_errors(form.domain) }}
-            <div class="form-text">The domain's key directory and DNSSEC policy algorithm will be used automatically.</div>
+            {{ form_label(form.zone, 'Zone') }}
+            {{ form_widget(form.zone) }}
+            {{ form_errors(form.zone) }}
+            <div class="form-text">Forward zones and reverse zones (subnets) with a DNSSEC policy are listed. Reverse zone names are shown after →.</div>
         </div>
         <div class="col-12">
             {{ form_label(form.dnsServer, 'DNS Server') }}
