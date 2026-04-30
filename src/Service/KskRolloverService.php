@@ -24,7 +24,7 @@ class KskRolloverService
         $algorithm = $rollover->getAlgorithm();
 
         // Find existing KSK before generating the new one
-        $oldFile = $this->findCurrentKsk($sftp, $keyDir, $zone);
+        $oldFile = $this->findCurrentKsk($sftp, $keyDir, $zone, $rollover);
         if ($oldFile) {
             $rollover->setOldKeyFile($oldFile);
             $oldDs = $this->fetchDsRecord($sftp, $keyDir, $oldFile);
@@ -126,42 +126,101 @@ class KskRolloverService
 
     /**
      * Finds the currently active KSK base name in keyDir for zone.
-     * Iterates all KSK files (flag 257) and returns the first one that has no
-     * Inactive time set, meaning it is still the active signer. This correctly
-     * handles leftover key files from previous failed rollovers.
+     *
+     * Stage 1: collect all 257-flag key files that have no Inactive time set.
+     * Stage 2: if more than one candidate remains (e.g. leftover failed-rollover
+     *          keys), query the parent zone's DS records and match by key tag —
+     *          the key whose tag appears in the parent DS is the trusted signer.
      */
-    private function findCurrentKsk(SFTP $sftp, string $keyDir, string $zone): ?string
+    private function findCurrentKsk(SFTP $sftp, string $keyDir, string $zone, DnssecKskRollover $rollover): ?string
     {
-        // Collect all KSK .key files for this zone
+        // ── Stage 1: inactive-time filter ────────────────────────────────────
         $listOut = $sftp->exec(sprintf(
             'ls %s/K%s.+*.key 2>/dev/null | xargs grep -l " 257 " 2>/dev/null',
             $keyDir,
             $zone
         ));
-        $files = array_filter(array_map('trim', explode("\n", (string)$listOut)));
-        if (empty($files)) {
+        $allFiles = array_values(array_filter(array_map('trim', explode("\n", (string)$listOut))));
+        if (empty($allFiles)) {
             return null;
         }
 
-        foreach ($files as $path) {
-            $path = trim($path);
-            if (!$path) {
-                continue;
-            }
-            // dnssec-settime -p all prints "Inactive: UNSET" (or "not set") when active
+        $candidates = [];
+        foreach ($allFiles as $path) {
             $info = $sftp->exec('dnssec-settime -p all ' . escapeshellarg($path) . ' 2>/dev/null');
             if (preg_match('/^Inactive:\s*(.+)$/im', (string)$info, $m)) {
                 $val = strtolower(trim($m[1]));
-                if (str_contains($val, 'unset') || str_contains($val, 'not set') || $val === '') {
-                    return basename($path, '.key');
+                $isUnset = str_contains($val, 'unset') || str_contains($val, 'not set') || $val === '';
+                if ($isUnset) {
+                    $candidates[] = $path;
                 }
             } else {
                 // No Inactive line at all — treat as active
-                return basename($path, '.key');
+                $candidates[] = $path;
             }
         }
 
-        return null;
+        if (empty($candidates)) {
+            return null;
+        }
+
+        if (count($candidates) === 1) {
+            return basename($candidates[0], '.key');
+        }
+
+        // ── Stage 2: break tie using parent-zone DS records ──────────────────
+        $rollover->addLog(sprintf(
+            '%d KSK candidates still active after timing check — querying parent DS to identify trusted key.',
+            count($candidates)
+        ));
+
+        $parentTags = $this->fetchParentDsTags($sftp, $zone);
+
+        if (!empty($parentTags)) {
+            foreach ($candidates as $path) {
+                $base = basename($path, '.key');
+                $tag  = $this->tagFromFile($base);
+                if ($tag !== null && in_array($tag, $parentTags, true)) {
+                    $rollover->addLog("Parent DS match: tag $tag → $base");
+                    return $base;
+                }
+            }
+            $rollover->addLog('Warning: no candidate key tag matched parent DS records (' . implode(', ', $parentTags) . ').');
+        } else {
+            $rollover->addLog('Warning: parent DS query returned no records; falling back to first candidate.');
+        }
+
+        // Last resort: return the first candidate
+        return basename($candidates[0], '.key');
+    }
+
+    /**
+     * Returns the set of key tags present in the parent zone's DS RRset for $zone.
+     * Runs dig on the remote server (which has a working resolver as a nameserver).
+     *
+     * DS record format: "zone. TTL IN DS <tag> <alg> <digest-type> <digest>"
+     */
+    private function fetchParentDsTags(SFTP $sftp, string $zone): array
+    {
+        $out = $sftp->exec(sprintf(
+            'dig +noall +answer DS %s 2>/dev/null',
+            escapeshellarg($zone)
+        ));
+
+        $tags = [];
+        foreach (explode("\n", (string)$out) as $line) {
+            $line = trim($line);
+            if ($line === '' || str_starts_with($line, ';')) {
+                continue;
+            }
+            $parts = preg_split('/\s+/', $line);
+            // Fields: name TTL class type tag alg digesttype digest
+            if (isset($parts[4]) && strtoupper($parts[3] ?? '') === 'DS' && ctype_digit($parts[4])) {
+                $tags[] = (int)$parts[4];
+            }
+        }
+
+        return array_unique($tags);
     }
 
     /**
