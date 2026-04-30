@@ -232,7 +232,7 @@
                         <tr>
                             <th style="min-width: 11rem">Host</th>
                             <th>Tags</th>
-                            <th class="font-monospace" style="min-width: 10rem">MAC Address</th>
+                            <th style="min-width: 10rem">Interface</th>
                             <th>Subnet</th>
                             <th>IPv4</th>
                             <th>IPv6</th>
@@ -260,7 +260,12 @@
                                             <span class="text-muted">—</span>
                                         {% endfor %}
                                     </td>
-                                    <td class="font-monospace small">{{ iface.macAddress }}</td>
+                                    <td class="small">
+                                        {% if iface.name %}
+                                            <div class="fw-semibold">{{ iface.name }}</div>
+                                        {% endif %}
+                                        <div class="font-monospace text-muted">{{ iface.macAddress }}</div>
+                                    </td>
                                     <td class="small">{{ iface.subnet ? iface.subnet.name : '—' }}</td>
                                     <td class="ip-address small">
                                         {% if iface.ipAddress %}

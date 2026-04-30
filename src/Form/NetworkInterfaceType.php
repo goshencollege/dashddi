@@ -27,6 +27,11 @@ class NetworkInterfaceType extends AbstractType
             : ['No IPv6 address' => 'none', 'Specify IP' => 'select', 'Auto-assign (EUI-64 from MAC)' => 'auto', 'Auto-assign (last IPv4 octet)' => 'auto_v4'];
 
         $builder
+            ->add('name', TextType::class, [
+                'label'    => 'Interface Name',
+                'required' => false,
+                'attr'     => ['placeholder' => 'e.g. eth0, Management, WAN'],
+            ])
             ->add('macAddress', TextType::class, [
                 'label'      => 'MAC Address',
                 'required'   => false,
