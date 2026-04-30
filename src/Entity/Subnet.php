@@ -100,10 +100,6 @@ class Subnet
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
     private ?DnssecPolicy $dnssecPolicy = null;
 
-    #[ORM\Column(length: 255, nullable: true)]
-    #[Assert\Length(max: 255)]
-    private ?string $keyDirectory = null;
-
     public function __construct()
     {
         $this->ipAddresses = new ArrayCollection();
@@ -160,9 +156,6 @@ class Subnet
 
     public function getDnssecPolicy(): ?DnssecPolicy { return $this->dnssecPolicy; }
     public function setDnssecPolicy(?DnssecPolicy $v): static { $this->dnssecPolicy = $v; return $this; }
-
-    public function getKeyDirectory(): ?string { return $this->keyDirectory; }
-    public function setKeyDirectory(?string $v): static { $this->keyDirectory = $v; return $this; }
 
     public function getViews(): Collection { return $this->views; }
 

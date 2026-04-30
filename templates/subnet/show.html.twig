@@ -71,32 +71,18 @@
     {% endif %}
 </div>
 
-{% if subnet.dnssecPolicy or subnet.keyDirectory %}
+{% if subnet.dnssecPolicy %}
 <div class="card mb-4">
     <div class="card-header"><i class="bi bi-shield-check me-1"></i>DNSSEC</div>
     <div class="card-body">
         <div class="row g-3">
-            {% if subnet.dnssecPolicy %}
-            <div class="col-md-4">
+            <div class="col-md-6">
                 <div class="text-muted small">Policy</div>
                 <div><a href="{{ path('dnssec_policy_edit', {id: subnet.dnssecPolicy.id}) }}" class="fw-semibold text-decoration-none"><code>{{ subnet.dnssecPolicy.name }}</code></a></div>
             </div>
-            {% endif %}
-            {% if subnet.keyDirectory %}
-            <div class="col-md-4">
-                <div class="text-muted small">Key Directory</div>
-                <div class="font-monospace">{{ subnet.keyDirectory }}</div>
-            </div>
-            {% endif %}
-            <div class="col-md-4">
+            <div class="col-md-6">
                 <div class="text-muted small">Inline Signing</div>
-                <div>
-                    {% if subnet.dnssecPolicy and subnet.keyDirectory %}
-                        <span class="badge bg-success"><i class="bi bi-check-lg me-1"></i>Yes</span>
-                    {% else %}
-                        <span class="badge bg-secondary">No</span>
-                    {% endif %}
-                </div>
+                <div><span class="badge bg-success"><i class="bi bi-check-lg me-1"></i>Yes</span></div>
             </div>
         </div>
     </div>

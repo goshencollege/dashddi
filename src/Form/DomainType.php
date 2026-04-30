@@ -67,11 +67,6 @@ class DomainType extends AbstractType
                 'placeholder'  => '— None —',
                 'required'     => false,
                 'label'        => 'DNSSEC Policy',
-            ])
-            ->add('keyDirectory', TextType::class, [
-                'label'    => 'Key Directory',
-                'required' => false,
-                'attr'     => ['placeholder' => 'e.g. /etc/bind/keys'],
             ]);
     }
 

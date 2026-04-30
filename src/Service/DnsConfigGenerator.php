@@ -260,6 +260,8 @@ class DnsConfigGenerator
                 $lines[] = '';
             }
 
+            $keyDirBase = $server->getKeyDirectory() ? rtrim($server->getKeyDirectory(), '/') : null;
+
             foreach ($domains as $domain) {
                 $file    = $zonePath . '/' . $view->getName() . '/' . $domain->getName() . '.zone';
                 $lines[] = '    zone "' . $domain->getName() . '" IN {';
@@ -268,10 +270,10 @@ class DnsConfigGenerator
                 if ($domain->getDnssecPolicy()) {
                     $lines[] = '        dnssec-policy "' . $domain->getDnssecPolicy()->getName() . '";';
                 }
-                if ($domain->getKeyDirectory()) {
-                    $lines[] = '        key-directory "' . $domain->getKeyDirectory() . '";';
+                if ($keyDirBase) {
+                    $lines[] = '        key-directory "' . $keyDirBase . '/' . $domain->getName() . '";';
                 }
-                if ($domain->getDnssecPolicy() && $domain->getKeyDirectory()) {
+                if ($domain->getDnssecPolicy() && $keyDirBase) {
                     $lines[] = '        inline-signing yes;';
                 }
                 $lines[] = '    };';
@@ -287,10 +289,10 @@ class DnsConfigGenerator
                     if ($subnet->getDnssecPolicy()) {
                         $lines[] = '        dnssec-policy "' . $subnet->getDnssecPolicy()->getName() . '";';
                     }
-                    if ($subnet->getKeyDirectory()) {
-                        $lines[] = '        key-directory "' . $subnet->getKeyDirectory() . '";';
+                    if ($keyDirBase) {
+                        $lines[] = '        key-directory "' . $keyDirBase . '/' . $zoneName . '";';
                     }
-                    if ($subnet->getDnssecPolicy() && $subnet->getKeyDirectory()) {
+                    if ($subnet->getDnssecPolicy() && $keyDirBase) {
                         $lines[] = '        inline-signing yes;';
                     }
                     $lines[] = '    };';

@@ -16,7 +16,7 @@
             <div class="card-body">
                 {{ form_start(form) }}
 
-                {% for field in ['name', 'hostname', 'sshUser', 'remoteZonePath'] %}
+                {% for field in ['name', 'hostname', 'sshUser', 'remoteZonePath', 'keyDirectory'] %}
                     <div class="mb-3">
                         {{ form_label(form[field], null, {label_attr: {class: 'form-label fw-semibold'}}) }}
                         {{ form_widget(form[field], {attr: {class: 'form-control' ~ (form[field].vars.errors|length ? ' is-invalid' : '')}}) }}
