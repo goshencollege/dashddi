@@ -4,9 +4,19 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h1 class="h3 mb-0"><i class="bi bi-pc-display me-2"></i>Hosts</h1>
-    <a href="{{ path('host_new') }}" class="btn btn-primary">
-        <i class="bi bi-plus-lg me-1"></i>Add Host
-    </a>
+    <div class="d-flex align-items-center gap-2">
+        <div class="btn-group btn-group-sm" role="group" id="view-mode-toggle" aria-label="View mode">
+            <button type="button" class="btn btn-outline-secondary{{ hostViewMode == 'host' ? ' active' }}" data-mode="host">
+                <i class="bi bi-pc-display me-1"></i>By Host
+            </button>
+            <button type="button" class="btn btn-outline-secondary{{ hostViewMode == 'interface' ? ' active' }}" data-mode="interface">
+                <i class="bi bi-hdd-network me-1"></i>By Interface
+            </button>
+        </div>
+        <a href="{{ path('host_new') }}" class="btn btn-primary btn-sm">
+            <i class="bi bi-plus-lg me-1"></i>Add Host
+        </a>
+    </div>
 </div>
 
 <div class="mb-4">
@@ -108,95 +118,248 @@
         </div>
     </div>
 {% else %}
-    <div class="card">
-        <div class="table-responsive">
-            <table class="table table-hover mb-0">
-                <thead class="">
-                    <tr>
-                        <th style="min-width: 13rem">Name</th>
-                        <th>Tags</th>
-                        <th>Location</th>
-                        <th>IP Addresses</th>
-                        <th>DNS Names</th>
-                        <th>Last Modified</th>
-                        <th class="text-end">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for host in hosts %}
+
+    {# ── By Host view ── #}
+    <div id="view-host" class="{{ hostViewMode == 'host' ? '' : 'd-none' }}">
+        <div class="card">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
                         <tr>
-                            <td>
-                                <a href="{{ path('host_show', {id: host.id}) }}" class="fw-semibold text-decoration-none">
-                                    {{ host.name }}
-                                </a>
-                            </td>
-                            <td>
-                                {% for tag in host.tags %}
-                                    <span class="badge bg-secondary me-1">{{ tag.name }}</span>
-                                {% else %}
-                                    <span class="text-muted">—</span>
-                                {% endfor %}
-                            </td>
-                            <td class="text-muted">{{ host.location ?: '—' }}</td>
-                            <td class="ip-address small">
-                                {% set ips = [] %}
-                                {% for iface in host.interfaces %}
-                                    {% if iface.ipAddress %}
-                                        {% set ips = ips|merge([iface.ipAddress.address]) %}
-                                    {% endif %}
-                                    {% if iface.ipv6Address %}
-                                        {% set ips = ips|merge([iface.ipv6Address.address]) %}
-                                    {% endif %}
-                                {% endfor %}
-                                {% if ips is empty %}
-                                    <span class="text-muted">—</span>
-                                {% else %}
-                                    {% for ip in ips %}
-                                        <div>{{ ip }}</div>
+                            <th style="min-width: 13rem">Name</th>
+                            <th>Tags</th>
+                            <th>Location</th>
+                            <th>IP Addresses</th>
+                            <th>DNS Names</th>
+                            <th>Last Modified</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for host in hosts %}
+                            <tr>
+                                <td>
+                                    <a href="{{ path('host_show', {id: host.id}) }}" class="fw-semibold text-decoration-none">
+                                        {{ host.name }}
+                                    </a>
+                                </td>
+                                <td>
+                                    {% for tag in host.tags %}
+                                        <span class="badge bg-secondary me-1">{{ tag.name }}</span>
+                                    {% else %}
+                                        <span class="text-muted">—</span>
                                     {% endfor %}
-                                {% endif %}
-                            </td>
-                            <td class="small font-monospace">
-                                {% set fqdns = [] %}
-                                {% for iface in host.interfaces %}
-                                    {% for iname in iface.names %}
-                                        {% if iname.domain %}
-                                            {% set fqdns = fqdns|merge([iname.fullyQualifiedName]) %}
+                                </td>
+                                <td class="text-muted">{{ host.location ?: '—' }}</td>
+                                <td class="ip-address small">
+                                    {% set ips = [] %}
+                                    {% for iface in host.interfaces %}
+                                        {% if iface.ipAddress %}
+                                            {% set ips = ips|merge([iface.ipAddress.address]) %}
+                                        {% endif %}
+                                        {% if iface.ipv6Address %}
+                                            {% set ips = ips|merge([iface.ipv6Address.address]) %}
                                         {% endif %}
                                     {% endfor %}
-                                {% endfor %}
-                                {% if fqdns is empty %}
-                                    <span class="text-muted">—</span>
-                                {% else %}
-                                    {% for fqdn in fqdns %}<div>{{ fqdn }}</div>{% endfor %}
-                                {% endif %}
-                            </td>
-                            <td class="text-muted small">
-                                {{ host.updatedAt|date('Y-m-d H:i') }}
-                                {% if host.updatedBy %}<br><span class="text-muted">{{ host.updatedBy }}</span>{% endif %}
-                            </td>
-                            <td class="text-end">
-                                <div class="d-flex gap-1 justify-content-end align-items-center">
-                                    <a href="{{ path('host_edit', {id: host.id}) }}" class="btn btn-sm btn-outline-secondary">
-                                        <i class="bi bi-pencil"></i>
-                                    </a>
-                                    <form method="post" action="{{ path('host_delete', {id: host.id}) }}"
-                                          onsubmit="return confirm('Delete host {{ host.name|e('js') }}?')">
-                                        <input type="hidden" name="_token" value="{{ csrf_token('delete_host_' ~ host.id) }}">
-                                        <button type="submit" class="btn btn-sm btn-outline-danger">
-                                            <i class="bi bi-trash"></i>
-                                        </button>
-                                    </form>
-                                </div>
-                            </td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                                    {% if ips is empty %}
+                                        <span class="text-muted">—</span>
+                                    {% else %}
+                                        {% for ip in ips %}<div>{{ ip }}</div>{% endfor %}
+                                    {% endif %}
+                                </td>
+                                <td class="small font-monospace">
+                                    {% set fqdns = [] %}
+                                    {% for iface in host.interfaces %}
+                                        {% for iname in iface.names %}
+                                            {% if iname.domain %}
+                                                {% set fqdns = fqdns|merge([iname.fullyQualifiedName]) %}
+                                            {% endif %}
+                                        {% endfor %}
+                                    {% endfor %}
+                                    {% if fqdns is empty %}
+                                        <span class="text-muted">—</span>
+                                    {% else %}
+                                        {% for fqdn in fqdns %}<div>{{ fqdn }}</div>{% endfor %}
+                                    {% endif %}
+                                </td>
+                                <td class="text-muted small">
+                                    {{ host.updatedAt|date('Y-m-d H:i') }}
+                                    {% if host.updatedBy %}<br><span class="text-muted">{{ host.updatedBy }}</span>{% endif %}
+                                </td>
+                                <td class="text-end">
+                                    <div class="d-flex gap-1 justify-content-end align-items-center">
+                                        <a href="{{ path('host_edit', {id: host.id}) }}" class="btn btn-sm btn-outline-secondary">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                        <form method="post" action="{{ path('host_delete', {id: host.id}) }}"
+                                              onsubmit="return confirm('Delete host {{ host.name|e('js') }}?')">
+                                            <input type="hidden" name="_token" value="{{ csrf_token('delete_host_' ~ host.id) }}">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% if query or isAdvanced %}
+                <div class="card-footer text-muted small">{{ hosts|length }} result{{ hosts|length != 1 ? 's' }}{% if query %} for "{{ query }}"{% endif %}</div>
+            {% endif %}
         </div>
-        {% if query or isAdvanced %}
-            <div class="card-footer text-muted small">{{ hosts|length }} result{{ hosts|length != 1 ? 's' }}{% if query %} for "{{ query }}"{% endif %}</div>
-        {% endif %}
     </div>
+
+    {# ── By Interface view ── #}
+    <div id="view-interface" class="{{ hostViewMode == 'interface' ? '' : 'd-none' }}">
+        <div class="card">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th style="min-width: 11rem">Host</th>
+                            <th>Tags</th>
+                            <th>Location</th>
+                            <th class="font-monospace" style="min-width: 10rem">MAC Address</th>
+                            <th>Subnet</th>
+                            <th>IPv4</th>
+                            <th>IPv6</th>
+                            <th>DNS Names</th>
+                            <th>Last Modified</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for host in hosts %}
+                            {% for iface in host.interfaces %}
+                                <tr>
+                                    <td>
+                                        <a href="{{ path('host_show', {id: host.id}) }}" class="fw-semibold text-decoration-none">
+                                            {{ host.name }}
+                                        </a>
+                                    </td>
+                                    <td>
+                                        {% for tag in host.tags %}
+                                            <span class="badge bg-secondary me-1">{{ tag.name }}</span>
+                                        {% else %}
+                                            <span class="text-muted">—</span>
+                                        {% endfor %}
+                                    </td>
+                                    <td class="text-muted">{{ host.location ?: '—' }}</td>
+                                    <td class="font-monospace small">{{ iface.macAddress }}</td>
+                                    <td class="small">{{ iface.subnet ? iface.subnet : '<span class="text-muted">—</span>'|raw }}</td>
+                                    <td class="ip-address small">
+                                        {% if iface.ipAddress %}
+                                            {{ iface.ipAddress.address }}
+                                        {% else %}
+                                            <span class="text-muted">—</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="ip-address small">
+                                        {% if iface.ipv6Address %}
+                                            {{ iface.ipv6Address.address }}
+                                        {% else %}
+                                            <span class="text-muted">—</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="small font-monospace">
+                                        {% set fqdns = [] %}
+                                        {% for iname in iface.names %}
+                                            {% if iname.domain %}
+                                                {% set fqdns = fqdns|merge([iname.fullyQualifiedName]) %}
+                                            {% endif %}
+                                        {% endfor %}
+                                        {% if fqdns is empty %}
+                                            <span class="text-muted">—</span>
+                                        {% else %}
+                                            {% for fqdn in fqdns %}<div>{{ fqdn }}</div>{% endfor %}
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-muted small">
+                                        {{ iface.updatedAt|date('Y-m-d H:i') }}
+                                        {% if iface.updatedBy %}<br><span class="text-muted">{{ iface.updatedBy }}</span>{% endif %}
+                                    </td>
+                                    <td class="text-end">
+                                        <div class="d-flex gap-1 justify-content-end align-items-center">
+                                            <a href="{{ path('host_edit', {id: host.id}) }}" class="btn btn-sm btn-outline-secondary">
+                                                <i class="bi bi-pencil"></i>
+                                            </a>
+                                            <form method="post" action="{{ path('host_delete', {id: host.id}) }}"
+                                                  onsubmit="return confirm('Delete host {{ host.name|e('js') }}?')">
+                                                <input type="hidden" name="_token" value="{{ csrf_token('delete_host_' ~ host.id) }}">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% else %}
+                                <tr>
+                                    <td>
+                                        <a href="{{ path('host_show', {id: host.id}) }}" class="fw-semibold text-decoration-none">
+                                            {{ host.name }}
+                                        </a>
+                                    </td>
+                                    <td>
+                                        {% for tag in host.tags %}
+                                            <span class="badge bg-secondary me-1">{{ tag.name }}</span>
+                                        {% else %}
+                                            <span class="text-muted">—</span>
+                                        {% endfor %}
+                                    </td>
+                                    <td class="text-muted">{{ host.location ?: '—' }}</td>
+                                    <td colspan="6" class="text-muted small fst-italic">No interfaces</td>
+                                    <td class="text-muted small">
+                                        {{ host.updatedAt|date('Y-m-d H:i') }}
+                                        {% if host.updatedBy %}<br><span class="text-muted">{{ host.updatedBy }}</span>{% endif %}
+                                    </td>
+                                    <td class="text-end">
+                                        <div class="d-flex gap-1 justify-content-end align-items-center">
+                                            <a href="{{ path('host_edit', {id: host.id}) }}" class="btn btn-sm btn-outline-secondary">
+                                                <i class="bi bi-pencil"></i>
+                                            </a>
+                                            <form method="post" action="{{ path('host_delete', {id: host.id}) }}"
+                                                  onsubmit="return confirm('Delete host {{ host.name|e('js') }}?')">
+                                                <input type="hidden" name="_token" value="{{ csrf_token('delete_host_' ~ host.id) }}">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% if query or isAdvanced %}
+                <div class="card-footer text-muted small">{{ hosts|length }} result{{ hosts|length != 1 ? 's' }}{% if query %} for "{{ query }}"{% endif %}</div>
+            {% endif %}
+        </div>
+    </div>
+
 {% endif %}
-{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('view-mode-toggle')?.addEventListener('click', function (e) {
+    const btn = e.target.closest('[data-mode]');
+    if (!btn) return;
+    const mode = btn.dataset.mode;
+
+    this.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('active', b === btn));
+    document.getElementById('view-host').classList.toggle('d-none', mode !== 'host');
+    document.getElementById('view-interface').classList.toggle('d-none', mode !== 'interface');
+
+    fetch('/api/preference/host-view-mode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode }),
+    });
+});
+</script>
+{% endblock scripts %}
+{% endblock content %}
