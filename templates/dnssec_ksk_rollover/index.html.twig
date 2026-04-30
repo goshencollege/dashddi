@@ -30,7 +30,7 @@
             <tbody>
             {% for r in rollovers %}
                 <tr>
-                    <td>{{ r.domain.name }}</td>
+                    <td>{{ r.zoneName }}</td>
                     <td>{{ r.dnsServer ? r.dnsServer.name : '—' }}</td>
                     <td><span class="badge {{ r.status.badgeClass() }}">{{ r.status.label() }}</span></td>
                     <td class="font-monospace">{{ r.oldKeyTag ?? '—' }}</td>

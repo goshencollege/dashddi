@@ -180,6 +180,36 @@ class Subnet
         return $this;
     }
 
+    public function getReverseZoneName(): ?string
+    {
+        if ($this->ipv4Cidr !== null) {
+            return $this->ipv4ReverseZone($this->ipv4Cidr);
+        }
+        if ($this->ipv6Cidr !== null) {
+            return $this->ipv6ReverseZone($this->ipv6Cidr);
+        }
+        return null;
+    }
+
+    private function ipv4ReverseZone(string $cidr): string
+    {
+        [$ip, $prefix] = explode('/', $cidr, 2);
+        $octets = explode('.', $ip);
+        $count  = (int) ceil((int) $prefix / 8);
+        $parts  = array_reverse(array_slice($octets, 0, max(1, $count)));
+        return implode('.', $parts) . '.in-addr.arpa';
+    }
+
+    private function ipv6ReverseZone(string $cidr): string
+    {
+        [$ip, $prefix] = explode('/', $cidr, 2);
+        $hex     = bin2hex(inet_pton($ip));
+        $nibbles = str_split($hex);
+        $count   = (int) ceil((int) $prefix / 4);
+        $parts   = array_reverse(array_slice($nibbles, 0, max(1, $count)));
+        return implode('.', $parts) . '.ip6.arpa';
+    }
+
     public function __toString(): string
     {
         $parts = [$this->name];

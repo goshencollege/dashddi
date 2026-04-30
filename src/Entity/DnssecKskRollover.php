@@ -4,6 +4,8 @@ namespace App\Entity;
 
 use App\Enum\KskRolloverStatus;
 use App\Repository\DnssecKskRolloverRepository;
+use Doctrine\Common\Collections\Collection;
+use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: DnssecKskRolloverRepository::class)]
@@ -16,8 +18,12 @@ class DnssecKskRollover
     private ?int $id = null;
 
     #[ORM\ManyToOne(targetEntity: Domain::class)]
-    #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
-    private Domain $domain;
+    #[ORM\JoinColumn(nullable: true, onDelete: 'CASCADE')]
+    private ?Domain $domain = null;
+
+    #[ORM\ManyToOne(targetEntity: Subnet::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?Subnet $subnet = null;
 
     #[ORM\ManyToOne(targetEntity: DnsServer::class)]
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
@@ -70,8 +76,37 @@ class DnssecKskRollover
 
     public function getId(): ?int { return $this->id; }
 
-    public function getDomain(): Domain { return $this->domain; }
-    public function setDomain(Domain $domain): static { $this->domain = $domain; return $this; }
+    public function getDomain(): ?Domain { return $this->domain; }
+    public function setDomain(?Domain $domain): static { $this->domain = $domain; return $this; }
+
+    public function getSubnet(): ?Subnet { return $this->subnet; }
+    public function setSubnet(?Subnet $subnet): static { $this->subnet = $subnet; return $this; }
+
+    public function getZoneName(): string
+    {
+        if ($this->domain !== null) {
+            return $this->domain->getName();
+        }
+        return $this->subnet?->getReverseZoneName() ?? '';
+    }
+
+    public function getEffectiveDnssecPolicy(): ?DnssecPolicy
+    {
+        return $this->domain?->getDnssecPolicy() ?? $this->subnet?->getDnssecPolicy();
+    }
+
+    public function getEffectiveKeyDirectory(): ?string
+    {
+        return $this->domain?->getKeyDirectory() ?? $this->subnet?->getKeyDirectory();
+    }
+
+    public function getEffectiveViews(): Collection
+    {
+        if ($this->domain !== null) {
+            return $this->domain->getViews();
+        }
+        return $this->subnet?->getViews() ?? new ArrayCollection();
+    }
 
     public function getDnsServer(): ?DnsServer { return $this->dnsServer; }
     public function setDnsServer(?DnsServer $server): static { $this->dnsServer = $server; return $this; }
