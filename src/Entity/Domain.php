@@ -64,10 +64,6 @@ class Domain
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
     private ?DnssecPolicy $dnssecPolicy = null;
 
-    #[ORM\Column(length: 255, nullable: true)]
-    #[Assert\Length(max: 255)]
-    private ?string $keyDirectory = null;
-
     #[ORM\OneToMany(targetEntity: DomainRecord::class, mappedBy: 'domain', cascade: ['persist', 'remove'], orphanRemoval: true)]
     #[ORM\OrderBy(['hostname' => 'ASC'])]
     private Collection $records;
@@ -114,9 +110,6 @@ class Domain
 
     public function getDnssecPolicy(): ?DnssecPolicy { return $this->dnssecPolicy; }
     public function setDnssecPolicy(?DnssecPolicy $v): static { $this->dnssecPolicy = $v; return $this; }
-
-    public function getKeyDirectory(): ?string { return $this->keyDirectory; }
-    public function setKeyDirectory(?string $v): static { $this->keyDirectory = $v; return $this; }
 
     public function getRecords(): Collection { return $this->records; }
     public function getInterfaceNames(): Collection { return $this->interfaceNames; }

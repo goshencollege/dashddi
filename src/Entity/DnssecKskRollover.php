@@ -97,7 +97,11 @@ class DnssecKskRollover
 
     public function getEffectiveKeyDirectory(): ?string
     {
-        return $this->domain?->getKeyDirectory() ?? $this->subnet?->getKeyDirectory();
+        if (!$this->dnsServer || !$this->dnsServer->getKeyDirectory()) {
+            return null;
+        }
+        $zone = $this->getZoneName();
+        return $zone ? rtrim($this->dnsServer->getKeyDirectory(), '/') . '/' . $zone : null;
     }
 
     public function getEffectiveViews(): Collection

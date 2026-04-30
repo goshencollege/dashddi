@@ -33,6 +33,11 @@ class DnsServerType extends AbstractType
                 'label' => 'Remote Zone Path',
                 'attr'  => ['placeholder' => 'e.g. /etc/bind/zones'],
             ])
+            ->add('keyDirectory', TextType::class, [
+                'label'    => 'DNSSEC Key Directory',
+                'required' => false,
+                'attr'     => ['placeholder' => 'e.g. /etc/bind/keys'],
+            ])
             ->add('views', EntityType::class, [
                 'class'        => DnsView::class,
                 'choices'      => $this->viewRepo->findBy([], ['name' => 'ASC']),

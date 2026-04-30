@@ -72,12 +72,13 @@ class DnssecKskRolloverController extends AbstractController
                 $rollover->setSubnet($subnet);
             }
 
-            $keyDir = $rollover->getEffectiveKeyDirectory();
-            if (!$keyDir) {
-                $label = $domain ? "domain \"{$domain->getName()}\"" : "subnet \"{$subnet->getName()}\"";
-                $this->addFlash('danger', "No key directory is set on $label. Edit it to set one.");
+            if (!$server->getKeyDirectory()) {
+                $this->addFlash('danger', 'No base key directory is set on server "' . $server->getName() . '". Edit the server to set one.');
                 return $this->redirectToRoute('ksk_rollover_start');
             }
+
+            $zoneName = $domain ? $domain->getName() : $subnet->getReverseZoneName();
+            $keyDir   = rtrim($server->getKeyDirectory(), '/') . '/' . $zoneName;
 
             $rollover->setDnsServer($server);
             $rollover->setAlgorithm($this->kskAlgorithm($rollover));

@@ -109,19 +109,14 @@
                     {% endif %}
                     <hr class="my-3">
                     <h6 class="text-muted mb-3"><i class="bi bi-shield-check me-1"></i>DNSSEC</h6>
-                    <div class="mb-3">
+                    <div class="mb-4">
                         {{ form_label(form.dnssecPolicy, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
                         {{ form_widget(form.dnssecPolicy, {attr: {class: 'form-select'}}) }}
                         <div class="form-text">
                             Policy must be defined under <a href="{{ path('dnssec_policy_index') }}">DNSSEC Policies</a>.
+                            The key directory is configured on the <a href="{{ path('dns_server_index') }}">DNS server</a> and a per-zone subdirectory is created automatically.
                         </div>
                         {{ form_errors(form.dnssecPolicy) }}
-                    </div>
-                    <div class="mb-4">
-                        {{ form_label(form.keyDirectory, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
-                        {{ form_widget(form.keyDirectory, {attr: {class: 'form-control font-monospace'}}) }}
-                        <div class="form-text">When both a policy and key directory are set, <code>inline-signing yes</code> is emitted automatically.</div>
-                        {{ form_errors(form.keyDirectory) }}
                     </div>
                     {% if embed_blocks %}
                     <hr class="my-4">

@@ -42,6 +42,9 @@ class DnsServer
     #[Assert\NotBlank]
     private string $remoteZonePath = '/etc/bind/zones';
 
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $keyDirectory = null;
+
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $description = null;
 
@@ -73,6 +76,9 @@ class DnsServer
 
     public function getRemoteZonePath(): string { return $this->remoteZonePath; }
     public function setRemoteZonePath(string $remoteZonePath): static { $this->remoteZonePath = $remoteZonePath; return $this; }
+
+    public function getKeyDirectory(): ?string { return $this->keyDirectory; }
+    public function setKeyDirectory(?string $v): static { $this->keyDirectory = $v; return $this; }
 
     public function getDescription(): ?string { return $this->description; }
     public function setDescription(?string $description): static { $this->description = $description; return $this; }
