@@ -8,6 +8,7 @@ use App\Repository\BuildingRepository;
 use App\Repository\HostRepository;
 use App\Repository\SubnetRepository;
 use App\Repository\TagRepository;
+use App\Repository\UserPreferenceRepository;
 use App\Service\IpAddressManager;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -23,7 +24,7 @@ class HostController extends AbstractController
     ) {}
 
     #[Route('', name: 'host_index', methods: ['GET'])]
-    public function index(Request $request, HostRepository $repo, SubnetRepository $subnetRepo, BuildingRepository $buildingRepo, TagRepository $tagRepo): Response
+    public function index(Request $request, HostRepository $repo, SubnetRepository $subnetRepo, BuildingRepository $buildingRepo, TagRepository $tagRepo, UserPreferenceRepository $prefRepo): Response
     {
         $query = trim($request->query->getString('q'));
 
@@ -45,14 +46,19 @@ class HostController extends AbstractController
             $hosts = $repo->findBy([], ['name' => 'ASC']);
         }
 
+        $user = $this->getUser();
+        $pref = $user ? $prefRepo->findByIdentifier($user->getUserIdentifier()) : null;
+        $hostViewMode = $pref?->getHostViewMode() ?? 'host';
+
         return $this->render('host/index.html.twig', [
-            'hosts'      => $hosts,
-            'query'      => $query,
-            'criteria'   => $criteria,
-            'isAdvanced' => $isAdvanced,
-            'subnets'    => $subnetRepo->findBy([], ['name' => 'ASC']),
-            'buildings'  => $buildingRepo->findBy([], ['name' => 'ASC']),
-            'tags'       => $tagRepo->findBy([], ['name' => 'ASC']),
+            'hosts'        => $hosts,
+            'query'        => $query,
+            'criteria'     => $criteria,
+            'isAdvanced'   => $isAdvanced,
+            'subnets'      => $subnetRepo->findBy([], ['name' => 'ASC']),
+            'buildings'    => $buildingRepo->findBy([], ['name' => 'ASC']),
+            'tags'         => $tagRepo->findBy([], ['name' => 'ASC']),
+            'hostViewMode' => $hostViewMode,
         ]);
     }
 

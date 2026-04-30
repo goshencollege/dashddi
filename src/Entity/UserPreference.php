@@ -20,6 +20,9 @@ class UserPreference
     #[ORM\Column(length: 16)]
     private string $theme = 'light';
 
+    #[ORM\Column(length: 16)]
+    private string $hostViewMode = 'host';
+
     public function __construct(string $userIdentifier)
     {
         $this->userIdentifier = $userIdentifier;
@@ -31,4 +34,7 @@ class UserPreference
 
     public function getTheme(): string { return $this->theme; }
     public function setTheme(string $theme): static { $this->theme = $theme; return $this; }
+
+    public function getHostViewMode(): string { return $this->hostViewMode; }
+    public function setHostViewMode(string $mode): static { $this->hostViewMode = $mode; return $this; }
 }
