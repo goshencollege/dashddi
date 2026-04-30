@@ -6,6 +6,14 @@ use App\Entity\DnssecKskRollover;
 use App\Enum\KskRolloverStatus;
 use phpseclib3\Net\SFTP;
 
+/**
+ * All commands that touch bind-owned key files run under "sudo -u bind".
+ * All rndc commands run under "sudo" (as root).
+ *
+ * Required sudoers entries on each DNS server:
+ *   ipam ALL=(bind) NOPASSWD: /usr/sbin/dnssec-keygen, /usr/sbin/dnssec-settime, /usr/sbin/dnssec-dsfromkey, /bin/rm
+ *   ipam ALL=(root) NOPASSWD: /usr/sbin/rndc
+ */
 class KskRolloverService
 {
     public function __construct(
@@ -23,7 +31,6 @@ class KskRolloverService
         $keyDir    = rtrim($rollover->getKeyDirectory(), '/');
         $algorithm = $rollover->getAlgorithm();
 
-        // Find existing KSK before generating the new one
         $oldFile = $this->findCurrentKsk($sftp, $keyDir, $zone, $rollover);
         if ($oldFile) {
             $rollover->setOldKeyFile($oldFile);
@@ -34,9 +41,8 @@ class KskRolloverService
             $rollover->addLog('No existing KSK found — generating fresh.');
         }
 
-        // Generate new KSK
         $out = $sftp->exec(sprintf(
-            'cd %s && dnssec-keygen -a %s -f KSK %s 2>&1',
+            'cd %s && sudo -u bind dnssec-keygen -a %s -f KSK %s 2>&1',
             escapeshellarg($keyDir),
             escapeshellarg($algorithm),
             escapeshellarg($zone)
@@ -55,22 +61,20 @@ class KskRolloverService
         }
         $rollover->setNewKeyFile($newFile);
 
-        // Get DS record — use it as the authoritative source of the key tag
         $ds = $this->fetchDsRecord($sftp, $keyDir, $newFile);
         $rollover->setDsRecord($ds);
         $newTag = $this->tagFromDs($ds) ?? $this->tagFromFile($newFile);
         $rollover->setNewKeyTag($newTag);
         $rollover->addLog("DS record obtained (new key tag: $newTag).");
 
-        // DNSKEY TTL: try policy first, fall back to dig
         $ttl = $this->dnskeyTtlFromPolicy($rollover) ?? $this->probeDnskeyTtl($sftp, $zone);
         if ($ttl !== null) {
             $rollover->setDnskeyTtlSeconds($ttl);
         }
 
         foreach ($this->zoneViewNames($rollover) as $view) {
-            $rndcOut = $sftp->exec('rndc loadkeys ' . escapeshellarg($zone) . ' IN ' . escapeshellarg($view) . ' 2>&1');
-            $rollover->addLog("rndc loadkeys ($view): " . trim((string)$rndcOut));
+            $out = $sftp->exec('sudo rndc loadkeys ' . escapeshellarg($zone) . ' IN ' . escapeshellarg($view) . ' 2>&1');
+            $rollover->addLog("rndc loadkeys ($view): " . trim((string)$out));
         }
 
         $rollover->setStatus(KskRolloverStatus::KeyPublished);
@@ -95,22 +99,19 @@ class KskRolloverService
         $keyDir  = rtrim($rollover->getKeyDirectory(), '/');
         $keyPath = $keyDir . '/' . $newFile;
 
-        // Tell BIND the key is inactive and should be deleted immediately,
-        // then reload so it removes the DNSKEY record from the zone.
         $settime = $sftp->exec(sprintf(
-            'dnssec-settime -I now -D now %s 2>&1',
+            'sudo -u bind dnssec-settime -I now -D now %s 2>&1',
             escapeshellarg($keyPath . '.key')
         ));
         $rollover->addLog("Cleanup dnssec-settime: " . trim((string)$settime));
 
         foreach ($this->zoneViewNames($rollover) as $view) {
-            $out = $sftp->exec('rndc loadkeys ' . escapeshellarg($zone) . ' IN ' . escapeshellarg($view) . ' 2>&1');
+            $out = $sftp->exec('sudo rndc loadkeys ' . escapeshellarg($zone) . ' IN ' . escapeshellarg($view) . ' 2>&1');
             $rollover->addLog("Cleanup rndc loadkeys ($view): " . trim((string)$out));
         }
 
-        // Remove the key files from disk
         $rm = $sftp->exec(sprintf(
-            'rm -f %s %s 2>&1',
+            'sudo -u bind rm -f %s %s 2>&1',
             escapeshellarg($keyPath . '.key'),
             escapeshellarg($keyPath . '.private')
         ));
@@ -136,7 +137,7 @@ class KskRolloverService
         $deleteDelay = '+' . ($ttl * 2);
 
         $cmd = sprintf(
-            'dnssec-settime -I now -D %s %s 2>&1',
+            'sudo -u bind dnssec-settime -I now -D %s %s 2>&1',
             escapeshellarg($deleteDelay),
             escapeshellarg($keyDir . '/' . $oldFile . '.key')
         );
@@ -148,8 +149,8 @@ class KskRolloverService
         }
 
         foreach ($this->zoneViewNames($rollover) as $view) {
-            $signOut = $sftp->exec('rndc sign ' . escapeshellarg($zone) . ' IN ' . escapeshellarg($view) . ' 2>&1');
-            $rollover->addLog("rndc sign ($view): " . trim((string)$signOut));
+            $out = $sftp->exec('sudo rndc sign ' . escapeshellarg($zone) . ' IN ' . escapeshellarg($view) . ' 2>&1');
+            $rollover->addLog("rndc sign ($view): " . trim((string)$out));
         }
 
         $rollover->setStatus(KskRolloverStatus::OldKeyRetired);
@@ -172,16 +173,18 @@ class KskRolloverService
     /**
      * Finds the currently active KSK base name in keyDir for zone.
      *
-     * Stage 1: collect all 257-flag key files that have no Inactive time set.
-     * Stage 2: if more than one candidate remains (e.g. leftover failed-rollover
-     *          keys), query the parent zone's DS records and match by key tag —
-     *          the key whose tag appears in the parent DS is the trusted signer.
+     * Lists .key files via shell glob (no sudo needed — only requires directory
+     * execute permission), then reads each with "sudo -u bind dnssec-settime -p all"
+     * to check both the KSK flag (257) and Inactive timing in one command.
+     *
+     * Stage 1: filter to files that are KSKs with no Inactive time set.
+     * Stage 2: if multiple candidates remain, break the tie against parent DS.
      */
     private function findCurrentKsk(SFTP $sftp, string $keyDir, string $zone, DnssecKskRollover $rollover): ?string
     {
-        // ── Stage 1: inactive-time filter ────────────────────────────────────
-        $listOut = $sftp->exec(sprintf(
-            'ls %s/K%s.+*.key 2>/dev/null | xargs grep -l " 257 " 2>/dev/null',
+        // Shell glob listing — runs as ipam, needs only directory x bit
+        $listOut  = $sftp->exec(sprintf(
+            'for f in %s/K%s.+*.key; do [ -f "$f" ] && echo "$f"; done 2>/dev/null',
             $keyDir,
             $zone
         ));
@@ -192,15 +195,22 @@ class KskRolloverService
 
         $candidates = [];
         foreach ($allFiles as $path) {
-            $info = $sftp->exec('dnssec-settime -p all ' . escapeshellarg($path) . ' 2>/dev/null');
-            if (preg_match('/^Inactive:\s*(.+)$/im', (string)$info, $m)) {
+            // sudo -u bind dnssec-settime -p all reads the file and outputs flags + timing
+            $info = $sftp->exec('sudo -u bind dnssec-settime -p all ' . escapeshellarg($path) . ' 2>/dev/null');
+            $info = (string)$info;
+
+            // Must be a KSK (Flags: 257)
+            if (!preg_match('/^Flags:\s*257\b/im', $info)) {
+                continue;
+            }
+
+            // Must not have an Inactive time set
+            if (preg_match('/^Inactive:\s*(.+)$/im', $info, $m)) {
                 $val = strtolower(trim($m[1]));
-                $isUnset = str_contains($val, 'unset') || str_contains($val, 'not set') || $val === '';
-                if ($isUnset) {
+                if (str_contains($val, 'unset') || str_contains($val, 'not set') || $val === '') {
                     $candidates[] = $path;
                 }
             } else {
-                // No Inactive line at all — treat as active
                 $candidates[] = $path;
             }
         }
@@ -235,13 +245,11 @@ class KskRolloverService
             $rollover->addLog('Warning: parent DS query returned no records; falling back to first candidate.');
         }
 
-        // Last resort: return the first candidate
         return basename($candidates[0], '.key');
     }
 
     /**
      * Returns the view names that the domain belongs to on the rollover's DNS server.
-     * These are the views rndc commands must be scoped to.
      *
      * @return string[]
      */
@@ -269,25 +277,19 @@ class KskRolloverService
 
     /**
      * Returns the set of key tags present in the parent zone's DS RRset for $zone.
-     * Runs dig on the remote server (which has a working resolver as a nameserver).
-     *
-     * DS record format: "zone. TTL IN DS <tag> <alg> <digest-type> <digest>"
+     * dig does not access key files and needs no sudo.
      */
     private function fetchParentDsTags(SFTP $sftp, string $zone): array
     {
-        $out = $sftp->exec(sprintf(
-            'dig +noall +answer DS %s 2>/dev/null',
-            escapeshellarg($zone)
-        ));
-
+        $out  = $sftp->exec(sprintf('dig +noall +answer DS %s 2>/dev/null', escapeshellarg($zone)));
         $tags = [];
+
         foreach (explode("\n", (string)$out) as $line) {
             $line = trim($line);
             if ($line === '' || str_starts_with($line, ';')) {
                 continue;
             }
             $parts = preg_split('/\s+/', $line);
-            // Fields: name TTL class type tag alg digesttype digest
             if (isset($parts[4]) && strtoupper($parts[3] ?? '') === 'DS' && ctype_digit($parts[4])) {
                 $tags[] = (int)$parts[4];
             }
@@ -296,10 +298,7 @@ class KskRolloverService
         return array_unique($tags);
     }
 
-    /**
-     * Parses the key tag from a DS record line.
-     * Format: "zone. TTL IN DS <tag> <alg> <digest-type> <digest>"
-     */
+    /** Parses the key tag from a DS record line. */
     private function tagFromDs(string $dsRecord): ?int
     {
         if (preg_match('/\sDS\s+(\d+)\s/', $dsRecord, $m)) {
@@ -319,7 +318,7 @@ class KskRolloverService
 
     /**
      * Reads dnskey-ttl from the domain's DNSSEC policy.
-     * The value may be in seconds ("3600") or ISO 8601 ("PT1H").
+     * Accepts seconds ("3600") or ISO 8601 durations ("PT1H").
      */
     private function dnskeyTtlFromPolicy(DnssecKskRollover $rollover): ?int
     {
@@ -334,7 +333,6 @@ class KskRolloverService
         if (is_numeric($raw)) {
             return (int)$raw;
         }
-        // Parse simple ISO 8601 durations: PT3600S, PT1H, P1D, PT30M, etc.
         if (preg_match('/^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/', strtoupper($raw), $m)) {
             return ((int)($m[1] ?? 0)) * 86400
                  + ((int)($m[2] ?? 0)) * 3600
@@ -344,6 +342,7 @@ class KskRolloverService
         return null;
     }
 
+    /** Probes the DNSKEY TTL via dig — no sudo required. */
     private function probeDnskeyTtl(SFTP $sftp, string $zone): ?int
     {
         $out = $sftp->exec(sprintf(
@@ -357,7 +356,7 @@ class KskRolloverService
     private function fetchDsRecord(SFTP $sftp, string $keyDir, string $keyFile): string
     {
         $out = $sftp->exec(sprintf(
-            'dnssec-dsfromkey %s 2>&1',
+            'sudo -u bind dnssec-dsfromkey %s 2>&1',
             escapeshellarg($keyDir . '/' . $keyFile . '.key')
         ));
         return trim((string)$out);
