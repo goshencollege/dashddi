@@ -68,8 +68,10 @@ class KskRolloverService
             $rollover->setDnskeyTtlSeconds($ttl);
         }
 
-        $rndcOut = $sftp->exec('rndc loadkeys ' . escapeshellarg($zone) . ' 2>&1');
-        $rollover->addLog("rndc loadkeys: " . trim((string)$rndcOut));
+        foreach ($this->zoneViewNames($rollover) as $view) {
+            $rndcOut = $sftp->exec('rndc loadkeys ' . escapeshellarg($zone) . ' IN ' . escapeshellarg($view) . ' 2>&1');
+            $rollover->addLog("rndc loadkeys ($view): " . trim((string)$rndcOut));
+        }
 
         $rollover->setStatus(KskRolloverStatus::KeyPublished);
     }
@@ -104,8 +106,10 @@ class KskRolloverService
             throw new \RuntimeException("dnssec-settime failed: " . trim((string)$out));
         }
 
-        $signOut = $sftp->exec('rndc sign ' . escapeshellarg($zone) . ' 2>&1');
-        $rollover->addLog("rndc sign: " . trim((string)$signOut));
+        foreach ($this->zoneViewNames($rollover) as $view) {
+            $signOut = $sftp->exec('rndc sign ' . escapeshellarg($zone) . ' IN ' . escapeshellarg($view) . ' 2>&1');
+            $rollover->addLog("rndc sign ($view): " . trim((string)$signOut));
+        }
 
         $rollover->setStatus(KskRolloverStatus::OldKeyRetired);
     }
@@ -192,6 +196,34 @@ class KskRolloverService
 
         // Last resort: return the first candidate
         return basename($candidates[0], '.key');
+    }
+
+    /**
+     * Returns the view names that the domain belongs to on the rollover's DNS server.
+     * These are the views rndc commands must be scoped to.
+     *
+     * @return string[]
+     */
+    private function zoneViewNames(DnssecKskRollover $rollover): array
+    {
+        $server = $rollover->getDnsServer();
+        if (!$server) {
+            return [];
+        }
+
+        $serverViewIds = [];
+        foreach ($server->getViews() as $v) {
+            $serverViewIds[$v->getId()] = $v->getName();
+        }
+
+        $names = [];
+        foreach ($rollover->getDomain()->getViews() as $v) {
+            if (isset($serverViewIds[$v->getId()])) {
+                $names[] = $v->getName();
+            }
+        }
+
+        return $names;
     }
 
     /**
