@@ -168,45 +168,63 @@ class KskRolloverService
     /**
      * Finds the currently active KSK base name in keyDir for zone.
      *
-     * Lists .key files via shell glob (no sudo needed — only requires directory
-     * execute permission), then reads each with "sudo -u bind dnssec-settime -p all"
-     * to check both the KSK flag (257) and Inactive timing in one command.
+     * Stage 1: query the live DNSKEY RRset with dig (no sudo, no directory access).
+     *   KSK records have flag 257.  The key tag is computed from the DNSKEY RDATA
+     *   using the RFC 4034 §B algorithm, which lets us reconstruct the exact file
+     *   base name (K{zone}.+{alg:03d}+{tag:05d}) without touching the key directory.
+     *   Works with both manually managed zones and dnssec-policy zones.
      *
-     * Stage 1: filter to files that are KSKs with no Inactive time set.
-     * Stage 2: if multiple candidates remain, break the tie against parent DS.
+     * Stage 2: for each KSK candidate, run "sudo -u bind dnssec-settime -p all"
+     *   to check whether an Inactive time is already set; if so, the key is
+     *   being retired and is skipped.
+     *
+     * Stage 3: if multiple candidates survive, break the tie against parent DS.
      */
     private function findCurrentKsk(SFTP $sftp, string $keyDir, string $zone, DnssecKskRollover $rollover): ?string
     {
-        // Shell glob listing — runs as ipam, needs only directory x bit
-        $listOut  = $sftp->exec(sprintf(
-            'for f in %s/K%s.+*.key; do [ -f "$f" ] && echo "$f"; done 2>/dev/null',
-            $keyDir,
-            $zone
+        // dig +short DNSKEY outputs one line per record: "flags proto alg base64key"
+        // No sudo needed — reads the live zone via DNS.
+        $out = (string)$sftp->exec(sprintf(
+            'dig +short DNSKEY %s 2>/dev/null',
+            escapeshellarg($zone)
         ));
-        $allFiles = array_values(array_filter(array_map('trim', explode("\n", (string)$listOut))));
-        if (empty($allFiles)) {
+
+        $rawCandidates = [];
+        foreach (explode("\n", $out) as $line) {
+            $line  = trim($line);
+            $parts = preg_split('/\s+/', $line, 4);
+            if (!isset($parts[3])) {
+                continue;
+            }
+            [$flagStr, $protoStr, $algStr, $pubKey] = $parts;
+            if ((int)$flagStr !== 257) {
+                continue; // ZSK (256) or unrecognised — not a KSK
+            }
+            $alg             = (int)$algStr;
+            $tag             = $this->computeKeyTag((int)$flagStr, (int)$protoStr, $alg, $pubKey);
+            $rawCandidates[] = sprintf('K%s.+%03d+%05d', $zone, $alg, $tag);
+        }
+
+        if (empty($rawCandidates)) {
             return null;
         }
 
+        // Stage 2: drop keys that already have an Inactive time set (being retired).
         $candidates = [];
-        foreach ($allFiles as $path) {
-            // sudo -u bind dnssec-settime -p all reads the file and outputs flags + timing
-            $info = $sftp->exec('sudo -u bind dnssec-settime -p all ' . escapeshellarg($path) . ' 2>/dev/null');
-            $info = (string)$info;
+        foreach ($rawCandidates as $base) {
+            $path = $keyDir . '/' . $base . '.key';
+            $info = (string)$sftp->exec(
+                'sudo -u bind dnssec-settime -p all ' . escapeshellarg($path) . ' 2>/dev/null'
+            );
 
-            // Must be a KSK (Flags: 257)
-            if (!preg_match('/^Flags:\s*257\b/im', $info)) {
-                continue;
-            }
-
-            // Must not have an Inactive time set
             if (preg_match('/^Inactive:\s*(.+)$/im', $info, $m)) {
                 $val = strtolower(trim($m[1]));
                 if (str_contains($val, 'unset') || str_contains($val, 'not set') || $val === '') {
-                    $candidates[] = $path;
+                    $candidates[] = $base;
                 }
+                // else: Inactive time is set — key is mid-retirement, skip it
             } else {
-                $candidates[] = $path;
+                $candidates[] = $base; // no Inactive line → not scheduled for retirement
             }
         }
 
@@ -215,10 +233,10 @@ class KskRolloverService
         }
 
         if (count($candidates) === 1) {
-            return basename($candidates[0], '.key');
+            return $candidates[0];
         }
 
-        // ── Stage 2: break tie using parent-zone DS records ──────────────────
+        // Stage 3: multiple active KSKs — break tie with parent DS.
         $rollover->addLog(sprintf(
             '%d KSK candidates still active after timing check — querying parent DS to identify trusted key.',
             count($candidates)
@@ -227,9 +245,8 @@ class KskRolloverService
         $parentTags = $this->fetchParentDsTags($sftp, $zone);
 
         if (!empty($parentTags)) {
-            foreach ($candidates as $path) {
-                $base = basename($path, '.key');
-                $tag  = $this->tagFromFile($base);
+            foreach ($candidates as $base) {
+                $tag = $this->tagFromFile($base);
                 if ($tag !== null && in_array($tag, $parentTags, true)) {
                     $rollover->addLog("Parent DS match: tag $tag → $base");
                     return $base;
@@ -240,7 +257,21 @@ class KskRolloverService
             $rollover->addLog('Warning: parent DS query returned no records; falling back to first candidate.');
         }
 
-        return basename($candidates[0], '.key');
+        return $candidates[0];
+    }
+
+    /**
+     * Computes the DNSSEC key tag from DNSKEY RDATA per RFC 4034 Appendix B.
+     */
+    private function computeKeyTag(int $flags, int $protocol, int $alg, string $pubKeyB64): int
+    {
+        $rdata = pack('n', $flags) . chr($protocol) . chr($alg) . base64_decode($pubKeyB64);
+        $ac    = 0;
+        for ($i = 0, $len = strlen($rdata); $i < $len; $i++) {
+            $ac += ($i & 1) ? ord($rdata[$i]) : (ord($rdata[$i]) << 8);
+        }
+        $ac += ($ac >> 16) & 0xFFFF;
+        return $ac & 0xFFFF;
     }
 
     /**
