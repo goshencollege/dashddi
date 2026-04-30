@@ -11,7 +11,7 @@ use phpseclib3\Net\SFTP;
  * All rndc commands run under "sudo" (as root).
  *
  * Required sudoers entries on each DNS server:
- *   ipam ALL=(bind) NOPASSWD: /usr/sbin/dnssec-keygen, /usr/sbin/dnssec-settime, /usr/sbin/dnssec-dsfromkey, /bin/rm
+ *   ipam ALL=(bind) NOPASSWD: /usr/sbin/dnssec-keygen, /usr/sbin/dnssec-settime, /usr/sbin/dnssec-dsfromkey
  *   ipam ALL=(root) NOPASSWD: /usr/sbin/rndc
  */
 class KskRolloverService
@@ -110,12 +110,7 @@ class KskRolloverService
             $rollover->addLog("Cleanup rndc loadkeys ($view): " . trim((string)$out));
         }
 
-        $rm = $sftp->exec(sprintf(
-            'sudo -u bind rm -f %s %s 2>&1',
-            escapeshellarg($keyPath . '.key'),
-            escapeshellarg($keyPath . '.private')
-        ));
-        $rollover->addLog("Cleanup removed key files: " . (trim((string)$rm) ?: 'ok'));
+        $rollover->addLog("Cleanup complete: key marked inactive+deleted, BIND will purge the files.");
     }
 
     /**
