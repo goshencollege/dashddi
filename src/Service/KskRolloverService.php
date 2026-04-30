@@ -77,6 +77,47 @@ class KskRolloverService
     }
 
     /**
+     * Cleans up the newly generated key after a failed rollover.
+     * Marks it inactive+deleted immediately, reloads BIND so it drops the
+     * DNSKEY from the zone, then removes the .key and .private files.
+     * No-ops if newKeyFile is not set (key was never generated).
+     * Does NOT flush — caller is responsible.
+     */
+    public function cleanupNewKey(DnssecKskRollover $rollover): void
+    {
+        $newFile = $rollover->getNewKeyFile();
+        if (!$newFile) {
+            return;
+        }
+
+        $sftp    = $this->connect($rollover);
+        $zone    = $rollover->getDomain()->getName();
+        $keyDir  = rtrim($rollover->getKeyDirectory(), '/');
+        $keyPath = $keyDir . '/' . $newFile;
+
+        // Tell BIND the key is inactive and should be deleted immediately,
+        // then reload so it removes the DNSKEY record from the zone.
+        $settime = $sftp->exec(sprintf(
+            'dnssec-settime -I now -D now %s 2>&1',
+            escapeshellarg($keyPath . '.key')
+        ));
+        $rollover->addLog("Cleanup dnssec-settime: " . trim((string)$settime));
+
+        foreach ($this->zoneViewNames($rollover) as $view) {
+            $out = $sftp->exec('rndc loadkeys ' . escapeshellarg($zone) . ' IN ' . escapeshellarg($view) . ' 2>&1');
+            $rollover->addLog("Cleanup rndc loadkeys ($view): " . trim((string)$out));
+        }
+
+        // Remove the key files from disk
+        $rm = $sftp->exec(sprintf(
+            'rm -f %s %s 2>&1',
+            escapeshellarg($keyPath . '.key'),
+            escapeshellarg($keyPath . '.private')
+        ));
+        $rollover->addLog("Cleanup removed key files: " . (trim((string)$rm) ?: 'ok'));
+    }
+
+    /**
      * Runs SSH operations for step 4: dnssec-settime + rndc sign.
      * Updates the rollover entity but does NOT flush — caller is responsible.
      */

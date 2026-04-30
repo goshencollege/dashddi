@@ -67,6 +67,7 @@ class DnssecKskRolloverController extends AbstractController
             } catch (\Throwable $e) {
                 $rollover->setStatus(KskRolloverStatus::Failed);
                 $rollover->addLog('Error: ' . $e->getMessage());
+                $this->tryCleanup($svc, $rollover);
                 $this->addFlash('danger', 'Rollover start failed: ' . $e->getMessage());
             }
 
@@ -95,7 +96,7 @@ class DnssecKskRolloverController extends AbstractController
                 'ds_submitted'      => $this->transition($rollover, KskRolloverStatus::DsSubmitted, 'DS record submitted to registrar; waiting for propagation.', $em),
                 'retire_old_key'    => $this->retireOldKey($rollover, $svc),
                 'complete'          => $this->transition($rollover, KskRolloverStatus::Complete, 'Rollover complete.', $em, completedAt: true),
-                'fail'              => $this->transition($rollover, KskRolloverStatus::Failed, 'Rollover marked as failed.', $em, completedAt: true),
+                'fail'              => $this->failRollover($rollover, $svc, $em),
                 default             => throw new \InvalidArgumentException("Unknown action: $action"),
             };
             // retire_old_key updates entity without flushing; flush here covers it.
@@ -140,5 +141,24 @@ class DnssecKskRolloverController extends AbstractController
     {
         $svc->retireOldKey($rollover); // SSH only; entity updated but not flushed — caller flushes
         $this->addFlash('success', 'Old KSK retired; BIND will remove it after cache TTL expires.');
+    }
+
+    private function failRollover(DnssecKskRollover $rollover, KskRolloverService $svc, EntityManagerInterface $em): void
+    {
+        $this->tryCleanup($svc, $rollover);
+        $rollover->setStatus(KskRolloverStatus::Failed);
+        $rollover->addLog('Rollover marked as failed.');
+        $rollover->setCompletedAt(new \DateTimeImmutable());
+        $em->flush();
+    }
+
+    /** Attempts SSH key cleanup; logs any error but never throws. */
+    private function tryCleanup(KskRolloverService $svc, DnssecKskRollover $rollover): void
+    {
+        try {
+            $svc->cleanupNewKey($rollover);
+        } catch (\Throwable $e) {
+            $rollover->addLog('Cleanup error: ' . $e->getMessage());
+        }
     }
 }
