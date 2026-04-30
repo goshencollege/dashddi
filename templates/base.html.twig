@@ -234,7 +234,7 @@
 </head>
 <body>
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
-    <div class="container">
+    <div class="container-xxl">
         <a class="navbar-brand" href="{{ path('dashboard') }}">
             <i class="bi bi-diagram-3-fill me-2"></i>IPAM
         </a>
@@ -390,7 +390,7 @@
     </div>
 </nav>
 
-<div class="{% block container_class %}container{% endblock %} mb-5">
+<div class="{% block container_class %}container-xxl{% endblock %} mb-5">
     {% for label, messages in app.flashes %}
         {% for message in messages %}
             <div class="alert alert-{{ label == 'success' ? 'success' : 'danger' }} alert-dismissible fade show" role="alert">
