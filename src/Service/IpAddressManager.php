@@ -250,14 +250,14 @@ class IpAddressManager
         }
 
         $normalized    = $parsed->toString();
-        $fixedBlocks   = array_filter(
-            $this->blockRepo->findFixedBySubnet($subnet->getId()),
+        $allowedBlocks = array_filter(
+            $this->blockRepo->findFixedOrReservedBySubnet($subnet->getId()),
             fn($b) => !str_contains($b->getStartIp(), ':')
         );
 
-        if (!empty($fixedBlocks)) {
-            if (!$this->isInBlocks($normalized, $fixedBlocks)) {
-                return sprintf('"%s" does not fall within any Fixed block in this subnet.', $normalized);
+        if (!empty($allowedBlocks)) {
+            if (!$this->isInBlocks($normalized, $allowedBlocks)) {
+                return sprintf('"%s" does not fall within any Fixed or Reserved block in this subnet.', $normalized);
             }
         } else {
             $range = Factory::parseRangeString($subnet->getIpv4Cidr() ?? '');
@@ -285,15 +285,15 @@ class IpAddressManager
             return sprintf('"%s" is not a valid IPv6 address.', $ip);
         }
 
-        $normalized  = $parsed->toString();
-        $fixedBlocks = array_filter(
-            $this->blockRepo->findFixedBySubnet($subnet->getId()),
+        $normalized    = $parsed->toString();
+        $allowedBlocks = array_filter(
+            $this->blockRepo->findFixedOrReservedBySubnet($subnet->getId()),
             fn($b) => str_contains($b->getStartIp(), ':')
         );
 
-        if (!empty($fixedBlocks)) {
-            if (!$this->isInBlocks($normalized, $fixedBlocks)) {
-                return sprintf('"%s" does not fall within any Fixed block in this subnet.', $normalized);
+        if (!empty($allowedBlocks)) {
+            if (!$this->isInBlocks($normalized, $allowedBlocks)) {
+                return sprintf('"%s" does not fall within any Fixed or Reserved block in this subnet.', $normalized);
             }
         } else {
             $range = Factory::parseRangeString($subnet->getIpv6Cidr() ?? '');
