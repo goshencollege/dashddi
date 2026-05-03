@@ -99,6 +99,12 @@ class SubnetType extends AbstractType
                 'placeholder'  => '— None —',
                 'required'     => false,
                 'label'        => 'DNSSEC Policy',
+            ])
+            ->add('leaseRetentionDays', IntegerType::class, [
+                'label'    => 'DHCP Lease Retention (days)',
+                'required' => false,
+                'attr'     => ['placeholder' => 'e.g. 90 — leave blank to keep forever'],
+                'help'     => 'Automatically delete lease log entries older than this many days.',
             ]);
 
         if ($options['embed_blocks']) {

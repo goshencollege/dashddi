@@ -100,6 +100,10 @@ class Subnet
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
     private ?DnssecPolicy $dnssecPolicy = null;
 
+    #[ORM\Column(nullable: true)]
+    #[Assert\PositiveOrZero]
+    private ?int $leaseRetentionDays = null;
+
     public function __construct()
     {
         $this->ipAddresses = new ArrayCollection();
@@ -156,6 +160,9 @@ class Subnet
 
     public function getDnssecPolicy(): ?DnssecPolicy { return $this->dnssecPolicy; }
     public function setDnssecPolicy(?DnssecPolicy $v): static { $this->dnssecPolicy = $v; return $this; }
+
+    public function getLeaseRetentionDays(): ?int { return $this->leaseRetentionDays; }
+    public function setLeaseRetentionDays(?int $v): static { $this->leaseRetentionDays = $v; return $this; }
 
     public function getViews(): Collection { return $this->views; }
 

@@ -256,6 +256,12 @@
                         <i class="bi bi-diagram-2 me-1"></i>Subnets
                     </a>
                 </li>
+                <li class="nav-item">
+                    <a class="nav-link {{ app.request.attributes.get('_route') starts with 'dhcp_lease' ? 'active' }}"
+                       href="{{ path('dhcp_lease_index') }}">
+                        <i class="bi bi-journal-text me-1"></i>DHCP Leases
+                    </a>
+                </li>
                 {% set dnsActive = app.request.attributes.get('_route') starts with 'domain'
                     or app.request.attributes.get('_route') starts with 'dns_view'
                     or app.request.attributes.get('_route') starts with 'dns_acl'
