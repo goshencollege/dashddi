@@ -46,7 +46,7 @@ class DhcpServer
     #[ORM\Column(length: 128, nullable: true)]
     private ?string $controlUser = null;
 
-    #[ORM\Column(length: 255, nullable: true)]
+    #[ORM\Column(type: 'text', nullable: true)]
     private ?string $controlPassword = null;
 
     #[ORM\Column(type: 'text', nullable: true)]

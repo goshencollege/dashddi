@@ -22,6 +22,10 @@ services:
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones
 
+    App\Service\EncryptionService:
+        arguments:
+            $encryptionKey: '%env(APP_ENCRYPTION_KEY)%'
+
     App\Security\SamlSettings:
         arguments:
             $spEntityId:   '%env(SAML_SP_ENTITY_ID)%'
