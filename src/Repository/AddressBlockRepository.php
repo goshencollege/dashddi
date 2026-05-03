@@ -36,4 +36,16 @@ class AddressBlockRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
     }
+
+    /** @return AddressBlock[] Returns Fixed and Reserved blocks for manual IP validation */
+    public function findFixedOrReservedBySubnet(int $subnetId): array
+    {
+        return $this->createQueryBuilder('b')
+            ->where('b.subnet = :id')
+            ->andWhere('b.type IN (:types)')
+            ->setParameter('id', $subnetId)
+            ->setParameter('types', [BlockType::Fixed, BlockType::Reserved])
+            ->getQuery()
+            ->getResult();
+    }
 }
