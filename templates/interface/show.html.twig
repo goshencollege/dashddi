@@ -106,4 +106,45 @@
         </div>
     </div>
 </div>
+
+{% if dhcp_leases is defined and dhcp_leases|length > 0 %}
+<div class="card mt-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-journal-text me-1"></i>DHCP Lease History</span>
+        <a href="{{ path('dhcp_lease_index', {mac: interface.macAddress}) }}" class="btn btn-sm btn-outline-secondary">
+            View all
+        </a>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>IP Address</th>
+                    <th>Subnet</th>
+                    <th>Hostname</th>
+                    <th>Lease Start</th>
+                    <th>Expires</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for lease in dhcp_leases %}
+                    <tr>
+                        <td><code>{{ lease.ipAddress }}</code></td>
+                        <td>
+                            {% if lease.subnet %}
+                                <a href="{{ path('subnet_show', {id: lease.subnet.id}) }}">{{ lease.subnet.name }}</a>
+                            {% else %}—{% endif %}
+                        </td>
+                        <td>{{ lease.hostname ?: '—' }}</td>
+                        <td class="text-nowrap">{{ lease.leaseStart|date('Y-m-d H:i') }}</td>
+                        <td class="text-nowrap">
+                            {{ lease.leaseExpires ? lease.leaseExpires|date('Y-m-d H:i') : '—' }}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
 {% endblock %}

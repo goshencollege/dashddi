@@ -1,0 +1,111 @@
+{% extends 'base.html.twig' %}
+{% block title %}DHCP Lease Log{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0"><i class="bi bi-journal-text me-2"></i>DHCP Lease Log</h1>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" action="{{ path('dhcp_lease_index') }}" class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label small text-muted mb-1">MAC Address</label>
+                <input type="text" name="mac" class="form-control form-control-sm"
+                       placeholder="e.g. aa:bb:cc" value="{{ filter_mac }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small text-muted mb-1">IP Address</label>
+                <input type="text" name="ip" class="form-control form-control-sm"
+                       placeholder="e.g. 192.168" value="{{ filter_ip }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small text-muted mb-1">Subnet</label>
+                <select name="subnet" class="form-select form-select-sm">
+                    <option value="">— All subnets —</option>
+                    {% for s in subnets %}
+                        <option value="{{ s.id }}" {{ filter_subnet == s.id ? 'selected' : '' }}>
+                            {{ s.name }}{% if s.ipv4Cidr %} ({{ s.ipv4Cidr }}){% endif %}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-auto">
+                <button type="submit" class="btn btn-sm btn-primary">
+                    <i class="bi bi-search me-1"></i>Search
+                </button>
+                <a href="{{ path('dhcp_lease_index') }}" class="btn btn-sm btn-outline-secondary ms-1">Clear</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-list-ul me-1"></i>Results</span>
+        <span class="text-muted small">{{ total }} record(s)</span>
+    </div>
+    {% if leases|length == 0 %}
+        <div class="card-body text-center text-muted py-4">No lease records found.</div>
+    {% else %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>MAC Address</th>
+                        <th>IP Address</th>
+                        <th>Subnet</th>
+                        <th>Hostname</th>
+                        <th>Lease Start</th>
+                        <th>Expires</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for lease in leases %}
+                        <tr>
+                            <td><code>{{ lease.macAddress }}</code></td>
+                            <td><code>{{ lease.ipAddress }}</code></td>
+                            <td>
+                                {% if lease.subnet %}
+                                    <a href="{{ path('subnet_show', {id: lease.subnet.id}) }}">{{ lease.subnet.name }}</a>
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ lease.hostname ?: '—' }}</td>
+                            <td class="text-nowrap">{{ lease.leaseStart|date('Y-m-d H:i') }}</td>
+                            <td class="text-nowrap">
+                                {% if lease.leaseExpires %}
+                                    {{ lease.leaseExpires|date('Y-m-d H:i') }}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if total > per_page %}
+            <div class="card-footer d-flex justify-content-between align-items-center">
+                <span class="text-muted small">Page {{ page }} of {{ (total / per_page)|round(0, 'ceil') }}</span>
+                <div>
+                    {% if page > 1 %}
+                        <a href="{{ path('dhcp_lease_index', {mac: filter_mac, ip: filter_ip, subnet: filter_subnet, page: page - 1}) }}"
+                           class="btn btn-sm btn-outline-secondary me-1">
+                            <i class="bi bi-chevron-left"></i> Prev
+                        </a>
+                    {% endif %}
+                    {% if page * per_page < total %}
+                        <a href="{{ path('dhcp_lease_index', {mac: filter_mac, ip: filter_ip, subnet: filter_subnet, page: page + 1}) }}"
+                           class="btn btn-sm btn-outline-secondary">
+                            Next <i class="bi bi-chevron-right"></i>
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        {% endif %}
+    {% endif %}
+</div>
+{% endblock %}

@@ -7,6 +7,7 @@ use App\Entity\InterfaceName;
 use App\Entity\NetworkInterface;
 use App\Form\InterfaceNameType;
 use App\Form\NetworkInterfaceType;
+use App\Repository\DhcpLeaseRepository;
 use App\Repository\NetworkInterfaceRepository;
 use App\Service\IpAddressManager;
 use Doctrine\ORM\EntityManagerInterface;
@@ -55,9 +56,12 @@ class InterfaceController extends AbstractController
     }
 
     #[Route('/interfaces/{id}', name: 'interface_show', methods: ['GET'])]
-    public function show(NetworkInterface $interface): Response
+    public function show(NetworkInterface $interface, DhcpLeaseRepository $leaseRepo): Response
     {
-        return $this->render('interface/show.html.twig', ['interface' => $interface]);
+        return $this->render('interface/show.html.twig', [
+            'interface'   => $interface,
+            'dhcp_leases' => $leaseRepo->findByMac($interface->getMacAddress(), 10),
+        ]);
     }
 
     #[Route('/interfaces/{id}/edit', name: 'interface_edit', methods: ['GET', 'POST'])]
