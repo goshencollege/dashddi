@@ -2,13 +2,18 @@
 
 namespace App\Controller;
 
+use App\Entity\Domain;
 use App\Entity\Host;
 use App\Entity\InterfaceName;
 use App\Entity\NetworkInterface;
+use App\Entity\Subnet;
 use App\Form\InterfaceNameType;
 use App\Form\NetworkInterfaceType;
 use App\Repository\DhcpLeaseRepository;
+use App\Repository\DomainRepository;
 use App\Repository\NetworkInterfaceRepository;
+use App\Repository\SubnetRepository;
+use App\Service\DnsViewResolver;
 use App\Service\IpAddressManager;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -21,6 +26,7 @@ class InterfaceController extends AbstractController
 {
     public function __construct(
         private readonly IpAddressManager $ipManager,
+        private readonly DnsViewResolver  $viewResolver,
     ) {}
 
     #[Route('/hosts/{id}/interfaces/new', name: 'interface_new', methods: ['GET', 'POST'])]
@@ -108,7 +114,7 @@ class InterfaceController extends AbstractController
     public function nameNew(Request $request, NetworkInterface $interface, EntityManagerInterface $em): Response
     {
         $name = new InterfaceName();
-        $form = $this->createForm(InterfaceNameType::class, $name);
+        $form = $this->createForm(InterfaceNameType::class, $name, ['network_interface' => $interface]);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
@@ -130,7 +136,7 @@ class InterfaceController extends AbstractController
     public function nameEdit(Request $request, int $interfaceId, InterfaceName $name, NetworkInterfaceRepository $repo, EntityManagerInterface $em): Response
     {
         $interface = $repo->find($interfaceId);
-        $form = $this->createForm(InterfaceNameType::class, $name);
+        $form = $this->createForm(InterfaceNameType::class, $name, ['network_interface' => $interface]);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
@@ -170,12 +176,41 @@ class InterfaceController extends AbstractController
         return $this->json($this->ipManager->getAvailableIpv6($subnet, 50));
     }
 
+    /**
+     * Returns views available for a domain, optionally intersected with a subnet's allowed views.
+     * Used by the interface name form JS to update view checkboxes on domain change.
+     */
     #[Route('/api/domains/{id}/views', name: 'api_domain_views', methods: ['GET'])]
-    public function domainViews(\App\Entity\Domain $domain): JsonResponse
+    public function domainViews(Domain $domain, Request $request, SubnetRepository $subnetRepo): JsonResponse
     {
+        $subnetId = $request->query->get('subnet');
+        $subnet   = $subnetId ? $subnetRepo->find((int) $subnetId) : null;
+        $views    = $this->viewResolver->availableViewsFor($domain, $subnet);
+
         return $this->json(
-            $domain->getViews()->map(fn($v) => ['id' => $v->getId(), 'name' => $v->getName()])->toArray()
+            array_map(fn($v) => ['id' => $v->getId(), 'name' => $v->getName()], $views)
         );
+    }
+
+    /**
+     * Returns all domains with a usable flag for the given subnet.
+     * Used by the inline name collection JS to update domain disabled state when subnet changes.
+     */
+    #[Route('/api/subnets/{id}/available-domains', name: 'api_subnet_available_domains', methods: ['GET'])]
+    public function subnetAvailableDomains(Subnet $subnet, DomainRepository $domainRepo): JsonResponse
+    {
+        $domains = $domainRepo->findBy([], ['name' => 'ASC']);
+
+        $result = array_map(function (Domain $domain) use ($subnet) {
+            $usable = $this->viewResolver->isDomainUsable($domain, $subnet);
+            $entry  = ['id' => $domain->getId(), 'name' => $domain->getName(), 'usable' => $usable];
+            if (!$usable) {
+                $entry['reason'] = $this->viewResolver->unusableDomainReason($domain, $subnet);
+            }
+            return $entry;
+        }, $domains);
+
+        return $this->json($result);
     }
 
     private function validateIpInputs(\Symfony\Component\Form\FormInterface $form, ?\App\Entity\Subnet $subnet, ?NetworkInterface $current): array
