@@ -26,6 +26,10 @@ services:
         arguments:
             $projectDir: '%kernel.project_dir%'
 
+    App\Command\RunScheduledTasksCommand:
+        arguments:
+            $projectDir: '%kernel.project_dir%'
+
     App\Service\EncryptionService:
         arguments:
             $encryptionKey: '%env(APP_ENCRYPTION_KEY)%'

@@ -7,11 +7,26 @@
     <h1><i class="bi bi-clock-history me-2"></i>Task Scheduler</h1>
 </div>
 
+{% if schedulerStale %}
+<div class="alert alert-warning d-flex align-items-center gap-2" role="alert">
+    <i class="bi bi-exclamation-triangle-fill fs-5"></i>
+    <div>
+        <strong>Scheduler not running.</strong>
+        {% if lastHeartbeat %}
+            Last check was at {{ lastHeartbeat|date('Y-m-d H:i:s') }} — more than an hour ago.
+        {% else %}
+            The scheduler has never been invoked.
+        {% endif %}
+        Automatic tasks will not fire until the cron job is configured on the host.
+    </div>
+</div>
+{% endif %}
+
 <div class="card mb-4">
     <div class="card-body text-muted small">
         <i class="bi bi-info-circle me-1"></i>
         To activate automatic scheduling, add the following to your system crontab (run every minute):
-        <code class="ms-2">* * * * * php /var/www/html/bin/console app:run-scheduled-tasks &gt;&gt; /var/log/ipam-scheduler.log 2&gt;&amp;1</code>
+        <code class="ms-2">* * * * * docker compose -f /home/ipam/ipam/docker-compose.yml exec -T app php bin/console app:run-scheduled-tasks &gt;&gt; /var/log/ipam-scheduler.log 2&gt;&amp;1</code>
     </div>
 </div>
 
