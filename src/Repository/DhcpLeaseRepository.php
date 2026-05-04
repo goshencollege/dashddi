@@ -84,8 +84,14 @@ class DhcpLeaseRepository extends ServiceEntityRepository
             ->getResult();
     }
 
-    /** Delete leases older than the retention period for each subnet. */
-    public function purgeByRetention(): int
+    /**
+     * Delete leases older than their retention period.
+     *
+     * Per-subnet retention takes priority. $defaultDays is used for leases
+     * whose subnet has no explicit retention set and for orphaned leases
+     * (subnet deleted / not yet matched).
+     */
+    public function purgeByRetention(?int $defaultDays = null): int
     {
         // Subnets with an explicit retention
         $subnets = $this->getEntityManager()
@@ -105,6 +111,27 @@ class DhcpLeaseRepository extends ServiceEntityRepository
                 ->setParameter('cutoff', $cutoff)
                 ->getQuery()
                 ->execute();
+        }
+
+        // Apply the default to everything not covered by a per-subnet setting.
+        if ($defaultDays !== null) {
+            $cutoff = new \DateTimeImmutable('-' . $defaultDays . ' days');
+            $qb = $this->createQueryBuilder('l')
+                ->delete()
+                ->where('l.createdAt < :cutoff')
+                ->setParameter('cutoff', $cutoff);
+
+            if (!empty($subnets)) {
+                // Exclude subnets that were already handled above.
+                $qb->andWhere(
+                    $qb->expr()->orX(
+                        $qb->expr()->isNull('l.subnet'),
+                        $qb->expr()->notIn('l.subnet', ':explicitSubnets')
+                    )
+                )->setParameter('explicitSubnets', $subnets);
+            }
+
+            $deleted += $qb->getQuery()->execute();
         }
 
         return $deleted;
