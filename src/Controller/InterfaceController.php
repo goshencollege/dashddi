@@ -14,6 +14,7 @@ use App\Repository\DomainRepository;
 use App\Repository\NetworkInterfaceRepository;
 use App\Repository\SubnetRepository;
 use App\Service\DnsViewResolver;
+use App\Service\FcrdnsChecker;
 use App\Service\IpAddressManager;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -27,6 +28,7 @@ class InterfaceController extends AbstractController
     public function __construct(
         private readonly IpAddressManager $ipManager,
         private readonly DnsViewResolver  $viewResolver,
+        private readonly FcrdnsChecker    $fcrdnsChecker,
     ) {}
 
     #[Route('/hosts/{id}/interfaces/new', name: 'interface_new', methods: ['GET', 'POST'])]
@@ -84,6 +86,15 @@ class InterfaceController extends AbstractController
                 }
             } else {
                 $this->handleIpAssignment($form, $interface, isEdit: true);
+                foreach ($interface->getNames() as $name) {
+                    if ($name->isCanonical()) {
+                        $fcrdnsError = $this->checkCanonical($name, $interface);
+                        if ($fcrdnsError !== null) {
+                            $this->addFlash('warning', 'FCrDNS check failed — name saved as canonical anyway. ' . $fcrdnsError);
+                        }
+                        break;
+                    }
+                }
                 $em->flush();
                 $this->addFlash('success', 'Interface updated.');
                 return $this->redirectToRoute('interface_show', ['id' => $interface->getId()]);
@@ -118,6 +129,13 @@ class InterfaceController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
+            $fcrdnsError = $this->checkCanonical($name, $interface);
+            if ($fcrdnsError !== null) {
+                $this->addFlash('warning', 'FCrDNS check failed — name saved as canonical anyway. ' . $fcrdnsError);
+            }
+            if ($name->isCanonical()) {
+                $this->clearOtherCanonicals($name, $interface);
+            }
             $interface->addName($name);
             $em->persist($name);
             $em->flush();
@@ -140,6 +158,13 @@ class InterfaceController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
+            $fcrdnsError = $this->checkCanonical($name, $interface);
+            if ($fcrdnsError !== null) {
+                $this->addFlash('warning', 'FCrDNS check failed — name saved as canonical anyway. ' . $fcrdnsError);
+            }
+            if ($name->isCanonical()) {
+                $this->clearOtherCanonicals($name, $interface);
+            }
             $em->flush();
             $this->addFlash('success', 'Name updated.');
             return $this->redirectToRoute('interface_show', ['id' => $interfaceId]);
@@ -211,6 +236,32 @@ class InterfaceController extends AbstractController
         }, $domains);
 
         return $this->json($result);
+    }
+
+    private function checkCanonical(InterfaceName $name, NetworkInterface $interface): ?string
+    {
+        if (!$name->isCanonical()) {
+            return null;
+        }
+
+        if ($name->getDomain() === null) {
+            return 'A domain is required to set a name as canonical — a bare label cannot be used for reverse DNS.';
+        }
+
+        return $this->fcrdnsChecker->check(
+            $name->getFullyQualifiedName(),
+            $interface->getIpAddress()?->getAddress(),
+            $interface->getIpv6Address()?->getAddress(),
+        );
+    }
+
+    private function clearOtherCanonicals(InterfaceName $canonical, NetworkInterface $interface): void
+    {
+        foreach ($interface->getNames() as $other) {
+            if ($other !== $canonical && $other->isCanonical()) {
+                $other->setIsCanonical(false);
+            }
+        }
     }
 
     private function validateIpInputs(\Symfony\Component\Form\FormInterface $form, ?\App\Entity\Subnet $subnet, ?NetworkInterface $current): array

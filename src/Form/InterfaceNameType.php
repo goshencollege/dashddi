@@ -10,6 +10,7 @@ use App\Repository\DnsViewRepository;
 use App\Service\DnsViewResolver;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
+use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
 use Symfony\Component\Form\Extension\Core\Type\IntegerType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
@@ -62,6 +63,10 @@ class InterfaceNameType extends AbstractType
                 'required'     => false,
                 'label'        => 'Views',
                 'by_reference' => false,
+            ])
+            ->add('isCanonical', CheckboxType::class, [
+                'label'    => 'Set as canonical (reverse DNS) name',
+                'required' => false,
             ]);
     }
 

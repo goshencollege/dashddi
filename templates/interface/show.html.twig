@@ -82,6 +82,9 @@
                         <div class="list-group-item d-flex justify-content-between align-items-center">
                             <div>
                                 <strong>{{ name.fullyQualifiedName }}</strong>
+                                {% if name.canonical %}
+                                    <span class="badge bg-primary ms-2" title="Used for reverse DNS (PTR)">Canonical</span>
+                                {% endif %}
                                 {% if name.ttl %}
                                     <span class="text-muted small ms-2">TTL {{ name.ttl }}</span>
                                 {% endif %}

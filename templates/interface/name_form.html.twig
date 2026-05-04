@@ -67,6 +67,17 @@
                         {{ form_errors(form.views) }}
                     </div>
                     {% endif %}
+                    <div class="mb-4">
+                        <div class="form-check">
+                            {{ form_widget(form.isCanonical, {attr: {class: 'form-check-input'}}) }}
+                            {{ form_label(form.isCanonical, null, {label_attr: {class: 'form-check-label fw-semibold'}}) }}
+                        </div>
+                        <div class="form-text">
+                            The canonical name is used for PTR (reverse DNS) records. Checking this will verify
+                            FCrDNS — the name must already resolve to this interface's IP address. A domain is required.
+                        </div>
+                        {{ form_errors(form.isCanonical) }}
+                    </div>
                     <div class="d-flex gap-2">
                         <button type="submit" class="btn btn-primary" id="save-btn">
                             <i class="bi bi-check-lg me-1"></i>Save
