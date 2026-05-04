@@ -67,4 +67,5 @@ class UserPreferenceController extends AbstractController
 
         return $this->json(['mode' => $mode]);
     }
+
 }

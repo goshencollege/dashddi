@@ -39,11 +39,14 @@ class NetworkInterfaceType extends AbstractType
                 'attr'       => ['placeholder' => 'e.g. aabbccddeeff  or  aa:bb:cc:dd:ee:ff  or  AA-BB-CC-DD-EE-FF (leave blank for 00:00:00:00:00:00)'],
             ])
             ->add('subnet', EntityType::class, [
-                'class' => Subnet::class,
-                'choice_label' => fn($subnet) => (string) $subnet,
-                'placeholder' => '-- Select a subnet --',
-                'required' => false,
-                'attr' => ['id' => 'interface_subnet'],
+                'class'         => Subnet::class,
+                'choice_label'  => fn($subnet) => (string) $subnet,
+                'placeholder'   => '-- Select a subnet --',
+                'required'      => false,
+                'attr'          => ['id' => 'interface_subnet'],
+                'query_builder' => fn($repo) => $repo->createQueryBuilder('s')
+                    ->where('s.isContainer = false')
+                    ->orderBy('s.name', 'ASC'),
             ])
             ->add('ipv4Assignment', ChoiceType::class, [
                 'mapped' => false,

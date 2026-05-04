@@ -11,6 +11,7 @@ use App\Enum\BlockType;
 use App\Repository\DnsViewRepository;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
+use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
 use Symfony\Component\Form\Extension\Core\Type\IntegerType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
@@ -26,6 +27,10 @@ class SubnetType extends AbstractType
         $builder
             ->add('name', TextType::class, [
                 'attr' => ['placeholder' => 'e.g. Office LAN'],
+            ])
+            ->add('isContainer', CheckboxType::class, [
+                'label'    => 'Container subnet (organizes other subnets, not pushed to DHCP)',
+                'required' => false,
             ])
             ->add('ipv4Cidr', TextType::class, [
                 'required' => false,
