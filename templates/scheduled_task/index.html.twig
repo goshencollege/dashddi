@@ -1,0 +1,94 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Task Scheduler{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-clock-history me-2"></i>Task Scheduler</h1>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body text-muted small">
+        <i class="bi bi-info-circle me-1"></i>
+        To activate automatic scheduling, add the following to your system crontab (run every minute):
+        <code class="ms-2">* * * * * php /var/www/html/bin/console app:run-scheduled-tasks &gt;&gt; /var/log/ipam-scheduler.log 2&gt;&amp;1</code>
+    </div>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-hover align-middle">
+        <thead>
+            <tr>
+                <th>Task</th>
+                <th>Schedule</th>
+                <th>Status</th>
+                <th>Last Run</th>
+                <th>Next Run</th>
+                <th class="text-end">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for task in tasks %}
+            <tr>
+                <td>
+                    <div class="fw-semibold">{{ task.name }}</div>
+                    <div class="text-muted small">{{ task.description }}</div>
+                </td>
+                <td>
+                    <code>{{ task.cronExpression }}</code>
+                    {% if not task.enabled %}
+                        <span class="badge bg-secondary ms-1">Disabled</span>
+                    {% else %}
+                        <span class="badge bg-success ms-1">Enabled</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if task.lastRunStatus == 'success' %}
+                        <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Success</span>
+                    {% elseif task.lastRunStatus == 'failure' %}
+                        <span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i>Failed</span>
+                    {% else %}
+                        <span class="badge bg-secondary">Never run</span>
+                    {% endif %}
+                </td>
+                <td class="text-muted small">
+                    {% if task.lastRunAt %}
+                        {{ task.lastRunAt|date('Y-m-d H:i:s') }}
+                    {% else %}
+                        —
+                    {% endif %}
+                </td>
+                <td class="text-muted small">
+                    {% if task.enabled and nextRun[task.id] %}
+                        {{ nextRun[task.id]|date('Y-m-d H:i') }}
+                    {% else %}
+                        —
+                    {% endif %}
+                </td>
+                <td class="text-end">
+                    {% if task.lastRunOutput %}
+                        <a href="{{ path('scheduler_output', {id: task.id}) }}" class="btn btn-sm btn-outline-secondary me-1" title="View last output">
+                            <i class="bi bi-terminal"></i>
+                        </a>
+                    {% endif %}
+                    <a href="{{ path('scheduler_edit', {id: task.id}) }}" class="btn btn-sm btn-outline-primary me-1">
+                        <i class="bi bi-pencil"></i> Edit
+                    </a>
+                    <form method="post" action="{{ path('scheduler_run', {id: task.id}) }}" class="d-inline"
+                          onsubmit="return confirm('Run &quot;{{ task.name|e('js') }}&quot; now?')">
+                        <input type="hidden" name="_token" value="{{ csrf_token('run_task_' ~ task.id) }}">
+                        <button type="submit" class="btn btn-sm btn-outline-warning">
+                            <i class="bi bi-play-fill"></i> Run Now
+                        </button>
+                    </form>
+                </td>
+            </tr>
+        {% else %}
+            <tr>
+                <td colspan="6" class="text-center text-muted py-4">No scheduled tasks configured.</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

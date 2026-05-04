@@ -73,6 +73,7 @@ class GenerateKeaConfigCommand extends Command
                             $reloadNote = ' <info>(reloaded)</info>';
                         } else {
                             $reloadNote = sprintf(' <error>(reload failed: %s)</error>', $r['response']);
+                            $failed = true;
                             if (!empty($r['restored'])) {
                                 $reloadNote .= ' <comment>[previous config restored]</comment>';
                             } elseif (!empty($r['restore_error'])) {

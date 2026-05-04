@@ -1,0 +1,101 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Edit Schedule – {{ task.name }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-clock me-2"></i>Edit Schedule</h1>
+    <a href="{{ path('scheduler_index') }}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i>Back
+    </a>
+</div>
+
+<div class="row">
+    <div class="col-lg-7">
+        <div class="card mb-4">
+            <div class="card-header">
+                <strong>{{ task.name }}</strong>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">{{ task.description }}</p>
+                <hr>
+                {{ form_start(form, {attr: {novalidate: 'novalidate'}}) }}
+                    <div class="mb-3">
+                        {{ form_label(form.cronExpression, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                        {{ form_widget(form.cronExpression) }}
+                        {{ form_errors(form.cronExpression) }}
+                        {{ form_help(form.cronExpression) }}
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="form-check">
+                            {{ form_widget(form.enabled, {attr: {class: 'form-check-input'}}) }}
+                            {{ form_label(form.enabled, null, {label_attr: {class: 'form-check-label'}}) }}
+                        </div>
+                        <div class="form-text">{{ form_help(form.enabled) }}</div>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-save me-1"></i>Save
+                        </button>
+                        <a href="{{ path('scheduler_index') }}" class="btn btn-outline-secondary">Cancel</a>
+                    </div>
+                {{ form_end(form) }}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-5">
+        <div class="card">
+            <div class="card-header">Common Schedules</div>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0">
+                    <tbody>
+                        <tr>
+                            <td><code>0 * * * *</code></td>
+                            <td class="text-muted">Every hour</td>
+                            <td><button class="btn btn-sm btn-link p-0 preset-btn" data-value="0 * * * *">Use</button></td>
+                        </tr>
+                        <tr>
+                            <td><code>0 2 * * *</code></td>
+                            <td class="text-muted">Daily at 2:00 AM</td>
+                            <td><button class="btn btn-sm btn-link p-0 preset-btn" data-value="0 2 * * *">Use</button></td>
+                        </tr>
+                        <tr>
+                            <td><code>0 3 * * *</code></td>
+                            <td class="text-muted">Daily at 3:00 AM</td>
+                            <td><button class="btn btn-sm btn-link p-0 preset-btn" data-value="0 3 * * *">Use</button></td>
+                        </tr>
+                        <tr>
+                            <td><code>0 2 * * 1</code></td>
+                            <td class="text-muted">Mondays at 2:00 AM</td>
+                            <td><button class="btn btn-sm btn-link p-0 preset-btn" data-value="0 2 * * 1">Use</button></td>
+                        </tr>
+                        <tr>
+                            <td><code>0 3 * * 0</code></td>
+                            <td class="text-muted">Sundays at 3:00 AM</td>
+                            <td><button class="btn btn-sm btn-link p-0 preset-btn" data-value="0 3 * * 0">Use</button></td>
+                        </tr>
+                        <tr>
+                            <td><code>0 4 1 * *</code></td>
+                            <td class="text-muted">1st of each month, 4:00 AM</td>
+                            <td><button class="btn btn-sm btn-link p-0 preset-btn" data-value="0 4 1 * *">Use</button></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll('.preset-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        document.getElementById('scheduled_task_form_cronExpression').value = this.dataset.value;
+    });
+});
+</script>
+{% endblock %}

@@ -10,6 +10,7 @@
         "doctrine/doctrine-bundle": "^2.18",
         "doctrine/doctrine-migrations-bundle": "^3.7",
         "doctrine/orm": "^3.6",
+        "dragonmantank/cron-expression": "^3.6",
         "mlocati/ip-lib": "^1.22",
         "onelogin/php-saml": "^4.3",
         "phpseclib/phpseclib": "~3.0",
