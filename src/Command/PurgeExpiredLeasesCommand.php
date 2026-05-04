@@ -2,6 +2,7 @@
 
 namespace App\Command;
 
+use App\Repository\AppSettingRepository;
 use App\Repository\DhcpLeaseRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -18,6 +19,7 @@ class PurgeExpiredLeasesCommand extends Command
 {
     public function __construct(
         private readonly DhcpLeaseRepository $leaseRepo,
+        private readonly AppSettingRepository $settingRepo,
         private readonly EntityManagerInterface $em,
     ) {
         parent::__construct();
@@ -27,7 +29,8 @@ class PurgeExpiredLeasesCommand extends Command
     {
         $io = new SymfonyStyle($input, $output);
 
-        $deleted = $this->leaseRepo->purgeByRetention();
+        $defaultDays = $this->settingRepo->getInstance()->getDefaultLeaseRetentionDays();
+        $deleted     = $this->leaseRepo->purgeByRetention($defaultDays);
 
         $io->success(sprintf('Purged %d expired DHCP lease record(s).', $deleted));
 

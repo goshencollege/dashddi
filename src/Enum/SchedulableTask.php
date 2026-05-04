@@ -22,7 +22,7 @@ enum SchedulableTask: string
         return match($this) {
             self::PushDns     => 'Generates BIND zone files and views.conf, then deploys them to all configured DNS servers.',
             self::PushDhcp    => 'Generates Kea DHCP subnet configuration and deploys it to all configured DHCP servers, then reloads Kea.',
-            self::PurgeLeases => 'Deletes DHCP lease log entries that exceed each subnet\'s configured retention period.',
+            self::PurgeLeases => 'Deletes DHCP lease log entries that exceed each subnet\'s configured retention period. A default retention period (for subnets with no per-subnet setting and unmatched leases) can be configured in Application Settings.',
         };
     }
 
