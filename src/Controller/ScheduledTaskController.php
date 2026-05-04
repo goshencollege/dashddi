@@ -30,9 +30,15 @@ class ScheduledTaskController extends AbstractController
             }
         }
 
+        $heartbeatFile   = $this->getParameter('kernel.project_dir') . '/var/scheduler-heartbeat';
+        $lastHeartbeat   = file_exists($heartbeatFile) ? (int) file_get_contents($heartbeatFile) : null;
+        $schedulerStale  = $lastHeartbeat === null || (time() - $lastHeartbeat) > 3600;
+
         return $this->render('scheduled_task/index.html.twig', [
-            'tasks'   => $tasks,
-            'nextRun' => $nextRun,
+            'tasks'          => $tasks,
+            'nextRun'        => $nextRun,
+            'schedulerStale' => $schedulerStale,
+            'lastHeartbeat'  => $lastHeartbeat !== null ? \DateTimeImmutable::createFromFormat('U', (string) $lastHeartbeat) : null,
         ]);
     }
 

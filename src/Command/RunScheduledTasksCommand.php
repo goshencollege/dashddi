@@ -17,8 +17,9 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 class RunScheduledTasksCommand extends Command
 {
     public function __construct(
-        private readonly ScheduledTaskRepository   $repo,
+        private readonly ScheduledTaskRepository    $repo,
         private readonly ScheduledTaskRunnerService $runner,
+        private readonly string                     $projectDir,
     ) {
         parent::__construct();
     }
@@ -26,6 +27,8 @@ class RunScheduledTasksCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io = new SymfonyStyle($input, $output);
+
+        file_put_contents($this->projectDir . '/var/scheduler-heartbeat', (string) time());
 
         $tasks = $this->repo->findBy(['enabled' => true]);
 
