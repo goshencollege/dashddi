@@ -115,7 +115,7 @@
                     {{ form_widget(proto.ttl, {attr: {class: 'form-control form-control-sm', placeholder: 'TTL'}}) }}
                 </div>
                 {% for viewWidget in proto.views %}
-                    <div class="form-check form-check-inline mb-0">
+                    <div class="form-check form-check-inline mb-0" data-view-id="{{ viewWidget.vars.value }}">
                         {{ form_widget(viewWidget, {attr: {class: 'form-check-input'}}) }}
                         {{ form_label(viewWidget, null, {label_attr: {class: 'form-check-label small'}}) }}
                     </div>
@@ -144,7 +144,7 @@
                             {{ form_widget(nameForm.ttl, {attr: {class: 'form-control form-control-sm', placeholder: 'TTL'}}) }}
                         </div>
                         {% for viewWidget in nameForm.views %}
-                            <div class="form-check form-check-inline mb-0">
+                            <div class="form-check form-check-inline mb-0" data-view-id="{{ viewWidget.vars.value }}">
                                 {{ form_widget(viewWidget, {attr: {class: 'form-check-input'}}) }}
                                 {{ form_label(viewWidget, null, {label_attr: {class: 'form-check-label small'}}) }}
                             </div>
@@ -222,13 +222,114 @@
     const addBtn = document.getElementById('add-name-btn');
     let index = collection.querySelectorAll('.name-entry').length;
 
-    addBtn.addEventListener('click', function () {
+    // ── View / domain cascade helpers ───────────────────────────────────────
+
+    function getSubnetId() {
+        return document.getElementById('interface_subnet')?.value || '';
+    }
+
+    async function fetchAvailableViewIds(domainId, subnetId) {
+        if (!domainId) return null;
+        let url = '/api/domains/' + domainId + '/views';
+        if (subnetId) url += '?subnet=' + subnetId;
+        try {
+            const r = await fetch(url);
+            const data = await r.json();
+            return new Set(data.map(v => v.id));
+        } catch { return null; }
+    }
+
+    async function fetchAvailableDomains(subnetId) {
+        if (!subnetId) return null;
+        try {
+            const r = await fetch('/api/subnets/' + subnetId + '/available-domains');
+            return r.ok ? await r.json() : null;
+        } catch { return null; }
+    }
+
+    function applyDomainUsability(domainSelect, domainData) {
+        if (!domainData) return;
+        const byId = {};
+        domainData.forEach(d => { byId[d.id] = d; });
+        domainSelect.querySelectorAll('option[value]').forEach(opt => {
+            const id = parseInt(opt.value, 10);
+            if (!id) return;
+            const info = byId[id];
+            if (info && !info.usable) {
+                opt.disabled = true;
+                opt.title    = info.reason || 'Not available for this subnet';
+            } else {
+                opt.disabled = false;
+                opt.title    = '';
+            }
+        });
+    }
+
+    function applyViewFilter(nameEntry, availableIds, autoCheck) {
+        nameEntry.querySelectorAll('.form-check[data-view-id]').forEach(wrap => {
+            const viewId = parseInt(wrap.dataset.viewId, 10);
+            const cb     = wrap.querySelector('input[type="checkbox"]');
+            if (availableIds === null || !availableIds.has(viewId)) {
+                wrap.style.display = 'none';
+                if (cb) cb.checked = false;
+            } else {
+                wrap.style.display = '';
+                if (autoCheck && cb) cb.checked = true;
+            }
+        });
+    }
+
+    async function refreshAllRows() {
+        const subnetId   = getSubnetId();
+        const domainData = await fetchAvailableDomains(subnetId);
+        const rows       = collection.querySelectorAll('.name-entry');
+
+        for (const row of rows) {
+            const domainSel = row.querySelector('select[name*="[domain]"]');
+            if (!domainSel) continue;
+            if (domainData) applyDomainUsability(domainSel, domainData);
+            const ids = await fetchAvailableViewIds(domainSel.value, subnetId);
+            applyViewFilter(row, ids, false);
+        }
+    }
+
+    // Subnet change → refresh all rows
+    if (subnetSelect) {
+        subnetSelect.addEventListener('change', refreshAllRows);
+    }
+
+    // Domain change within a row → refresh just that row's views
+    collection.addEventListener('change', async function (e) {
+        const domainSel = e.target.closest('select[name*="[domain]"]');
+        if (!domainSel) return;
+        const row = domainSel.closest('.name-entry');
+        if (!row) return;
+        const subnetId = getSubnetId();
+        const ids = await fetchAvailableViewIds(domainSel.value, subnetId);
+        applyViewFilter(row, ids, true);
+    });
+
+    // Initial page load: apply cascade to existing rows
+    refreshAllRows();
+
+    // ── Add / remove entries ────────────────────────────────────────────────
+
+    addBtn.addEventListener('click', async function () {
         document.getElementById('no-names-msg')?.remove();
         const div = document.createElement('div');
         div.innerHTML = collection.dataset.prototype.replace(/__name__/g, index++);
         const entry = div.firstElementChild;
-        entry.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = true);
         collection.appendChild(entry);
+
+        // Apply domain usability for current subnet
+        const subnetId = getSubnetId();
+        if (subnetId) {
+            const domainData = await fetchAvailableDomains(subnetId);
+            const domainSel  = entry.querySelector('select[name*="[domain]"]');
+            if (domainSel && domainData) applyDomainUsability(domainSel, domainData);
+        }
+        // Hide all views until a domain is chosen
+        applyViewFilter(entry, null, false);
     });
 
     collection.addEventListener('click', function (e) {
