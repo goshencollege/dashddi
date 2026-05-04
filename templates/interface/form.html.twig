@@ -278,10 +278,10 @@
             const viewId = parseInt(wrap.dataset.viewId, 10);
             const cb     = wrap.querySelector('input[type="checkbox"]');
             if (availableIds === null || !availableIds.has(viewId)) {
-                wrap.style.display = 'none';
+                wrap.style.visibility = 'hidden';
                 if (cb) cb.checked = false;
             } else {
-                wrap.style.display = '';
+                wrap.style.visibility = '';
                 if (autoCheck && cb) cb.checked = true;
             }
         });
