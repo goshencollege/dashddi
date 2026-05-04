@@ -102,6 +102,10 @@
             {% set proto = form.names.vars.prototype %}
             {% set proto_html %}
             <div class="name-entry border rounded p-2 mb-2 d-flex align-items-center gap-2 flex-wrap">
+                <div class="flex-shrink-0" title="Set as canonical (reverse DNS) name">
+                    <input type="radio" class="form-check-input canonical-radio" name="canonical_radio" value="__name__">
+                </div>
+                <div class="d-none">{{ form_widget(proto.isCanonical) }}</div>
                 <div class="flex-fill" style="min-width:7rem">
                     {{ form_widget(proto.name, {attr: {class: 'form-control form-control-sm font-monospace'}}) }}
                     {{ form_errors(proto.name) }}
@@ -131,6 +135,10 @@
                  data-prototype="{{ proto_html|e('html_attr') }}">
                 {% for nameForm in form.names %}
                     <div class="name-entry border rounded p-2 mb-2 d-flex align-items-center gap-2 flex-wrap">
+                        <div class="flex-shrink-0" title="Set as canonical (reverse DNS) name">
+                            <input type="radio" class="form-check-input canonical-radio" name="canonical_radio" value="{{ nameForm.vars.name }}">
+                        </div>
+                        <div class="d-none">{{ form_widget(nameForm.isCanonical) }}</div>
                         <div class="flex-fill" style="min-width:7rem">
                             {{ form_widget(nameForm.name, {attr: {class: 'form-control form-control-sm font-monospace'}}) }}
                             {{ form_errors(nameForm.name) }}
@@ -330,13 +338,55 @@
         }
         // Hide all views until a domain is chosen
         applyViewFilter(entry, null, false);
+
+        // If no canonical is selected yet, make this new row the canonical
+        if (!collection.querySelector('.canonical-radio:checked')) selectFirstCanonical();
     });
 
     collection.addEventListener('click', function (e) {
         if (e.target.closest('.remove-name-btn')) {
-            e.target.closest('.name-entry').remove();
+            const row = e.target.closest('.name-entry');
+            const wasCanonical = row.querySelector('.canonical-radio')?.checked;
+            row.remove();
+            if (wasCanonical) selectFirstCanonical();
         }
     });
+
+    // ── Canonical name radio → hidden-checkbox sync ───────────────────────
+
+    function syncCanonical(selectedKey) {
+        collection.querySelectorAll('input[name*="[isCanonical]"]').forEach(cb => { cb.checked = false; });
+        const cb = collection.querySelector('input[name*="[names][' + selectedKey + '][isCanonical]"]');
+        if (cb) cb.checked = true;
+    }
+
+    function selectFirstCanonical() {
+        const first = collection.querySelector('.canonical-radio');
+        if (first) {
+            first.checked = true;
+            syncCanonical(first.value);
+        }
+    }
+
+    collection.addEventListener('change', function (e) {
+        if (e.target.classList.contains('canonical-radio')) syncCanonical(e.target.value);
+    });
+
+    // Initialise radios from persisted checkbox state on page load; fall back to first row
+    (function () {
+        let found = false;
+        collection.querySelectorAll('input[name*="[isCanonical]"]').forEach(cb => {
+            if (cb.checked) {
+                found = true;
+                const m = cb.name.match(/\[names\]\[([^\]]+)\]\[isCanonical\]/);
+                if (m) {
+                    const r = collection.querySelector('.canonical-radio[value="' + m[1] + '"]');
+                    if (r) r.checked = true;
+                }
+            }
+        });
+        if (!found) selectFirstCanonical();
+    })();
 
 })();
 </script>

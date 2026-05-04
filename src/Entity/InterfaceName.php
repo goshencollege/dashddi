@@ -40,6 +40,9 @@ class InterfaceName
     #[Assert\Positive]
     private ?int $ttl = null;
 
+    #[ORM\Column(options: ['default' => false])]
+    private bool $isCanonical = false;
+
     #[ORM\ManyToMany(targetEntity: DnsView::class)]
     #[ORM\JoinTable(name: 'interface_name_dns_view')]
     private Collection $views;
@@ -62,6 +65,9 @@ class InterfaceName
 
     public function getTtl(): ?int { return $this->ttl; }
     public function setTtl(?int $ttl): static { $this->ttl = $ttl; return $this; }
+
+    public function isCanonical(): bool { return $this->isCanonical; }
+    public function setIsCanonical(bool $isCanonical): static { $this->isCanonical = $isCanonical; return $this; }
 
     public function getViews(): Collection { return $this->views; }
 

@@ -19,6 +19,7 @@ class DnsConfigGenerator
         private readonly SubnetRepository       $subnetRepo,
         private readonly DnssecPolicyRepository $policyRepo,
         private readonly DnsAclRepository       $aclRepo,
+        private readonly FcrdnsChecker          $fcrdnsChecker,
     ) {}
 
     /** @return Domain[] */
@@ -355,11 +356,19 @@ class DnsConfigGenerator
     private function ptrHostname(NetworkInterface $iface, ?DnsView $view): ?string
     {
         foreach ($iface->getNames() as $name) {
+            if (!$name->isCanonical()) {
+                continue;
+            }
             if (!$name->getDomain()) {
                 continue;
             }
             if ($view !== null && !$this->inView($view, $name->getViews()->toArray())) {
                 continue;
+            }
+            $ipv4 = $iface->getIpAddress()?->getAddress();
+            $ipv6 = $iface->getIpv6Address()?->getAddress();
+            if ($this->fcrdnsChecker->check($name->getFullyQualifiedName(), $ipv4, $ipv6) !== null) {
+                return null;
             }
             return $name->getFullyQualifiedName() . '.';
         }
