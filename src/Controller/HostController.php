@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Entity\Host;
 use App\Form\HostType;
 use App\Repository\BuildingRepository;
+use App\Repository\DhcpLeaseRepository;
 use App\Repository\HostRepository;
 use App\Repository\SubnetRepository;
 use App\Repository\TagRepository;
@@ -24,7 +25,7 @@ class HostController extends AbstractController
     ) {}
 
     #[Route('', name: 'host_index', methods: ['GET'])]
-    public function index(Request $request, HostRepository $repo, SubnetRepository $subnetRepo, BuildingRepository $buildingRepo, TagRepository $tagRepo, UserPreferenceRepository $prefRepo): Response
+    public function index(Request $request, HostRepository $repo, SubnetRepository $subnetRepo, BuildingRepository $buildingRepo, TagRepository $tagRepo, UserPreferenceRepository $prefRepo, DhcpLeaseRepository $leaseRepo): Response
     {
         $query = trim($request->query->getString('q'));
 
@@ -50,6 +51,13 @@ class HostController extends AbstractController
         $pref = $user ? $prefRepo->findByIdentifier($user->getUserIdentifier()) : null;
         $hostViewMode = $pref?->getHostViewMode() ?? 'host';
 
+        $macs = [];
+        foreach ($hosts as $host) {
+            foreach ($host->getInterfaces() as $iface) {
+                $macs[] = $iface->getMacAddress();
+            }
+        }
+
         return $this->render('host/index.html.twig', [
             'hosts'        => $hosts,
             'query'        => $query,
@@ -59,6 +67,7 @@ class HostController extends AbstractController
             'buildings'    => $buildingRepo->findBy([], ['name' => 'ASC']),
             'tags'         => $tagRepo->findBy([], ['name' => 'ASC']),
             'hostViewMode' => $hostViewMode,
+            'lease_map'    => $leaseRepo->findLatestByMacs($macs),
         ]);
     }
 
@@ -119,9 +128,16 @@ class HostController extends AbstractController
     }
 
     #[Route('/{id}', name: 'host_show', methods: ['GET'])]
-    public function show(Host $host): Response
+    public function show(Host $host, DhcpLeaseRepository $leaseRepo): Response
     {
-        return $this->render('host/show.html.twig', ['host' => $host]);
+        $macs = array_map(
+            fn($i) => $i->getMacAddress(),
+            $host->getInterfaces()->toArray()
+        );
+        return $this->render('host/show.html.twig', [
+            'host'      => $host,
+            'lease_map' => $leaseRepo->findLatestByMacs($macs),
+        ]);
     }
 
     #[Route('/{id}/edit', name: 'host_edit', methods: ['GET', 'POST'])]

@@ -154,17 +154,20 @@
                                     {% endfor %}
                                 </td>
                                 <td class="ip-address small">
-                                    {% set ipv4s = [] %}
+                                    {% set any_ip = false %}
                                     {% for iface in host.interfaces %}
-                                        {% if iface.ipAddress %}
-                                            {% set ipv4s = ipv4s|merge([iface.ipAddress.address]) %}
+                                        {% set lease = lease_map[iface.macAddress] ?? null %}
+                                        {% set static_ip = iface.ipAddress ? iface.ipAddress.address : null %}
+                                        {% set lease_ip = lease ? lease.ipAddress : null %}
+                                        {% if static_ip %}
+                                            {% set any_ip = true %}
+                                            <div>{{ static_ip }}{% if lease_ip and lease_ip != static_ip %} <span class="text-muted">({{ lease_ip }})</span>{% endif %}</div>
+                                        {% elseif lease_ip %}
+                                            {% set any_ip = true %}
+                                            <div class="text-muted">({{ lease_ip }})</div>
                                         {% endif %}
                                     {% endfor %}
-                                    {% if ipv4s is empty %}
-                                        <span class="text-muted">—</span>
-                                    {% else %}
-                                        {% for ip in ipv4s %}<div>{{ ip }}</div>{% endfor %}
-                                    {% endif %}
+                                    {% if not any_ip %}<span class="text-muted">—</span>{% endif %}
                                 </td>
                                 <td class="ip-address small">
                                     {% set ipv6s = [] %}
@@ -268,8 +271,15 @@
                                     </td>
                                     <td class="small">{{ iface.subnet ? iface.subnet.name : '—' }}</td>
                                     <td class="ip-address small">
+                                        {% set lease = lease_map[iface.macAddress] ?? null %}
+                                        {% set lease_ip = lease ? lease.ipAddress : null %}
                                         {% if iface.ipAddress %}
                                             {{ iface.ipAddress.address }}
+                                            {% if lease_ip and lease_ip != iface.ipAddress.address %}
+                                                <span class="text-muted">({{ lease_ip }})</span>
+                                            {% endif %}
+                                        {% elseif lease_ip %}
+                                            <span class="text-muted">({{ lease_ip }})</span>
                                         {% else %}
                                             <span class="text-muted">—</span>
                                         {% endif %}

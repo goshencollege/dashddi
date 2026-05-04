@@ -50,7 +50,7 @@
     {% else %}
         <div class="table-responsive">
             <table class="table table-hover mb-0">
-                <thead class="table-light">
+                <thead>
                     <tr>
                         <th>MAC Address</th>
                         <th>IP Address</th>
@@ -62,8 +62,15 @@
                 </thead>
                 <tbody>
                     {% for lease in leases %}
+                        {% set iface = interface_map[lease.macAddress] ?? null %}
                         <tr>
-                            <td><code>{{ lease.macAddress }}</code></td>
+                            <td>
+                                {% if iface %}
+                                    <a href="{{ path('interface_show', {id: iface.id}) }}"><code>{{ lease.macAddress }}</code></a>
+                                {% else %}
+                                    <code>{{ lease.macAddress }}</code>
+                                {% endif %}
+                            </td>
                             <td><code>{{ lease.ipAddress }}</code></td>
                             <td>
                                 {% if lease.subnet %}

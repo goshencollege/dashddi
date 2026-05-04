@@ -5,8 +5,10 @@ namespace App\Controller;
 use App\Entity\DhcpLease;
 use App\Entity\Subnet;
 use App\Repository\DhcpLeaseRepository;
+use App\Repository\NetworkInterfaceRepository;
 use App\Repository\SubnetRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use IPLib\Address\IPv6;
 use IPLib\Factory as IpFactory;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -21,25 +23,29 @@ class DhcpLeaseController extends AbstractController
         Request $request,
         DhcpLeaseRepository $leaseRepo,
         SubnetRepository $subnetRepo,
+        NetworkInterfaceRepository $ifaceRepo,
     ): Response {
         $mac      = trim((string) $request->query->get('mac', ''));
         $ip       = trim((string) $request->query->get('ip', ''));
-        $subnetId = $request->query->getInt('subnet');
+        $subnetId = (int) $request->query->get('subnet', 0);
         $page     = max(1, $request->query->getInt('page', 1));
 
         $subnet  = $subnetId ? $subnetRepo->find($subnetId) : null;
         $leases  = $leaseRepo->search($mac, $ip, $subnet, $page);
         $subnets = $subnetRepo->findBy([], ['name' => 'ASC']);
 
+        $macs = array_unique(array_map(fn($l) => $l->getMacAddress(), iterator_to_array($leases)));
+
         return $this->render('dhcp_lease/index.html.twig', [
-            'leases'      => $leases,
-            'subnets'     => $subnets,
-            'filter_mac'  => $mac,
-            'filter_ip'   => $ip,
+            'leases'        => $leases,
+            'subnets'       => $subnets,
+            'filter_mac'    => $mac,
+            'filter_ip'     => $ip,
             'filter_subnet' => $subnetId,
-            'page'        => $page,
-            'total'       => count($leases),
-            'per_page'    => 50,
+            'page'          => $page,
+            'total'         => count($leases),
+            'per_page'      => 50,
+            'interface_map' => $ifaceRepo->findByMacs($macs),
         ]);
     }
 
@@ -110,7 +116,7 @@ class DhcpLeaseController extends AbstractController
         }
 
         foreach ($subnetRepo->findAll() as $subnet) {
-            $cidr = $parsed->isVersion6() ? $subnet->getIpv6Cidr() : $subnet->getIpv4Cidr();
+            $cidr = ($parsed instanceof IPv6) ? $subnet->getIpv6Cidr() : $subnet->getIpv4Cidr();
             if ($cidr === null) {
                 continue;
             }

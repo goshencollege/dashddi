@@ -26,7 +26,8 @@ class HostRepository extends ServiceEntityRepository
             ->leftJoin('i.ipAddress', 'ip4')
             ->leftJoin('i.ipv6Address', 'ip6')
             ->leftJoin('i.names', 'n')
-            ->leftJoin('n.domain', 'nd');
+            ->leftJoin('n.domain', 'nd')
+            ->leftJoin('App\Entity\DhcpLease', 'dl', 'WITH', 'dl.macAddress = i.macAddress');
 
         if (!empty($criteria['name'])) {
             $qb->andWhere('h.name LIKE :name')
@@ -45,7 +46,7 @@ class HostRepository extends ServiceEntityRepository
                ->setParameter('subnet', (int) $criteria['subnet']);
         }
         if (!empty($criteria['ip'])) {
-            $qb->andWhere($qb->expr()->orX('ip4.address LIKE :ip', 'ip6.address LIKE :ip'))
+            $qb->andWhere($qb->expr()->orX('ip4.address LIKE :ip', 'ip6.address LIKE :ip', 'dl.ipAddress LIKE :ip'))
                ->setParameter('ip', $this->toLike($criteria['ip']));
         }
         if (!empty($criteria['mac'])) {
@@ -88,6 +89,7 @@ class HostRepository extends ServiceEntityRepository
             ->leftJoin('i.ipv6Address', 'ip6')
             ->leftJoin('i.names', 'n')
             ->leftJoin('n.domain', 'nd')
+            ->leftJoin('App\Entity\DhcpLease', 'dl', 'WITH', 'dl.macAddress = i.macAddress')
             ->where('h.name LIKE :q')
             ->orWhere('b.name LIKE :q')
             ->orWhere('h.room LIKE :q')
@@ -95,6 +97,7 @@ class HostRepository extends ServiceEntityRepository
             ->orWhere('s.name LIKE :q')
             ->orWhere('ip4.address LIKE :q')
             ->orWhere('ip6.address LIKE :q')
+            ->orWhere('dl.ipAddress LIKE :q')
             ->orWhere('i.macAddress LIKE :q')
             ->orWhere('n.name LIKE :q')
             ->orWhere('nd.name LIKE :q')
