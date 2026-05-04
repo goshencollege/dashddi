@@ -23,6 +23,9 @@ class UserPreference
     #[ORM\Column(length: 16)]
     private string $hostViewMode = 'host';
 
+    #[ORM\Column(length: 16)]
+    private string $subnetViewMode = 'name';
+
     public function __construct(string $userIdentifier)
     {
         $this->userIdentifier = $userIdentifier;
@@ -37,4 +40,7 @@ class UserPreference
 
     public function getHostViewMode(): string { return $this->hostViewMode; }
     public function setHostViewMode(string $mode): static { $this->hostViewMode = $mode; return $this; }
+
+    public function getSubnetViewMode(): string { return $this->subnetViewMode; }
+    public function setSubnetViewMode(string $mode): static { $this->subnetViewMode = $mode; return $this; }
 }

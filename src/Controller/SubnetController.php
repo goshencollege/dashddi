@@ -4,9 +4,11 @@ namespace App\Controller;
 
 use App\Entity\AddressBlock;
 use App\Entity\Subnet;
+use App\Entity\UserPreference;
 use App\Enum\BlockType;
 use App\Form\SubnetType;
 use App\Repository\SubnetRepository;
+use App\Repository\UserPreferenceRepository;
 use App\Repository\VrfRepository;
 use App\Service\IpAddressManager;
 use IPLib\Factory;
@@ -20,10 +22,32 @@ use Symfony\Component\Routing\Attribute\Route;
 class SubnetController extends AbstractController
 {
     #[Route('', name: 'subnet_index', methods: ['GET'])]
-    public function index(SubnetRepository $repo, VrfRepository $vrfRepo): Response
+    public function index(Request $request, SubnetRepository $repo, VrfRepository $vrfRepo, UserPreferenceRepository $prefRepo, EntityManagerInterface $em): Response
     {
+        $user = $this->getUser();
+        $pref = $user ? $prefRepo->findByIdentifier($user->getUserIdentifier()) : null;
+
+        if ($request->query->has('view')) {
+            $view = $request->query->get('view');
+            if (!in_array($view, ['name', 'ipv4', 'ipv6'], true)) {
+                $view = 'name';
+            }
+            if ($user) {
+                if (!$pref) {
+                    $pref = new UserPreference($user->getUserIdentifier());
+                    $em->persist($pref);
+                }
+                $pref->setSubnetViewMode($view);
+                $em->flush();
+            }
+        } else {
+            $view = $pref?->getSubnetViewMode() ?? 'name';
+        }
+
         return $this->render('subnet/index.html.twig', [
-            'subnets' => $repo->findBy([], ['name' => 'ASC']),
+            'subnets' => $view === 'name' ? $repo->findBy(['isContainer' => false], ['name' => 'ASC']) : null,
+            'tree'    => $view !== 'name' ? $repo->buildFlatHierarchy($view) : null,
+            'view'    => $view,
             'vrfs'    => $vrfRepo->findBy([], ['name' => 'ASC']),
         ]);
     }

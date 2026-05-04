@@ -2,14 +2,39 @@
 {% block title %}Subnets{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="d-flex justify-content-between align-items-center mb-3">
     <h1 class="h3 mb-0"><i class="bi bi-diagram-2 me-2"></i>Subnets</h1>
     <a href="{{ path('subnet_new') }}" class="btn btn-primary">
         <i class="bi bi-plus-lg me-1"></i>Add Subnet
     </a>
 </div>
 
-{% if subnets is empty %}
+<div class="d-flex align-items-center mb-3 gap-3">
+    <div class="btn-group btn-group-sm" role="group" aria-label="View mode">
+        <a href="{{ path('subnet_index', {view: 'name'}) }}"
+           class="btn {{ view == 'name' ? 'btn-secondary' : 'btn-outline-secondary' }}">
+            <i class="bi bi-sort-alpha-down me-1"></i>By Name
+        </a>
+        <a href="{{ path('subnet_index', {view: 'ipv4'}) }}"
+           class="btn {{ view == 'ipv4' ? 'btn-secondary' : 'btn-outline-secondary' }}">
+            <i class="bi bi-diagram-3 me-1"></i>By IPv4
+        </a>
+        <a href="{{ path('subnet_index', {view: 'ipv6'}) }}"
+           class="btn {{ view == 'ipv6' ? 'btn-secondary' : 'btn-outline-secondary' }}">
+            <i class="bi bi-diagram-3 me-1"></i>By IPv6
+        </a>
+    </div>
+    {% if view != 'name' %}
+        <span class="text-muted small">
+            <i class="bi bi-folder me-1"></i>Container subnets group children by CIDR containment.
+            Subnets without a{{ view == 'ipv4' ? 'n IPv4' : 'n IPv6' }} CIDR are hidden in this view.
+        </span>
+    {% endif %}
+</div>
+
+{% set isEmpty = (view == 'name' and subnets is empty) or (view != 'name' and tree is empty) %}
+
+{% if isEmpty %}
     <div class="card">
         <div class="card-body text-center text-muted py-5">
             <i class="bi bi-diagram-2 fs-1 d-block mb-3 opacity-25"></i>
@@ -20,7 +45,7 @@
     <div class="card">
         <div class="table-responsive">
             <table class="table table-hover mb-0">
-                <thead class="">
+                <thead>
                     <tr>
                         <th>Name</th>
                         <th>VRF</th>
@@ -35,54 +60,78 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for subnet in subnets %}
-                        <tr>
-                            <td>
-                                <a href="{{ path('subnet_show', {id: subnet.id}) }}" class="fw-semibold text-decoration-none">
-                                    {{ subnet.name }}
-                                </a>
-                            </td>
-                            <td>{{ subnet.vrf ? subnet.vrf.name : '—' }}</td>
-                            <td class="ip-address">{{ subnet.ipv4Cidr ?: '—' }}</td>
-                            <td class="ip-address small">{{ subnet.ipv6Cidr ?: '—' }}</td>
-                            <td>{{ subnet.vlan ?: '—' }}</td>
-                            <td class="ip-address">{{ subnet.gateway ?: '—' }}</td>
-                            <td>
-                                <span class="badge bg-info text-dark">{{ subnet.ipAddresses|length }} v4</span>
-                                <span class="badge bg-warning text-dark ms-1">{{ subnet.ipv6Addresses|length }} v6</span>
-                            </td>
-                            <td>
-                                {% if subnet.dnssecPolicy %}
-                                    <span class="badge bg-success-subtle text-success border border-success-subtle">
-                                        <i class="bi bi-shield-check me-1"></i>{{ subnet.dnssecPolicy.name }}
-                                    </span>
-                                {% else %}
-                                    <span class="text-muted">—</span>
-                                {% endif %}
-                            </td>
-                            <td class="text-muted small">
-                                {{ subnet.updatedAt|date('Y-m-d H:i') }}
-                                {% if subnet.updatedBy %}<br>{{ subnet.updatedBy }}{% endif %}
-                            </td>
-                            <td class="text-end">
-                                <a href="{{ path('subnet_edit', {id: subnet.id}) }}" class="btn btn-sm btn-outline-secondary me-1">
-                                    <i class="bi bi-pencil"></i>
-                                </a>
-                                <form method="post" action="{{ path('subnet_delete', {id: subnet.id}) }}" class="d-inline"
-                                      onsubmit="return confirm('Delete subnet {{ subnet.name|e('js') }}?')">
-                                    <input type="hidden" name="_token" value="{{ csrf_token('delete_subnet_' ~ subnet.id) }}">
-                                    <button type="submit" class="btn btn-sm btn-outline-danger">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </form>
-                            </td>
-                        </tr>
-                    {% endfor %}
+                    {% if view == 'name' %}
+                        {% for subnet in subnets %}
+                            {{ _self.subnet_row(subnet, 0, false) }}
+                        {% endfor %}
+                    {% else %}
+                        {% for item in tree %}
+                            {{ _self.subnet_row(item.subnet, item.depth, true) }}
+                        {% endfor %}
+                    {% endif %}
                 </tbody>
             </table>
         </div>
     </div>
 {% endif %}
+
+{% macro subnet_row(subnet, depth, treeView) %}
+<tr class="{{ subnet.isContainer ? 'table-active' : '' }}"
+    {% if treeView %}data-tree-row data-depth="{{ depth }}"{% if subnet.isContainer %} data-container-id="{{ subnet.id }}"{% endif %}{% endif %}>
+    <td style="padding-left: {{ 0.75 + depth * 1.5 }}rem">
+        {% if treeView and subnet.isContainer %}
+            <button type="button" class="btn btn-sm btn-link p-0 me-1 text-muted container-toggle"
+                    data-container-id="{{ subnet.id }}" style="line-height:1">
+                <i class="bi bi-chevron-down"></i>
+            </button>
+            <i class="bi bi-folder2-open me-1 text-muted"></i>
+        {% elseif not treeView and subnet.isContainer %}
+            <i class="bi bi-folder2-open me-1 text-muted"></i>
+        {% elseif depth > 0 %}
+            <span class="text-muted me-1" style="font-size:.75rem">└</span>
+        {% endif %}
+        <a href="{{ path('subnet_show', {id: subnet.id}) }}" class="fw-semibold text-decoration-none">
+            {{ subnet.name }}
+        </a>
+    </td>
+    <td>{{ subnet.vrf ? subnet.vrf.name : '—' }}</td>
+    <td class="ip-address">{{ subnet.ipv4Cidr ?: '—' }}</td>
+    <td class="ip-address small">{{ subnet.ipv6Cidr ?: '—' }}</td>
+    <td>{{ subnet.vlan ?: '—' }}</td>
+    <td class="ip-address">{{ subnet.gateway ?: '—' }}</td>
+    <td>
+        {% if not subnet.isContainer %}
+            <span class="badge bg-info text-dark">{{ subnet.ipAddresses|length }} v4</span>
+            <span class="badge bg-warning text-dark ms-1">{{ subnet.ipv6Addresses|length }} v6</span>
+        {% endif %}
+    </td>
+    <td>
+        {% if subnet.dnssecPolicy %}
+            <span class="badge bg-success-subtle text-success border border-success-subtle">
+                <i class="bi bi-shield-check me-1"></i>{{ subnet.dnssecPolicy.name }}
+            </span>
+        {% else %}
+            <span class="text-muted">—</span>
+        {% endif %}
+    </td>
+    <td class="text-muted small">
+        {{ subnet.updatedAt|date('Y-m-d H:i') }}
+        {% if subnet.updatedBy %}<br>{{ subnet.updatedBy }}{% endif %}
+    </td>
+    <td class="text-end">
+        <a href="{{ path('subnet_edit', {id: subnet.id}) }}" class="btn btn-sm btn-outline-secondary me-1">
+            <i class="bi bi-pencil"></i>
+        </a>
+        <form method="post" action="{{ path('subnet_delete', {id: subnet.id}) }}" class="d-inline"
+              onsubmit="return confirm('Delete subnet {{ subnet.name|e('js') }}?')">
+            <input type="hidden" name="_token" value="{{ csrf_token('delete_subnet_' ~ subnet.id) }}">
+            <button type="submit" class="btn btn-sm btn-outline-danger">
+                <i class="bi bi-trash"></i>
+            </button>
+        </form>
+    </td>
+</tr>
+{% endmacro %}
 
 <div class="d-flex justify-content-between align-items-center mt-5 mb-3">
     <h2 class="h5 mb-0"><i class="bi bi-signpost-split me-2"></i>VRFs</h2>
@@ -135,3 +184,44 @@
     </div>
 {% endif %}
 {% endblock %}
+
+{% block scripts %}
+{{ parent() }}
+<script>
+(function () {
+    var collapsed = new Set();
+
+    function updateVisibility() {
+        var rows = Array.from(document.querySelectorAll('tr[data-tree-row]'));
+        var stack = []; // depths of collapsed containers we're currently inside
+        rows.forEach(function (row) {
+            var depth = parseInt(row.dataset.depth, 10);
+            while (stack.length > 0 && stack[stack.length - 1] >= depth) {
+                stack.pop();
+            }
+            row.style.display = stack.length > 0 ? 'none' : '';
+            var cid = row.dataset.containerId;
+            if (cid && collapsed.has(cid)) {
+                stack.push(depth);
+            }
+        });
+    }
+
+    document.querySelectorAll('.container-toggle').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var cid = this.dataset.containerId;
+            var icon = this.querySelector('i');
+            if (collapsed.has(cid)) {
+                collapsed.delete(cid);
+                icon.classList.replace('bi-chevron-right', 'bi-chevron-down');
+            } else {
+                collapsed.add(cid);
+                icon.classList.replace('bi-chevron-down', 'bi-chevron-right');
+            }
+            updateVisibility();
+        });
+    });
+})();
+</script>
+{% endblock %}
+

@@ -104,6 +104,9 @@ class Subnet
     #[Assert\PositiveOrZero]
     private ?int $leaseRetentionDays = null;
 
+    #[ORM\Column(options: ['default' => false])]
+    private bool $isContainer = false;
+
     public function __construct()
     {
         $this->ipAddresses = new ArrayCollection();
@@ -163,6 +166,9 @@ class Subnet
 
     public function getLeaseRetentionDays(): ?int { return $this->leaseRetentionDays; }
     public function setLeaseRetentionDays(?int $v): static { $this->leaseRetentionDays = $v; return $this; }
+
+    public function isContainer(): bool { return $this->isContainer; }
+    public function setIsContainer(bool $isContainer): static { $this->isContainer = $isContainer; return $this; }
 
     public function getViews(): Collection { return $this->views; }
 
