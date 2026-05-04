@@ -1,0 +1,31 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Output – {{ task.name }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-terminal me-2"></i>Task Output</h1>
+    <a href="{{ path('scheduler_index') }}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i>Back to Scheduler
+    </a>
+</div>
+
+<div class="card mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <strong>{{ task.name }}</strong>
+        <span>
+            {% if task.lastRunStatus == 'success' %}
+                <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Success</span>
+            {% elseif task.lastRunStatus == 'failure' %}
+                <span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i>Failed</span>
+            {% endif %}
+            {% if task.lastRunAt %}
+                <span class="text-muted ms-2 small">{{ task.lastRunAt|date('Y-m-d H:i:s') }}</span>
+            {% endif %}
+        </span>
+    </div>
+    <div class="card-body p-0">
+        <pre class="m-0 p-3" style="max-height: 600px; overflow-y: auto; font-size: .85rem;">{{ task.lastRunOutput ?? '(no output)' }}</pre>
+    </div>
+</div>
+{% endblock %}
