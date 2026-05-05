@@ -1,0 +1,116 @@
+{% extends 'base.html.twig' %}
+{% block title %}Import DHCP Config{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0"><i class="bi bi-upload me-2"></i>Import DHCP Config</h1>
+    <a href="{{ path('subnet_index') }}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i>Back to Subnets
+    </a>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-7">
+        <div class="card">
+            <div class="card-body p-4">
+                <p class="text-muted mb-4">
+                    Upload a config file from <strong>ISC DHCPD</strong> or <strong>Kea DHCP</strong> to import
+                    subnets and host reservations. You will be shown a preview of proposed changes
+                    before anything is created.
+                </p>
+
+                <form method="post" action="{{ path('subnet_import') }}" enctype="multipart/form-data">
+
+                    <div class="mb-4">
+                        <label for="config_file" class="form-label fw-semibold">Config File</label>
+                        <input type="file" class="form-control" id="config_file" name="config_file"
+                               accept=".conf,.cfg,.json,.txt," required>
+                        <div class="form-text">Accepted formats: ISC DHCPD (<code>dhcpd.conf</code>) or Kea JSON config.</div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold">Config Format</label>
+                        <div class="d-flex gap-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="format" id="fmt_auto" value="auto" checked>
+                                <label class="form-check-label" for="fmt_auto">Auto-detect</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="format" id="fmt_dhcpd" value="dhcpd">
+                                <label class="form-check-label" for="fmt_dhcpd">ISC DHCPD</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="format" id="fmt_kea" value="kea">
+                                <label class="form-check-label" for="fmt_kea">Kea (JSON)</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold">What to Import</label>
+                        <div class="d-flex gap-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="import_subnets"
+                                       id="import_subnets" value="1" checked>
+                                <label class="form-check-label" for="import_subnets">
+                                    <i class="bi bi-diagram-2 me-1"></i>Subnets
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="import_reservations"
+                                       id="import_reservations" value="1" checked>
+                                <label class="form-check-label" for="import_reservations">
+                                    <i class="bi bi-pc-display me-1"></i>Host Reservations
+                                </label>
+                            </div>
+                        </div>
+                        <div class="form-text">Existing subnets and hosts with the same MAC address will be skipped automatically.</div>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-search me-1"></i>Parse & Preview Changes
+                        </button>
+                        <a href="{{ path('subnet_index') }}" class="btn btn-outline-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <strong><i class="bi bi-info-circle me-1"></i>Format Notes</strong>
+            </div>
+            <div class="card-body small">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p class="fw-semibold mb-1">ISC DHCPD (<code>dhcpd.conf</code>)</p>
+                        <pre class="bg-body-secondary rounded p-2 small mb-0">subnet 192.168.1.0 netmask 255.255.255.0 {
+  option routers 192.168.1.1;
+  host myhost {
+    hardware ethernet aa:bb:cc:dd:ee:ff;
+    fixed-address 192.168.1.10;
+  }
+}</pre>
+                    </div>
+                    <div class="col-md-6">
+                        <p class="fw-semibold mb-1">Kea DHCP (JSON)</p>
+                        <pre class="bg-body-secondary rounded p-2 small mb-0">{
+  "Dhcp4": {
+    "subnet4": [{
+      "subnet": "192.168.1.0/24",
+      "reservations": [{
+        "hw-address": "aa:bb:cc:dd:ee:ff",
+        "ip-address": "192.168.1.10",
+        "hostname": "myhost"
+      }]
+    }]
+  }
+}</pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
