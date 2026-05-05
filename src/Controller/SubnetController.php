@@ -8,6 +8,7 @@ use App\Entity\UserPreference;
 use App\Enum\BlockType;
 use App\Form\SubnetType;
 use App\Repository\SubnetRepository;
+use App\Repository\TagRepository;
 use App\Repository\UserPreferenceRepository;
 use App\Repository\VrfRepository;
 use App\Service\IpAddressManager;
@@ -21,13 +22,28 @@ use Symfony\Component\Routing\Attribute\Route;
 #[Route('/subnets')]
 class SubnetController extends AbstractController
 {
-    #[Route('', name: 'subnet_index', methods: ['GET'])]
-    public function index(Request $request, SubnetRepository $repo, VrfRepository $vrfRepo, UserPreferenceRepository $prefRepo, EntityManagerInterface $em): Response
-    {
-        $user = $this->getUser();
-        $pref = $user ? $prefRepo->findByIdentifier($user->getUserIdentifier()) : null;
+    private const PER_PAGE = 50;
 
-        if ($request->query->has('view')) {
+    #[Route('', name: 'subnet_index', methods: ['GET'])]
+    public function index(Request $request, SubnetRepository $repo, VrfRepository $vrfRepo, TagRepository $tagRepo, UserPreferenceRepository $prefRepo, EntityManagerInterface $em): Response
+    {
+        $user  = $this->getUser();
+        $pref  = $user ? $prefRepo->findByIdentifier($user->getUserIdentifier()) : null;
+        $page  = max(1, $request->query->getInt('page', 1));
+        $query = trim($request->query->getString('q'));
+
+        $advancedFields = ['name', 'cidr', 'vlan', 'gateway', 'vrf', 'tag'];
+        $criteria = [];
+        foreach ($advancedFields as $field) {
+            $val = trim($request->query->getString($field));
+            if ($val !== '') {
+                $criteria[$field] = $val;
+            }
+        }
+        $isAdvanced  = !empty($criteria);
+        $isSearching = $isAdvanced || $query !== '';
+
+        if ($request->query->has('view') && !$isSearching) {
             $view = $request->query->get('view');
             if (!in_array($view, ['name', 'ipv4', 'ipv6'], true)) {
                 $view = 'name';
@@ -40,15 +56,56 @@ class SubnetController extends AbstractController
                 $pref->setSubnetViewMode($view);
                 $em->flush();
             }
+        } elseif ($isSearching) {
+            $view = 'name';
         } else {
             $view = $pref?->getSubnetViewMode() ?? 'name';
         }
 
+        $subnets    = null;
+        $tree       = null;
+        $total      = 0;
+        $totalPages = 1;
+
+        if ($view === 'name') {
+            if ($isAdvanced) {
+                ['subnets' => $subnets, 'total' => $total] = $repo->advancedSearchPaginated($criteria, $page, self::PER_PAGE);
+            } elseif ($query !== '') {
+                ['subnets' => $subnets, 'total' => $total] = $repo->searchPaginated($query, $page, self::PER_PAGE);
+            } else {
+                ['subnets' => $subnets, 'total' => $total] = $repo->findAllPaginated($page, self::PER_PAGE);
+            }
+            $totalPages = max(1, (int) ceil($total / self::PER_PAGE));
+        } else {
+            $tree = $repo->buildFlatHierarchy($view);
+        }
+
+        $linkParams = array_filter([
+            'q'       => $query ?: null,
+            'name'    => $criteria['name'] ?? null,
+            'cidr'    => $criteria['cidr'] ?? null,
+            'vlan'    => $criteria['vlan'] ?? null,
+            'gateway' => $criteria['gateway'] ?? null,
+            'vrf'     => $criteria['vrf'] ?? null,
+            'tag'     => $criteria['tag'] ?? null,
+        ]);
+
         return $this->render('subnet/index.html.twig', [
-            'subnets' => $view === 'name' ? $repo->findBy(['isContainer' => false], ['name' => 'ASC']) : null,
-            'tree'    => $view !== 'name' ? $repo->buildFlatHierarchy($view) : null,
-            'view'    => $view,
-            'vrfs'    => $vrfRepo->findBy([], ['name' => 'ASC']),
+            'subnets'    => $subnets,
+            'tree'       => $tree,
+            'view'       => $view,
+            'vrfs'       => $vrfRepo->findBy([], ['name' => 'ASC']),
+            'tags'       => $tagRepo->findBy([], ['name' => 'ASC']),
+            'query'      => $query,
+            'criteria'   => $criteria,
+            'isAdvanced' => $isAdvanced,
+            'pagination' => [
+                'page'        => $page,
+                'per_page'    => self::PER_PAGE,
+                'total'       => $total,
+                'pages'       => $totalPages,
+                'link_params' => $linkParams,
+            ],
         ]);
     }
 

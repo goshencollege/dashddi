@@ -4,6 +4,7 @@ namespace App\Repository;
 
 use App\Entity\Subnet;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 use IPLib\Factory;
 
@@ -16,6 +17,153 @@ class SubnetRepository extends ServiceEntityRepository
     {
         parent::__construct($registry, Subnet::class);
     }
+
+    // -------------------------------------------------------------------------
+    // Paginated listing / search
+    // -------------------------------------------------------------------------
+
+    /** @return array{subnets: Subnet[], total: int} */
+    public function findAllPaginated(int $page, int $perPage): array
+    {
+        $offset = max(0, ($page - 1) * $perPage);
+
+        $total = (int) $this->createQueryBuilder('s')
+            ->select('COUNT(s.id)')
+            ->andWhere('s.isContainer = false')
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        $ids = $this->idsForPage(
+            $this->createQueryBuilder('s')->andWhere('s.isContainer = false'),
+            $offset,
+            $perPage
+        );
+
+        return ['subnets' => $this->fetchByIds($ids), 'total' => $total];
+    }
+
+    /** @return array{subnets: Subnet[], total: int} */
+    public function searchPaginated(string $query, int $page, int $perPage): array
+    {
+        return $this->paginateFilterQuery($this->buildSearchQb($query), $page, $perPage);
+    }
+
+    /** @return array{subnets: Subnet[], total: int} */
+    public function advancedSearchPaginated(array $criteria, int $page, int $perPage): array
+    {
+        return $this->paginateFilterQuery($this->buildAdvancedQb($criteria), $page, $perPage);
+    }
+
+    private function buildSearchQb(string $query): QueryBuilder
+    {
+        $q = '%' . $query . '%';
+
+        return $this->createQueryBuilder('s')
+            ->leftJoin('s.vrf', 'v')
+            ->leftJoin('s.tags', 'tg')
+            ->where('s.name LIKE :q')
+            ->orWhere('s.ipv4Cidr LIKE :q')
+            ->orWhere('s.ipv6Cidr LIKE :q')
+            ->orWhere('s.description LIKE :q')
+            ->orWhere('s.gateway LIKE :q')
+            ->orWhere('v.name LIKE :q')
+            ->orWhere('tg.name LIKE :q')
+            ->setParameter('q', $q);
+    }
+
+    private function buildAdvancedQb(array $criteria): QueryBuilder
+    {
+        $qb = $this->createQueryBuilder('s')
+            ->leftJoin('s.vrf', 'v')
+            ->leftJoin('s.tags', 'tg');
+
+        if (!empty($criteria['name'])) {
+            $qb->andWhere('s.name LIKE :name')
+               ->setParameter('name', $this->toLike($criteria['name']));
+        }
+        if (!empty($criteria['cidr'])) {
+            $qb->andWhere($qb->expr()->orX('s.ipv4Cidr LIKE :cidr', 's.ipv6Cidr LIKE :cidr'))
+               ->setParameter('cidr', $this->toLike($criteria['cidr']));
+        }
+        if (!empty($criteria['vlan'])) {
+            $qb->andWhere('s.vlan = :vlan')
+               ->setParameter('vlan', (int) $criteria['vlan']);
+        }
+        if (!empty($criteria['gateway'])) {
+            $qb->andWhere('s.gateway LIKE :gateway')
+               ->setParameter('gateway', $this->toLike($criteria['gateway']));
+        }
+        if (!empty($criteria['vrf'])) {
+            $qb->andWhere('s.vrf = :vrf')
+               ->setParameter('vrf', (int) $criteria['vrf']);
+        }
+        if (!empty($criteria['tag'])) {
+            $qb->andWhere('tg.id = :tag')
+               ->setParameter('tag', (int) $criteria['tag']);
+        }
+
+        return $qb;
+    }
+
+    /** @return array{subnets: Subnet[], total: int} */
+    private function paginateFilterQuery(QueryBuilder $filterQb, int $page, int $perPage): array
+    {
+        $offset = max(0, ($page - 1) * $perPage);
+
+        $total = (int) (clone $filterQb)
+            ->select('COUNT(DISTINCT s.id)')
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        if ($total === 0) {
+            return ['subnets' => [], 'total' => 0];
+        }
+
+        $ids = $this->idsForPage((clone $filterQb)->distinct(), $offset, $perPage);
+
+        return ['subnets' => $this->fetchByIds($ids), 'total' => $total];
+    }
+
+    private function idsForPage(QueryBuilder $qb, int $offset, int $perPage): array
+    {
+        $rows = $qb->select('s.id as sid', 's.name as sname')
+            ->orderBy('s.name', 'ASC')
+            ->setFirstResult($offset)
+            ->setMaxResults($perPage)
+            ->getQuery()
+            ->getScalarResult();
+
+        return array_column($rows, 'sid');
+    }
+
+    /** @return Subnet[] */
+    private function fetchByIds(array $ids): array
+    {
+        if (empty($ids)) {
+            return [];
+        }
+
+        return $this->createQueryBuilder('s')
+            ->leftJoin('s.vrf', 'v')->addSelect('v')
+            ->leftJoin('s.tags', 'tg')->addSelect('tg')
+            ->leftJoin('s.dnssecPolicy', 'dp')->addSelect('dp')
+            ->where('s.id IN (:ids)')
+            ->setParameter('ids', $ids)
+            ->orderBy('s.name', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    private function toLike(string $value): string
+    {
+        return str_contains($value, '*')
+            ? str_replace('*', '%', $value)
+            : '%' . $value . '%';
+    }
+
+    // -------------------------------------------------------------------------
+    // Tree / hierarchy helpers
+    // -------------------------------------------------------------------------
 
     /**
      * Build a flat list of ['subnet' => Subnet, 'depth' => int] for tree display.
