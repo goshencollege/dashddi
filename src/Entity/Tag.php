@@ -25,9 +25,13 @@ class Tag
     #[ORM\ManyToMany(targetEntity: Host::class, mappedBy: 'tags')]
     private Collection $hosts;
 
+    #[ORM\ManyToMany(targetEntity: Subnet::class, mappedBy: 'tags')]
+    private Collection $subnets;
+
     public function __construct()
     {
         $this->hosts = new ArrayCollection();
+        $this->subnets = new ArrayCollection();
     }
 
     public function getId(): ?int { return $this->id; }
@@ -36,6 +40,8 @@ class Tag
     public function setName(string $name): static { $this->name = $name; return $this; }
 
     public function getHosts(): Collection { return $this->hosts; }
+
+    public function getSubnets(): Collection { return $this->subnets; }
 
     public function __toString(): string { return $this->name; }
 }

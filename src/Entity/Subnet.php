@@ -67,6 +67,11 @@ class Subnet
     #[ORM\OrderBy(['startIp' => 'ASC'])]
     private Collection $addressBlocks;
 
+    #[ORM\ManyToMany(targetEntity: Tag::class, inversedBy: 'subnets')]
+    #[ORM\JoinTable(name: 'subnet_tag')]
+    #[ORM\OrderBy(['name' => 'ASC'])]
+    private Collection $tags;
+
     #[ORM\ManyToMany(targetEntity: DnsView::class)]
     #[ORM\JoinTable(name: 'subnet_dns_view')]
     private Collection $views;
@@ -113,6 +118,7 @@ class Subnet
         $this->ipv6Addresses = new ArrayCollection();
         $this->interfaces = new ArrayCollection();
         $this->addressBlocks = new ArrayCollection();
+        $this->tags = new ArrayCollection();
         $this->views = new ArrayCollection();
     }
 
@@ -169,6 +175,22 @@ class Subnet
 
     public function isContainer(): bool { return $this->isContainer; }
     public function setIsContainer(bool $isContainer): static { $this->isContainer = $isContainer; return $this; }
+
+    public function getTags(): Collection { return $this->tags; }
+
+    public function addTag(Tag $tag): static
+    {
+        if (!$this->tags->contains($tag)) {
+            $this->tags->add($tag);
+        }
+        return $this;
+    }
+
+    public function removeTag(Tag $tag): static
+    {
+        $this->tags->removeElement($tag);
+        return $this;
+    }
 
     public function getViews(): Collection { return $this->views; }
 
