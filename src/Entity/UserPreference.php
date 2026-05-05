@@ -26,6 +26,9 @@ class UserPreference
     #[ORM\Column(length: 16)]
     private string $subnetViewMode = 'name';
 
+    #[ORM\Column(type: 'json', nullable: true)]
+    private ?array $subnetSearch = null;
+
     public function __construct(string $userIdentifier)
     {
         $this->userIdentifier = $userIdentifier;
@@ -43,4 +46,7 @@ class UserPreference
 
     public function getSubnetViewMode(): string { return $this->subnetViewMode; }
     public function setSubnetViewMode(string $mode): static { $this->subnetViewMode = $mode; return $this; }
+
+    public function getSubnetSearch(): ?array { return $this->subnetSearch; }
+    public function setSubnetSearch(?array $search): static { $this->subnetSearch = $search; return $this; }
 }

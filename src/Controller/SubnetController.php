@@ -30,20 +30,59 @@ class SubnetController extends AbstractController
         $user  = $this->getUser();
         $pref  = $user ? $prefRepo->findByIdentifier($user->getUserIdentifier()) : null;
         $page  = max(1, $request->query->getInt('page', 1));
-        $query = trim($request->query->getString('q'));
+        $reset = $request->query->getBoolean('reset');
 
         $advancedFields = ['name', 'cidr', 'vlan', 'gateway', 'vrf', 'tag'];
+
+        // True when this request explicitly carries search state (not a bare page load).
+        $hasExplicitState = $request->query->has('q')
+            || $request->query->has('page')
+            || (bool) array_filter($advancedFields, fn($f) => $request->query->has($f));
+
+        $query    = '';
         $criteria = [];
-        foreach ($advancedFields as $field) {
-            $val = trim($request->query->getString($field));
-            if ($val !== '') {
-                $criteria[$field] = $val;
+        $needsFlush = false;
+
+        if ($reset) {
+            // User clicked Clear — wipe the saved search.
+            if ($user && $pref) {
+                $pref->setSubnetSearch(null);
+                $needsFlush = true;
+            }
+        } elseif ($hasExplicitState) {
+            // Search params are in the URL — use them and persist to preferences.
+            $query = trim($request->query->getString('q'));
+            foreach ($advancedFields as $field) {
+                $val = trim($request->query->getString($field));
+                if ($val !== '') {
+                    $criteria[$field] = $val;
+                }
+            }
+            if ($user) {
+                if (!$pref) {
+                    $pref = new UserPreference($user->getUserIdentifier());
+                    $em->persist($pref);
+                }
+                $saved = array_filter(['q' => $query] + $criteria, fn($v) => $v !== '');
+                $pref->setSubnetSearch($saved ?: null);
+                $needsFlush = true;
+            }
+        } else {
+            // Bare page load — restore the last saved search for this user.
+            $saved = $pref?->getSubnetSearch() ?? [];
+            $query = $saved['q'] ?? '';
+            foreach ($advancedFields as $field) {
+                if (!empty($saved[$field])) {
+                    $criteria[$field] = $saved[$field];
+                }
             }
         }
+
         $isAdvanced  = !empty($criteria);
         $isSearching = $isAdvanced || $query !== '';
 
-        if ($request->query->has('view') && !$isSearching) {
+        // Resolve view mode independently of search state.
+        if ($request->query->has('view')) {
             $view = $request->query->get('view');
             if (!in_array($view, ['name', 'ipv4', 'ipv6'], true)) {
                 $view = 'name';
@@ -54,12 +93,16 @@ class SubnetController extends AbstractController
                     $em->persist($pref);
                 }
                 $pref->setSubnetViewMode($view);
-                $em->flush();
+                $needsFlush = true;
             }
         } elseif ($isSearching) {
             $view = 'name';
         } else {
             $view = $pref?->getSubnetViewMode() ?? 'name';
+        }
+
+        if ($needsFlush) {
+            $em->flush();
         }
 
         $subnets    = null;
