@@ -204,7 +204,7 @@ class HostRepository extends ServiceEntityRepository
     /** Returns a page of host IDs from the given QueryBuilder. */
     private function idsForPage(QueryBuilder $qb, int $offset, int $perPage): array
     {
-        $rows = $qb->select('h.id as hid')
+        $rows = $qb->select('h.id as hid', 'h.name as hname')
             ->orderBy('h.name', 'ASC')
             ->setFirstResult($offset)
             ->setMaxResults($perPage)
