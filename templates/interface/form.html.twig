@@ -44,7 +44,7 @@
                     <div class="card-header fw-semibold">
                         <i class="bi bi-4-square me-1"></i>IPv4 Assignment
                         {% if interface.ipAddress %}
-                            <span class="badge bg-success ms-2">Currently: <code class="text-white">{{ interface.ipAddress.address }}</code></span>
+                            <span id="ipv4-current-badge" class="badge bg-success ms-2">Currently: <code class="text-white">{{ interface.ipAddress.address }}</code></span>
                         {% endif %}
                     </div>
                     <div class="card-body">
@@ -69,7 +69,7 @@
                     <div class="card-header fw-semibold">
                         <i class="bi bi-6-square me-1"></i>IPv6 Assignment
                         {% if interface.ipv6Address %}
-                            <span class="badge bg-success ms-2">Currently: <code class="text-white">{{ interface.ipv6Address.address }}</code></span>
+                            <span id="ipv6-current-badge" class="badge bg-success ms-2">Currently: <code class="text-white">{{ interface.ipv6Address.address }}</code></span>
                         {% endif %}
                     </div>
                     <div class="card-body">
@@ -204,7 +204,7 @@
     bindIpRadios('ipv6', 'ipv6-input-section');
 
     // Fetch available IPs when subnet changes
-    const subnetSelect = document.getElementById('interface_subnet');
+    const subnetSelect = document.getElementById('network_interface_subnet');
     function loadAvailableIps(subnetId) {
         if (!subnetId) return;
         fetch('/api/subnets/' + subnetId + '/available-ips')
@@ -220,8 +220,24 @@
                 dl.innerHTML = ips.map(ip => '<option value="' + ip + '">').join('');
             });
     }
+    function resetIpAssignmentsForSubnetChange() {
+        ['ipv4', 'ipv6'].forEach(prefix => {
+            const keepRadio = document.querySelector('input[name$="[' + prefix + 'Assignment]"][value="keep"]');
+            const noneRadio = document.querySelector('input[name$="[' + prefix + 'Assignment]"][value="none"]');
+            if (keepRadio?.checked && noneRadio) {
+                noneRadio.checked = true;
+                noneRadio.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        });
+        document.getElementById('ipv4-current-badge')?.remove();
+        document.getElementById('ipv6-current-badge')?.remove();
+    }
+
     if (subnetSelect) {
-        subnetSelect.addEventListener('change', () => loadAvailableIps(subnetSelect.value));
+        subnetSelect.addEventListener('change', () => {
+            loadAvailableIps(subnetSelect.value);
+            resetIpAssignmentsForSubnetChange();
+        });
         if (subnetSelect.value) loadAvailableIps(subnetSelect.value);
     }
 
@@ -233,7 +249,7 @@
     // ── View / domain cascade helpers ───────────────────────────────────────
 
     function getSubnetId() {
-        return document.getElementById('interface_subnet')?.value || '';
+        return document.getElementById('network_interface_subnet')?.value || '';
     }
 
     async function fetchAvailableViewIds(domainId, subnetId) {

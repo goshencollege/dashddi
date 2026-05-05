@@ -43,7 +43,7 @@ class NetworkInterfaceType extends AbstractType
                 'choice_label'  => fn($subnet) => (string) $subnet,
                 'placeholder'   => '-- Select a subnet --',
                 'required'      => false,
-                'attr'          => ['id' => 'interface_subnet'],
+
                 'query_builder' => fn($repo) => $repo->createQueryBuilder('s')
                     ->where('s.isContainer = false')
                     ->orderBy('s.name', 'ASC'),
