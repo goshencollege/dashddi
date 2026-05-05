@@ -6,6 +6,7 @@ use App\Entity\AddressBlock;
 use App\Entity\DnsView;
 use App\Entity\DnssecPolicy;
 use App\Entity\Subnet;
+use App\Entity\Tag;
 use App\Entity\Vrf;
 use App\Enum\BlockType;
 use App\Repository\DnsViewRepository;
@@ -54,6 +55,15 @@ class SubnetType extends AbstractType
             ->add('description', TextareaType::class, [
                 'required' => false,
                 'attr' => ['rows' => 3],
+            ])
+            ->add('tags', EntityType::class, [
+                'class'        => Tag::class,
+                'choice_label' => 'name',
+                'multiple'     => true,
+                'expanded'     => false,
+                'required'     => false,
+                'label'        => 'Tags',
+                'by_reference' => false,
             ])
             ->add('vrf', EntityType::class, [
                 'class'        => Vrf::class,

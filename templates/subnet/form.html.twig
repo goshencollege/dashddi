@@ -1,6 +1,10 @@
 {% extends 'base.html.twig' %}
 {% block title %}{{ title }}{% endblock %}
 
+{% block stylesheets %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css">
+{% endblock %}
+
 {% block content %}
 <nav aria-label="breadcrumb" class="mb-3">
     <ol class="breadcrumb">
@@ -62,6 +66,11 @@
                     <div class="mb-3">
                         {{ form_label(form.description, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
                         {{ form_widget(form.description, {attr: {class: 'form-control'}}) }}
+                    </div>
+                    <div class="mb-3">
+                        {{ form_label(form.tags, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                        {{ form_widget(form.tags, {attr: {class: 'form-select', id: 'subnet_tags'}}) }}
+                        {{ form_errors(form.tags) }}
                     </div>
                     <hr class="my-3">
                     <h6 class="text-muted mb-3">Reverse Zone SOA</h6>
@@ -183,6 +192,7 @@
 
 {% block scripts %}
 {{ parent() }}
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
 <script>
 (function () {
     var toggle = document.getElementById('isContainerCheck');
@@ -191,6 +201,45 @@
     function sync() { dhcp.style.display = toggle.checked ? 'none' : ''; }
     toggle.addEventListener('change', sync);
     sync();
+})();
+
+(function () {
+    const select = document.getElementById('subnet_tags');
+    if (!select) return;
+
+    Array.from(select.options).forEach(opt => { if (!opt.selected) opt.remove(); });
+
+    new TomSelect(select, {
+        plugins: ['remove_button'],
+        valueField: 'value',
+        labelField: 'text',
+        searchField: 'text',
+        persist: false,
+        load: function (query, callback) {
+            fetch('/api/tags?q=' + encodeURIComponent(query))
+                .then(r => r.json())
+                .then(callback)
+                .catch(() => callback());
+        },
+        create: function (input, callback) {
+            fetch('/api/tags', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: input }),
+            })
+                .then(r => r.json())
+                .then(callback)
+                .catch(() => callback());
+        },
+        render: {
+            option_create: function (data, escape) {
+                return '<div class="create">Create tag <strong>' + escape(data.input) + '</strong></div>';
+            },
+            no_results: function (data, escape) {
+                return '<div class="no-results">No tags matching <strong>' + escape(data.input) + '</strong></div>';
+            },
+        },
+    });
 })();
 </script>
 {% endblock %}

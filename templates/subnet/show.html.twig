@@ -66,6 +66,15 @@
             </div>
         </div>
     {% endif %}
+    {% if subnet.tags is not empty %}
+        <div class="col-12">
+            <div>
+                {% for tag in subnet.tags %}
+                    <span class="badge bg-secondary me-1">{{ tag.name }}</span>
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
     {% if subnet.description %}
         <div class="col-12">
             <p class="text-muted mb-0">{{ subnet.description }}</p>
