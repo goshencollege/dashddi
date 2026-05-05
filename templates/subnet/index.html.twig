@@ -1,6 +1,50 @@
 {% extends 'base.html.twig' %}
 {% block title %}Subnets{% endblock %}
 
+{% macro pager(pagination, route) %}
+{% set p = pagination %}
+<div class="card-footer d-flex align-items-center justify-content-between py-2">
+    <span class="text-muted small">
+        {% set first = (p.page - 1) * p.per_page + 1 %}
+        {% set last  = min(p.page * p.per_page, p.total) %}
+        {% if p.total == 0 %}
+            No results
+        {% elseif p.total == 1 %}
+            1 subnet
+        {% else %}
+            {{ first }}–{{ last }} of {{ p.total }} subnets
+        {% endif %}
+    </span>
+    {% if p.pages > 1 %}
+    <nav aria-label="Subnet list pages">
+        <ul class="pagination pagination-sm mb-0">
+            <li class="page-item {{ p.page <= 1 ? 'disabled' }}">
+                <a class="page-link" href="{{ path('subnet_index', p.link_params|merge({page: p.page - 1})) }}" aria-label="Previous">‹</a>
+            </li>
+            {% set win_start = max(1, p.page - 3) %}
+            {% set win_end   = min(p.pages, p.page + 3) %}
+            {% if win_start > 1 %}
+                <li class="page-item"><a class="page-link" href="{{ path('subnet_index', p.link_params|merge({page: 1})) }}">1</a></li>
+                {% if win_start > 2 %}<li class="page-item disabled"><span class="page-link">…</span></li>{% endif %}
+            {% endif %}
+            {% for n in range(win_start, win_end) %}
+                <li class="page-item {{ n == p.page ? 'active' }}">
+                    <a class="page-link" href="{{ path('subnet_index', p.link_params|merge({page: n})) }}">{{ n }}</a>
+                </li>
+            {% endfor %}
+            {% if win_end < p.pages %}
+                {% if win_end < p.pages - 1 %}<li class="page-item disabled"><span class="page-link">…</span></li>{% endif %}
+                <li class="page-item"><a class="page-link" href="{{ path('subnet_index', p.link_params|merge({page: p.pages})) }}">{{ p.pages }}</a></li>
+            {% endif %}
+            <li class="page-item {{ p.page >= p.pages ? 'disabled' }}">
+                <a class="page-link" href="{{ path('subnet_index', p.link_params|merge({page: p.page + 1})) }}" aria-label="Next">›</a>
+            </li>
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+{% endmacro %}
+
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h1 class="h3 mb-0"><i class="bi bi-diagram-2 me-2"></i>Subnets</h1>
@@ -37,9 +81,89 @@
     {% endif %}
 </div>
 
-{% set isEmpty = (view == 'name' and subnets is empty) or (view != 'name' and tree is empty) %}
+{% if view == 'name' %}
+<div class="mb-4">
+    {# Simple search #}
+    <form method="get" action="{{ path('subnet_index') }}" class="mb-2">
+        <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-search"></i></span>
+            <input type="search" name="q" class="form-control" placeholder="Search by name, CIDR, gateway, VRF, or tag…" value="{{ query }}">
+            <button type="submit" class="btn btn-outline-secondary">Search</button>
+            {% if query or isAdvanced %}
+                <a href="{{ path('subnet_index') }}" class="btn btn-outline-secondary">Clear</a>
+            {% endif %}
+            <button type="button" class="btn btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#advanced-search"
+                    aria-expanded="{{ isAdvanced ? 'true' : 'false' }}">
+                <i class="bi bi-sliders me-1"></i>Advanced
+            </button>
+        </div>
+    </form>
 
-{% if isEmpty %}
+    {# Advanced search #}
+    <div class="collapse {{ isAdvanced ? 'show' : '' }}" id="advanced-search">
+        <form method="get" action="{{ path('subnet_index') }}">
+            <div class="card card-body">
+                <div class="row g-2 mb-2">
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold mb-1">Name</label>
+                        <input type="text" name="name" class="form-control form-control-sm" value="{{ criteria.name ?? '' }}" placeholder="e.g. Office* or Lab">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small fw-semibold mb-1">CIDR</label>
+                        <input type="text" name="cidr" class="form-control form-control-sm font-monospace" value="{{ criteria.cidr ?? '' }}" placeholder="e.g. 10.0.*">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small fw-semibold mb-1">Gateway</label>
+                        <input type="text" name="gateway" class="form-control form-control-sm font-monospace" value="{{ criteria.gateway ?? '' }}" placeholder="e.g. 192.168.1.*">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small fw-semibold mb-1">VLAN</label>
+                        <input type="text" name="vlan" class="form-control form-control-sm" value="{{ criteria.vlan ?? '' }}" placeholder="e.g. 100">
+                    </div>
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold mb-1">VRF</label>
+                        <select name="vrf" class="form-select form-select-sm">
+                            <option value="">— Any —</option>
+                            {% for vrf in vrfs %}
+                                <option value="{{ vrf.id }}" {{ (criteria.vrf ?? '') == (vrf.id ~ '') ? 'selected' }}>{{ vrf.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold mb-1">Tag</label>
+                        <select name="tag" class="form-select form-select-sm">
+                            <option value="">— Any —</option>
+                            {% for tag in tags %}
+                                <option value="{{ tag.id }}" {{ (criteria.tag ?? '') == (tag.id ~ '') ? 'selected' }}>{{ tag.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="d-flex gap-2 align-items-center">
+                    <button type="submit" class="btn btn-sm btn-primary">
+                        <i class="bi bi-search me-1"></i>Search
+                    </button>
+                    <a href="{{ path('subnet_index') }}" class="btn btn-sm btn-outline-secondary">Clear</a>
+                    <span class="text-muted small ms-2">Use <code>*</code> as a wildcard (e.g. <code>10.0.*</code>, <code>Office*</code>)</span>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+
+{% set isEmpty = (view == 'name' and subnets is empty and not (query or isAdvanced)) or (view != 'name' and tree is empty) %}
+
+{% if view == 'name' and subnets is empty and (query or isAdvanced) %}
+    <div class="card">
+        <div class="card-body text-center text-muted py-5">
+            <i class="bi bi-search fs-1 d-block mb-3 opacity-25"></i>
+            No subnets matched your search. <a href="{{ path('subnet_index') }}">Clear search →</a>
+        </div>
+    </div>
+{% elseif isEmpty %}
     <div class="card">
         <div class="card-body text-center text-muted py-5">
             <i class="bi bi-diagram-2 fs-1 d-block mb-3 opacity-25"></i>
@@ -78,6 +202,9 @@
                 </tbody>
             </table>
         </div>
+        {% if view == 'name' %}
+            {{ _self.pager(pagination) }}
+        {% endif %}
     </div>
 {% endif %}
 
@@ -237,4 +364,3 @@
 })();
 </script>
 {% endblock %}
-
