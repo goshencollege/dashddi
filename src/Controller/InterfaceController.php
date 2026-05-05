@@ -75,16 +75,22 @@ class InterfaceController extends AbstractController
     #[Route('/interfaces/{id}/edit', name: 'interface_edit', methods: ['GET', 'POST'])]
     public function edit(Request $request, NetworkInterface $interface, EntityManagerInterface $em): Response
     {
+        $originalSubnet = $interface->getSubnet();
         $form = $this->createForm(NetworkInterfaceType::class, $interface, ['is_edit' => true]);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            $errors = $this->validateIpInputs($form, $interface->getSubnet(), $interface);
+            $subnetChanged = $originalSubnet !== $interface->getSubnet();
+            $errors = $this->validateIpInputs($form, $interface->getSubnet(), $subnetChanged ? null : $interface);
             if ($errors) {
                 foreach ($errors as $error) {
                     $this->addFlash('danger', $error);
                 }
             } else {
+                if ($subnetChanged) {
+                    $this->ipManager->releaseIpv4($interface);
+                    $this->ipManager->releaseIpv6($interface);
+                }
                 $this->handleIpAssignment($form, $interface, isEdit: true);
                 foreach ($interface->getNames() as $name) {
                     if ($name->isCanonical()) {
