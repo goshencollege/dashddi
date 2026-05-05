@@ -24,9 +24,12 @@ class HostController extends AbstractController
         private readonly IpAddressManager $ipManager,
     ) {}
 
+    private const PER_PAGE = 50;
+
     #[Route('', name: 'host_index', methods: ['GET'])]
     public function index(Request $request, HostRepository $repo, SubnetRepository $subnetRepo, BuildingRepository $buildingRepo, TagRepository $tagRepo, UserPreferenceRepository $prefRepo, DhcpLeaseRepository $leaseRepo): Response
     {
+        $page  = max(1, $request->query->getInt('page', 1));
         $query = trim($request->query->getString('q'));
 
         $advancedFields = ['name', 'building', 'room', 'subnet', 'ip', 'mac', 'dns', 'tag'];
@@ -40,11 +43,11 @@ class HostController extends AbstractController
         $isAdvanced = !empty($criteria);
 
         if ($isAdvanced) {
-            $hosts = $repo->advancedSearch($criteria);
+            ['hosts' => $hosts, 'total' => $total] = $repo->advancedSearchPaginated($criteria, $page, self::PER_PAGE);
         } elseif ($query !== '') {
-            $hosts = $repo->search($query);
+            ['hosts' => $hosts, 'total' => $total] = $repo->searchPaginated($query, $page, self::PER_PAGE);
         } else {
-            $hosts = $repo->findBy([], ['name' => 'ASC']);
+            ['hosts' => $hosts, 'total' => $total] = $repo->findAllPaginated($page, self::PER_PAGE);
         }
 
         $user = $this->getUser();
@@ -58,6 +61,21 @@ class HostController extends AbstractController
             }
         }
 
+        // Params for pagination link generation (everything except 'page')
+        $linkParams = array_filter([
+            'q'        => $query ?: null,
+            'name'     => $criteria['name'] ?? null,
+            'building' => $criteria['building'] ?? null,
+            'room'     => $criteria['room'] ?? null,
+            'subnet'   => $criteria['subnet'] ?? null,
+            'ip'       => $criteria['ip'] ?? null,
+            'mac'      => $criteria['mac'] ?? null,
+            'dns'      => $criteria['dns'] ?? null,
+            'tag'      => $criteria['tag'] ?? null,
+        ]);
+
+        $totalPages = max(1, (int) ceil($total / self::PER_PAGE));
+
         return $this->render('host/index.html.twig', [
             'hosts'        => $hosts,
             'query'        => $query,
@@ -68,6 +86,13 @@ class HostController extends AbstractController
             'tags'         => $tagRepo->findBy([], ['name' => 'ASC']),
             'hostViewMode' => $hostViewMode,
             'lease_map'    => $leaseRepo->findLatestByMacs($macs),
+            'pagination'   => [
+                'page'       => $page,
+                'per_page'   => self::PER_PAGE,
+                'total'      => $total,
+                'pages'      => $totalPages,
+                'link_params'=> $linkParams,
+            ],
         ]);
     }
 

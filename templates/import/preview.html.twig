@@ -1,0 +1,151 @@
+{% extends 'base.html.twig' %}
+{% block title %}Import Preview{% endblock %}
+
+{% block content %}
+{% set newSubnets      = preview.subnets|filter(s => s.status == 'new')|length %}
+{% set newReservations = preview.reservations|filter(r => r.status == 'new')|length %}
+{% set conflicts       = preview.reservations|filter(r => r.status == 'conflict')|length %}
+{% set totalNew        = newSubnets + newReservations %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0"><i class="bi bi-list-check me-2"></i>Import Preview</h1>
+    <a href="{{ path('subnet_import') }}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i>Upload Different File
+    </a>
+</div>
+
+{# Summary banner #}
+<div class="alert {{ totalNew > 0 ? 'alert-info' : 'alert-secondary' }} d-flex align-items-center gap-3 mb-4">
+    <i class="bi bi-clipboard-check fs-4"></i>
+    <div>
+        {% if totalNew > 0 %}
+            <strong>{{ totalNew }} item(s) ready to import</strong>
+            — {{ newSubnets }} subnet(s) and {{ newReservations }} host reservation(s) will be created.
+        {% else %}
+            <strong>Nothing new to import.</strong>
+            All parsed items already exist in the database.
+        {% endif %}
+        {% if conflicts > 0 %}
+            <br><span class="text-warning"><i class="bi bi-exclamation-triangle me-1"></i>{{ conflicts }} reservation(s) have conflicts and will be skipped.</span>
+        {% endif %}
+    </div>
+</div>
+
+{# ── Subnets ── #}
+{% if preview.import_subnets and preview.subnets is not empty %}
+<h2 class="h5 mb-3"><i class="bi bi-diagram-2 me-2"></i>Subnets
+    <span class="badge bg-primary ms-1">{{ preview.subnets|length }}</span>
+</h2>
+<div class="card mb-5">
+    <div class="table-responsive">
+        <table class="table table-hover table-sm mb-0">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>CIDR</th>
+                    <th>Version</th>
+                    <th>Gateway</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in preview.subnets %}
+                <tr class="{{ s.status == 'existing' ? 'text-muted' : '' }}">
+                    <td class="fw-semibold">
+                        {% if s.name %}
+                            {{ s.name }}
+                        {% else %}
+                            <span class="text-muted fst-italic small">{{ s.cidr }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="ip-address">{{ s.cidr }}</td>
+                    <td>IPv{{ s.version }}</td>
+                    <td class="ip-address">{{ s.gateway ?: '—' }}</td>
+                    <td>
+                        {% if s.status == 'new' %}
+                            <span class="badge bg-success"><i class="bi bi-plus-lg me-1"></i>Create</span>
+                        {% else %}
+                            <span class="badge bg-secondary">
+                                <i class="bi bi-check me-1"></i>Skip — exists
+                                {% if s.existing_name %} as "{{ s.existing_name }}"{% endif %}
+                            </span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+{# ── Host Reservations ── #}
+{% if preview.import_reservations and preview.reservations is not empty %}
+<h2 class="h5 mb-3"><i class="bi bi-pc-display me-2"></i>Host Reservations
+    <span class="badge bg-primary ms-1">{{ preview.reservations|length }}</span>
+</h2>
+<div class="card mb-5">
+    <div class="table-responsive">
+        <table class="table table-hover table-sm mb-0">
+            <thead>
+                <tr>
+                    <th>Hostname</th>
+                    <th>MAC Address</th>
+                    <th>IPv4</th>
+                    <th>IPv6</th>
+                    <th>Subnet</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in preview.reservations %}
+                <tr class="{{ r.status == 'existing' ? 'text-muted' : (r.status == 'conflict' ? 'table-warning' : '') }}">
+                    <td class="fw-semibold">{{ r.hostname ?: '—' }}</td>
+                    <td class="font-monospace small">{{ r.mac }}</td>
+                    <td class="ip-address">{{ r.ipv4 ?: '—' }}</td>
+                    <td class="ip-address small">{{ r.ipv6 ?: '—' }}</td>
+                    <td class="ip-address small">{{ r.subnet_cidr ?: '—' }}</td>
+                    <td>
+                        {% if r.status == 'new' %}
+                            <span class="badge bg-success"><i class="bi bi-plus-lg me-1"></i>Create</span>
+                        {% elseif r.status == 'existing' %}
+                            <span class="badge bg-secondary" title="Host: {{ r.existing_host }}">
+                                <i class="bi bi-check me-1"></i>Skip — MAC exists
+                            </span>
+                        {% else %}
+                            <span class="badge bg-warning text-dark" title="{{ r.conflict_reason }}">
+                                <i class="bi bi-exclamation-triangle me-1"></i>Skip — conflict
+                            </span>
+                            <span class="d-block text-danger small mt-1">{{ r.conflict_reason }}</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+{% if not preview.import_subnets and not preview.import_reservations %}
+    <div class="alert alert-secondary">No items selected for import.</div>
+{% endif %}
+
+{# ── Confirm / Cancel ── #}
+<div class="d-flex gap-2 mt-2">
+    {% if totalNew > 0 %}
+    <form method="post" action="{{ path('subnet_import_confirm') }}">
+        <input type="hidden" name="_token" value="{{ csrf_token('dhcp_import_confirm') }}">
+        <button type="submit" class="btn btn-primary">
+            <i class="bi bi-cloud-upload me-1"></i>Confirm Import ({{ totalNew }} item{{ totalNew != 1 ? 's' : '' }})
+        </button>
+    </form>
+    {% endif %}
+    <a href="{{ path('subnet_import') }}" class="btn btn-outline-secondary">
+        <i class="bi bi-x-lg me-1"></i>Cancel
+    </a>
+    <a href="{{ path('subnet_index') }}" class="btn btn-outline-secondary">
+        <i class="bi bi-list me-1"></i>Back to Subnets
+    </a>
+</div>
+{% endblock %}

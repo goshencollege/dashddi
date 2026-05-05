@@ -1,6 +1,51 @@
 {% extends 'base.html.twig' %}
 {% block title %}Hosts{% endblock %}
 
+{# Renders Bootstrap pagination controls and a result-count footer line. #}
+{% macro pager(pagination) %}
+{% set p = pagination %}
+<div class="card-footer d-flex align-items-center justify-content-between py-2">
+    <span class="text-muted small">
+        {% set first = (p.page - 1) * p.per_page + 1 %}
+        {% set last  = min(p.page * p.per_page, p.total) %}
+        {% if p.total == 0 %}
+            No results
+        {% elseif p.total == 1 %}
+            1 host
+        {% else %}
+            {{ first }}–{{ last }} of {{ p.total }} hosts
+        {% endif %}
+    </span>
+    {% if p.pages > 1 %}
+    <nav aria-label="Host list pages">
+        <ul class="pagination pagination-sm mb-0">
+            <li class="page-item {{ p.page <= 1 ? 'disabled' }}">
+                <a class="page-link" href="{{ path('host_index', p.link_params|merge({page: p.page - 1})) }}" aria-label="Previous">‹</a>
+            </li>
+            {% set win_start = max(1, p.page - 3) %}
+            {% set win_end   = min(p.pages, p.page + 3) %}
+            {% if win_start > 1 %}
+                <li class="page-item"><a class="page-link" href="{{ path('host_index', p.link_params|merge({page: 1})) }}">1</a></li>
+                {% if win_start > 2 %}<li class="page-item disabled"><span class="page-link">…</span></li>{% endif %}
+            {% endif %}
+            {% for n in range(win_start, win_end) %}
+                <li class="page-item {{ n == p.page ? 'active' }}">
+                    <a class="page-link" href="{{ path('host_index', p.link_params|merge({page: n})) }}">{{ n }}</a>
+                </li>
+            {% endfor %}
+            {% if win_end < p.pages %}
+                {% if win_end < p.pages - 1 %}<li class="page-item disabled"><span class="page-link">…</span></li>{% endif %}
+                <li class="page-item"><a class="page-link" href="{{ path('host_index', p.link_params|merge({page: p.pages})) }}">{{ p.pages }}</a></li>
+            {% endif %}
+            <li class="page-item {{ p.page >= p.pages ? 'disabled' }}">
+                <a class="page-link" href="{{ path('host_index', p.link_params|merge({page: p.page + 1})) }}" aria-label="Next">›</a>
+            </li>
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+{% endmacro %}
+
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h1 class="h3 mb-0"><i class="bi bi-pc-display me-2"></i>Hosts</h1>
@@ -220,9 +265,7 @@
                     </tbody>
                 </table>
             </div>
-            {% if query or isAdvanced %}
-                <div class="card-footer text-muted small">{{ hosts|length }} result{{ hosts|length != 1 ? 's' }}{% if query %} for "{{ query }}"{% endif %}</div>
-            {% endif %}
+            {{ _self.pager(pagination) }}
         </div>
     </div>
 
@@ -365,9 +408,7 @@
                     </tbody>
                 </table>
             </div>
-            {% if query or isAdvanced %}
-                <div class="card-footer text-muted small">{{ hosts|length }} result{{ hosts|length != 1 ? 's' }}{% if query %} for "{{ query }}"{% endif %}</div>
-            {% endif %}
+            {{ _self.pager(pagination) }}
         </div>
     </div>
 

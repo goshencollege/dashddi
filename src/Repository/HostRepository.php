@@ -4,6 +4,7 @@ namespace App\Repository;
 
 use App\Entity\Host;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
@@ -16,8 +17,107 @@ class HostRepository extends ServiceEntityRepository
         parent::__construct($registry, Host::class);
     }
 
+    // -------------------------------------------------------------------------
+    // Full-result methods (kept for any non-paginated callers)
+    // -------------------------------------------------------------------------
+
+    /** @return Host[] */
+    public function search(string $query): array
+    {
+        return $this->buildSearchQb($query)
+            ->distinct()
+            ->orderBy('h.name', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
     /** @return Host[] */
     public function advancedSearch(array $criteria): array
+    {
+        return $this->buildAdvancedQb($criteria)
+            ->distinct()
+            ->orderBy('h.name', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    // -------------------------------------------------------------------------
+    // Paginated methods
+    // -------------------------------------------------------------------------
+
+    /** @return array{hosts: Host[], total: int} */
+    public function findAllPaginated(int $page, int $perPage): array
+    {
+        $offset = max(0, ($page - 1) * $perPage);
+
+        $total = (int) $this->createQueryBuilder('h')
+            ->select('COUNT(h.id)')
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        $ids = $this->idsForPage(
+            $this->createQueryBuilder('h'),
+            $offset,
+            $perPage
+        );
+
+        return ['hosts' => $this->fetchByIds($ids), 'total' => $total];
+    }
+
+    /** @return array{hosts: Host[], total: int} */
+    public function searchPaginated(string $query, int $page, int $perPage): array
+    {
+        return $this->paginateFilterQuery($this->buildSearchQb($query), $page, $perPage);
+    }
+
+    /** @return array{hosts: Host[], total: int} */
+    public function advancedSearchPaginated(array $criteria, int $page, int $perPage): array
+    {
+        return $this->paginateFilterQuery($this->buildAdvancedQb($criteria), $page, $perPage);
+    }
+
+    // -------------------------------------------------------------------------
+    // Private query builders
+    // -------------------------------------------------------------------------
+
+    private function buildSearchQb(string $query): QueryBuilder
+    {
+        $q  = '%' . $query . '%';
+        $qb = $this->createQueryBuilder('h')
+            ->leftJoin('h.building', 'b')
+            ->leftJoin('h.tags', 'tg')
+            ->leftJoin('h.interfaces', 'i')
+            ->leftJoin('i.subnet', 's')
+            ->leftJoin('i.ipAddress', 'ip4')
+            ->leftJoin('i.ipv6Address', 'ip6')
+            ->leftJoin('i.names', 'n')
+            ->leftJoin('n.domain', 'nd')
+            ->leftJoin('App\Entity\DhcpLease', 'dl', 'WITH', 'dl.macAddress = i.macAddress')
+            ->where('h.name LIKE :q')
+            ->orWhere('b.name LIKE :q')
+            ->orWhere('h.room LIKE :q')
+            ->orWhere("CONCAT(COALESCE(b.name, ''), COALESCE(h.room, '')) LIKE :q")
+            ->orWhere('s.name LIKE :q')
+            ->orWhere('ip4.address LIKE :q')
+            ->orWhere('ip6.address LIKE :q')
+            ->orWhere('dl.ipAddress LIKE :q')
+            ->orWhere('i.macAddress LIKE :q')
+            ->orWhere('n.name LIKE :q')
+            ->orWhere('nd.name LIKE :q')
+            ->orWhere("CONCAT(n.name, '.', nd.name) LIKE :q")
+            ->orWhere('tg.name LIKE :q')
+            ->setParameter('q', $q);
+
+        $hex = preg_replace('/[^0-9a-fA-F]/', '', $query);
+        if (strlen($hex) === 12) {
+            $normalized = implode(':', str_split(strtolower($hex), 2));
+            $qb->orWhere('i.macAddress = :mac')->setParameter('mac', $normalized);
+        }
+
+        return $qb;
+    }
+
+    private function buildAdvancedQb(array $criteria): QueryBuilder
     {
         $qb = $this->createQueryBuilder('h')
             ->leftJoin('h.building', 'b')
@@ -65,58 +165,86 @@ class HostRepository extends ServiceEntityRepository
             ))->setParameter('dns', $this->toLike($criteria['dns']));
         }
 
-        return $qb->distinct()->orderBy('h.name', 'ASC')->getQuery()->getResult();
+        return $qb;
+    }
+
+    // -------------------------------------------------------------------------
+    // Pagination helpers
+    // -------------------------------------------------------------------------
+
+    /**
+     * Count + ID-page + entity fetch for any filter QueryBuilder.
+     * Uses a two-step approach (IDs first, then full hydration) so that LIMIT/OFFSET
+     * operates on host rows rather than join-multiplied rows.
+     *
+     * @return array{hosts: Host[], total: int}
+     */
+    private function paginateFilterQuery(QueryBuilder $filterQb, int $page, int $perPage): array
+    {
+        $offset = max(0, ($page - 1) * $perPage);
+
+        $total = (int) (clone $filterQb)
+            ->select('COUNT(DISTINCT h.id)')
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        if ($total === 0) {
+            return ['hosts' => [], 'total' => 0];
+        }
+
+        $ids = $this->idsForPage(
+            (clone $filterQb)->distinct(),
+            $offset,
+            $perPage
+        );
+
+        return ['hosts' => $this->fetchByIds($ids), 'total' => $total];
+    }
+
+    /** Returns a page of host IDs from the given QueryBuilder. */
+    private function idsForPage(QueryBuilder $qb, int $offset, int $perPage): array
+    {
+        $rows = $qb->select('h.id as hid')
+            ->orderBy('h.name', 'ASC')
+            ->setFirstResult($offset)
+            ->setMaxResults($perPage)
+            ->getQuery()
+            ->getScalarResult();
+
+        return array_column($rows, 'hid');
+    }
+
+    /**
+     * Fetch full Host entities by ID with all associations the list template needs
+     * eagerly loaded to prevent N+1 queries.
+     *
+     * @return Host[]
+     */
+    private function fetchByIds(array $ids): array
+    {
+        if (empty($ids)) {
+            return [];
+        }
+
+        return $this->createQueryBuilder('h')
+            ->leftJoin('h.interfaces', 'i')->addSelect('i')
+            ->leftJoin('h.tags', 'tg')->addSelect('tg')
+            ->leftJoin('i.ipAddress', 'ip4')->addSelect('ip4')
+            ->leftJoin('i.ipv6Address', 'ip6')->addSelect('ip6')
+            ->leftJoin('i.subnet', 's')->addSelect('s')
+            ->leftJoin('i.names', 'n')->addSelect('n')
+            ->leftJoin('n.domain', 'nd')->addSelect('nd')
+            ->where('h.id IN (:ids)')
+            ->setParameter('ids', $ids)
+            ->orderBy('h.name', 'ASC')
+            ->getQuery()
+            ->getResult();
     }
 
     private function toLike(string $value): string
     {
-        // * is the user-facing wildcard; if none present, do a contains search
         return str_contains($value, '*')
             ? str_replace('*', '%', $value)
             : '%' . $value . '%';
-    }
-
-    /** @return Host[] */
-    public function search(string $query): array
-    {
-        $q  = '%' . $query . '%';
-        $qb = $this->createQueryBuilder('h')
-            ->leftJoin('h.building', 'b')
-            ->leftJoin('h.tags', 'tg')
-            ->leftJoin('h.interfaces', 'i')
-            ->leftJoin('i.subnet', 's')
-            ->leftJoin('i.ipAddress', 'ip4')
-            ->leftJoin('i.ipv6Address', 'ip6')
-            ->leftJoin('i.names', 'n')
-            ->leftJoin('n.domain', 'nd')
-            ->leftJoin('App\Entity\DhcpLease', 'dl', 'WITH', 'dl.macAddress = i.macAddress')
-            ->where('h.name LIKE :q')
-            ->orWhere('b.name LIKE :q')
-            ->orWhere('h.room LIKE :q')
-            ->orWhere("CONCAT(COALESCE(b.name, ''), COALESCE(h.room, '')) LIKE :q")
-            ->orWhere('s.name LIKE :q')
-            ->orWhere('ip4.address LIKE :q')
-            ->orWhere('ip6.address LIKE :q')
-            ->orWhere('dl.ipAddress LIKE :q')
-            ->orWhere('i.macAddress LIKE :q')
-            ->orWhere('n.name LIKE :q')
-            ->orWhere('nd.name LIKE :q')
-            ->orWhere("CONCAT(n.name, '.', nd.name) LIKE :q")
-            ->orWhere('tg.name LIKE :q')
-            ->setParameter('q', $q);
-
-        // If the query is (or contains) a MAC in any delimiter/case style,
-        // also match the normalized colon-separated form stored in the DB.
-        $hex = preg_replace('/[^0-9a-fA-F]/', '', $query);
-        if (strlen($hex) === 12) {
-            $normalized = implode(':', str_split(strtolower($hex), 2));
-            $qb->orWhere('i.macAddress = :mac')->setParameter('mac', $normalized);
-        }
-
-        return $qb
-            ->distinct()
-            ->orderBy('h.name', 'ASC')
-            ->getQuery()
-            ->getResult();
     }
 }
