@@ -161,6 +161,59 @@ class SubnetRepository extends ServiceEntityRepository
             : '%' . $value . '%';
     }
 
+    /**
+     * Returns subnet choices for form dropdowns.
+     * If the saved search yields results, returns a grouped array with matches first.
+     * Otherwise returns a flat ordered array of all non-container subnets.
+     *
+     * @return Subnet[]|array<string, Subnet[]>
+     */
+    public function buildGroupedChoices(?array $savedSearch): array
+    {
+        $all = $this->createQueryBuilder('s')
+            ->where('s.isContainer = false')
+            ->orderBy('s.name', 'ASC')
+            ->getQuery()
+            ->getResult();
+
+        if (empty($savedSearch)) {
+            return $all;
+        }
+
+        $filterIds = $this->idsForSearch($savedSearch);
+        if (empty($filterIds)) {
+            return $all;
+        }
+
+        $idSet    = array_flip($filterIds);
+        $filtered = array_values(array_filter($all, fn(Subnet $s) => isset($idSet[$s->getId()])));
+
+        return empty($filtered) ? $all : ['Saved search' => $filtered, 'All subnets' => $all];
+    }
+
+    private function idsForSearch(array $savedSearch): array
+    {
+        $criteria = array_filter(
+            array_intersect_key($savedSearch, array_flip(['name', 'cidr', 'vlan', 'gateway', 'vrf', 'tag'])),
+            fn($v) => $v !== ''
+        );
+
+        if (!empty($criteria)) {
+            $qb = $this->buildAdvancedQb($criteria);
+        } elseif (!empty($savedSearch['q'])) {
+            $qb = $this->buildSearchQb($savedSearch['q']);
+        } else {
+            return [];
+        }
+
+        $rows = (clone $qb)
+            ->select('DISTINCT s.id as sid')
+            ->getQuery()
+            ->getScalarResult();
+
+        return array_column($rows, 'sid');
+    }
+
     // -------------------------------------------------------------------------
     // Tree / hierarchy helpers
     // -------------------------------------------------------------------------

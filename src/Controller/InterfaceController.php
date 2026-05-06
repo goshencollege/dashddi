@@ -13,6 +13,7 @@ use App\Repository\DhcpLeaseRepository;
 use App\Repository\DomainRepository;
 use App\Repository\NetworkInterfaceRepository;
 use App\Repository\SubnetRepository;
+use App\Repository\UserPreferenceRepository;
 use App\Service\DnsViewResolver;
 use App\Service\FcrdnsChecker;
 use App\Service\IpAddressManager;
@@ -32,12 +33,18 @@ class InterfaceController extends AbstractController
     ) {}
 
     #[Route('/hosts/{id}/interfaces/new', name: 'interface_new', methods: ['GET', 'POST'])]
-    public function new(Request $request, Host $host, EntityManagerInterface $em): Response
+    public function new(Request $request, Host $host, EntityManagerInterface $em, SubnetRepository $subnetRepo, UserPreferenceRepository $prefRepo): Response
     {
+        $user          = $this->getUser();
+        $pref          = $user ? $prefRepo->findByIdentifier($user->getUserIdentifier()) : null;
+        $subnetChoices = $subnetRepo->buildGroupedChoices($pref?->getSubnetSearch());
+
         $interface = new NetworkInterface();
         $interface->setHost($host);
 
-        $form = $this->createForm(NetworkInterfaceType::class, $interface);
+        $form = $this->createForm(NetworkInterfaceType::class, $interface, [
+            'subnet_choices' => $subnetChoices,
+        ]);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
@@ -73,10 +80,17 @@ class InterfaceController extends AbstractController
     }
 
     #[Route('/interfaces/{id}/edit', name: 'interface_edit', methods: ['GET', 'POST'])]
-    public function edit(Request $request, NetworkInterface $interface, EntityManagerInterface $em): Response
+    public function edit(Request $request, NetworkInterface $interface, EntityManagerInterface $em, SubnetRepository $subnetRepo, UserPreferenceRepository $prefRepo): Response
     {
+        $user          = $this->getUser();
+        $pref          = $user ? $prefRepo->findByIdentifier($user->getUserIdentifier()) : null;
+        $subnetChoices = $subnetRepo->buildGroupedChoices($pref?->getSubnetSearch());
+
         $originalSubnet = $interface->getSubnet();
-        $form = $this->createForm(NetworkInterfaceType::class, $interface, ['is_edit' => true]);
+        $form = $this->createForm(NetworkInterfaceType::class, $interface, [
+            'is_edit'        => true,
+            'subnet_choices' => $subnetChoices,
+        ]);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {

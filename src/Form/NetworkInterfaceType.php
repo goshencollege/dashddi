@@ -39,15 +39,16 @@ class NetworkInterfaceType extends AbstractType
                 'attr'       => ['placeholder' => 'e.g. aabbccddeeff  or  aa:bb:cc:dd:ee:ff  or  AA-BB-CC-DD-EE-FF (leave blank for 00:00:00:00:00:00)'],
             ])
             ->add('subnet', EntityType::class, [
-                'class'         => Subnet::class,
-                'choice_label'  => fn($subnet) => (string) $subnet,
-                'placeholder'   => '-- Select a subnet --',
-                'required'      => false,
-
-                'query_builder' => fn($repo) => $repo->createQueryBuilder('s')
-                    ->where('s.isContainer = false')
-                    ->orderBy('s.name', 'ASC'),
-            ])
+                'class'        => Subnet::class,
+                'choice_label' => fn($subnet) => (string) $subnet,
+                'placeholder'  => '-- Select a subnet --',
+                'required'     => false,
+            ] + ($options['subnet_choices'] !== null
+                ? ['choices' => $options['subnet_choices']]
+                : ['query_builder' => fn($repo) => $repo->createQueryBuilder('s')
+                        ->where('s.isContainer = false')
+                        ->orderBy('s.name', 'ASC')]
+            ))
             ->add('ipv4Assignment', ChoiceType::class, [
                 'mapped' => false,
                 'label' => 'IPv4 Assignment',
@@ -103,11 +104,13 @@ class NetworkInterfaceType extends AbstractType
     public function configureOptions(OptionsResolver $resolver): void
     {
         $resolver->setDefaults([
-            'data_class' => NetworkInterface::class,
-            'is_edit'    => false,
-            'show_names' => true,
+            'data_class'     => NetworkInterface::class,
+            'is_edit'        => false,
+            'show_names'     => true,
+            'subnet_choices' => null,
         ]);
         $resolver->setAllowedTypes('is_edit', 'bool');
         $resolver->setAllowedTypes('show_names', 'bool');
+        $resolver->setAllowedTypes('subnet_choices', ['null', 'array']);
     }
 }
