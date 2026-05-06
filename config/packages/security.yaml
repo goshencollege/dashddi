@@ -10,8 +10,9 @@ security:
 
         api:
             pattern: ^/api/
-            stateless: true
-            security: false
+            context: main
+            lazy: true
+            provider: saml_provider
 
         main:
             lazy: true
