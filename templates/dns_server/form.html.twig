@@ -16,6 +16,19 @@
             <div class="card-body">
                 {{ form_start(form) }}
 
+                <div class="mb-3">
+                    {{ form_label(form.serverType, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                    {{ form_widget(form.serverType, {attr: {class: 'form-select' ~ (form.serverType.vars.errors|length ? ' is-invalid' : ''), id: 'dns_server_serverType'}}) }}
+                    {{ form_errors(form.serverType) }}
+                </div>
+
+                <div class="mb-3" id="primary-hostname-row" style="{{ form.vars.data.serverType == 'secondary' ? '' : 'display:none' }}">
+                    {{ form_label(form.primaryHostname, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                    {{ form_widget(form.primaryHostname, {attr: {class: 'form-select' ~ (form.primaryHostname.vars.errors|length ? ' is-invalid' : '')}}) }}
+                    {{ form_errors(form.primaryHostname) }}
+                    <div class="form-text text-muted">Zone data is pulled from this server via AXFR. Zone files are <strong>not</strong> pushed to secondary servers.</div>
+                </div>
+
                 {% for field in ['name', 'hostname', 'sshUser', 'remoteZonePath', 'keyDirectory'] %}
                     <div class="mb-3">
                         {{ form_label(form[field], null, {label_attr: {class: 'form-label fw-semibold'}}) }}
@@ -86,4 +99,53 @@
         {% endif %}
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    const typeSelect    = document.getElementById('dns_server_serverType');
+    const primaryRow    = document.getElementById('primary-hostname-row');
+    const primarySelect = document.getElementById('dns_server_primaryHostname');
+    const viewCheckboxes = Array.from(document.querySelectorAll('input[name="dns_server[views][]"]'));
+    if (!typeSelect || !primaryRow) return;
+
+    function onViewChange(e) {
+        if (e.target.checked) {
+            viewCheckboxes.forEach(cb => { if (cb !== e.target) cb.checked = false; });
+        }
+    }
+
+    function applySecondaryViewMode() {
+        // Keep only the first checked view
+        let kept = false;
+        viewCheckboxes.forEach(cb => {
+            if (cb.checked) { if (kept) cb.checked = false; else kept = true; }
+        });
+        // Auto-check first view if none selected
+        if (!kept && viewCheckboxes.length > 0) viewCheckboxes[0].checked = true;
+        viewCheckboxes.forEach(cb => cb.addEventListener('change', onViewChange));
+    }
+
+    function removeSingleViewMode() {
+        viewCheckboxes.forEach(cb => cb.removeEventListener('change', onViewChange));
+    }
+
+    typeSelect.addEventListener('change', function () {
+        const isSecondary = this.value === 'secondary';
+        primaryRow.style.display = isSecondary ? '' : 'none';
+        if (isSecondary) {
+            if (primarySelect && !primarySelect.value && primarySelect.options.length > 0) {
+                primarySelect.selectedIndex = 0;
+            }
+            applySecondaryViewMode();
+        } else {
+            removeSingleViewMode();
+        }
+    });
+
+    // Apply on page load if already secondary
+    if (typeSelect.value === 'secondary') applySecondaryViewMode();
+})();
+</script>
 {% endblock %}

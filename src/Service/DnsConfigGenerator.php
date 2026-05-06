@@ -263,19 +263,30 @@ class DnsConfigGenerator
 
             $keyDirBase = $server->getKeyDirectory() ? rtrim($server->getKeyDirectory(), '/') : null;
 
+            $isSecondary = $server->isSecondary();
+            $primaryHost = $server->getPrimaryHostname();
+
             foreach ($domains as $domain) {
                 $file    = $zonePath . '/' . $view->getName() . '/' . $domain->getName() . '.zone';
                 $lines[] = '    zone "' . $domain->getName() . '" IN {';
-                $lines[] = '        type master;';
-                $lines[] = '        file "' . $file . '";';
-                if ($domain->getDnssecPolicy()) {
-                    $lines[] = '        dnssec-policy "' . $domain->getDnssecPolicy()->getName() . '";';
-                }
-                if ($keyDirBase) {
-                    $lines[] = '        key-directory "' . $keyDirBase . '/' . $domain->getName() . '";';
-                }
-                if ($domain->getDnssecPolicy() && $keyDirBase) {
-                    $lines[] = '        inline-signing yes;';
+                if ($isSecondary) {
+                    $lines[] = '        type secondary;';
+                    $lines[] = '        file "' . $file . '";';
+                    if ($primaryHost) {
+                        $lines[] = '        primaries { ' . $primaryHost . '; };';
+                    }
+                } else {
+                    $lines[] = '        type master;';
+                    $lines[] = '        file "' . $file . '";';
+                    if ($domain->getDnssecPolicy()) {
+                        $lines[] = '        dnssec-policy "' . $domain->getDnssecPolicy()->getName() . '";';
+                    }
+                    if ($keyDirBase) {
+                        $lines[] = '        key-directory "' . $keyDirBase . '/' . $domain->getName() . '";';
+                    }
+                    if ($domain->getDnssecPolicy() && $keyDirBase) {
+                        $lines[] = '        inline-signing yes;';
+                    }
                 }
                 $lines[] = '    };';
             }
@@ -285,16 +296,24 @@ class DnsConfigGenerator
                     $zoneName = $this->reverseZoneName($cidr);
                     $file     = $zonePath . '/' . $view->getName() . '/' . $zoneName . '.zone';
                     $lines[] = '    zone "' . $zoneName . '" IN {';
-                    $lines[] = '        type master;';
-                    $lines[] = '        file "' . $file . '";';
-                    if ($subnet->getDnssecPolicy()) {
-                        $lines[] = '        dnssec-policy "' . $subnet->getDnssecPolicy()->getName() . '";';
-                    }
-                    if ($keyDirBase) {
-                        $lines[] = '        key-directory "' . $keyDirBase . '/' . $zoneName . '";';
-                    }
-                    if ($subnet->getDnssecPolicy() && $keyDirBase) {
-                        $lines[] = '        inline-signing yes;';
+                    if ($isSecondary) {
+                        $lines[] = '        type secondary;';
+                        $lines[] = '        file "' . $file . '";';
+                        if ($primaryHost) {
+                            $lines[] = '        primaries { ' . $primaryHost . '; };';
+                        }
+                    } else {
+                        $lines[] = '        type master;';
+                        $lines[] = '        file "' . $file . '";';
+                        if ($subnet->getDnssecPolicy()) {
+                            $lines[] = '        dnssec-policy "' . $subnet->getDnssecPolicy()->getName() . '";';
+                        }
+                        if ($keyDirBase) {
+                            $lines[] = '        key-directory "' . $keyDirBase . '/' . $zoneName . '";';
+                        }
+                        if ($subnet->getDnssecPolicy() && $keyDirBase) {
+                            $lines[] = '        inline-signing yes;';
+                        }
                     }
                     $lines[] = '    };';
                 }

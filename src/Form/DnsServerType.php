@@ -4,9 +4,11 @@ namespace App\Form;
 
 use App\Entity\DnsServer;
 use App\Entity\DnsView;
+use App\Repository\DnsServerRepository;
 use App\Repository\DnsViewRepository;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
+use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
@@ -14,11 +16,31 @@ use Symfony\Component\OptionsResolver\OptionsResolver;
 
 class DnsServerType extends AbstractType
 {
-    public function __construct(private readonly DnsViewRepository $viewRepo) {}
+    public function __construct(
+        private readonly DnsViewRepository $viewRepo,
+        private readonly DnsServerRepository $serverRepo,
+    ) {}
 
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
+        $primaryServers = $this->serverRepo->findBy(['serverType' => 'primary'], ['name' => 'ASC']);
+        $primaryChoices = [];
+        foreach ($primaryServers as $s) {
+            $primaryChoices[$s->getName() . ' (' . $s->getHostname() . ')'] = $s->getHostname();
+        }
+
         $builder
+            ->add('serverType', ChoiceType::class, [
+                'label'   => 'Server Type',
+                'choices' => ['Primary (authoritative)' => 'primary', 'Secondary (replicates from primary)' => 'secondary'],
+            ])
+            ->add('primaryHostname', ChoiceType::class, [
+                'label'       => 'Primary Server',
+                'required'    => false,
+                'choices'     => $primaryChoices,
+                'placeholder' => empty($primaryChoices) ? '— No primary servers configured —' : false,
+                'attr'        => ['class' => 'form-select'],
+            ])
             ->add('name', TextType::class, [
                 'attr' => ['placeholder' => 'e.g. ns1-internal'],
             ])
