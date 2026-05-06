@@ -382,10 +382,24 @@
 <div class="{% block container_class %}container-fluid{% endblock %} mb-5">
     {% for label, messages in app.flashes %}
         {% for message in messages %}
+            {% if label == 'ssh_pubkey' %}
+            <div class="alert alert-info alert-dismissible fade show" role="alert">
+                <strong><i class="bi bi-key me-1"></i>SSH Public Key</strong> — Add this to <code>authorized_keys</code> on the server:
+                <div class="input-group mt-2">
+                    <textarea class="form-control font-monospace small" rows="3" readonly>{{ message }}</textarea>
+                    <button class="btn btn-outline-secondary" type="button"
+                            onclick="navigator.clipboard.writeText(this.closest('.input-group').querySelector('textarea').value).then(() => this.innerHTML = '<i class=\'bi bi-check-lg\'></i> Copied')">
+                        <i class="bi bi-clipboard"></i>
+                    </button>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            {% else %}
             <div class="alert alert-{{ label == 'success' ? 'success' : 'danger' }} alert-dismissible fade show" role="alert">
                 {{ message }}
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
+            {% endif %}
         {% endfor %}
     {% endfor %}
 
