@@ -57,7 +57,6 @@
         <i class="bi bi-globe me-1"></i>Parsed Records
         <span class="badge bg-primary ms-1">{{ preview.records|length }}</span>
     </div>
-    <div class="table-responsive">
         <table class="table table-hover table-sm mb-0">
             <thead>
                 <tr>
@@ -73,7 +72,7 @@
                 <tr class="{{ r.action == 'skip' ? 'text-muted' : '' }}">
                     <td class="font-monospace">{{ r.name }}</td>
                     <td><span class="badge bg-secondary">{{ r.type }}</span></td>
-                    <td class="font-monospace small">{{ r.value }}</td>
+                    <td class="font-monospace small" style="word-break: break-all;">{{ r.value }}</td>
                     <td class="text-muted small">{{ r.ttl ?: '—' }}</td>
                     <td>
                         {% if r.action == 'host_dns_name' %}
@@ -111,7 +110,6 @@
                 {% endfor %}
             </tbody>
         </table>
-    </div>
 </div>
 
 {# Confirm / Cancel #}
