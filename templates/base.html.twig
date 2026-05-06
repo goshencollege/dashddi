@@ -20,128 +20,84 @@
             border: 1px solid rgba(255,255,255,.25);
         }
 
-        /* ── Purple theme (OBNOXIOUS) ───────────────────────────── */
-        @keyframes purple-slide {
-            0%   { background-position: 0% 50%; }
-            50%  { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
-        }
+        /* ── Purple theme ───────────────────────────────────────── */
         [data-theme="purple"] .navbar {
-            background: linear-gradient(270deg, #1a0033, #8800ff, #ff00cc, #8800ff, #1a0033) !important;
-            background-size: 300% 300% !important;
-            animation: purple-slide 4s ease infinite;
-            box-shadow: 0 2px 20px rgba(255,0,204,.55) !important;
+            background-color: #3b0764 !important;
         }
         [data-theme="purple"] thead {
-            background: linear-gradient(90deg, #6600ff, #ff00ff) !important;
-        }
-        [data-theme="purple"] thead th, [data-theme="purple"] thead td {
-            color: #ffff00 !important;
-            text-shadow: 0 0 8px #ff00ff;
+            background-color: #4c1d95 !important;
         }
         [data-theme="purple"] {
-            --bs-primary:                #cc00ff;
-            --bs-primary-rgb:            204, 0, 255;
-            --bs-link-color:             #ff66ff;
-            --bs-link-color-rgb:         255, 102, 255;
-            --bs-link-hover-color:       #ffff00;
+            --bs-primary:                #9333ea;
+            --bs-primary-rgb:            147, 51, 234;
+            --bs-link-color:             #c084fc;
+            --bs-link-color-rgb:         192, 132, 252;
+            --bs-link-hover-color:       #d8b4fe;
         }
         [data-theme="purple"] .btn-primary {
-            --bs-btn-bg:                 #cc00ff;
-            --bs-btn-border-color:       #ff00ff;
-            --bs-btn-hover-bg:           #ff00cc;
-            --bs-btn-hover-border-color: #ff66ff;
-            --bs-btn-active-bg:          #9900cc;
-            box-shadow: 0 0 12px rgba(204,0,255,.6);
+            --bs-btn-bg:                 #7c3aed;
+            --bs-btn-border-color:       #7c3aed;
+            --bs-btn-hover-bg:           #6d28d9;
+            --bs-btn-hover-border-color: #6d28d9;
+            --bs-btn-active-bg:          #5b21b6;
         }
         [data-theme="purple"] .btn-outline-primary {
-            --bs-btn-color:              #ff66ff;
-            --bs-btn-border-color:       #cc00ff;
-            --bs-btn-hover-bg:           #cc00ff;
-            --bs-btn-hover-border-color: #ff00ff;
-            --bs-btn-hover-color:        #ffff00;
+            --bs-btn-color:              #c084fc;
+            --bs-btn-border-color:       #c084fc;
+            --bs-btn-hover-bg:           #7c3aed;
+            --bs-btn-hover-border-color: #7c3aed;
+            --bs-btn-hover-color:        #fff;
         }
-        [data-theme="purple"] .bg-primary       { background-color: #cc00ff !important; }
-        [data-theme="purple"] .text-primary      { color: #ff66ff !important; }
-        [data-theme="purple"] .nav-link.active   { color: #ffff00 !important; text-shadow: 0 0 10px #ff00ff; }
+        [data-theme="purple"] .bg-primary       { background-color: #7c3aed !important; }
+        [data-theme="purple"] .text-primary      { color: #c084fc !important; }
+        [data-theme="purple"] .nav-link.active   { color: #c084fc !important; }
         [data-theme="purple"] .form-control:focus,
         [data-theme="purple"] .form-select:focus {
-            border-color: #ff00ff;
-            box-shadow: 0 0 0 .25rem rgba(255,0,255,.45), 0 0 12px rgba(204,0,255,.4);
+            border-color: #a855f7;
+            box-shadow: 0 0 0 .25rem rgba(168,85,247,.25);
         }
         [data-theme="purple"] .table-hover tbody tr:hover {
-            background-color: rgba(204,0,255,.18);
-            box-shadow: inset 0 0 8px rgba(255,0,204,.15);
-        }
-        [data-theme="purple"] h1, [data-theme="purple"] h2,
-        [data-theme="purple"] h3, [data-theme="purple"] h4 {
-            text-shadow: 0 0 12px rgba(204,0,255,.7);
+            background-color: rgba(147,51,234,.12);
         }
 
-        /* ── Green theme (OBNOXIOUS) ────────────────────────────── */
-        @keyframes green-pulse {
-            0%, 100% { box-shadow: 0 2px 15px rgba(0,255,65,.4) !important; }
-            50%       { box-shadow: 0 2px 35px rgba(0,255,65,.9) !important; }
-        }
-        @keyframes green-scan {
-            0%   { background-position: 0% 50%; }
-            50%  { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
-        }
+        /* ── Green theme ────────────────────────────────────────── */
         [data-theme="green"] .navbar {
-            background: linear-gradient(270deg, #001a00, #006600, #00ff41, #006600, #001a00) !important;
-            background-size: 300% 300% !important;
-            animation: green-scan 3s ease infinite;
-            box-shadow: 0 2px 25px rgba(0,255,65,.6) !important;
+            background-color: #064e3b !important;
         }
         [data-theme="green"] thead {
-            background: linear-gradient(90deg, #003300, #00cc44) !important;
-        }
-        [data-theme="green"] thead th, [data-theme="green"] thead td {
-            color: #00ff41 !important;
-            text-shadow: 0 0 8px #00ff41;
+            background-color: #065f46 !important;
         }
         [data-theme="green"] {
-            --bs-primary:                #00ff41;
-            --bs-primary-rgb:            0, 255, 65;
-            --bs-link-color:             #00ff41;
-            --bs-link-color-rgb:         0, 255, 65;
-            --bs-link-hover-color:       #ccff00;
+            --bs-primary:                #059669;
+            --bs-primary-rgb:            5, 150, 105;
+            --bs-link-color:             #34d399;
+            --bs-link-color-rgb:         52, 211, 153;
+            --bs-link-hover-color:       #6ee7b7;
         }
         [data-theme="green"] .btn-primary {
-            --bs-btn-bg:                 #00cc44;
-            --bs-btn-border-color:       #00ff41;
-            --bs-btn-hover-bg:           #00ff41;
-            --bs-btn-hover-border-color: #ccff00;
-            --bs-btn-active-bg:          #009933;
-            --bs-btn-color:              #001a00;
-            --bs-btn-hover-color:        #001a00;
-            box-shadow: 0 0 12px rgba(0,255,65,.55);
-            text-shadow: none;
+            --bs-btn-bg:                 #059669;
+            --bs-btn-border-color:       #059669;
+            --bs-btn-hover-bg:           #047857;
+            --bs-btn-hover-border-color: #047857;
+            --bs-btn-active-bg:          #065f46;
         }
         [data-theme="green"] .btn-outline-primary {
-            --bs-btn-color:              #00ff41;
-            --bs-btn-border-color:       #00ff41;
-            --bs-btn-hover-bg:           #00cc44;
-            --bs-btn-hover-border-color: #00ff41;
-            --bs-btn-hover-color:        #001a00;
+            --bs-btn-color:              #34d399;
+            --bs-btn-border-color:       #34d399;
+            --bs-btn-hover-bg:           #059669;
+            --bs-btn-hover-border-color: #059669;
+            --bs-btn-hover-color:        #fff;
         }
-        [data-theme="green"] .bg-primary       { background-color: #00cc44 !important; }
-        [data-theme="green"] .text-primary      { color: #00ff41 !important; }
-        [data-theme="green"] .nav-link.active   { color: #00ff41 !important; text-shadow: 0 0 10px #00ff41; }
+        [data-theme="green"] .bg-primary       { background-color: #059669 !important; }
+        [data-theme="green"] .text-primary      { color: #34d399 !important; }
+        [data-theme="green"] .nav-link.active   { color: #34d399 !important; }
         [data-theme="green"] .form-control:focus,
         [data-theme="green"] .form-select:focus {
-            border-color: #00ff41;
-            box-shadow: 0 0 0 .25rem rgba(0,255,65,.4), 0 0 14px rgba(0,255,65,.35);
+            border-color: #10b981;
+            box-shadow: 0 0 0 .25rem rgba(16,185,129,.25);
         }
         [data-theme="green"] .table-hover tbody tr:hover {
-            background-color: rgba(0,255,65,.12);
-            box-shadow: inset 0 0 8px rgba(0,255,65,.1);
-        }
-        [data-theme="green"] h1, [data-theme="green"] h2,
-        [data-theme="green"] h3, [data-theme="green"] h4 {
-            color: #00ff41;
-            text-shadow: 0 0 10px rgba(0,255,65,.6);
+            background-color: rgba(5,150,105,.12);
         }
 
         /* ── Rainbow theme ──────────────────────────────────────── */
@@ -369,14 +325,14 @@
                         </li>
                         <li>
                             <button class="dropdown-item d-flex align-items-center gap-2 theme-option {{ _theme == 'purple' ? 'active' }}" data-theme="purple">
-                                <span class="theme-swatch" style="background:#cc00ff; border-color:#ff00cc;"></span>
+                                <span class="theme-swatch" style="background:#7c3aed;"></span>
                                 Purple
                                 {% if _theme == 'purple' %}<i class="bi bi-check ms-auto"></i>{% endif %}
                             </button>
                         </li>
                         <li>
                             <button class="dropdown-item d-flex align-items-center gap-2 theme-option {{ _theme == 'green' ? 'active' }}" data-theme="green">
-                                <span class="theme-swatch" style="background:#00ff41; border-color:#00cc44;"></span>
+                                <span class="theme-swatch" style="background:#059669;"></span>
                                 Green
                                 {% if _theme == 'green' %}<i class="bi bi-check ms-auto"></i>{% endif %}
                             </button>
