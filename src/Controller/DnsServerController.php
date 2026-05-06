@@ -37,8 +37,9 @@ class DnsServerController extends AbstractController
             $server->setSshPrivateKey($keys['private'])->setSshPublicKey($keys['public']);
             $em->persist($server);
             $em->flush();
-            $this->addFlash('success', 'DNS server "' . $server->getName() . '" added. Add the public key to authorized_keys on the server.');
-            return $this->redirectToRoute('dns_server_edit', ['id' => $server->getId()]);
+            $this->addFlash('success', 'DNS server "' . $server->getName() . '" added. Add the SSH public key below to authorized_keys on the server.');
+            $this->addFlash('ssh_pubkey', $server->getSshPublicKey());
+            return $this->redirectToRoute('servers_index');
         }
 
         return $this->render('dns_server/form.html.twig', [
