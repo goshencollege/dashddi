@@ -14,6 +14,12 @@
             <div class="card-header"><strong>DHCP Lease Log</strong></div>
             <div class="card-body">
                 <div class="mb-3">
+                    {{ form_label(form.defaultNewSubnetLeaseRetentionDays, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                    {{ form_widget(form.defaultNewSubnetLeaseRetentionDays) }}
+                    {{ form_errors(form.defaultNewSubnetLeaseRetentionDays) }}
+                    {{ form_help(form.defaultNewSubnetLeaseRetentionDays) }}
+                </div>
+                <div class="mb-0">
                     {{ form_label(form.defaultLeaseRetentionDays, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
                     {{ form_widget(form.defaultLeaseRetentionDays) }}
                     {{ form_errors(form.defaultLeaseRetentionDays) }}
@@ -67,7 +73,7 @@
                     {{ form_errors(form.smtpFromEmail) }}
                 </div>
 
-                <div class="mb-3">
+                <div class="mb-0">
                     {{ form_label(form.smtpFromName, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
                     {{ form_widget(form.smtpFromName, {attr: {class: 'form-control'}}) }}
                     {{ form_errors(form.smtpFromName) }}
@@ -83,4 +89,25 @@
     </button>
 </div>
 {{ form_end(form) }}
+
+<div class="row g-4 mt-0">
+    <div class="col-lg-6 offset-lg-6">
+        <div class="card">
+            <div class="card-header"><strong>Send Test Email</strong></div>
+            <div class="card-body">
+                <p class="text-muted small">Sends a test message using the SMTP settings above. Save your settings before testing.</p>
+                <form method="post" action="{{ path('app_settings_test_email') }}" class="d-flex gap-2 align-items-start">
+                    <input type="hidden" name="_token" value="{{ csrf_token('test_email') }}">
+                    <div class="flex-grow-1">
+                        <input type="email" name="test_recipient" class="form-control"
+                               placeholder="recipient@example.com" required>
+                    </div>
+                    <button type="submit" class="btn btn-outline-secondary text-nowrap">
+                        <i class="bi bi-send me-1"></i>Send Test
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}

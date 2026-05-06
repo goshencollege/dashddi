@@ -21,7 +21,13 @@ class AppSettingType extends AbstractType
                 'label'    => 'Default DHCP Lease Retention (days)',
                 'required' => false,
                 'attr'     => ['placeholder' => 'e.g. 365 — leave blank to keep forever'],
-                'help'     => 'Fallback retention period for subnets with no per-subnet setting and for leases that do not match any known subnet. Leave blank to keep those records forever.',
+                'help'     => 'Fallback retention period for leases that do not match any known subnet. Leave blank to keep those records forever.',
+            ])
+            ->add('defaultNewSubnetLeaseRetentionDays', IntegerType::class, [
+                'label'    => 'Default Retention for New Subnets (days)',
+                'required' => false,
+                'attr'     => ['placeholder' => 'e.g. 365 — leave blank for no default'],
+                'help'     => 'Pre-filled on new subnets at creation time. Can be overridden per subnet. Leave blank to create subnets with no retention limit set.',
             ])
             ->add('smtpHost', TextType::class, [
                 'label'    => 'SMTP Host',
