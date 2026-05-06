@@ -46,6 +46,9 @@ class ScheduledTask
     #[ORM\Column(type: Types::TEXT, nullable: true)]
     private ?string $lastRunOutput = null;
 
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $notificationEmail = null;
+
     public function getId(): ?int { return $this->id; }
 
     public function getName(): string { return $this->name; }
@@ -76,4 +79,7 @@ class ScheduledTask
 
     public function getLastRunOutput(): ?string { return $this->lastRunOutput; }
     public function setLastRunOutput(?string $lastRunOutput): static { $this->lastRunOutput = $lastRunOutput; return $this; }
+
+    public function getNotificationEmail(): ?string { return $this->notificationEmail; }
+    public function setNotificationEmail(?string $notificationEmail): static { $this->notificationEmail = $notificationEmail; return $this; }
 }
