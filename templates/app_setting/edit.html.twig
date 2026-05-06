@@ -7,24 +7,80 @@
     <h1><i class="bi bi-sliders me-2"></i>Application Settings</h1>
 </div>
 
-<div class="row">
+{{ form_start(form, {attr: {novalidate: 'novalidate'}}) }}
+<div class="row g-4">
     <div class="col-lg-6">
         <div class="card">
             <div class="card-header"><strong>DHCP Lease Log</strong></div>
             <div class="card-body">
-                {{ form_start(form, {attr: {novalidate: 'novalidate'}}) }}
-                    <div class="mb-3">
-                        {{ form_label(form.defaultLeaseRetentionDays, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
-                        {{ form_widget(form.defaultLeaseRetentionDays) }}
-                        {{ form_errors(form.defaultLeaseRetentionDays) }}
-                        {{ form_help(form.defaultLeaseRetentionDays) }}
+                <div class="mb-3">
+                    {{ form_label(form.defaultLeaseRetentionDays, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                    {{ form_widget(form.defaultLeaseRetentionDays) }}
+                    {{ form_errors(form.defaultLeaseRetentionDays) }}
+                    {{ form_help(form.defaultLeaseRetentionDays) }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header"><strong>SMTP Email Settings</strong></div>
+            <div class="card-body">
+                <p class="text-muted small">Used to send failure notifications for scheduled tasks.</p>
+
+                <div class="mb-3">
+                    {{ form_label(form.smtpHost, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                    {{ form_widget(form.smtpHost, {attr: {class: 'form-control'}}) }}
+                    {{ form_errors(form.smtpHost) }}
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-sm-5">
+                        {{ form_label(form.smtpPort, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                        {{ form_widget(form.smtpPort, {attr: {class: 'form-control'}}) }}
+                        {{ form_errors(form.smtpPort) }}
                     </div>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-check-lg me-1"></i>Save Settings
-                    </button>
-                {{ form_end(form) }}
+                    <div class="col-sm-7">
+                        {{ form_label(form.smtpEncryption, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                        {{ form_widget(form.smtpEncryption, {attr: {class: 'form-select'}}) }}
+                        {{ form_errors(form.smtpEncryption) }}
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    {{ form_label(form.smtpUsername, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                    {{ form_widget(form.smtpUsername, {attr: {class: 'form-control'}}) }}
+                    {{ form_errors(form.smtpUsername) }}
+                </div>
+
+                <div class="mb-3">
+                    {{ form_label(form.smtpPassword, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                    {{ form_widget(form.smtpPassword, {attr: {class: 'form-control'}}) }}
+                    {{ form_errors(form.smtpPassword) }}
+                    {{ form_help(form.smtpPassword) }}
+                </div>
+
+                <div class="mb-3">
+                    {{ form_label(form.smtpFromEmail, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                    {{ form_widget(form.smtpFromEmail, {attr: {class: 'form-control'}}) }}
+                    {{ form_errors(form.smtpFromEmail) }}
+                </div>
+
+                <div class="mb-3">
+                    {{ form_label(form.smtpFromName, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                    {{ form_widget(form.smtpFromName, {attr: {class: 'form-control'}}) }}
+                    {{ form_errors(form.smtpFromName) }}
+                </div>
             </div>
         </div>
     </div>
 </div>
+
+<div class="mt-4">
+    <button type="submit" class="btn btn-primary">
+        <i class="bi bi-check-lg me-1"></i>Save Settings
+    </button>
+</div>
+{{ form_end(form) }}
 {% endblock %}

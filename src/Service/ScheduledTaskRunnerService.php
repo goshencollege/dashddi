@@ -12,6 +12,7 @@ class ScheduledTaskRunnerService
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly string $projectDir,
+        private readonly SmtpMailerService $mailer,
     ) {}
 
     public function isDue(ScheduledTask $task): bool
@@ -52,10 +53,28 @@ class ScheduledTaskRunnerService
         $process->setTimeout(300);
         $process->run();
 
+        $status = $process->isSuccessful() ? 'success' : 'failure';
+        $output = trim($process->getOutput() . "\n" . $process->getErrorOutput());
+
         $task->setLastRunAt(new \DateTimeImmutable());
-        $task->setLastRunStatus($process->isSuccessful() ? 'success' : 'failure');
-        $task->setLastRunOutput(trim($process->getOutput() . "\n" . $process->getErrorOutput()));
+        $task->setLastRunStatus($status);
+        $task->setLastRunOutput($output);
 
         $this->em->flush();
+
+        if ($status === 'failure' && $task->getNotificationEmail() !== null && $this->mailer->isConfigured()) {
+            try {
+                $subject = sprintf('[DashDDI] Scheduled task failed: %s', $task->getName());
+                $body    = sprintf(
+                    "The scheduled task \"%s\" failed at %s.\n\nOutput:\n%s",
+                    $task->getName(),
+                    (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
+                    $output ?: '(no output)',
+                );
+                $this->mailer->send($task->getNotificationEmail(), $subject, $body);
+            } catch (\Throwable) {
+                // Don't let a mail failure obscure the original task failure
+            }
+        }
     }
 }
