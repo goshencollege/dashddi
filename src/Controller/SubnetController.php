@@ -7,6 +7,7 @@ use App\Entity\Subnet;
 use App\Entity\UserPreference;
 use App\Enum\BlockType;
 use App\Form\SubnetType;
+use App\Repository\AppSettingRepository;
 use App\Repository\SubnetRepository;
 use App\Repository\TagRepository;
 use App\Repository\UserPreferenceRepository;
@@ -153,9 +154,13 @@ class SubnetController extends AbstractController
     }
 
     #[Route('/new', name: 'subnet_new', methods: ['GET', 'POST'])]
-    public function new(Request $request, EntityManagerInterface $em): Response
+    public function new(Request $request, EntityManagerInterface $em, AppSettingRepository $settingRepo): Response
     {
         $subnet = new Subnet();
+        $defaultDays = $settingRepo->getInstance()?->getDefaultNewSubnetLeaseRetentionDays();
+        if ($defaultDays !== null) {
+            $subnet->setLeaseRetentionDays($defaultDays);
+        }
         $form = $this->createForm(SubnetType::class, $subnet, ['embed_blocks' => true]);
         $form->handleRequest($request);
 
