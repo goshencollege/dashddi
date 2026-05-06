@@ -206,17 +206,27 @@
                         <i class="bi bi-pc-display me-1"></i>Hosts
                     </a>
                 </li>
-                <li class="nav-item">
-                    <a class="nav-link {{ app.request.attributes.get('_route') starts with 'subnet' or app.request.attributes.get('_route') starts with 'vrf' ? 'active' }}"
-                       href="{{ path('subnet_index') }}">
-                        <i class="bi bi-diagram-2 me-1"></i>Subnets
+                {% set dhcpActive = app.request.attributes.get('_route') starts with 'subnet'
+                    or app.request.attributes.get('_route') starts with 'vrf'
+                    or app.request.attributes.get('_route') starts with 'dhcp_lease' %}
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle {{ dhcpActive ? 'active' }}" href="#" data-bs-toggle="dropdown">
+                        <i class="bi bi-diagram-2 me-1"></i>DHCP
                     </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link {{ app.request.attributes.get('_route') starts with 'dhcp_lease' ? 'active' }}"
-                       href="{{ path('dhcp_lease_index') }}">
-                        <i class="bi bi-journal-text me-1"></i>DHCP Leases
-                    </a>
+                    <ul class="dropdown-menu">
+                        <li>
+                            <a class="dropdown-item {{ app.request.attributes.get('_route') starts with 'subnet' or app.request.attributes.get('_route') starts with 'vrf' ? 'active' }}"
+                               href="{{ path('subnet_index') }}">
+                                <i class="bi bi-diagram-2 me-1"></i>Subnets
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item {{ app.request.attributes.get('_route') starts with 'dhcp_lease' ? 'active' }}"
+                               href="{{ path('dhcp_lease_index') }}">
+                                <i class="bi bi-journal-text me-1"></i>DHCP Leases
+                            </a>
+                        </li>
+                    </ul>
                 </li>
                 {% set dnsActive = app.request.attributes.get('_route') starts with 'domain'
                     or app.request.attributes.get('_route') starts with 'dns_view'
@@ -266,13 +276,10 @@
                         <i class="bi bi-server me-1"></i>Servers
                     </a>
                 </li>
-                <li class="nav-item">
-                    <a class="nav-link {{ app.request.attributes.get('_route') starts with 'scheduler' ? 'active' }}"
-                       href="{{ path('scheduler_index') }}">
-                        <i class="bi bi-clock-history me-1"></i>Scheduler
-                    </a>
-                </li>
-                {% set settingsActive = app.request.attributes.get('_route') starts with 'building' or app.request.attributes.get('_route') starts with 'tag' or app.request.attributes.get('_route') starts with 'app_settings' %}
+                {% set settingsActive = app.request.attributes.get('_route') starts with 'building'
+                    or app.request.attributes.get('_route') starts with 'tag'
+                    or app.request.attributes.get('_route') starts with 'app_settings'
+                    or app.request.attributes.get('_route') starts with 'scheduler' %}
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle {{ settingsActive ? 'active' }}" href="#" data-bs-toggle="dropdown">
                         <i class="bi bi-gear me-1"></i>Other Settings
@@ -288,6 +295,12 @@
                             <a class="dropdown-item {{ app.request.attributes.get('_route') starts with 'tag' ? 'active' }}"
                                href="{{ path('tag_index') }}">
                                 <i class="bi bi-tags me-1"></i>Tags
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item {{ app.request.attributes.get('_route') starts with 'scheduler' ? 'active' }}"
+                               href="{{ path('scheduler_index') }}">
+                                <i class="bi bi-clock-history me-1"></i>Scheduler
                             </a>
                         </li>
                         <li><hr class="dropdown-divider"></li>
