@@ -44,9 +44,10 @@ class HostType extends AbstractType
 
         if ($options['embed_interface']) {
             $builder->add('interface', NetworkInterfaceType::class, [
-                'mapped' => false,
-                'label'  => false,
-                'data'   => new NetworkInterface(),
+                'mapped'         => false,
+                'label'          => false,
+                'data'           => new NetworkInterface(),
+                'subnet_choices' => $options['subnet_choices'],
             ]);
         }
     }
@@ -56,7 +57,9 @@ class HostType extends AbstractType
         $resolver->setDefaults([
             'data_class'      => Host::class,
             'embed_interface' => false,
+            'subnet_choices'  => null,
         ]);
         $resolver->setAllowedTypes('embed_interface', 'bool');
+        $resolver->setAllowedTypes('subnet_choices', ['null', 'array']);
     }
 }

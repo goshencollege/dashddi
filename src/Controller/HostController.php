@@ -97,10 +97,17 @@ class HostController extends AbstractController
     }
 
     #[Route('/new', name: 'host_new', methods: ['GET', 'POST'])]
-    public function new(Request $request, EntityManagerInterface $em): Response
+    public function new(Request $request, EntityManagerInterface $em, SubnetRepository $subnetRepo, UserPreferenceRepository $prefRepo): Response
     {
+        $user          = $this->getUser();
+        $pref          = $user ? $prefRepo->findByIdentifier($user->getUserIdentifier()) : null;
+        $subnetChoices = $subnetRepo->buildGroupedChoices($pref?->getSubnetSearch());
+
         $host = new Host();
-        $form = $this->createForm(HostType::class, $host, ['embed_interface' => true]);
+        $form = $this->createForm(HostType::class, $host, [
+            'embed_interface' => true,
+            'subnet_choices'  => $subnetChoices,
+        ]);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
