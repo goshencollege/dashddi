@@ -8,6 +8,7 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Validator\Constraints as Assert;
+use Symfony\Component\Validator\Context\ExecutionContextInterface;
 
 #[ORM\Entity(repositoryClass: DnsServerRepository::class)]
 #[ORM\Table(name: 'dns_server')]
@@ -45,6 +46,12 @@ class DnsServer
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $keyDirectory = null;
 
+    #[ORM\Column(length: 16)]
+    private string $serverType = 'primary';
+
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $primaryHostname = null;
+
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $description = null;
 
@@ -80,6 +87,14 @@ class DnsServer
     public function getKeyDirectory(): ?string { return $this->keyDirectory; }
     public function setKeyDirectory(?string $v): static { $this->keyDirectory = $v; return $this; }
 
+    public function getServerType(): string { return $this->serverType; }
+    public function setServerType(string $serverType): static { $this->serverType = $serverType; return $this; }
+    public function isPrimary(): bool { return $this->serverType === 'primary'; }
+    public function isSecondary(): bool { return $this->serverType === 'secondary'; }
+
+    public function getPrimaryHostname(): ?string { return $this->primaryHostname; }
+    public function setPrimaryHostname(?string $primaryHostname): static { $this->primaryHostname = $primaryHostname; return $this; }
+
     public function getDescription(): ?string { return $this->description; }
     public function setDescription(?string $description): static { $this->description = $description; return $this; }
 
@@ -97,5 +112,15 @@ class DnsServer
     {
         $this->views->removeElement($view);
         return $this;
+    }
+
+    #[Assert\Callback]
+    public function validateSecondaryViewCount(ExecutionContextInterface $context): void
+    {
+        if ($this->isSecondary() && $this->views->count() > 1) {
+            $context->buildViolation('A secondary server can only be assigned one view.')
+                ->atPath('views')
+                ->addViolation();
+        }
     }
 }

@@ -30,6 +30,7 @@
                 <thead>
                     <tr>
                         <th>Name</th>
+                        <th>Type</th>
                         <th>Hostname / IP</th>
                         <th>SSH User</th>
                         <th>Remote Zone Path</th>
@@ -42,6 +43,16 @@
                     {% for server in servers %}
                         <tr>
                             <td class="fw-semibold">{{ server.name }}</td>
+                            <td>
+                                {% if server.serverType == 'secondary' %}
+                                    <span class="badge bg-info text-dark">secondary</span>
+                                    {% if server.primaryHostname %}
+                                        <span class="text-muted small ms-1">← {{ server.primaryHostname }}</span>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="badge bg-primary">primary</span>
+                                {% endif %}
+                            </td>
                             <td class="font-monospace">{{ server.hostname }}</td>
                             <td class="font-monospace">{{ server.sshUser }}</td>
                             <td class="font-monospace small">{{ server.remoteZonePath }}</td>

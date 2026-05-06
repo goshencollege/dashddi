@@ -32,6 +32,8 @@ class DnsDeployService
         $zonePath  = rtrim($server->getRemoteZonePath(), '/');
         $hasDomains = false;
 
+        $isSecondary = $server->isSecondary();
+
         foreach ($server->getViews() as $view) {
             $viewName = $view->getName();
             $domains  = $this->generator->domainsForView($view);
@@ -42,30 +44,32 @@ class DnsDeployService
             $mkdirOut = $sftp->exec('mkdir -p ' . escapeshellarg($zonePath . '/' . $viewName));
             $viewResult['mkdir'] = ['success' => $sftp->getExitStatus() === 0, 'output' => trim((string) $mkdirOut)];
 
-            foreach ($domains as $domain) {
-                $hasDomains = true;
-                $remotePath  = $zonePath . '/' . $viewName . '/' . $domain->getName() . '.zone';
-                $displayFile = $viewName . '/' . $domain->getName() . '.zone';
-                $ok = $sftp->put($remotePath, $this->generator->generateZoneFile($domain, $view));
-                $viewResult['zones'][$domain->getName()] = [
-                    'success' => $ok,
-                    'file'    => $displayFile,
-                    'output'  => $ok ? '' : 'SFTP upload failed',
-                ];
-            }
-
-            foreach ($subnets as $subnet) {
-                foreach (array_filter([$subnet->getIpv4Cidr(), $subnet->getIpv6Cidr()]) as $cidr) {
-                    $hasDomains  = true;
-                    $zoneName    = $this->generator->reverseZoneName($cidr);
-                    $remotePath  = $zonePath . '/' . $viewName . '/' . $zoneName . '.zone';
-                    $displayFile = $viewName . '/' . $zoneName . '.zone';
-                    $ok = $sftp->put($remotePath, $this->generator->generateReverseZoneFile($subnet, $cidr, $view));
-                    $viewResult['zones'][$zoneName] = [
+            if (!$isSecondary) {
+                foreach ($domains as $domain) {
+                    $hasDomains = true;
+                    $remotePath  = $zonePath . '/' . $viewName . '/' . $domain->getName() . '.zone';
+                    $displayFile = $viewName . '/' . $domain->getName() . '.zone';
+                    $ok = $sftp->put($remotePath, $this->generator->generateZoneFile($domain, $view));
+                    $viewResult['zones'][$domain->getName()] = [
                         'success' => $ok,
                         'file'    => $displayFile,
                         'output'  => $ok ? '' : 'SFTP upload failed',
                     ];
+                }
+
+                foreach ($subnets as $subnet) {
+                    foreach (array_filter([$subnet->getIpv4Cidr(), $subnet->getIpv6Cidr()]) as $cidr) {
+                        $hasDomains  = true;
+                        $zoneName    = $this->generator->reverseZoneName($cidr);
+                        $remotePath  = $zonePath . '/' . $viewName . '/' . $zoneName . '.zone';
+                        $displayFile = $viewName . '/' . $zoneName . '.zone';
+                        $ok = $sftp->put($remotePath, $this->generator->generateReverseZoneFile($subnet, $cidr, $view));
+                        $viewResult['zones'][$zoneName] = [
+                            'success' => $ok,
+                            'file'    => $displayFile,
+                            'output'  => $ok ? '' : 'SFTP upload failed',
+                        ];
+                    }
                 }
             }
 
