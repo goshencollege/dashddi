@@ -1,0 +1,134 @@
+{% extends 'base.html.twig' %}
+{% block title %}Import Preview — {{ domain.name }}{% endblock %}
+
+{% block content %}
+{% set hostNames   = preview.records|filter(r => r.action == 'host_dns_name')|length %}
+{% set dnsRecords  = preview.records|filter(r => r.action == 'dns_record')|length %}
+{% set addViews    = preview.records|filter(r => r.action == 'add_view')|length %}
+{% set skipped     = preview.records|filter(r => r.action == 'skip')|length %}
+{% set totalNew    = hostNames + dnsRecords %}
+{% set totalAction = totalNew + addViews %}
+
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ path('domain_index') }}">Domains</a></li>
+        <li class="breadcrumb-item"><a href="{{ path('domain_show', {id: domain.id}) }}">{{ domain.name }}</a></li>
+        <li class="breadcrumb-item active">Import Preview</li>
+    </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0"><i class="bi bi-list-check me-2"></i>Import Preview — {{ domain.name }}</h1>
+    <a href="{{ path('zone_import_upload', {id: domain.id}) }}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i>Upload Different File
+    </a>
+</div>
+
+{# Summary banner #}
+<div class="alert {{ totalAction > 0 ? 'alert-info' : 'alert-secondary' }} d-flex align-items-center gap-3 mb-4">
+    <i class="bi bi-clipboard-check fs-4"></i>
+    <div>
+        {% if totalAction > 0 %}
+            <strong>{{ totalAction }} item(s) to process</strong>
+            {% if totalNew > 0 %}
+                — {{ dnsRecords }} standalone DNS record(s) and {{ hostNames }} host DNS name(s) will be created
+                {%- if addViews > 0 %}, {{ addViews }} existing record(s) will have view(s) added{% endif %}.
+            {% else %}
+                — {{ addViews }} existing record(s) will have view(s) added.
+            {% endif %}
+        {% else %}
+            <strong>Nothing to import.</strong>
+            All parsed records already exist in the database with the selected view(s).
+        {% endif %}
+        {% if skipped > 0 %}
+            <br><span class="text-muted"><i class="bi bi-skip-forward me-1"></i>{{ skipped }} record(s) will be skipped (already fully up to date).</span>
+        {% endif %}
+        {% if views is not empty %}
+            <br><span class="text-muted small">View(s):
+                {% for view in views %}<strong>{{ view.name }}</strong>{% if not loop.last %}, {% endif %}{% endfor %}
+            </span>
+        {% endif %}
+    </div>
+</div>
+
+{# Records table #}
+<div class="card mb-5">
+    <div class="card-header">
+        <i class="bi bi-globe me-1"></i>Parsed Records
+        <span class="badge bg-primary ms-1">{{ preview.records|length }}</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover table-sm mb-0">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>Value</th>
+                    <th>TTL</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in preview.records %}
+                <tr class="{{ r.action == 'skip' ? 'text-muted' : '' }}">
+                    <td class="font-monospace">{{ r.name }}</td>
+                    <td><span class="badge bg-secondary">{{ r.type }}</span></td>
+                    <td class="font-monospace small">{{ r.value }}</td>
+                    <td class="text-muted small">{{ r.ttl ?: '—' }}</td>
+                    <td>
+                        {% if r.action == 'host_dns_name' %}
+                            <span class="badge bg-success">
+                                <i class="bi bi-plus-lg me-1"></i>Host DNS Name
+                            </span>
+                            {% if r.host_name %}
+                                <span class="d-block text-muted small mt-1">
+                                    <i class="bi bi-pc-display me-1"></i>{{ r.host_name }}
+                                </span>
+                            {% endif %}
+                        {% elseif r.action == 'dns_record' %}
+                            <span class="badge bg-primary">
+                                <i class="bi bi-plus-lg me-1"></i>DNS Record
+                            </span>
+                        {% elseif r.action == 'add_view' %}
+                            <span class="badge bg-warning text-dark">
+                                <i class="bi bi-eye me-1"></i>Add View(s)
+                            </span>
+                            {% if r.host_name %}
+                                <span class="d-block text-muted small mt-1">
+                                    <i class="bi bi-pc-display me-1"></i>{{ r.host_name }}
+                                </span>
+                            {% endif %}
+                        {% else %}
+                            <span class="badge bg-secondary">
+                                <i class="bi bi-check me-1"></i>Skip
+                            </span>
+                            {% if r.skip_reason %}
+                                <span class="d-block text-muted small mt-1">{{ r.skip_reason }}</span>
+                            {% endif %}
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{# Confirm / Cancel #}
+<div class="d-flex gap-2 mt-2">
+    {% if totalAction > 0 %}
+    <form method="post" action="{{ path('zone_import_confirm', {id: domain.id}) }}">
+        <input type="hidden" name="_token" value="{{ csrf_token('zone_import_confirm_' ~ domain.id) }}">
+        <button type="submit" class="btn btn-primary">
+            <i class="bi bi-cloud-upload me-1"></i>Confirm Import ({{ totalAction }} item{{ totalAction != 1 ? 's' : '' }})
+        </button>
+    </form>
+    {% endif %}
+    <a href="{{ path('zone_import_upload', {id: domain.id}) }}" class="btn btn-outline-secondary">
+        <i class="bi bi-x-lg me-1"></i>Cancel
+    </a>
+    <a href="{{ path('domain_show', {id: domain.id}) }}" class="btn btn-outline-secondary">
+        <i class="bi bi-globe me-1"></i>Back to {{ domain.name }}
+    </a>
+</div>
+{% endblock %}

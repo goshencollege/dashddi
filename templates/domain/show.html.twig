@@ -102,9 +102,14 @@
 <div class="card mb-4">
     <div class="card-header d-flex justify-content-between align-items-center">
         <span><i class="bi bi-list-ul me-1"></i>DNS Records ({{ domain.records|length }})</span>
-        <a href="{{ path('domain_record_new', {domainId: domain.id}) }}" class="btn btn-sm btn-primary">
-            <i class="bi bi-plus-lg me-1"></i>Add Record
-        </a>
+        <div class="d-flex gap-2">
+            <a href="{{ path('zone_import_upload', {id: domain.id}) }}" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-upload me-1"></i>Import Zone
+            </a>
+            <a href="{{ path('domain_record_new', {domainId: domain.id}) }}" class="btn btn-sm btn-primary">
+                <i class="bi bi-plus-lg me-1"></i>Add Record
+            </a>
+        </div>
     </div>
     {% if domain.records is empty %}
         <div class="card-body text-center text-muted py-3">

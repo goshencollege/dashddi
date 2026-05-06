@@ -1,0 +1,96 @@
+{% extends 'base.html.twig' %}
+{% block title %}Import Zone File — {{ domain.name }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ path('domain_index') }}">Domains</a></li>
+        <li class="breadcrumb-item"><a href="{{ path('domain_show', {id: domain.id}) }}">{{ domain.name }}</a></li>
+        <li class="breadcrumb-item active">Import Zone File</li>
+    </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0"><i class="bi bi-upload me-2"></i>Import Zone File</h1>
+    <a href="{{ path('domain_show', {id: domain.id}) }}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i>Back to {{ domain.name }}
+    </a>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-7">
+        <div class="card">
+            <div class="card-body p-4">
+                <p class="text-muted mb-4">
+                    Upload a <strong>BIND zone file</strong> to import DNS records into
+                    <strong>{{ domain.name }}</strong>. A records and AAAA records whose IP
+                    addresses match an existing host will be added as <em>host DNS names</em>;
+                    all others will be created as standalone DNS records.
+                    You will be shown a preview before anything is saved.
+                </p>
+
+                <form method="post" action="{{ path('zone_import_upload', {id: domain.id}) }}" enctype="multipart/form-data">
+
+                    <div class="mb-4">
+                        <label for="zone_file" class="form-label fw-semibold">Zone File</label>
+                        <input type="file" class="form-control" id="zone_file" name="zone_file"
+                               accept=".zone,.txt,.conf," required>
+                        <div class="form-text">Standard BIND zone file format (<code>db.example.com</code> or <code>.zone</code>).</div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold">Assign to View(s)</label>
+                        {% if all_views is empty %}
+                            <div class="text-muted small">No DNS views configured — records will have no view assignment.</div>
+                        {% else %}
+                            <div class="d-flex flex-wrap gap-3">
+                                {% for view in all_views %}
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox"
+                                               name="view_ids[]" id="view_{{ view.id }}"
+                                               value="{{ view.id }}"
+                                               {% if domain.views.contains(view) %}checked{% endif %}>
+                                        <label class="form-check-label" for="view_{{ view.id }}">
+                                            {{ view.name }}
+                                            {% if view.description %}
+                                                <span class="text-muted small">({{ view.description }})</span>
+                                            {% endif %}
+                                        </label>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                            <div class="form-text">Imported records will be assigned to the selected view(s). Leave all unchecked for no view assignment.</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-search me-1"></i>Parse &amp; Preview Changes
+                        </button>
+                        <a href="{{ path('domain_show', {id: domain.id}) }}" class="btn btn-outline-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <strong><i class="bi bi-info-circle me-1"></i>Format Notes</strong>
+            </div>
+            <div class="card-body small">
+                <p class="mb-2">Supported record types: <strong>A, AAAA, CNAME, MX, NS, TXT, PTR, SRV</strong>. SOA records and unsupported types are skipped automatically.</p>
+                <pre class="bg-body-secondary rounded p-2 small mb-2">$ORIGIN example.com.
+$TTL 3600
+@    IN  SOA  ns1.example.com. admin.example.com. ( 2024010101 3600 900 604800 3600 )
+@    IN  NS   ns1.example.com.
+@    IN  A    192.168.1.1
+www  IN  A    192.168.1.10
+mail IN  A    192.168.1.20
+@    IN  MX   10 mail.example.com.
+www  IN  AAAA 2001:db8::10</pre>
+                <p class="mb-0 text-muted">If <code>$ORIGIN</code> is omitted, <strong>{{ domain.name }}</strong> is used as the origin.</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
