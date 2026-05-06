@@ -8,11 +8,17 @@ security:
             pattern: ^/(_(profiler|wdt)|assets|build)/
             security: false
 
+        api_kea:
+            pattern: ^/api/kea/
+            security: false
+
         api:
             pattern: ^/api/
             context: main
-            lazy: true
             provider: saml_provider
+            custom_authenticators:
+                - App\Security\SamlAuthenticator
+            entry_point: App\Security\ApiAuthenticationEntryPoint
 
         main:
             lazy: true
@@ -27,5 +33,6 @@ security:
 
     access_control:
         - { path: ^/saml, roles: PUBLIC_ACCESS }
-        - { path: ^/api/, roles: PUBLIC_ACCESS }
+        - { path: ^/api/kea/, roles: PUBLIC_ACCESS }
+        - { path: ^/api/, roles: ROLE_USER }
         - { path: ^/, roles: ROLE_USER }
