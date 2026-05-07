@@ -1,0 +1,481 @@
+{% extends 'base.html.twig' %}
+{% block title %}API Documentation{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+
+    {# ── Sidebar ─────────────────────────────────────────────────────────── #}
+    <div class="col-lg-2 d-none d-lg-block">
+        <nav class="sticky-top pt-1" style="top:1rem">
+            <div class="small fw-semibold text-uppercase text-muted mb-2 ps-2">Contents</div>
+            <ul class="nav flex-column nav-pills nav-fill gap-1 small">
+                <li class="nav-item"><a class="nav-link py-1 px-2 text-start" href="#auth">Authentication</a></li>
+                <li class="nav-item"><a class="nav-link py-1 px-2 text-start" href="#responses">Responses</a></li>
+                <li class="nav-item mt-2">
+                    <span class="small fw-semibold text-uppercase text-muted ps-2">Resources</span>
+                </li>
+                <li class="nav-item"><a class="nav-link py-1 px-2 text-start" href="#hosts">Hosts</a></li>
+                <li class="nav-item"><a class="nav-link py-1 px-2 text-start" href="#interfaces">Interfaces</a></li>
+                <li class="nav-item"><a class="nav-link py-1 px-2 text-start" href="#interface-names">Interface Names</a></li>
+                <li class="nav-item"><a class="nav-link py-1 px-2 text-start" href="#subnets">Subnets</a></li>
+                <li class="nav-item"><a class="nav-link py-1 px-2 text-start" href="#address-blocks">Address Blocks</a></li>
+                <li class="nav-item"><a class="nav-link py-1 px-2 text-start" href="#domains">Domains</a></li>
+                <li class="nav-item"><a class="nav-link py-1 px-2 text-start" href="#domain-records">Domain Records</a></li>
+                <li class="nav-item"><a class="nav-link py-1 px-2 text-start" href="#tags">Tags</a></li>
+                <li class="nav-item"><a class="nav-link py-1 px-2 text-start" href="#dhcp-lease">DHCP Lease</a></li>
+            </ul>
+        </nav>
+    </div>
+
+    {# ── Main content ─────────────────────────────────────────────────────── #}
+    <div class="col-lg-10">
+
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h3 mb-0"><i class="bi bi-file-earmark-code me-2"></i>API Documentation</h1>
+            <a href="{{ path('api_token_index') }}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-key me-1"></i>My Tokens
+            </a>
+        </div>
+
+        {# ── Authentication ──────────────────────────────────────────────── #}
+        <section id="auth" class="mb-5">
+            <h2 class="h5 border-bottom pb-2 mb-3">Authentication</h2>
+            <p>All API endpoints require a Bearer token in the <code>Authorization</code> header. Tokens are created and managed on the <a href="{{ path('api_token_index') }}">API Tokens</a> page.</p>
+            <pre class="bg-dark text-light rounded p-3 small"><code>Authorization: Bearer &lt;your-token&gt;</code></pre>
+            <p class="mb-0 text-muted small">Always use <strong>HTTPS</strong>. HTTP requests will be redirected and the Authorization header will be stripped by the redirect.</p>
+        </section>
+
+        {# ── Common responses ────────────────────────────────────────────── #}
+        <section id="responses" class="mb-5">
+            <h2 class="h5 border-bottom pb-2 mb-3">Common Response Codes</h2>
+            <table class="table table-sm table-bordered mb-0">
+                <thead class="table-light"><tr><th style="width:80px">Code</th><th>Meaning</th></tr></thead>
+                <tbody>
+                    <tr><td><code>200</code></td><td>Success — returns the resource or a list.</td></tr>
+                    <tr><td><code>201</code></td><td>Created — returns the new resource.</td></tr>
+                    <tr><td><code>204</code></td><td>No Content — successful delete, empty body.</td></tr>
+                    <tr><td><code>401</code></td><td>Unauthorized — token missing or invalid.</td></tr>
+                    <tr><td><code>403</code></td><td>Forbidden — token valid but not permitted on this endpoint.</td></tr>
+                    <tr><td><code>404</code></td><td>Not Found — resource ID does not exist.</td></tr>
+                    <tr><td><code>422</code></td><td>Unprocessable Entity — validation error; body contains <code>{"error": "…"}</code>.</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        {# ═══════════════════════════════════════════════════════════════════
+           HOSTS
+           ═══════════════════════════════════════════════════════════════════ #}
+        <section id="hosts" class="mb-5">
+            <h2 class="h5 border-bottom pb-2 mb-3">Hosts <code class="small fw-normal text-muted">/api/hosts</code></h2>
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'GET', path: '/api/hosts', name: 'List hosts',
+                query: [
+                    {name: 'name', type: 'string', desc: 'Partial name match (case-insensitive).'},
+                    {name: 'building_id', type: 'integer', desc: 'Filter by building ID.'},
+                ],
+                response_example: '[\n  {\n    "id": 1,\n    "name": "server01",\n    "room": "A101",\n    "building_id": 3,\n    "tag_ids": [1, 2],\n    "created_at": "2024-01-01T00:00:00+00:00",\n    "updated_at": "2024-01-01T00:00:00+00:00",\n    "created_by": "user@example.com",\n    "updated_by": "user@example.com"\n  }\n]',
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'GET', path: '/api/hosts/{id}', name: 'Get host',
+                response_example: '{\n  "id": 1,\n  "name": "server01",\n  "room": "A101",\n  "building_id": 3,\n  "tag_ids": [1, 2],\n  "created_at": "2024-01-01T00:00:00+00:00",\n  "updated_at": "2024-01-01T00:00:00+00:00",\n  "created_by": "user@example.com",\n  "updated_by": "user@example.com"\n}',
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'POST', path: '/api/hosts', name: 'Create host',
+                body: [
+                    {name: 'name', type: 'string', required: true, desc: 'Host name.'},
+                    {name: 'room', type: 'string', required: false, desc: 'Room or location label.'},
+                    {name: 'building_id', type: 'integer', required: false, desc: 'Building ID.'},
+                    {name: 'tag_ids', type: 'integer[]', required: false, desc: 'Array of tag IDs.'},
+                ],
+                response_status: '201',
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'PATCH', path: '/api/hosts/{id}', name: 'Update host',
+                notes: 'Only include fields you want to change. Omitted fields are left unchanged.',
+                body: [
+                    {name: 'name', type: 'string', required: false, desc: 'Host name.'},
+                    {name: 'room', type: 'string|null', required: false, desc: 'Room label, or null to clear.'},
+                    {name: 'building_id', type: 'integer|null', required: false, desc: 'Building ID, or null to clear.'},
+                    {name: 'tag_ids', type: 'integer[]', required: false, desc: 'Replaces all current tags.'},
+                ],
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'DELETE', path: '/api/hosts/{id}', name: 'Delete host',
+                response_status: '204',
+            } %}
+        </section>
+
+        {# ═══════════════════════════════════════════════════════════════════
+           INTERFACES
+           ═══════════════════════════════════════════════════════════════════ #}
+        <section id="interfaces" class="mb-5">
+            <h2 class="h5 border-bottom pb-2 mb-3">Interfaces <code class="small fw-normal text-muted">/api/interfaces</code></h2>
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'GET', path: '/api/interfaces', name: 'List interfaces',
+                query: [
+                    {name: 'host_id', type: 'integer', desc: 'Filter by host ID.'},
+                    {name: 'subnet_id', type: 'integer', desc: 'Filter by subnet ID.'},
+                    {name: 'mac_address', type: 'string', desc: 'Exact MAC address match.'},
+                ],
+                response_example: '[\n  {\n    "id": 1,\n    "name": "eth0",\n    "mac_address": "aa:bb:cc:dd:ee:ff",\n    "host_id": 1,\n    "subnet_id": 2,\n    "ip_address": "10.0.0.5",\n    "ipv6_address": null,\n    "created_at": "2024-01-01T00:00:00+00:00",\n    "updated_at": "2024-01-01T00:00:00+00:00",\n    "created_by": "user@example.com",\n    "updated_by": "user@example.com"\n  }\n]',
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'GET', path: '/api/interfaces/{id}', name: 'Get interface',
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'POST', path: '/api/interfaces', name: 'Create interface',
+                body: [
+                    {name: 'host_id', type: 'integer', required: true, desc: 'Host this interface belongs to.'},
+                    {name: 'mac_address', type: 'string', required: true, desc: 'MAC address (e.g. aa:bb:cc:dd:ee:ff).'},
+                    {name: 'name', type: 'string', required: false, desc: 'Interface name (e.g. eth0).'},
+                    {name: 'subnet_id', type: 'integer', required: false, desc: 'Subnet ID.'},
+                    {name: 'ip_address', type: 'string', required: false, desc: 'IPv4 address to assign.'},
+                    {name: 'ipv6_address', type: 'string', required: false, desc: 'IPv6 address to assign.'},
+                ],
+                response_status: '201',
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'PATCH', path: '/api/interfaces/{id}', name: 'Update interface',
+                notes: 'Only include fields you want to change.',
+                body: [
+                    {name: 'mac_address', type: 'string', required: false, desc: 'MAC address.'},
+                    {name: 'name', type: 'string|null', required: false, desc: 'Interface name, or null to clear.'},
+                    {name: 'host_id', type: 'integer', required: false, desc: 'Move to a different host.'},
+                    {name: 'subnet_id', type: 'integer|null', required: false, desc: 'Subnet ID, or null to clear.'},
+                    {name: 'ip_address', type: 'string|null', required: false, desc: 'IPv4 address, or null/empty to clear.'},
+                    {name: 'ipv6_address', type: 'string|null', required: false, desc: 'IPv6 address, or null/empty to clear.'},
+                ],
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'DELETE', path: '/api/interfaces/{id}', name: 'Delete interface',
+                response_status: '204',
+            } %}
+        </section>
+
+        {# ═══════════════════════════════════════════════════════════════════
+           INTERFACE NAMES
+           ═══════════════════════════════════════════════════════════════════ #}
+        <section id="interface-names" class="mb-5">
+            <h2 class="h5 border-bottom pb-2 mb-3">Interface Names <code class="small fw-normal text-muted">/api/interface-names</code></h2>
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'GET', path: '/api/interface-names', name: 'List interface names',
+                query: [
+                    {name: 'interface_id', type: 'integer', desc: 'Filter by interface ID.'},
+                    {name: 'domain_id', type: 'integer', desc: 'Filter by domain ID.'},
+                ],
+                response_example: '[\n  {\n    "id": 1,\n    "name": "server01",\n    "fqdn": "server01.example.com",\n    "interface_id": 1,\n    "domain_id": 2,\n    "ttl": 3600,\n    "is_canonical": true,\n    "view_ids": [1]\n  }\n]',
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'GET', path: '/api/interface-names/{id}', name: 'Get interface name',
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'POST', path: '/api/interface-names', name: 'Create interface name',
+                body: [
+                    {name: 'interface_id', type: 'integer', required: true, desc: 'Interface this name belongs to.'},
+                    {name: 'name', type: 'string', required: true, desc: 'Hostname label (without domain).'},
+                    {name: 'domain_id', type: 'integer', required: false, desc: 'Domain ID.'},
+                    {name: 'ttl', type: 'integer', required: false, desc: 'DNS TTL in seconds.'},
+                    {name: 'is_canonical', type: 'boolean', required: false, desc: 'Whether this is the canonical (PTR) name. Default: false.'},
+                    {name: 'view_ids', type: 'integer[]', required: false, desc: 'DNS view IDs.'},
+                ],
+                response_status: '201',
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'PATCH', path: '/api/interface-names/{id}', name: 'Update interface name',
+                notes: 'Only include fields you want to change.',
+                body: [
+                    {name: 'name', type: 'string', required: false, desc: 'Hostname label.'},
+                    {name: 'domain_id', type: 'integer|null', required: false, desc: 'Domain ID, or null to clear.'},
+                    {name: 'ttl', type: 'integer|null', required: false, desc: 'DNS TTL, or null to clear.'},
+                    {name: 'is_canonical', type: 'boolean', required: false, desc: 'Canonical name flag.'},
+                    {name: 'view_ids', type: 'integer[]', required: false, desc: 'Replaces all current views.'},
+                ],
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'DELETE', path: '/api/interface-names/{id}', name: 'Delete interface name',
+                response_status: '204',
+            } %}
+        </section>
+
+        {# ═══════════════════════════════════════════════════════════════════
+           SUBNETS
+           ═══════════════════════════════════════════════════════════════════ #}
+        <section id="subnets" class="mb-5">
+            <h2 class="h5 border-bottom pb-2 mb-3">Subnets <code class="small fw-normal text-muted">/api/subnets</code></h2>
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'GET', path: '/api/subnets', name: 'List subnets',
+                query: [
+                    {name: 'name', type: 'string', desc: 'Partial name match.'},
+                    {name: 'vlan', type: 'integer', desc: 'Exact VLAN number match.'},
+                    {name: 'vrf_id', type: 'integer', desc: 'Filter by VRF ID.'},
+                ],
+                response_example: '[\n  {\n    "id": 1,\n    "name": "Campus LAN",\n    "ipv4_cidr": "10.0.0.0/24",\n    "ipv6_cidr": null,\n    "description": "Main campus network",\n    "vlan": 10,\n    "gateway": "10.0.0.1",\n    "vrf_id": null,\n    "lease_retention_days": 30,\n    "is_container": false,\n    "tag_ids": [],\n    "view_ids": [1],\n    "created_at": "2024-01-01T00:00:00+00:00",\n    "updated_at": "2024-01-01T00:00:00+00:00",\n    "created_by": "user@example.com",\n    "updated_by": "user@example.com"\n  }\n]',
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'GET', path: '/api/subnets/{id}', name: 'Get subnet',
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'POST', path: '/api/subnets', name: 'Create subnet',
+                body: [
+                    {name: 'name', type: 'string', required: true, desc: 'Subnet name.'},
+                    {name: 'ipv4_cidr', type: 'string', required: false, desc: 'IPv4 CIDR (e.g. 10.0.0.0/24).'},
+                    {name: 'ipv6_cidr', type: 'string', required: false, desc: 'IPv6 CIDR.'},
+                    {name: 'description', type: 'string', required: false, desc: 'Free-text description.'},
+                    {name: 'vlan', type: 'integer', required: false, desc: 'VLAN number.'},
+                    {name: 'gateway', type: 'string', required: false, desc: 'Gateway IP address.'},
+                    {name: 'vrf_id', type: 'integer', required: false, desc: 'VRF ID.'},
+                    {name: 'lease_retention_days', type: 'integer', required: false, desc: 'Days to retain DHCP lease records.'},
+                    {name: 'is_container', type: 'boolean', required: false, desc: 'Mark as a container subnet. Default: false.'},
+                    {name: 'tag_ids', type: 'integer[]', required: false, desc: 'Array of tag IDs.'},
+                    {name: 'view_ids', type: 'integer[]', required: false, desc: 'DNS view IDs.'},
+                ],
+                response_status: '201',
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'PATCH', path: '/api/subnets/{id}', name: 'Update subnet',
+                notes: 'Only include fields you want to change.',
+                body: [
+                    {name: 'name', type: 'string', required: false, desc: 'Subnet name.'},
+                    {name: 'ipv4_cidr', type: 'string|null', required: false, desc: 'IPv4 CIDR, or null to clear.'},
+                    {name: 'ipv6_cidr', type: 'string|null', required: false, desc: 'IPv6 CIDR, or null to clear.'},
+                    {name: 'description', type: 'string|null', required: false, desc: 'Description, or null to clear.'},
+                    {name: 'vlan', type: 'integer|null', required: false, desc: 'VLAN number, or null to clear.'},
+                    {name: 'gateway', type: 'string|null', required: false, desc: 'Gateway IP, or null to clear.'},
+                    {name: 'vrf_id', type: 'integer|null', required: false, desc: 'VRF ID, or null to clear.'},
+                    {name: 'lease_retention_days', type: 'integer|null', required: false, desc: 'Retention days, or null to clear.'},
+                    {name: 'is_container', type: 'boolean', required: false, desc: 'Container flag.'},
+                    {name: 'tag_ids', type: 'integer[]', required: false, desc: 'Replaces all current tags.'},
+                    {name: 'view_ids', type: 'integer[]', required: false, desc: 'Replaces all current views.'},
+                ],
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'DELETE', path: '/api/subnets/{id}', name: 'Delete subnet',
+                response_status: '204',
+            } %}
+        </section>
+
+        {# ═══════════════════════════════════════════════════════════════════
+           ADDRESS BLOCKS
+           ═══════════════════════════════════════════════════════════════════ #}
+        <section id="address-blocks" class="mb-5">
+            <h2 class="h5 border-bottom pb-2 mb-3">Address Blocks <code class="small fw-normal text-muted">/api/address-blocks</code></h2>
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'GET', path: '/api/address-blocks', name: 'List address blocks',
+                query: [
+                    {name: 'subnet_id', type: 'integer', desc: 'Filter by subnet ID.'},
+                    {name: 'type', type: 'string', desc: 'Filter by type: <code>reserved</code>, <code>dynamic</code>, or <code>fixed</code>.'},
+                ],
+                response_example: '[\n  {\n    "id": 1,\n    "subnet_id": 2,\n    "type": "dynamic",\n    "label": "DHCP pool",\n    "start_ip": "10.0.0.100",\n    "end_ip": "10.0.0.200",\n    "created_at": "2024-01-01T00:00:00+00:00",\n    "updated_at": "2024-01-01T00:00:00+00:00",\n    "created_by": "user@example.com",\n    "updated_by": "user@example.com"\n  }\n]',
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'GET', path: '/api/address-blocks/{id}', name: 'Get address block',
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'POST', path: '/api/address-blocks', name: 'Create address block',
+                body: [
+                    {name: 'subnet_id', type: 'integer', required: true, desc: 'Subnet this block belongs to.'},
+                    {name: 'type', type: 'string', required: true, desc: 'Block type: <code>reserved</code>, <code>dynamic</code>, or <code>fixed</code>.'},
+                    {name: 'start_ip', type: 'string', required: true, desc: 'First IP address in the range.'},
+                    {name: 'end_ip', type: 'string', required: true, desc: 'Last IP address in the range.'},
+                    {name: 'label', type: 'string', required: false, desc: 'Optional label.'},
+                ],
+                response_status: '201',
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'PATCH', path: '/api/address-blocks/{id}', name: 'Update address block',
+                notes: 'Only include fields you want to change.',
+                body: [
+                    {name: 'subnet_id', type: 'integer', required: false, desc: 'Move to a different subnet.'},
+                    {name: 'type', type: 'string', required: false, desc: 'Block type: <code>reserved</code>, <code>dynamic</code>, or <code>fixed</code>.'},
+                    {name: 'start_ip', type: 'string', required: false, desc: 'First IP address.'},
+                    {name: 'end_ip', type: 'string', required: false, desc: 'Last IP address.'},
+                    {name: 'label', type: 'string|null', required: false, desc: 'Label, or null to clear.'},
+                ],
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'DELETE', path: '/api/address-blocks/{id}', name: 'Delete address block',
+                response_status: '204',
+            } %}
+        </section>
+
+        {# ═══════════════════════════════════════════════════════════════════
+           DOMAINS
+           ═══════════════════════════════════════════════════════════════════ #}
+        <section id="domains" class="mb-5">
+            <h2 class="h5 border-bottom pb-2 mb-3">Domains <code class="small fw-normal text-muted">/api/domains</code></h2>
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'GET', path: '/api/domains', name: 'List domains',
+                query: [
+                    {name: 'name', type: 'string', desc: 'Partial name match.'},
+                ],
+                response_example: '[\n  {\n    "id": 1,\n    "name": "example.com",\n    "description": null,\n    "soa_nameserver": "ns1.example.com",\n    "soa_email": "hostmaster.example.com",\n    "soa_refresh": 3600,\n    "soa_retry": 900,\n    "soa_expire": 604800,\n    "soa_ttl": 300,\n    "view_ids": [1],\n    "created_at": "2024-01-01T00:00:00+00:00",\n    "updated_at": "2024-01-01T00:00:00+00:00",\n    "created_by": "user@example.com",\n    "updated_by": "user@example.com"\n  }\n]',
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'GET', path: '/api/domains/{id}', name: 'Get domain',
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'POST', path: '/api/domains', name: 'Create domain',
+                body: [
+                    {name: 'name', type: 'string', required: true, desc: 'Domain name (e.g. example.com).'},
+                    {name: 'description', type: 'string', required: false, desc: 'Free-text description.'},
+                    {name: 'soa_nameserver', type: 'string', required: false, desc: 'SOA primary nameserver.'},
+                    {name: 'soa_email', type: 'string', required: false, desc: 'SOA contact email (dot-encoded, e.g. hostmaster.example.com).'},
+                    {name: 'soa_refresh', type: 'integer', required: false, desc: 'SOA refresh interval (seconds).'},
+                    {name: 'soa_retry', type: 'integer', required: false, desc: 'SOA retry interval (seconds).'},
+                    {name: 'soa_expire', type: 'integer', required: false, desc: 'SOA expire value (seconds).'},
+                    {name: 'soa_ttl', type: 'integer', required: false, desc: 'SOA minimum/negative-cache TTL (seconds).'},
+                    {name: 'view_ids', type: 'integer[]', required: false, desc: 'DNS view IDs.'},
+                ],
+                response_status: '201',
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'PATCH', path: '/api/domains/{id}', name: 'Update domain',
+                notes: 'Only include fields you want to change.',
+                body: [
+                    {name: 'name', type: 'string', required: false, desc: 'Domain name.'},
+                    {name: 'description', type: 'string|null', required: false, desc: 'Description, or null to clear.'},
+                    {name: 'soa_nameserver', type: 'string|null', required: false, desc: 'SOA nameserver, or null to clear.'},
+                    {name: 'soa_email', type: 'string|null', required: false, desc: 'SOA email, or null to clear.'},
+                    {name: 'soa_refresh', type: 'integer|null', required: false, desc: 'Refresh interval, or null to clear.'},
+                    {name: 'soa_retry', type: 'integer|null', required: false, desc: 'Retry interval, or null to clear.'},
+                    {name: 'soa_expire', type: 'integer|null', required: false, desc: 'Expire value, or null to clear.'},
+                    {name: 'soa_ttl', type: 'integer|null', required: false, desc: 'Minimum TTL, or null to clear.'},
+                    {name: 'view_ids', type: 'integer[]', required: false, desc: 'Replaces all current views.'},
+                ],
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'DELETE', path: '/api/domains/{id}', name: 'Delete domain',
+                response_status: '204',
+            } %}
+        </section>
+
+        {# ═══════════════════════════════════════════════════════════════════
+           DOMAIN RECORDS
+           ═══════════════════════════════════════════════════════════════════ #}
+        <section id="domain-records" class="mb-5">
+            <h2 class="h5 border-bottom pb-2 mb-3">Domain Records <code class="small fw-normal text-muted">/api/domain-records</code></h2>
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'GET', path: '/api/domain-records', name: 'List domain records',
+                query: [
+                    {name: 'domain_id', type: 'integer', desc: 'Filter by domain ID.'},
+                    {name: 'type', type: 'string', desc: 'Filter by record type (A, AAAA, CNAME, MX, NS, TXT, PTR, SRV).'},
+                ],
+                response_example: '[\n  {\n    "id": 1,\n    "domain_id": 1,\n    "hostname": "www",\n    "type": "A",\n    "value": "10.0.0.5",\n    "ttl": 3600,\n    "view_ids": [1],\n    "created_at": "2024-01-01T00:00:00+00:00",\n    "updated_at": "2024-01-01T00:00:00+00:00",\n    "created_by": "user@example.com",\n    "updated_by": "user@example.com"\n  }\n]',
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'GET', path: '/api/domain-records/{id}', name: 'Get domain record',
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'POST', path: '/api/domain-records', name: 'Create domain record',
+                body: [
+                    {name: 'domain_id', type: 'integer', required: true, desc: 'Domain this record belongs to.'},
+                    {name: 'hostname', type: 'string', required: true, desc: 'Hostname label (without domain, e.g. www).'},
+                    {name: 'type', type: 'string', required: true, desc: 'Record type: A, AAAA, CNAME, MX, NS, TXT, PTR, or SRV (case-insensitive).'},
+                    {name: 'value', type: 'string', required: true, desc: 'Record value (IP, hostname, or text depending on type).'},
+                    {name: 'ttl', type: 'integer', required: false, desc: 'TTL in seconds.'},
+                    {name: 'view_ids', type: 'integer[]', required: false, desc: 'DNS view IDs.'},
+                ],
+                response_status: '201',
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'PATCH', path: '/api/domain-records/{id}', name: 'Update domain record',
+                notes: 'Only include fields you want to change.',
+                body: [
+                    {name: 'domain_id', type: 'integer', required: false, desc: 'Move to a different domain.'},
+                    {name: 'hostname', type: 'string', required: false, desc: 'Hostname label.'},
+                    {name: 'type', type: 'string', required: false, desc: 'Record type (A, AAAA, CNAME, MX, NS, TXT, PTR, SRV).'},
+                    {name: 'value', type: 'string', required: false, desc: 'Record value.'},
+                    {name: 'ttl', type: 'integer|null', required: false, desc: 'TTL in seconds, or null to clear.'},
+                    {name: 'view_ids', type: 'integer[]', required: false, desc: 'Replaces all current views.'},
+                ],
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'DELETE', path: '/api/domain-records/{id}', name: 'Delete domain record',
+                response_status: '204',
+            } %}
+        </section>
+
+        {# ═══════════════════════════════════════════════════════════════════
+           TAGS
+           ═══════════════════════════════════════════════════════════════════ #}
+        <section id="tags" class="mb-5">
+            <h2 class="h5 border-bottom pb-2 mb-3">Tags <code class="small fw-normal text-muted">/api/tags</code></h2>
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'GET', path: '/api/tags', name: 'Search tags',
+                notes: 'Returns up to 20 results. If no query is provided, returns the first 20 tags alphabetically.',
+                query: [
+                    {name: 'q', type: 'string', desc: 'Partial name match.'},
+                ],
+                response_example: '[\n  {"value": "1", "text": "production"},\n  {"value": "2", "text": "staging"}\n]',
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'POST', path: '/api/tags', name: 'Create tag',
+                notes: 'Idempotent — if a tag with the given name already exists, it is returned rather than creating a duplicate.',
+                body: [
+                    {name: 'name', type: 'string', required: true, desc: 'Tag name.'},
+                ],
+                response_example: '{"value": "1", "text": "production"}',
+                response_status: '200',
+            } %}
+        </section>
+
+        {# ═══════════════════════════════════════════════════════════════════
+           DHCP LEASE
+           ═══════════════════════════════════════════════════════════════════ #}
+        <section id="dhcp-lease" class="mb-5">
+            <h2 class="h5 border-bottom pb-2 mb-3">DHCP Lease <code class="small fw-normal text-muted">/api/dhcp/lease</code></h2>
+            <p class="text-muted small">Used by DHCP servers to record lease events. The subnet is matched automatically from the IP address.</p>
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'POST', path: '/api/dhcp/lease', name: 'Record DHCP lease',
+                body: [
+                    {name: 'ip-address', type: 'string', required: true, desc: 'Leased IP address.'},
+                    {name: 'hw-address', type: 'string', required: true, desc: 'Client MAC address.'},
+                    {name: 'hostname', type: 'string', required: false, desc: 'Client-provided hostname.'},
+                    {name: 'expire', type: 'integer', required: false, desc: 'Lease expiry as a Unix timestamp.'},
+                ],
+                response_example: '{"id": 42}',
+                response_status: '201',
+            } %}
+        </section>
+
+    </div>{# /col #}
+</div>{# /row #}
+{% endblock %}

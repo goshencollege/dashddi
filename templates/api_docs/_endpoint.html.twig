@@ -1,0 +1,98 @@
+{#
+  Variables:
+    method          string   GET | POST | PATCH | DELETE
+    path            string   e.g. /api/hosts/{id}
+    name            string   Short description
+    query           array    [{name, type, desc}]   (optional)
+    body            array    [{name, type, required, desc}]  (optional)
+    notes           string   Free-text note (optional)
+    response_example string  Raw JSON string (optional)
+    response_status  string  e.g. '201' (default '200', '204' hides example block)
+#}
+{% set method = method ?? 'GET' %}
+{% set response_status = response_status ?? '200' %}
+
+{% set badge_class = {
+    'GET':    'bg-primary',
+    'POST':   'bg-success',
+    'PATCH':  'bg-warning text-dark',
+    'DELETE': 'bg-danger',
+}[method] ?? 'bg-secondary' %}
+
+<div class="card mb-3">
+    <div class="card-header d-flex align-items-center gap-2 py-2">
+        <span class="badge {{ badge_class }} font-monospace" style="min-width:3.5rem">{{ method }}</span>
+        <code class="fw-semibold">{{ path }}</code>
+        <span class="text-muted small ms-1">{{ name }}</span>
+    </div>
+    {% if notes is defined or (query is defined and query) or (body is defined and body) or (response_example is defined and response_status != '204') %}
+    <div class="card-body py-3">
+
+        {% if notes is defined %}
+            <p class="small text-muted mb-3">{{ notes|raw }}</p>
+        {% endif %}
+
+        {% if query is defined and query %}
+        <div class="mb-3">
+            <div class="small fw-semibold text-uppercase text-muted mb-1">Query Parameters</div>
+            <table class="table table-sm table-bordered mb-0 small">
+                <thead class="table-light"><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead>
+                <tbody>
+                    {% for p in query %}
+                    <tr>
+                        <td><code>{{ p.name }}</code></td>
+                        <td class="text-muted">{{ p.type }}</td>
+                        <td>{{ p.desc|raw }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        {% if body is defined and body %}
+        <div class="mb-3">
+            <div class="small fw-semibold text-uppercase text-muted mb-1">Request Body <span class="fw-normal">(JSON)</span></div>
+            <table class="table table-sm table-bordered mb-0 small">
+                <thead class="table-light"><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+                <tbody>
+                    {% for f in body %}
+                    <tr>
+                        <td><code>{{ f.name }}</code></td>
+                        <td class="text-muted font-monospace">{{ f.type }}</td>
+                        <td>
+                            {% if f.required ?? false %}
+                                <span class="badge bg-danger-subtle text-danger-emphasis border border-danger-subtle">required</span>
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ f.desc|raw }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        {% if response_status != '204' %}
+        <div>
+            <div class="small fw-semibold text-uppercase text-muted mb-1">
+                Response
+                <span class="badge bg-success-subtle text-success-emphasis border border-success-subtle ms-1">{{ response_status }}</span>
+            </div>
+            {% if response_example is defined %}
+            <pre class="bg-dark text-light rounded p-3 small mb-0"><code>{{ response_example }}</code></pre>
+            {% else %}
+            <p class="small text-muted mb-0">Returns the resource object. See List endpoint for schema.</p>
+            {% endif %}
+        </div>
+        {% else %}
+        <div class="small text-muted">
+            Returns <span class="badge bg-secondary">204 No Content</span> on success.
+        </div>
+        {% endif %}
+
+    </div>
+    {% endif %}
+</div>
