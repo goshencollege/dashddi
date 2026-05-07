@@ -298,27 +298,28 @@
 
             {% include 'api_docs/_endpoint.html.twig' with {
                 method: 'POST', path: '/api/interfaces', name: 'Create interface',
+                notes: 'For <code>ip_address</code> and <code>ipv6_address</code>, pass <code>"auto"</code> to auto-assign the next available address from the subnet, a specific IP string to assign that address, or omit the field to leave unassigned. For IPv6 only, <code>"auto_v4"</code> derives the address from the interface\'s IPv4 assignment. The interface must have a <code>subnet_id</code> with the appropriate CIDR for auto-assignment.',
                 body: [
                     {name: 'host_id', type: 'integer', required: true, desc: 'Host this interface belongs to.'},
                     {name: 'mac_address', type: 'string', required: true, desc: 'MAC address (e.g. aa:bb:cc:dd:ee:ff).'},
                     {name: 'name', type: 'string', required: false, desc: 'Interface name (e.g. eth0).'},
-                    {name: 'subnet_id', type: 'integer', required: false, desc: 'Subnet ID.'},
-                    {name: 'ip_address', type: 'string', required: false, desc: 'IPv4 address to assign.'},
-                    {name: 'ipv6_address', type: 'string', required: false, desc: 'IPv6 address to assign.'},
+                    {name: 'subnet_id', type: 'integer', required: false, desc: 'Subnet ID. Required for auto IP assignment.'},
+                    {name: 'ip_address', type: 'string|null', required: false, desc: '<code>"auto"</code> to auto-assign, a specific IPv4, or omit to leave unassigned.'},
+                    {name: 'ipv6_address', type: 'string|null', required: false, desc: '<code>"auto"</code> to auto-assign, <code>"auto_v4"</code> to derive from IPv4, a specific IPv6, or omit to leave unassigned.'},
                 ],
                 response_status: '201',
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
                 method: 'PATCH', path: '/api/interfaces/{id}', name: 'Update interface',
-                notes: 'Only include fields you want to change.',
+                notes: 'Only include fields you want to change. Sending <code>ip_address</code> or <code>ipv6_address</code> always releases the existing address first, then applies the new value. Pass <code>null</code> or <code>""</code> to clear without reassigning.',
                 body: [
                     {name: 'mac_address', type: 'string', required: false, desc: 'MAC address.'},
                     {name: 'name', type: 'string|null', required: false, desc: 'Interface name, or null to clear.'},
                     {name: 'host_id', type: 'integer', required: false, desc: 'Move to a different host.'},
                     {name: 'subnet_id', type: 'integer|null', required: false, desc: 'Subnet ID, or null to clear.'},
-                    {name: 'ip_address', type: 'string|null', required: false, desc: 'IPv4 address, or null/empty to clear.'},
-                    {name: 'ipv6_address', type: 'string|null', required: false, desc: 'IPv6 address, or null/empty to clear.'},
+                    {name: 'ip_address', type: 'string|null', required: false, desc: '<code>"auto"</code> to auto-assign, a specific IPv4, or null/empty to clear.'},
+                    {name: 'ipv6_address', type: 'string|null', required: false, desc: '<code>"auto"</code> to auto-assign, <code>"auto_v4"</code> to derive from IPv4, a specific IPv6, or null/empty to clear.'},
                 ],
             } %}
 
