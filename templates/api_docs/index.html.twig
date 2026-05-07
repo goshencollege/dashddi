@@ -14,6 +14,7 @@
                 <li class="nav-item mt-2">
                     <span class="small fw-semibold text-uppercase text-muted ps-2">Resources</span>
                 </li>
+                <li class="nav-item"><a class="nav-link py-1 px-2 text-start" href="#buildings">Buildings</a></li>
                 <li class="nav-item"><a class="nav-link py-1 px-2 text-start" href="#hosts">Hosts</a></li>
                 <li class="nav-item"><a class="nav-link py-1 px-2 text-start" href="#interfaces">Interfaces</a></li>
                 <li class="nav-item"><a class="nav-link py-1 px-2 text-start" href="#interface-names">Interface Names</a></li>
@@ -60,6 +61,49 @@
                     <tr><td><code>422</code></td><td>Unprocessable Entity — validation error; body contains <code>{"error": "…"}</code>.</td></tr>
                 </tbody>
             </table>
+        </section>
+
+        {# ═══════════════════════════════════════════════════════════════════
+           BUILDINGS
+           ═══════════════════════════════════════════════════════════════════ #}
+        <section id="buildings" class="mb-5">
+            <h2 class="h5 border-bottom pb-2 mb-3">Buildings <code class="small fw-normal text-muted">/api/buildings</code></h2>
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'GET', path: '/api/buildings', name: 'List buildings',
+                query: [
+                    {name: 'name', type: 'string', desc: 'Partial name match (case-insensitive).'},
+                ],
+                response_example: '[\n  {\n    "id": 1,\n    "name": "Science Hall",\n    "description": "Main science building"\n  }\n]',
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'GET', path: '/api/buildings/{id}', name: 'Get building',
+                response_example: '{\n  "id": 1,\n  "name": "Science Hall",\n  "description": "Main science building"\n}',
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'POST', path: '/api/buildings', name: 'Create building',
+                body: [
+                    {name: 'name', type: 'string', required: true, desc: 'Building name (must be unique).'},
+                    {name: 'description', type: 'string', required: false, desc: 'Free-text description.'},
+                ],
+                response_status: '201',
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'PATCH', path: '/api/buildings/{id}', name: 'Update building',
+                notes: 'Only include fields you want to change.',
+                body: [
+                    {name: 'name', type: 'string', required: false, desc: 'Building name (must be unique).'},
+                    {name: 'description', type: 'string|null', required: false, desc: 'Description, or null to clear.'},
+                ],
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'DELETE', path: '/api/buildings/{id}', name: 'Delete building',
+                response_status: '204',
+            } %}
         </section>
 
         {# ═══════════════════════════════════════════════════════════════════
