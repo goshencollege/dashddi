@@ -15,6 +15,8 @@
                     <span class="small fw-semibold text-uppercase text-muted ps-2">Resources</span>
                 </li>
                 <li class="nav-item"><a class="nav-link py-1 px-2 text-start" href="#buildings">Buildings</a></li>
+                <li class="nav-item"><a class="nav-link py-1 px-2 text-start" href="#dns-servers">DNS Servers</a></li>
+                <li class="nav-item"><a class="nav-link py-1 px-2 text-start" href="#dhcp-servers">DHCP Servers</a></li>
                 <li class="nav-item"><a class="nav-link py-1 px-2 text-start" href="#hosts">Hosts</a></li>
                 <li class="nav-item"><a class="nav-link py-1 px-2 text-start" href="#interfaces">Interfaces</a></li>
                 <li class="nav-item"><a class="nav-link py-1 px-2 text-start" href="#interface-names">Interface Names</a></li>
@@ -103,6 +105,126 @@
             {% include 'api_docs/_endpoint.html.twig' with {
                 method: 'DELETE', path: '/api/buildings/{id}', name: 'Delete building',
                 response_status: '204',
+            } %}
+        </section>
+
+        {# ═══════════════════════════════════════════════════════════════════
+           DNS SERVERS
+           ═══════════════════════════════════════════════════════════════════ #}
+        <section id="dns-servers" class="mb-5">
+            <h2 class="h5 border-bottom pb-2 mb-3">DNS Servers <code class="small fw-normal text-muted">/api/dns-servers</code></h2>
+            <p class="text-muted small">SSH keys are generated automatically when a server is created. The <code>ssh_public_key</code> value must be added to <code>authorized_keys</code> on the server. Private keys are never returned by the API.</p>
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'GET', path: '/api/dns-servers', name: 'List DNS servers',
+                response_example: '[\n  {\n    "id": 1,\n    "name": "ns1",\n    "hostname": "ns1.example.com",\n    "ssh_user": "root",\n    "ssh_public_key": "ssh-ed25519 AAAA...",\n    "remote_zone_path": "/etc/bind/zones",\n    "key_directory": null,\n    "server_type": "primary",\n    "primary_hostname": null,\n    "description": null,\n    "view_ids": [1],\n    "created_at": "2024-01-01T00:00:00+00:00",\n    "updated_at": "2024-01-01T00:00:00+00:00",\n    "created_by": "user@example.com",\n    "updated_by": "user@example.com"\n  }\n]',
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'GET', path: '/api/dns-servers/{id}', name: 'Get DNS server',
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'POST', path: '/api/dns-servers', name: 'Create DNS server',
+                notes: 'An SSH key pair is generated automatically. Copy the <code>ssh_public_key</code> from the response to <code>authorized_keys</code> on the target server.',
+                body: [
+                    {name: 'name', type: 'string', required: true, desc: 'Display name.'},
+                    {name: 'hostname', type: 'string', required: true, desc: 'Hostname or IP used for SSH connections.'},
+                    {name: 'ssh_user', type: 'string', required: false, desc: 'SSH login user. Default: <code>root</code>.'},
+                    {name: 'remote_zone_path', type: 'string', required: false, desc: 'Path on the server where zone files are written. Default: <code>/etc/bind/zones</code>.'},
+                    {name: 'key_directory', type: 'string', required: false, desc: 'DNSSEC key directory path.'},
+                    {name: 'server_type', type: 'string', required: false, desc: 'Server role: <code>primary</code> or <code>secondary</code>. Default: <code>primary</code>.'},
+                    {name: 'primary_hostname', type: 'string', required: false, desc: 'Primary server hostname (for secondary servers).'},
+                    {name: 'description', type: 'string', required: false, desc: 'Free-text description.'},
+                    {name: 'view_ids', type: 'integer[]', required: false, desc: 'DNS view IDs. Secondary servers may only have one view.'},
+                ],
+                response_status: '201',
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'PATCH', path: '/api/dns-servers/{id}', name: 'Update DNS server',
+                notes: 'Only include fields you want to change. SSH keys cannot be updated via this endpoint.',
+                body: [
+                    {name: 'name', type: 'string', required: false, desc: 'Display name.'},
+                    {name: 'hostname', type: 'string', required: false, desc: 'Hostname or IP.'},
+                    {name: 'ssh_user', type: 'string', required: false, desc: 'SSH login user.'},
+                    {name: 'remote_zone_path', type: 'string', required: false, desc: 'Zone file path on server.'},
+                    {name: 'key_directory', type: 'string|null', required: false, desc: 'DNSSEC key directory, or null to clear.'},
+                    {name: 'server_type', type: 'string', required: false, desc: '<code>primary</code> or <code>secondary</code>.'},
+                    {name: 'primary_hostname', type: 'string|null', required: false, desc: 'Primary hostname, or null to clear.'},
+                    {name: 'description', type: 'string|null', required: false, desc: 'Description, or null to clear.'},
+                    {name: 'view_ids', type: 'integer[]', required: false, desc: 'Replaces all current views.'},
+                ],
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'DELETE', path: '/api/dns-servers/{id}', name: 'Delete DNS server',
+                response_status: '204',
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'POST', path: '/api/dns-servers/{id}/push', name: 'Push config to DNS server',
+                notes: 'Generates zone files and deploys them to the server via SSH, then reloads BIND.',
+                response_example: '{\n  "views": {\n    "internal": {"success": true, "zones_written": 3}\n  },\n  "reload": {"success": true, "output": ""}\n}',
+            } %}
+        </section>
+
+        {# ═══════════════════════════════════════════════════════════════════
+           DHCP SERVERS
+           ═══════════════════════════════════════════════════════════════════ #}
+        <section id="dhcp-servers" class="mb-5">
+            <h2 class="h5 border-bottom pb-2 mb-3">DHCP Servers <code class="small fw-normal text-muted">/api/dhcp-servers</code></h2>
+            <p class="text-muted small">SSH keys are generated automatically when a server is created. The <code>ssh_public_key</code> value must be added to <code>authorized_keys</code> on the server. Private keys and control passwords are never returned by the API.</p>
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'GET', path: '/api/dhcp-servers', name: 'List DHCP servers',
+                response_example: '[\n  {\n    "id": 1,\n    "name": "dhcp1",\n    "hostname": "dhcp1.example.com",\n    "ssh_user": "root",\n    "ssh_public_key": "ssh-ed25519 AAAA...",\n    "remote_path": "/etc/kea",\n    "control_url": "http://localhost:8000",\n    "control_user": "kea",\n    "description": null,\n    "created_at": "2024-01-01T00:00:00+00:00",\n    "updated_at": "2024-01-01T00:00:00+00:00",\n    "created_by": "user@example.com",\n    "updated_by": "user@example.com"\n  }\n]',
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'GET', path: '/api/dhcp-servers/{id}', name: 'Get DHCP server',
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'POST', path: '/api/dhcp-servers', name: 'Create DHCP server',
+                notes: 'An SSH key pair is generated automatically. Copy the <code>ssh_public_key</code> from the response to <code>authorized_keys</code> on the target server.',
+                body: [
+                    {name: 'name', type: 'string', required: true, desc: 'Display name.'},
+                    {name: 'hostname', type: 'string', required: true, desc: 'Hostname or IP used for SSH connections.'},
+                    {name: 'ssh_user', type: 'string', required: false, desc: 'SSH login user. Default: <code>root</code>.'},
+                    {name: 'remote_path', type: 'string', required: false, desc: 'Path on the server where config files are written. Default: <code>/etc/kea</code>.'},
+                    {name: 'control_url', type: 'string', required: false, desc: 'Kea control agent URL for config reload (e.g. <code>http://localhost:8000</code>).'},
+                    {name: 'control_user', type: 'string', required: false, desc: 'HTTP basic auth username for control agent.'},
+                    {name: 'control_password', type: 'string', required: false, desc: 'HTTP basic auth password for control agent. Write-only — never returned.'},
+                    {name: 'description', type: 'string', required: false, desc: 'Free-text description.'},
+                ],
+                response_status: '201',
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'PATCH', path: '/api/dhcp-servers/{id}', name: 'Update DHCP server',
+                notes: 'Only include fields you want to change. SSH keys cannot be updated via this endpoint. Sending <code>control_password</code> replaces the stored password.',
+                body: [
+                    {name: 'name', type: 'string', required: false, desc: 'Display name.'},
+                    {name: 'hostname', type: 'string', required: false, desc: 'Hostname or IP.'},
+                    {name: 'ssh_user', type: 'string', required: false, desc: 'SSH login user.'},
+                    {name: 'remote_path', type: 'string', required: false, desc: 'Config file path on server.'},
+                    {name: 'control_url', type: 'string|null', required: false, desc: 'Control agent URL, or null to clear.'},
+                    {name: 'control_user', type: 'string|null', required: false, desc: 'Control agent username, or null to clear.'},
+                    {name: 'control_password', type: 'string|null', required: false, desc: 'Control agent password, or null to clear.'},
+                    {name: 'description', type: 'string|null', required: false, desc: 'Description, or null to clear.'},
+                ],
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'DELETE', path: '/api/dhcp-servers/{id}', name: 'Delete DHCP server',
+                response_status: '204',
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'POST', path: '/api/dhcp-servers/{id}/push', name: 'Push config to DHCP server',
+                notes: 'Generates Kea config files and deploys them to the server via SSH, then signals Kea to reload via the control agent.',
+                response_example: '{\n  "dhcp4": {"success": true, "output": "", "file": "subnets4.json"},\n  "dhcp6": {"success": true, "output": "", "file": "subnets6.json"}\n}',
             } %}
         </section>
 
