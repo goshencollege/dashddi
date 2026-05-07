@@ -3,8 +3,6 @@
 namespace App\Controller;
 
 use App\Entity\Host;
-use App\Entity\IpAddress;
-use App\Entity\Ipv6Address;
 use App\Entity\NetworkInterface;
 use App\Entity\Subnet;
 use App\Repository\IpAddressRepository;
@@ -12,6 +10,7 @@ use App\Repository\Ipv6AddressRepository;
 use App\Repository\NetworkInterfaceRepository;
 use App\Repository\SubnetRepository;
 use App\Service\DhcpConfigParser;
+use App\Service\IpAddressManager;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -100,6 +99,7 @@ class ImportController extends AbstractController
         Request $request,
         EntityManagerInterface $em,
         SubnetRepository $subnetRepo,
+        IpAddressManager $ipManager,
     ): Response {
         if (!$this->isCsrfTokenValid('dhcp_import_confirm', $request->request->get('_token'))) {
             $this->addFlash('danger', 'Invalid CSRF token.');
@@ -184,25 +184,17 @@ class ImportController extends AbstractController
                 $iface->setMacAddress($r['mac']);
                 $iface->setSubnet($subnet);
 
-                if ($r['ipv4'] && $subnet) {
-                    $ip = new IpAddress();
-                    $ip->setAddress($r['ipv4']);
-                    $ip->setSubnet($subnet);
-                    $iface->setIpAddress($ip);
-                    $em->persist($ip);
-                }
-
-                if ($r['ipv6'] && $subnet) {
-                    $ip6 = new Ipv6Address();
-                    $ip6->setAddress($r['ipv6']);
-                    $ip6->setSubnet($subnet);
-                    $iface->setIpv6Address($ip6);
-                    $em->persist($ip6);
-                }
-
                 $host->addInterface($iface);
                 $em->persist($host);
                 $em->persist($iface);
+
+                if ($r['ipv4'] && $subnet) {
+                    $ipManager->assignIpv4($iface, $r['ipv4']);
+                }
+
+                if ($r['ipv6'] && $subnet) {
+                    $ipManager->assignIpv6($iface, $r['ipv6']);
+                }
                 $hostsCreated++;
             }
             if ($hostsCreated > 0) {
@@ -293,6 +285,9 @@ class ImportController extends AbstractController
             }
         }
 
+        $seenIpv4 = []; // track IPs claimed within this batch to catch intra-file duplicates
+        $seenIpv6 = [];
+
         foreach ($parsed['reservations'] as $r) {
             $mac   = $this->normalizeMac($r['mac']);
             $iface = ($mac !== '00:00:00:00:00:00') ? ($ifaceByMac[$mac] ?? null) : null;
@@ -312,11 +307,19 @@ class ImportController extends AbstractController
             }
 
             $conflicts = [];
-            if ($r['ipv4'] && isset($usedIpv4[$r['ipv4']])) {
-                $conflicts[] = 'IPv4 ' . $r['ipv4'] . ' already assigned';
+            if ($r['ipv4']) {
+                if (isset($usedIpv4[$r['ipv4']]) || isset($seenIpv4[$r['ipv4']])) {
+                    $conflicts[] = 'IPv4 ' . $r['ipv4'] . ' already assigned';
+                } else {
+                    $seenIpv4[$r['ipv4']] = true;
+                }
             }
-            if ($r['ipv6'] && isset($usedIpv6[$r['ipv6']])) {
-                $conflicts[] = 'IPv6 ' . $r['ipv6'] . ' already assigned';
+            if ($r['ipv6']) {
+                if (isset($usedIpv6[$r['ipv6']]) || isset($seenIpv6[$r['ipv6']])) {
+                    $conflicts[] = 'IPv6 ' . $r['ipv6'] . ' already assigned';
+                } else {
+                    $seenIpv6[$r['ipv6']] = true;
+                }
             }
 
             $preview['reservations'][] = [

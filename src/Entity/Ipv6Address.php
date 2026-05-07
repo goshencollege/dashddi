@@ -15,7 +15,7 @@ class Ipv6Address
     #[ORM\Column]
     private ?int $id = null;
 
-    #[ORM\Column(length: 100)]
+    #[ORM\Column(length: 100, unique: true)]
     #[Assert\NotBlank]
     #[Assert\Ip(version: 6, message: 'Must be a valid IPv6 address')]
     private string $address = '';
