@@ -81,6 +81,26 @@ class ApiTokenController extends AbstractController
         ]);
     }
 
+    #[Route('/{id}/regenerate', name: 'api_token_regenerate', methods: ['POST'])]
+    public function regenerate(Request $request, ApiToken $token, EntityManagerInterface $em): Response
+    {
+        if ($token->getOwnerIdentifier() !== $this->getUser()->getUserIdentifier()) {
+            throw $this->createAccessDeniedException();
+        }
+
+        if (!$this->isCsrfTokenValid('regenerate_api_token_' . $token->getId(), $request->request->get('_token'))) {
+            $this->addFlash('danger', 'Invalid CSRF token.');
+            return $this->redirectToRoute('api_token_index');
+        }
+
+        $raw = bin2hex(random_bytes(32));
+        $token->setTokenHash(hash('sha256', $raw));
+        $em->flush();
+
+        $request->getSession()->set('_new_api_token', $raw);
+        return $this->redirectToRoute('api_token_created', ['id' => $token->getId()]);
+    }
+
     #[Route('/{id}/delete', name: 'api_token_delete', methods: ['POST'])]
     public function delete(Request $request, ApiToken $token, EntityManagerInterface $em): Response
     {

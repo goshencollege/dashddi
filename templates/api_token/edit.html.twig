@@ -9,7 +9,7 @@
     </a>
 </div>
 
-{{ form_start(form, {attr: {class: 'card'}}) }}
+{{ form_start(form, {attr: {class: 'card mb-3'}}) }}
 <div class="card-body">
     <div class="mb-3">
         {{ form_label(form.name, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
@@ -44,4 +44,12 @@
     </button>
 </div>
 {{ form_end(form) }}
+
+<form method="post" action="{{ path('api_token_regenerate', {id: token.id}) }}"
+      onsubmit="return confirm('Regenerate token \'{{ token.name|e('js') }}\'? The current token will stop working immediately.')">
+    <input type="hidden" name="_token" value="{{ csrf_token('regenerate_api_token_' ~ token.id) }}">
+    <button type="submit" class="btn btn-outline-warning">
+        <i class="bi bi-arrow-clockwise me-1"></i>Regenerate Token
+    </button>
+</form>
 {% endblock %}
