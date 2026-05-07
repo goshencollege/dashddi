@@ -15,7 +15,7 @@ class IpAddress
     #[ORM\Column]
     private ?int $id = null;
 
-    #[ORM\Column(length: 50)]
+    #[ORM\Column(length: 50, unique: true)]
     #[Assert\NotBlank]
     #[Assert\Ip(version: 4, message: 'Must be a valid IPv4 address')]
     private string $address = '';
