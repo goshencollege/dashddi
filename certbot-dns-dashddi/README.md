@@ -4,16 +4,13 @@ A Certbot DNS authenticator plugin that uses the [DashDDI](https://github.com/yo
 
 ## Installation
 
-Install the plugin into the same Python environment as Certbot:
+Certbot and the plugin must share the same Python environment. On modern Debian/Ubuntu systems, install both into a virtualenv to avoid the `externally-managed-environment` error:
 
 ```bash
-pip install /path/to/certbot-dns-dashddi
-```
-
-Or directly from the repository:
-
-```bash
-pip install git+https://github.com/davidwkdavidwk/dashddi/#subdirectory=certbot-dns-dashddi
+python3 -m venv /opt/certbot
+/opt/certbot/bin/pip install certbot
+/opt/certbot/bin/pip install git+https://github.com/davidwkdavidwk/dashddi/#subdirectory=certbot-dns-dashddi
+ln -s /opt/certbot/bin/certbot /usr/local/bin/certbot
 ```
 
 Verify the plugin is detected:
@@ -23,6 +20,8 @@ certbot plugins
 ```
 
 You should see `dns-dashddi` in the list.
+
+> **Note:** If you later upgrade Certbot (`/opt/certbot/bin/pip install --upgrade certbot`), re-run the plugin install line to keep the two in sync.
 
 ## Setup
 
