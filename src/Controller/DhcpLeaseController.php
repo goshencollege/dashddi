@@ -49,7 +49,7 @@ class DhcpLeaseController extends AbstractController
         ]);
     }
 
-    #[Route('/api/kea/lease', name: 'api_kea_lease', methods: ['POST'])]
+    #[Route('/api/dhcp/lease', name: 'api_dhcp_lease', methods: ['POST'])]
     public function receiveLease(
         Request $request,
         EntityManagerInterface $em,
