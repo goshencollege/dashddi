@@ -2,12 +2,11 @@
 
 namespace App\Controller\Api;
 
-use App\Entity\IpAddress;
-use App\Entity\Ipv6Address;
 use App\Entity\NetworkInterface;
 use App\Repository\HostRepository;
 use App\Repository\NetworkInterfaceRepository;
 use App\Repository\SubnetRepository;
+use App\Service\IpAddressManager;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -50,6 +49,7 @@ class InterfaceApiController extends AbstractController
         EntityManagerInterface $em,
         HostRepository $hostRepo,
         SubnetRepository $subnetRepo,
+        IpAddressManager $ipManager,
     ): JsonResponse {
         $data = json_decode($request->getContent(), true) ?? [];
 
@@ -78,9 +78,15 @@ class InterfaceApiController extends AbstractController
             $iface->setSubnet($subnet);
         }
 
-        $this->applyIpAddresses($iface, $data, $em);
-
         $em->persist($iface);
+
+        if ($error = $this->applyIpv4($iface, $data, $ipManager)) {
+            return $this->json(['error' => $error], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+        if ($error = $this->applyIpv6($iface, $data, $ipManager)) {
+            return $this->json(['error' => $error], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
         $em->flush();
 
         return $this->json($this->serialize($iface), Response::HTTP_CREATED);
@@ -93,6 +99,7 @@ class InterfaceApiController extends AbstractController
         EntityManagerInterface $em,
         HostRepository $hostRepo,
         SubnetRepository $subnetRepo,
+        IpAddressManager $ipManager,
     ): JsonResponse {
         $data = json_decode($request->getContent(), true) ?? [];
 
@@ -123,8 +130,18 @@ class InterfaceApiController extends AbstractController
             $interface->setSubnet($subnet);
         }
 
-        if (array_key_exists('ip_address', $data) || array_key_exists('ipv6_address', $data)) {
-            $this->applyIpAddresses($interface, $data, $em);
+        if (array_key_exists('ip_address', $data)) {
+            $ipManager->releaseIpv4($interface);
+            if ($error = $this->applyIpv4($interface, $data, $ipManager, isEdit: true)) {
+                return $this->json(['error' => $error], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+        }
+
+        if (array_key_exists('ipv6_address', $data)) {
+            $ipManager->releaseIpv6($interface);
+            if ($error = $this->applyIpv6($interface, $data, $ipManager, isEdit: true)) {
+                return $this->json(['error' => $error], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
         }
 
         $em->flush();
@@ -141,37 +158,99 @@ class InterfaceApiController extends AbstractController
         return $this->json(null, Response::HTTP_NO_CONTENT);
     }
 
-    private function applyIpAddresses(NetworkInterface $iface, array $data, EntityManagerInterface $em): void
+    /**
+     * Handles ip_address field. Values:
+     *   "auto"       – assign next available IPv4 from the interface's subnet
+     *   "<ip>"       – assign the specified address (validated)
+     *   null / ""    – release / leave unassigned
+     *
+     * Returns an error string on failure, null on success.
+     */
+    private function applyIpv4(NetworkInterface $iface, array $data, IpAddressManager $ipManager, bool $isEdit = false): ?string
     {
-        if (array_key_exists('ip_address', $data)) {
-            $existing = $iface->getIpAddress();
-            if (empty($data['ip_address'])) {
-                $iface->setIpAddress(null);
-            } else {
-                $ip = $existing ?? new IpAddress();
-                $ip->setAddress($data['ip_address']);
-                $ip->setSubnet($iface->getSubnet());
-                if (!$existing) {
-                    $em->persist($ip);
-                }
-                $iface->setIpAddress($ip);
-            }
+        $value = $data['ip_address'] ?? null;
+        if (empty($value)) {
+            return null;
         }
 
-        if (array_key_exists('ipv6_address', $data)) {
-            $existing = $iface->getIpv6Address();
-            if (empty($data['ipv6_address'])) {
-                $iface->setIpv6Address(null);
-            } else {
-                $ip = $existing ?? new Ipv6Address();
-                $ip->setAddress($data['ipv6_address']);
-                $ip->setSubnet($iface->getSubnet());
-                if (!$existing) {
-                    $em->persist($ip);
-                }
-                $iface->setIpv6Address($ip);
+        $subnet = $iface->getSubnet();
+
+        if ($value === 'auto') {
+            if (!$subnet?->getIpv4Cidr()) {
+                return 'Cannot auto-assign IPv4: the interface has no subnet with an IPv4 CIDR.';
+            }
+            $ip = $ipManager->findNextAvailableIpv4($subnet);
+            if (!$ip) {
+                return 'No available IPv4 addresses in subnet ' . $subnet->getIpv4Cidr() . '.';
+            }
+            $ipManager->assignIpv4($iface, $ip);
+            return null;
+        }
+
+        if ($subnet) {
+            $error = $ipManager->validateSpecifiedIpv4($value, $subnet, $isEdit ? $iface : null);
+            if ($error) {
+                return $error;
             }
         }
+        $ipManager->assignIpv4($iface, $value);
+        return null;
+    }
+
+    /**
+     * Handles ipv6_address field. Values:
+     *   "auto"       – assign next available IPv6 from the interface's subnet (uses MAC for EUI-64)
+     *   "auto_v4"    – derive IPv6 from the interface's current IPv4 address
+     *   "<ip>"       – assign the specified address (validated)
+     *   null / ""    – release / leave unassigned
+     *
+     * Returns an error string on failure, null on success.
+     */
+    private function applyIpv6(NetworkInterface $iface, array $data, IpAddressManager $ipManager, bool $isEdit = false): ?string
+    {
+        $value = $data['ipv6_address'] ?? null;
+        if (empty($value)) {
+            return null;
+        }
+
+        $subnet = $iface->getSubnet();
+
+        if ($value === 'auto') {
+            if (!$subnet?->getIpv6Cidr()) {
+                return 'Cannot auto-assign IPv6: the interface has no subnet with an IPv6 CIDR.';
+            }
+            $ip = $ipManager->findNextAvailableIpv6($subnet, $iface->getMacAddress());
+            if (!$ip) {
+                return 'No available IPv6 addresses in subnet ' . $subnet->getIpv6Cidr() . '.';
+            }
+            $ipManager->assignIpv6($iface, $ip);
+            return null;
+        }
+
+        if ($value === 'auto_v4') {
+            if (!$subnet?->getIpv6Cidr()) {
+                return 'Cannot auto-assign IPv6 from IPv4: the interface has no subnet with an IPv6 CIDR.';
+            }
+            $ipv4 = $iface->getIpAddress()?->getAddress();
+            if (!$ipv4) {
+                return 'Cannot auto-assign IPv6 from IPv4: the interface has no IPv4 address. Assign one first or in the same request.';
+            }
+            $ip = $ipManager->findIpv6FromIpv4($subnet, $ipv4);
+            if (!$ip) {
+                return 'Could not derive an IPv6 address from ' . $ipv4 . ' within ' . $subnet->getIpv6Cidr() . '.';
+            }
+            $ipManager->assignIpv6($iface, $ip);
+            return null;
+        }
+
+        if ($subnet) {
+            $error = $ipManager->validateSpecifiedIpv6($value, $subnet, $isEdit ? $iface : null);
+            if ($error) {
+                return $error;
+            }
+        }
+        $ipManager->assignIpv6($iface, $value);
+        return null;
     }
 
     private function serialize(NetworkInterface $iface): array
