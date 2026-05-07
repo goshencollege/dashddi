@@ -122,23 +122,33 @@ class InterfaceApiController extends AbstractController
             $interface->setHost($host);
         }
 
+        $subnetChanged = false;
         if (array_key_exists('subnet_id', $data)) {
             $subnet = $data['subnet_id'] ? $subnetRepo->find($data['subnet_id']) : null;
             if ($data['subnet_id'] && !$subnet) {
                 return $this->json(['error' => 'subnet_id not found'], Response::HTTP_UNPROCESSABLE_ENTITY);
             }
+            $subnetChanged = $subnet !== $interface->getSubnet();
+            if ($subnetChanged) {
+                $ipManager->releaseIpv4($interface);
+                $ipManager->releaseIpv6($interface);
+            }
             $interface->setSubnet($subnet);
         }
 
         if (array_key_exists('ip_address', $data)) {
-            $ipManager->releaseIpv4($interface);
+            if (!$subnetChanged) {
+                $ipManager->releaseIpv4($interface);
+            }
             if ($error = $this->applyIpv4($interface, $data, $ipManager, isEdit: true)) {
                 return $this->json(['error' => $error], Response::HTTP_UNPROCESSABLE_ENTITY);
             }
         }
 
         if (array_key_exists('ipv6_address', $data)) {
-            $ipManager->releaseIpv6($interface);
+            if (!$subnetChanged) {
+                $ipManager->releaseIpv6($interface);
+            }
             if ($error = $this->applyIpv6($interface, $data, $ipManager, isEdit: true)) {
                 return $this->json(['error' => $error], Response::HTTP_UNPROCESSABLE_ENTITY);
             }
