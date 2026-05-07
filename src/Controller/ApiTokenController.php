@@ -95,6 +95,7 @@ class ApiTokenController extends AbstractController
 
         $raw = bin2hex(random_bytes(32));
         $token->setTokenHash(hash('sha256', $raw));
+        $token->setOwnerIdentifier($this->getUser()->getUserIdentifier());
         $em->flush();
 
         $request->getSession()->set('_new_api_token', $raw);
