@@ -279,7 +279,8 @@
                 {% set settingsActive = app.request.attributes.get('_route') starts with 'building'
                     or app.request.attributes.get('_route') starts with 'tag'
                     or app.request.attributes.get('_route') starts with 'app_settings'
-                    or app.request.attributes.get('_route') starts with 'scheduler' %}
+                    or app.request.attributes.get('_route') starts with 'scheduler'
+                    or app.request.attributes.get('_route') starts with 'api_token' %}
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle {{ settingsActive ? 'active' }}" href="#" data-bs-toggle="dropdown">
                         <i class="bi bi-gear me-1"></i>Other Settings
@@ -308,6 +309,12 @@
                             <a class="dropdown-item {{ app.request.attributes.get('_route') starts with 'app_settings' ? 'active' }}"
                                href="{{ path('app_settings') }}">
                                 <i class="bi bi-sliders me-1"></i>Application Settings
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item {{ app.request.attributes.get('_route') starts with 'api_token' ? 'active' }}"
+                               href="{{ path('api_token_index') }}">
+                                <i class="bi bi-key me-1"></i>API Tokens
                             </a>
                         </li>
                     </ul>
@@ -365,12 +372,6 @@
                     </a>
                     <ul class="dropdown-menu dropdown-menu-end">
                         <li><span class="dropdown-item-text text-muted small">{{ app.user.email }}</span></li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li>
-                            <a href="{{ path('api_token_index') }}" class="dropdown-item">
-                                <i class="bi bi-key me-1"></i>API Tokens
-                            </a>
-                        </li>
                         <li><hr class="dropdown-divider"></li>
                         <li>
                             <a href="{{ path('saml_logout') }}" class="dropdown-item">
