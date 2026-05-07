@@ -1,6 +1,6 @@
 # certbot-dns-dashddi
 
-A Certbot DNS authenticator plugin that uses the [dashddi](https://github.com/your-org/dashddi) DNS management API to perform DNS-01 challenges. This allows you to obtain certificates from an ACME CA (such as an internal ADCS with ACME support, or Let's Encrypt via DNS) without requiring the server to be publicly accessible.
+A Certbot DNS authenticator plugin that uses the [DashDDI](https://github.com/your-org/dashddi) DNS management API to perform DNS-01 challenges. This allows you to obtain certificates from an ACME CA without requiring the server to be publicly accessible.
 
 ## Installation
 
@@ -13,7 +13,7 @@ pip install /path/to/certbot-dns-dashddi
 Or directly from the repository:
 
 ```bash
-pip install git+https://your-repo-url#subdirectory=certbot-dns-dashddi
+pip install git+https://github.com/davidwkdavidwk/dashddi/#subdirectory=certbot-dns-dashddi
 ```
 
 Verify the plugin is detected:
@@ -38,7 +38,7 @@ chmod 600 /etc/letsencrypt/dashddi.ini
 Edit `/etc/letsencrypt/dashddi.ini`:
 
 ```ini
-dns_dashddi_url = https://dashddi.goshen.edu
+dns_dashddi_url = https://dashddi.domain.com
 dns_dashddi_token = your-api-token-here
 
 # Optional: comma-separated DNS view IDs to add the challenge record to
@@ -47,7 +47,7 @@ dns_dashddi_token = your-api-token-here
 
 ### 2. Generate an API token
 
-In the dashddi UI, go to **My Tokens** and create a new token. The token must have the following routes allowed:
+In the DashDDI UI, go to **My Tokens** and create a new token. The token must have the following routes allowed:
 
 - `api_domains_index`
 - `api_domain_records_create`
@@ -59,16 +59,7 @@ In the dashddi UI, go to **My Tokens** and create a new token. The token must ha
 certbot certonly \
   --authenticator dns-dashddi \
   --dns-dashddi-credentials /etc/letsencrypt/dashddi.ini \
-  -d dashddi.goshen.edu
-```
-
-For a wildcard certificate:
-
-```bash
-certbot certonly \
-  --authenticator dns-dashddi \
-  --dns-dashddi-credentials /etc/letsencrypt/dashddi.ini \
-  -d "*.goshen.edu"
+  -d myhost.domain.com
 ```
 
 ## Configuration options
@@ -81,13 +72,13 @@ certbot certonly \
 ## How it works
 
 1. Certbot asks the plugin to prove control of a domain by placing a TXT record at `_acme-challenge.<domain>`.
-2. The plugin fetches all domains from the dashddi API and finds the longest-suffix match (so `_acme-challenge.dashddi.goshen.edu` matches domain `dashddi.goshen.edu` in preference to `goshen.edu` if both exist).
+2. The plugin fetches all domains from the DashDDI API and finds the longest-suffix match (so `_acme-challenge.myhost.domain.com` matches domain `myhost.domain.com` in preference to `domain.com` if both exist).
 3. It creates a TXT record with a TTL of 60 seconds via `POST /api/domain-records`.
 4. After the CA validates the challenge, the plugin deletes the record via `DELETE /api/domain-records/{id}`.
 
 ## DNS views
 
-If your dashddi instance uses DNS views, add the IDs of the views that should serve the challenge record to the credentials file:
+If your DashDDI instance uses DNS views, add the IDs of the views that should serve the challenge record to the credentials file:
 
 ```ini
 dns_dashddi_view_ids = 1,2
@@ -97,13 +88,13 @@ If this option is omitted, the record is created with no view association.
 
 ## Troubleshooting
 
-**`Could not find a matching domain in dashddi for '_acme-challenge.example.com'`**
+**`Could not find a matching domain in DashDDI for '_acme-challenge.example.com'`**
 
-The domain being certified does not exist in dashddi. Add it under the Domains section of the UI before running Certbot.
+The domain being certified does not exist in DashDDI. Add it under the Domains section of the UI before running Certbot.
 
 **`Token not permitted for this endpoint`**
 
-The API token is missing one of the required route permissions. Edit the token in the dashddi UI and add the three routes listed in the Setup section above.
+The API token is missing one of the required route permissions. Edit the token in the DashDDI UI and add the three routes listed in the Setup section above.
 
 **Validation fails despite record being created**
 
@@ -114,5 +105,5 @@ certbot certonly \
   --authenticator dns-dashddi \
   --dns-dashddi-credentials /etc/letsencrypt/dashddi.ini \
   --dns-dashddi-propagation-seconds 60 \
-  -d dashddi.goshen.edu
+  -d myhost.domain.com
 ```
