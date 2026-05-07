@@ -1,0 +1,134 @@
+{# Render the real checkboxes hidden — marks the parent field as rendered so form_end doesn't re-render it #}
+<div class="d-none" id="allowedRoutes-container">{{ form_widget(form.allowedRoutes) }}</div>
+{{ form_errors(form.allowedRoutes) }}
+
+{# Grid and "Other Endpoints" are built by the script below #}
+<div id="endpoint-grid-container" class="table-responsive mb-3"></div>
+<div id="other-endpoints-container" class="mb-1"></div>
+
+<script>
+(function () {
+    const groups = [
+        { label: 'Hosts',          path: '/api/hosts',           routes: ['api_hosts_index',          'api_hosts_show',          'api_hosts_create',          'api_hosts_update',          'api_hosts_delete'         ] },
+        { label: 'Interfaces',     path: '/api/interfaces',      routes: ['api_interfaces_index',      'api_interfaces_show',      'api_interfaces_create',      'api_interfaces_update',      'api_interfaces_delete'     ] },
+        { label: 'Interface Names',path: '/api/interface-names', routes: ['api_interface_names_index', 'api_interface_names_show', 'api_interface_names_create', 'api_interface_names_update', 'api_interface_names_delete'] },
+        { label: 'Subnets',        path: '/api/subnets',         routes: ['api_subnets_index',         'api_subnets_show',         'api_subnets_create',         'api_subnets_update',         'api_subnets_delete'        ] },
+        { label: 'Address Blocks', path: '/api/address-blocks',  routes: ['api_address_blocks_index',  'api_address_blocks_show',  'api_address_blocks_create',  'api_address_blocks_update',  'api_address_blocks_delete' ] },
+        { label: 'Domains',        path: '/api/domains',         routes: ['api_domains_index',         'api_domains_show',         'api_domains_create',         'api_domains_update',         'api_domains_delete'        ] },
+        { label: 'Domain Records', path: '/api/domain-records',  routes: ['api_domain_records_index',  'api_domain_records_show',  'api_domain_records_create',  'api_domain_records_update',  'api_domain_records_delete' ] },
+        { label: 'Tags',           path: '/api/tags',            routes: ['api_tags_search',           null,                       'api_tags_create',            null,                         null                       ] },
+    ];
+    const colLabels = ['List', 'Detail', 'Create', 'Update', 'Delete'];
+    const knownRoutes = new Set(groups.flatMap(g => g.routes.filter(Boolean)));
+
+    // Map route name → hidden checkbox
+    const hiddenMap = {};
+    document.querySelectorAll('#allowedRoutes-container input[type="checkbox"]').forEach(cb => {
+        hiddenMap[cb.value] = cb;
+    });
+
+    function makeCheck(routeName, extraClass = '') {
+        const hidden = hiddenMap[routeName];
+        if (!hidden) return null;
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        input.className = 'form-check-input' + (extraClass ? ' ' + extraClass : '');
+        input.dataset.route = routeName;
+        input.checked = hidden.checked;
+        input.addEventListener('change', () => { hidden.checked = input.checked; });
+        return input;
+    }
+
+    // ── CRUD grid ────────────────────────────────────────────────────────────
+    const table = document.createElement('table');
+    table.className = 'table table-bordered table-sm align-middle mb-0';
+
+    const thead = table.createTHead();
+    const hRow = thead.insertRow();
+    ['Resource', ...colLabels, 'All'].forEach((text, i) => {
+        const th = document.createElement('th');
+        th.textContent = text;
+        if (i > 0) th.className = 'text-center';
+        hRow.appendChild(th);
+    });
+    hRow.lastElementChild.title = 'Toggle all for this row';
+
+    const tbody = table.createTBody();
+    groups.forEach(group => {
+        const row = tbody.insertRow();
+
+        const nameCell = row.insertCell();
+        nameCell.innerHTML = `<span class="fw-semibold">${group.label}</span><br><code class="small text-muted fw-normal">${group.path}</code>`;
+
+        const rowChecks = [];
+        group.routes.forEach(routeName => {
+            const cell = row.insertCell();
+            cell.className = 'text-center';
+            const check = routeName ? makeCheck(routeName, 'endpoint-check') : null;
+            if (check) { cell.appendChild(check); rowChecks.push(check); }
+            else        { cell.innerHTML = '<span class="text-body-tertiary">—</span>'; }
+        });
+
+        // "All" toggle
+        const allCell = row.insertCell();
+        allCell.className = 'text-center';
+        if (rowChecks.length) {
+            const allCheck = document.createElement('input');
+            allCheck.type = 'checkbox';
+            allCheck.className = 'form-check-input';
+            allCheck.title = 'Select / deselect all';
+            const sync = () => {
+                const n = rowChecks.filter(c => c.checked).length;
+                allCheck.checked       = n === rowChecks.length;
+                allCheck.indeterminate = n > 0 && n < rowChecks.length;
+            };
+            allCheck.addEventListener('change', () => rowChecks.forEach(c => {
+                c.checked = allCheck.checked;
+                hiddenMap[c.dataset.route].checked = allCheck.checked;
+            }));
+            rowChecks.forEach(c => c.addEventListener('change', sync));
+            sync();
+            allCell.appendChild(allCheck);
+        } else {
+            allCell.innerHTML = '<span class="text-body-tertiary">—</span>';
+        }
+    });
+
+    const tableWrap = document.createElement('div');
+    tableWrap.className = 'table-responsive mb-3';
+    tableWrap.appendChild(table);
+    document.getElementById('endpoint-grid-container').appendChild(tableWrap);
+
+    // ── Other endpoints ───────────────────────────────────────────────────────
+    const others = Object.keys(hiddenMap).filter(r => !knownRoutes.has(r));
+    if (others.length) {
+        const container = document.getElementById('other-endpoints-container');
+        const lbl = document.createElement('label');
+        lbl.className = 'form-label fw-semibold small text-muted text-uppercase';
+        lbl.textContent = 'Other Endpoints';
+        container.appendChild(lbl);
+
+        const flex = document.createElement('div');
+        flex.className = 'border rounded p-3 d-flex flex-wrap gap-3';
+        others.forEach(routeName => {
+            const hidden = hiddenMap[routeName];
+            const wrap = document.createElement('div');
+            wrap.className = 'form-check mb-0';
+            const visual = document.createElement('input');
+            visual.type = 'checkbox';
+            visual.className = 'form-check-input';
+            visual.id = 'vis_' + hidden.id;
+            visual.checked = hidden.checked;
+            visual.addEventListener('change', () => { hidden.checked = visual.checked; });
+            const label = document.createElement('label');
+            label.className = 'form-check-label font-monospace small';
+            label.htmlFor = 'vis_' + hidden.id;
+            label.textContent = routeName;
+            wrap.appendChild(visual);
+            wrap.appendChild(label);
+            flex.appendChild(wrap);
+        });
+        container.appendChild(flex);
+    }
+})();
+</script>

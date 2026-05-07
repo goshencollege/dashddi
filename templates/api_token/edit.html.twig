@@ -4,9 +4,18 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1 class="h3 mb-0"><i class="bi bi-key me-2"></i>Edit Token: {{ token.name }}</h1>
-    <a href="{{ path('api_token_index') }}" class="btn btn-outline-secondary">
-        <i class="bi bi-arrow-left me-1"></i>Back
-    </a>
+    <div class="d-flex gap-2">
+        <form method="post" action="{{ path('api_token_regenerate', {id: token.id}) }}"
+              onsubmit="return confirm('Regenerate token \'{{ token.name|e('js') }}\'? The current token will stop working immediately.')">
+            <input type="hidden" name="_token" value="{{ csrf_token('regenerate_api_token_' ~ token.id) }}">
+            <button type="submit" class="btn btn-outline-warning">
+                <i class="bi bi-arrow-clockwise me-1"></i>Regenerate Token
+            </button>
+        </form>
+        <a href="{{ path('api_token_index') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i>Back
+        </a>
+    </div>
 </div>
 
 {{ form_start(form, {attr: {class: 'card mb-3'}}) }}
@@ -19,15 +28,7 @@
 
     <div class="mb-3">
         <label class="form-label fw-semibold">Allowed Endpoints</label>
-        <div class="border rounded p-3">
-            {% for choice in form.allowedRoutes %}
-                <div class="form-check">
-                    {{ form_widget(choice, {attr: {class: 'form-check-input'}}) }}
-                    {{ form_label(choice, null, {label_attr: {class: 'form-check-label font-monospace small'}}) }}
-                </div>
-            {% endfor %}
-        </div>
-        {{ form_errors(form.allowedRoutes) }}
+        {% include 'api_token/_endpoint_grid.html.twig' %}
     </div>
 
     <div class="mb-3">
@@ -44,12 +45,4 @@
     </button>
 </div>
 {{ form_end(form) }}
-
-<form method="post" action="{{ path('api_token_regenerate', {id: token.id}) }}"
-      onsubmit="return confirm('Regenerate token \'{{ token.name|e('js') }}\'? The current token will stop working immediately.')">
-    <input type="hidden" name="_token" value="{{ csrf_token('regenerate_api_token_' ~ token.id) }}">
-    <button type="submit" class="btn btn-outline-warning">
-        <i class="bi bi-arrow-clockwise me-1"></i>Regenerate Token
-    </button>
-</form>
 {% endblock %}
