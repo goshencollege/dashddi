@@ -7,6 +7,7 @@ A Certbot DNS authenticator plugin that uses the [DashDDI](https://github.com/yo
 Certbot and the plugin must share the same Python environment. On modern Debian/Ubuntu systems, install both into a virtualenv to avoid the `externally-managed-environment` error:
 
 ```bash
+apt install -y python3-venv
 python3 -m venv /opt/certbot
 /opt/certbot/bin/pip install certbot
 /opt/certbot/bin/pip install git+https://github.com/davidwkdavidwk/dashddi/#subdirectory=certbot-dns-dashddi
