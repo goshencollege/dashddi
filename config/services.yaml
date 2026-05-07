@@ -30,17 +30,12 @@ services:
         arguments:
             $projectDir: '%kernel.project_dir%'
 
+    App\Command\SamlImportMetadataCommand:
+        arguments:
+            $defaultUri: '%env(DEFAULT_URI)%'
+
     App\Service\EncryptionService:
         arguments:
             $encryptionKey: '%env(APP_ENCRYPTION_KEY)%'
 
-    App\Security\SamlSettings:
-        arguments:
-            $spEntityId:   '%env(SAML_SP_ENTITY_ID)%'
-            $spAcsUrl:     '%env(SAML_SP_ACS_URL)%'
-            $spSloUrl:     '%env(SAML_SP_SLO_URL)%'
-            $spCert:       '%env(SAML_SP_CERT)%'
-            $spPrivateKey: '%env(SAML_SP_PRIVATE_KEY)%'
-            $idpEntityId:  '%env(SAML_IDP_ENTITY_ID)%'
-            $idpSsoUrl:    '%env(SAML_IDP_SSO_URL)%'
-            $idpCert:      '%env(SAML_IDP_CERT)%'
+    # SamlSettings now loads configuration from the saml_provider database table.
