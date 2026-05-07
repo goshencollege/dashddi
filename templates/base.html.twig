@@ -186,11 +186,85 @@
             -webkit-text-fill-color: transparent;
             background-clip: text;
         }
+
+        /* ── Full-height paginated list layout ─────────────────────── */
+        /* Body fills the viewport; only the table-responsive area scrolls */
+        body.page-list-view {
+            height: 100dvh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        body.page-list-view > .container-fluid {
+            flex: 1 1 0;
+            min-height: 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 0 !important;
+            padding-bottom: .75rem;
+        }
+        body.page-list-view > footer { display: none; }
+
+        /* Variant where the content area itself scrolls (e.g. subnet page with VRF section) */
+        body.page-list-scroll {
+            height: 100dvh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        body.page-list-scroll > .container-fluid {
+            flex: 1 1 0;
+            min-height: 0;
+            overflow-y: auto;
+            margin-bottom: 0 !important;
+            padding-bottom: 1rem;
+        }
+        body.page-list-scroll > footer { display: none; }
+        .sticky-list-header {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background-color: var(--bs-body-bg);
+            padding-bottom: .25rem;
+        }
+
+        /* Flex wrapper that fills the remaining viewport height */
+        .list-page-content {
+            flex: 1 1 0;
+            min-height: 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        /* All direct children are fixed-height except .list-scroll-card */
+        .list-page-content > * { flex-shrink: 0; }
+
+        /* The card that contains the scrollable table */
+        .list-scroll-card {
+            flex: 1 1 0;
+            min-height: 0;
+            overflow: hidden;
+        }
+        .list-scroll-card > .card {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .list-scroll-card > .card > .card-header,
+        .list-scroll-card > .card > .card-footer,
+        .list-scroll-card > .card > .card-body { flex-shrink: 0; }
+        .list-scroll-card > .card > .table-responsive {
+            flex: 1 1 0;
+            min-height: 0;
+            overflow-y: auto;
+        }
     </style>
     {% block stylesheets %}{% endblock %}
 </head>
-<body>
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+<body class="{% block body_class %}{% endblock %}">
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 sticky-top">
     <div class="container-fluid">
         <a class="navbar-brand" href="{{ path('dashboard') }}">
             <i class="bi bi-diagram-3-fill me-2"></i>DashDDI
@@ -215,9 +289,15 @@
                     </a>
                     <ul class="dropdown-menu">
                         <li>
-                            <a class="dropdown-item {{ app.request.attributes.get('_route') starts with 'subnet' or app.request.attributes.get('_route') starts with 'vrf' ? 'active' }}"
+                            <a class="dropdown-item {{ app.request.attributes.get('_route') starts with 'subnet' ? 'active' }}"
                                href="{{ path('subnet_index') }}">
                                 <i class="bi bi-diagram-2 me-1"></i>Subnets
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item {{ app.request.attributes.get('_route') starts with 'vrf' ? 'active' }}"
+                               href="{{ path('vrf_index') }}">
+                                <i class="bi bi-signpost-split me-1"></i>VRFs
                             </a>
                         </li>
                         <li>
