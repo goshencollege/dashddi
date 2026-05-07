@@ -280,7 +280,8 @@
                     or app.request.attributes.get('_route') starts with 'tag'
                     or app.request.attributes.get('_route') starts with 'app_settings'
                     or app.request.attributes.get('_route') starts with 'scheduler'
-                    or app.request.attributes.get('_route') starts with 'api_token' %}
+                    or app.request.attributes.get('_route') starts with 'api_token'
+                    or app.request.attributes.get('_route') starts with 'saml_provider' %}
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle {{ settingsActive ? 'active' }}" href="#" data-bs-toggle="dropdown">
                         <i class="bi bi-gear me-1"></i>Other Settings
@@ -315,6 +316,12 @@
                             <a class="dropdown-item {{ app.request.attributes.get('_route') starts with 'api_token' ? 'active' }}"
                                href="{{ path('api_token_index') }}">
                                 <i class="bi bi-key me-1"></i>API Tokens
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item {{ app.request.attributes.get('_route') starts with 'saml_provider' ? 'active' }}"
+                               href="{{ path('saml_provider_index') }}">
+                                <i class="bi bi-shield-lock me-1"></i>SAML Providers
                             </a>
                         </li>
                     </ul>
