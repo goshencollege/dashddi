@@ -4,7 +4,7 @@
 {% block content %}
 <nav aria-label="breadcrumb" class="mb-3">
     <ol class="breadcrumb">
-        <li class="breadcrumb-item"><a href="{{ path('subnet_index') }}">Subnets</a></li>
+        <li class="breadcrumb-item"><a href="{{ path('vrf_index') }}">VRFs</a></li>
         <li class="breadcrumb-item active">{{ title }}</li>
     </ol>
 </nav>
@@ -33,7 +33,7 @@
                     <button type="submit" class="btn btn-primary">
                         <i class="bi bi-check-lg me-1"></i>Save
                     </button>
-                    <a href="{{ path('subnet_index') }}" class="btn btn-outline-secondary">Cancel</a>
+                    <a href="{{ path('vrf_index') }}" class="btn btn-outline-secondary">Cancel</a>
                 </div>
                 {{ form_end(form) }}
             </div>

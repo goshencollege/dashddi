@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\Vrf;
 use App\Form\VrfType;
+use App\Repository\VrfRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -13,6 +14,14 @@ use Symfony\Component\Routing\Attribute\Route;
 #[Route('/vrfs')]
 class VrfController extends AbstractController
 {
+    #[Route('', name: 'vrf_index', methods: ['GET'])]
+    public function index(VrfRepository $repo): Response
+    {
+        return $this->render('vrf/index.html.twig', [
+            'vrfs' => $repo->findBy([], ['name' => 'ASC']),
+        ]);
+    }
+
     #[Route('/new', name: 'vrf_new', methods: ['GET', 'POST'])]
     public function new(Request $request, EntityManagerInterface $em): Response
     {
@@ -24,7 +33,7 @@ class VrfController extends AbstractController
             $em->persist($vrf);
             $em->flush();
             $this->addFlash('success', 'VRF "' . $vrf->getName() . '" added.');
-            return $this->redirectToRoute('subnet_index');
+            return $this->redirectToRoute('vrf_index');
         }
 
         return $this->render('vrf/form.html.twig', [
@@ -43,7 +52,7 @@ class VrfController extends AbstractController
         if ($form->isSubmitted() && $form->isValid()) {
             $em->flush();
             $this->addFlash('success', 'VRF updated.');
-            return $this->redirectToRoute('subnet_index');
+            return $this->redirectToRoute('vrf_index');
         }
 
         return $this->render('vrf/form.html.twig', [
@@ -61,6 +70,6 @@ class VrfController extends AbstractController
             $em->flush();
             $this->addFlash('success', 'VRF deleted.');
         }
-        return $this->redirectToRoute('subnet_index');
+        return $this->redirectToRoute('vrf_index');
     }
 }
