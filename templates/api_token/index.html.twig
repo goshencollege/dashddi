@@ -4,14 +4,20 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1 class="h3 mb-0"><i class="bi bi-key me-2"></i>API Tokens</h1>
-    <a href="{{ path('api_token_new') }}" class="btn btn-primary">
-        <i class="bi bi-plus-lg me-1"></i>New Token
-    </a>
+    <div class="d-flex gap-2">
+        <a href="{{ path('api_docs') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-file-earmark-code me-1"></i>API Docs
+        </a>
+        <a href="{{ path('api_token_new') }}" class="btn btn-primary">
+            <i class="bi bi-plus-lg me-1"></i>New Token
+        </a>
+    </div>
 </div>
 
 <p class="text-muted mb-4">
     Tokens allow programmatic access to API endpoints without SAML authentication.
     Send the token in the <code>Authorization: Bearer &lt;token&gt;</code> header.
+    See the <a href="{{ path('api_docs') }}">API documentation</a> for available endpoints and request formats.
 </p>
 
 {% if tokens is empty %}
