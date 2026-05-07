@@ -1,0 +1,57 @@
+{% extends 'base.html.twig' %}
+{% block title %}Token Created — {{ token.name }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0"><i class="bi bi-check-circle text-success me-2"></i>Token Created</h1>
+</div>
+
+<div class="alert alert-warning d-flex gap-2 mb-4">
+    <i class="bi bi-exclamation-triangle-fill flex-shrink-0 mt-1"></i>
+    <div>
+        <strong>Copy your token now.</strong>
+        This is the only time it will be shown. It cannot be retrieved after you leave this page.
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header fw-semibold">{{ token.name }}</div>
+    <div class="card-body">
+        <label class="form-label text-muted small">Bearer Token</label>
+        <div class="input-group">
+            <input type="text" class="form-control font-monospace" id="tokenValue" value="{{ raw }}" readonly>
+            <button class="btn btn-outline-secondary" type="button" id="copyBtn"
+                    onclick="navigator.clipboard.writeText(document.getElementById('tokenValue').value).then(() => { this.innerHTML = '<i class=\'bi bi-check-lg\'></i> Copied'; setTimeout(() => this.innerHTML = '<i class=\'bi bi-clipboard\'></i> Copy', 2000); })">
+                <i class="bi bi-clipboard"></i> Copy
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header fw-semibold">Usage</div>
+    <div class="card-body">
+        <p class="text-muted small mb-2">Include this header in your HTTP requests:</p>
+        <pre class="bg-body-secondary p-3 rounded font-monospace small">Authorization: Bearer {{ raw }}</pre>
+
+        <p class="text-muted small mb-2 mt-3">Example with curl:</p>
+        <pre class="bg-body-secondary p-3 rounded font-monospace small">curl -H "Authorization: Bearer {{ raw }}" \
+     {{ app.request.schemeAndHttpHost }}/api/tags</pre>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header fw-semibold">Allowed Endpoints</div>
+    <div class="card-body">
+        <ul class="list-unstyled mb-0">
+            {% for route in token.allowedRoutes %}
+                <li><code>{{ route }}</code></li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+
+<a href="{{ path('api_token_index') }}" class="btn btn-primary">
+    <i class="bi bi-check-lg me-1"></i>Done
+</a>
+{% endblock %}
