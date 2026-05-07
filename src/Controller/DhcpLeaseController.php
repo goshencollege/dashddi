@@ -49,25 +49,12 @@ class DhcpLeaseController extends AbstractController
         ]);
     }
 
-    /**
-     * Kea calls this endpoint on each lease event.
-     *
-     * Expected JSON body (subset of Kea lease4 structure):
-     *   { "ip-address": "x.x.x.x", "hw-address": "aa:bb:cc:dd:ee:ff",
-     *     "hostname": "optional", "expire": <unix timestamp or null> }
-     *
-     * Secured by a bearer token set in the LEASE_API_KEY env variable.
-     */
     #[Route('/api/kea/lease', name: 'api_kea_lease', methods: ['POST'])]
     public function receiveLease(
         Request $request,
         EntityManagerInterface $em,
         SubnetRepository $subnetRepo,
     ): JsonResponse {
-        if (!$this->isApiTokenValid($request)) {
-            return $this->json(['error' => 'Unauthorized'], Response::HTTP_UNAUTHORIZED);
-        }
-
         $data = json_decode($request->getContent(), true);
         if (!is_array($data)) {
             return $this->json(['error' => 'Invalid JSON'], Response::HTTP_BAD_REQUEST);
@@ -95,17 +82,6 @@ class DhcpLeaseController extends AbstractController
         $em->flush();
 
         return $this->json(['id' => $lease->getId()], Response::HTTP_CREATED);
-    }
-
-    private function isApiTokenValid(Request $request): bool
-    {
-        $expected = $_ENV['LEASE_API_KEY'] ?? '';
-        if ($expected === '') {
-            return false;
-        }
-        $auth  = $request->headers->get('Authorization', '');
-        $token = str_starts_with($auth, 'Bearer ') ? substr($auth, 7) : '';
-        return hash_equals($expected, $token);
     }
 
     private function findSubnetForIp(string $ipStr, SubnetRepository $subnetRepo): ?Subnet
