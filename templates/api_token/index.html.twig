@@ -34,6 +34,7 @@
                 <thead>
                     <tr>
                         <th>Name</th>
+                        <th>Owner</th>
                         <th>Allowed Endpoints</th>
                         <th>Expires</th>
                         <th>Last Used</th>
@@ -50,6 +51,7 @@
                                     <span class="badge bg-warning text-dark ms-1">Expired</span>
                                 {% endif %}
                             </td>
+                            <td class="text-muted small">{{ token.ownerIdentifier }}</td>
                             <td>
                                 {% for route in token.allowedRoutes %}
                                     <code class="d-block small">{{ route }}</code>
