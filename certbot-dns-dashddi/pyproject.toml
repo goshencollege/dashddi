@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "certbot-dns-dashddi"
+version = "1.0.0"
+description = "Certbot DNS authenticator plugin for dashddi"
+requires-python = ">=3.9"
+dependencies = [
+    "certbot>=2.0",
+    "requests>=2.28",
+]
+
+[project.entry-points."certbot.plugins"]
+dns-dashddi = "certbot_dns_dashddi._internal.dns_dashddi:Authenticator"
