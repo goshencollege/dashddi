@@ -19,15 +19,7 @@
 
     <div class="mb-3">
         <label class="form-label fw-semibold">Allowed Endpoints</label>
-        <div class="border rounded p-3">
-            {% for choice in form.allowedRoutes %}
-                <div class="form-check">
-                    {{ form_widget(choice, {attr: {class: 'form-check-input'}}) }}
-                    {{ form_label(choice, null, {label_attr: {class: 'form-check-label font-monospace small'}}) }}
-                </div>
-            {% endfor %}
-        </div>
-        {{ form_errors(form.allowedRoutes) }}
+        {% include 'api_token/_endpoint_grid.html.twig' %}
     </div>
 
     <div class="mb-3">
