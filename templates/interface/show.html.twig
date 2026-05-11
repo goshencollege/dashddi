@@ -22,7 +22,7 @@
             <i class="bi bi-pencil me-1"></i>Edit
         </a>
         <form method="post" action="{{ path('interface_delete', {id: interface.id}) }}" class="d-inline"
-              onsubmit="return confirm('Delete this interface?')">
+              onsubmit="return confirm({% if interface.host and interface.host.interfaces|length == 1 %}'Delete this interface? It is the only interface on {{ interface.host.name|e('js') }}, so the host will also be deleted.'{% else %}'Delete this interface?'{% endif %})">
             <input type="hidden" name="_token" value="{{ csrf_token('delete_interface_' ~ interface.id) }}">
             <button type="submit" class="btn btn-outline-danger">
                 <i class="bi bi-trash me-1"></i>Delete

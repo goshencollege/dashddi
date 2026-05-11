@@ -105,7 +105,7 @@
                                     <i class="bi bi-pencil"></i>
                                 </a>
                                 <form method="post" action="{{ path('interface_delete', {id: iface.id}) }}" class="d-inline"
-                                      onsubmit="return confirm('Delete this interface?')">
+                                      onsubmit="return confirm({% if host.interfaces|length == 1 %}'Delete this interface? It is the only interface on {{ host.name|e('js') }}, so the host will also be deleted.'{% else %}'Delete this interface from {{ host.name|e('js') }}?'{% endif %})">
                                     <input type="hidden" name="_token" value="{{ csrf_token('delete_interface_' ~ iface.id) }}">
                                     <button type="submit" class="btn btn-sm btn-outline-danger">
                                         <i class="bi bi-trash"></i>
