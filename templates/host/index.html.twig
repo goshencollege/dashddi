@@ -2,6 +2,10 @@
 {% block title %}Hosts{% endblock %}
 {% block body_class %}page-list-view{% endblock %}
 
+{% block stylesheets %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css">
+{% endblock %}
+
 {# Renders Bootstrap pagination controls and a result-count footer line. #}
 {% macro pager(pagination) %}
 {% set p = pagination %}
@@ -169,10 +173,27 @@
     {# ── By Host view ── #}
     <div id="view-host" class="list-scroll-card {{ hostViewMode == 'host' ? '' : 'd-none' }}">
         <div class="card">
+            <div id="host-bulk-bar" class="card-header d-none py-2">
+                <div class="d-flex align-items-center gap-2">
+                    <span id="host-selected-count" class="text-muted small">0 hosts selected</span>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="host-add-tag-btn">
+                        <i class="bi bi-tag me-1"></i>Add Tag
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="host-remove-tag-btn">
+                        <i class="bi bi-tag me-1"></i>Remove Tag
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-danger ms-auto" id="host-delete-btn">
+                        <i class="bi bi-trash me-1"></i>Delete Selected
+                    </button>
+                </div>
+            </div>
             <div class="table-responsive">
                 <table class="table table-hover mb-0">
                     <thead>
                         <tr>
+                            <th class="ps-3" style="width:2.25rem">
+                                <input type="checkbox" class="form-check-input" id="select-all-hosts" title="Select all on this page">
+                            </th>
                             <th style="min-width: 13rem">Name</th>
                             <th>Tags</th>
                             <th>IPv4</th>
@@ -185,6 +206,9 @@
                     <tbody>
                         {% for host in hosts %}
                             <tr>
+                                <td class="ps-3">
+                                    <input type="checkbox" class="form-check-input bulk-host-cb" value="{{ host.id }}">
+                                </td>
                                 <td>
                                     <a href="{{ path('host_show', {id: host.id}) }}" class="fw-semibold text-decoration-none">
                                         {{ host.name }}
@@ -274,10 +298,21 @@
     {# ── By Interface view ── #}
     <div id="view-interface" class="list-scroll-card {{ hostViewMode == 'interface' ? '' : 'd-none' }}">
         <div class="card">
+            <div id="iface-bulk-bar" class="card-header d-none py-2">
+                <div class="d-flex align-items-center gap-2">
+                    <span id="iface-selected-count" class="text-muted small">0 interfaces selected</span>
+                    <button type="button" class="btn btn-sm btn-outline-danger ms-auto" id="iface-delete-btn">
+                        <i class="bi bi-trash me-1"></i>Delete Selected
+                    </button>
+                </div>
+            </div>
             <div class="table-responsive">
                 <table class="table table-hover mb-0">
                     <thead>
                         <tr>
+                            <th class="ps-3" style="width:2.25rem">
+                                <input type="checkbox" class="form-check-input" id="select-all-ifaces" title="Select all on this page">
+                            </th>
                             <th style="min-width: 11rem">Host</th>
                             <th>Tags</th>
                             <th style="min-width: 10rem">Interface</th>
@@ -293,6 +328,9 @@
                         {% for host in hosts %}
                             {% for iface in host.interfaces %}
                                 <tr>
+                                    <td class="ps-3">
+                                        <input type="checkbox" class="form-check-input bulk-iface-cb" value="{{ iface.id }}">
+                                    </td>
                                     <td>
                                         <a href="{{ path('host_show', {id: host.id}) }}" class="fw-semibold text-decoration-none">
                                             {{ host.name }}
@@ -370,6 +408,7 @@
                                 </tr>
                             {% else %}
                                 <tr>
+                                    <td class="ps-3"></td>
                                     <td>
                                         <a href="{{ path('host_show', {id: host.id}) }}" class="fw-semibold text-decoration-none">
                                             {{ host.name }}
@@ -417,23 +456,180 @@
 {% endif %}
 </div>{# /list-page-content #}
 
+{# Tag selection modal (shared for add/remove on selected hosts) #}
+<div class="modal fade" id="bulk-tag-modal" tabindex="-1" aria-labelledby="bulk-tag-modal-label" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="bulk-tag-modal-label">Add Tag to Selected Hosts</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <label class="form-label" for="bulk-tag-select">Tag</label>
+                <select id="bulk-tag-select" class="form-select" placeholder="Search tags…"></select>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-sm btn-primary" id="bulk-tag-submit">Add Tag</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
 <script>
+// --- View mode toggle ---
 document.getElementById('view-mode-toggle')?.addEventListener('click', function (e) {
     const btn = e.target.closest('[data-mode]');
     if (!btn) return;
     const mode = btn.dataset.mode;
-
     this.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('active', b === btn));
     document.getElementById('view-host').classList.toggle('d-none', mode !== 'host');
     document.getElementById('view-interface').classList.toggle('d-none', mode !== 'interface');
-
     fetch('/api/preference/host-view-mode', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mode }),
     });
 });
+
+// --- Bulk selection ---
+const hostSelected = new Set();
+const ifaceSelected = new Set();
+
+function updateHostToolbar() {
+    const count = hostSelected.size;
+    document.getElementById('host-bulk-bar').classList.toggle('d-none', count === 0);
+    document.getElementById('host-selected-count').textContent =
+        count + ' host' + (count !== 1 ? 's' : '') + ' selected';
+    const all = document.querySelectorAll('.bulk-host-cb');
+    const sa  = document.getElementById('select-all-hosts');
+    if (sa) {
+        sa.checked       = all.length > 0 && count === all.length;
+        sa.indeterminate = count > 0 && count < all.length;
+    }
+}
+
+function updateIfaceToolbar() {
+    const count = ifaceSelected.size;
+    document.getElementById('iface-bulk-bar').classList.toggle('d-none', count === 0);
+    document.getElementById('iface-selected-count').textContent =
+        count + ' interface' + (count !== 1 ? 's' : '') + ' selected';
+    const all = document.querySelectorAll('.bulk-iface-cb');
+    const sa  = document.getElementById('select-all-ifaces');
+    if (sa) {
+        sa.checked       = all.length > 0 && count === all.length;
+        sa.indeterminate = count > 0 && count < all.length;
+    }
+}
+
+document.addEventListener('change', function (e) {
+    if (e.target.matches('.bulk-host-cb')) {
+        e.target.checked ? hostSelected.add(e.target.value) : hostSelected.delete(e.target.value);
+        updateHostToolbar();
+    } else if (e.target.matches('.bulk-iface-cb')) {
+        e.target.checked ? ifaceSelected.add(e.target.value) : ifaceSelected.delete(e.target.value);
+        updateIfaceToolbar();
+    } else if (e.target.id === 'select-all-hosts') {
+        document.querySelectorAll('.bulk-host-cb').forEach(cb => {
+            cb.checked = e.target.checked;
+            e.target.checked ? hostSelected.add(cb.value) : hostSelected.delete(cb.value);
+        });
+        updateHostToolbar();
+    } else if (e.target.id === 'select-all-ifaces') {
+        document.querySelectorAll('.bulk-iface-cb').forEach(cb => {
+            cb.checked = e.target.checked;
+            e.target.checked ? ifaceSelected.add(cb.value) : ifaceSelected.delete(cb.value);
+        });
+        updateIfaceToolbar();
+    }
+});
+
+// --- Bulk host delete ---
+document.getElementById('host-delete-btn')?.addEventListener('click', async function () {
+    const count = hostSelected.size;
+    if (!confirm(`Delete ${count} host${count !== 1 ? 's' : ''} and all their interfaces? This cannot be undone.`)) return;
+    const resp = await fetch('{{ path('host_bulk') }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete', ids: [...hostSelected], _token: '{{ csrf_token('bulk_hosts') }}' }),
+    });
+    const data = await resp.json();
+    if (resp.ok) { location.reload(); } else { alert(data.error ?? 'Error'); }
+});
+
+// --- Bulk interface delete ---
+document.getElementById('iface-delete-btn')?.addEventListener('click', async function () {
+    const count = ifaceSelected.size;
+    if (!confirm(`Delete ${count} interface${count !== 1 ? 's' : ''}? This cannot be undone.`)) return;
+    const resp = await fetch('{{ path('interface_bulk') }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete', ids: [...ifaceSelected], _token: '{{ csrf_token('bulk_interfaces') }}' }),
+    });
+    const data = await resp.json();
+    if (resp.ok) { location.reload(); } else { alert(data.error ?? 'Error'); }
+});
+
+// --- Tag modal (add / remove on selected hosts) ---
+const bulkTagModalEl = document.getElementById('bulk-tag-modal');
+let bulkTagModal = null;
+let bulkTagSelect = null;
+let bulkTagAction = 'add-tag';
+
+if (bulkTagModalEl) {
+    bulkTagModal = new bootstrap.Modal(bulkTagModalEl);
+
+    bulkTagSelect = new TomSelect('#bulk-tag-select', {
+        valueField: 'value',
+        labelField: 'text',
+        searchField: 'text',
+        maxOptions: 20,
+        plugins: ['remove_button'],
+        load(query, callback) {
+            fetch('/api/tags?q=' + encodeURIComponent(query))
+                .then(r => r.json()).then(callback).catch(() => callback());
+        },
+        onInitialize() {
+            fetch('/api/tags').then(r => r.json()).then(tags => this.addOptions(tags));
+        },
+    });
+
+    document.getElementById('host-add-tag-btn')?.addEventListener('click', function () {
+        bulkTagAction = 'add-tag';
+        document.getElementById('bulk-tag-modal-label').textContent = 'Add Tag to Selected Hosts';
+        document.getElementById('bulk-tag-submit').textContent = 'Add Tag';
+        bulkTagSelect.clear();
+        bulkTagModal.show();
+    });
+
+    document.getElementById('host-remove-tag-btn')?.addEventListener('click', function () {
+        bulkTagAction = 'remove-tag';
+        document.getElementById('bulk-tag-modal-label').textContent = 'Remove Tag from Selected Hosts';
+        document.getElementById('bulk-tag-submit').textContent = 'Remove Tag';
+        bulkTagSelect.clear();
+        bulkTagModal.show();
+    });
+
+    document.getElementById('bulk-tag-submit')?.addEventListener('click', async function () {
+        const tagId = bulkTagSelect.getValue();
+        if (!tagId) { alert('Please select a tag.'); return; }
+        const resp = await fetch('{{ path('host_bulk') }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: bulkTagAction,
+                ids: [...hostSelected],
+                tagId,
+                _token: '{{ csrf_token('bulk_hosts') }}',
+            }),
+        });
+        const data = await resp.json();
+        if (resp.ok) { bulkTagModal.hide(); location.reload(); }
+        else { alert(data.error ?? 'Error'); }
+    });
+}
 </script>
 {% endblock scripts %}
 {% endblock content %}

@@ -13,6 +13,7 @@ use App\Repository\UserPreferenceRepository;
 use App\Service\IpAddressManager;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -157,6 +158,48 @@ class HostController extends AbstractController
             'title'           => 'New Host',
             'embed_interface' => true,
         ]);
+    }
+
+    #[Route('/bulk', name: 'host_bulk', methods: ['POST'])]
+    public function bulk(Request $request, HostRepository $repo, TagRepository $tagRepo, EntityManagerInterface $em): JsonResponse
+    {
+        $data   = json_decode($request->getContent(), true) ?? [];
+        $action = $data['action'] ?? '';
+        $ids    = array_values(array_filter(array_map('intval', $data['ids'] ?? []), fn($id) => $id > 0));
+
+        if (!$this->isCsrfTokenValid('bulk_hosts', $data['_token'] ?? '')) {
+            return $this->json(['error' => 'Invalid CSRF token'], 403);
+        }
+        if (empty($ids)) {
+            return $this->json(['error' => 'No hosts selected'], 400);
+        }
+
+        $hosts = $repo->findBy(['id' => $ids]);
+
+        if ($action === 'delete') {
+            $count = count($hosts);
+            foreach ($hosts as $host) {
+                $em->remove($host);
+            }
+            $em->flush();
+            return $this->json(['message' => $count . ' host(s) deleted.']);
+        }
+
+        if ($action === 'add-tag' || $action === 'remove-tag') {
+            $tagId = (int) ($data['tagId'] ?? 0);
+            $tag   = $tagId ? $tagRepo->find($tagId) : null;
+            if (!$tag) {
+                return $this->json(['error' => 'Tag not found'], 404);
+            }
+            foreach ($hosts as $host) {
+                $action === 'add-tag' ? $host->addTag($tag) : $host->removeTag($tag);
+            }
+            $em->flush();
+            $verb = $action === 'add-tag' ? 'added to' : 'removed from';
+            return $this->json(['message' => 'Tag "' . $tag->getName() . '" ' . $verb . ' ' . count($hosts) . ' host(s).']);
+        }
+
+        return $this->json(['error' => 'Unknown action'], 400);
     }
 
     #[Route('/{id}', name: 'host_show', methods: ['GET'])]
