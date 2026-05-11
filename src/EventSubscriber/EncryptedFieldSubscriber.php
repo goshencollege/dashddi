@@ -2,6 +2,7 @@
 
 namespace App\EventSubscriber;
 
+use App\Entity\BackupSetting;
 use App\Entity\DhcpServer;
 use App\Entity\DnsServer;
 use App\Service\EncryptionService;
@@ -22,8 +23,9 @@ class EncryptedFieldSubscriber
 {
     // entity class => list of property names to encrypt
     private const FIELDS = [
-        DhcpServer::class => ['sshPrivateKey', 'controlPassword'],
-        DnsServer::class  => ['sshPrivateKey'],
+        BackupSetting::class => ['backupPassword'],
+        DhcpServer::class    => ['sshPrivateKey', 'controlPassword'],
+        DnsServer::class     => ['sshPrivateKey'],
     ];
 
     public function __construct(private readonly EncryptionService $encryption) {}
@@ -74,7 +76,7 @@ class EncryptedFieldSubscriber
             $setter = 'set' . ucfirst($property);
             $value  = $entity->$getter();
 
-            if ($value !== null && !$this->encryption->isEncrypted($value)) {
+            if ($value !== null && $value !== '' && !$this->encryption->isEncrypted($value)) {
                 $entity->$setter($this->encryption->encrypt($value));
                 $changed = true;
             }
