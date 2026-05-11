@@ -9,7 +9,7 @@ fi
 export PHP_INI_SCAN_DIR=":/tmp/php-conf"
 
 # Ensure Symfony var subdirectories exist and are writable by www-data
-for dir in /var/www/html/var/cache /var/www/html/var/log; do
+for dir in /var/www/html/var/cache /var/www/html/var/log /var/www/html/var/backups; do
     mkdir -p "$dir"
     chown -R www-data:www-data "$dir"
 done
