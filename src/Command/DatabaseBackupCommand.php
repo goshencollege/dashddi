@@ -42,6 +42,7 @@ class DatabaseBackupCommand extends Command
             ->addOption('encrypt-backup', null, InputOption::VALUE_NONE, 'Encrypt the backup file with AES-256-CBC')
             ->addOption('backup-password', null, InputOption::VALUE_REQUIRED, 'Password for backup file encryption/decryption')
             ->addOption('retention', null, InputOption::VALUE_REQUIRED, 'Number of backups to keep (0 = unlimited, overrides settings)')
+            ->addOption('exclude-dhcp-leases', null, InputOption::VALUE_NONE, 'Omit the dhcp_lease table from the backup')
         ;
     }
 
@@ -68,9 +69,10 @@ class DatabaseBackupCommand extends Command
         $cifsPassword = $input->getOption('cifs-password') ?? $settings->getCifsPassword() ?? '';
         $cifsSubdir   = $input->getOption('cifs-subdir')   ?? $settings->getCifsSubdir()   ?? '';
 
-        $decryptFields  = $input->getOption('decrypt-fields')  || $settings->isDecryptFields();
-        $includeKey     = $input->getOption('include-key')     || $settings->isIncludeEncryptionKey();
-        $encryptBackup  = $input->getOption('encrypt-backup')  || $settings->isEncryptBackup();
+        $decryptFields      = $input->getOption('decrypt-fields')      || $settings->isDecryptFields();
+        $includeKey         = $input->getOption('include-key')         || $settings->isIncludeEncryptionKey();
+        $encryptBackup      = $input->getOption('encrypt-backup')      || $settings->isEncryptBackup();
+        $excludeDhcpLeases  = $input->getOption('exclude-dhcp-leases') || $settings->isExcludeDhcpLeases();
         $backupPassword = $input->getOption('backup-password') ?? $settings->getBackupPassword() ?? '';
         $retention      = $input->getOption('retention') !== null
             ? (int) $input->getOption('retention')
@@ -89,8 +91,10 @@ class DatabaseBackupCommand extends Command
         // -- Dump database via DBAL (no external mysqldump needed) ---------------
         $io->writeln('Dumping database…');
 
+        $excludeTables = $excludeDhcpLeases ? ['dhcp_lease'] : [];
+
         try {
-            $sql = $this->dumpDatabase();
+            $sql = $this->dumpDatabase($excludeTables);
         } catch (\Throwable $e) {
             $io->error('Database dump failed: ' . $e->getMessage());
             return Command::FAILURE;
@@ -159,13 +163,17 @@ class DatabaseBackupCommand extends Command
 
     // ---------------------------------------------------------------------------
 
-    private function dumpDatabase(): string
+    /** @param string[] $excludeTables */
+    private function dumpDatabase(array $excludeTables = []): string
     {
         $lines = [];
 
         $lines[] = 'SET FOREIGN_KEY_CHECKS=0;';
         $lines[] = 'SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";';
         $lines[] = 'SET NAMES utf8mb4;';
+        if ($excludeTables !== []) {
+            $lines[] = '-- Excluded tables: ' . implode(', ', $excludeTables);
+        }
         $lines[] = '';
 
         $tables = $this->connection->fetchFirstColumn(
@@ -175,6 +183,9 @@ class DatabaseBackupCommand extends Command
         );
 
         foreach ($tables as $table) {
+            if (in_array($table, $excludeTables, true)) {
+                continue;
+            }
             $lines[] = '';
             $lines[] = '-- --------------------------------------------------------';
             $lines[] = "-- Table: `{$table}`";
