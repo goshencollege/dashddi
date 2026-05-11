@@ -38,4 +38,13 @@ services:
         arguments:
             $encryptionKey: '%env(APP_ENCRYPTION_KEY)%'
 
+    App\Command\DatabaseBackupCommand:
+        arguments:
+            $projectDir: '%kernel.project_dir%'
+            $encryptionKey: '%env(APP_ENCRYPTION_KEY)%'
+
+    App\Command\DatabaseRestoreCommand:
+        arguments:
+            $projectDir: '%kernel.project_dir%'
+
     # SamlSettings now loads configuration from the saml_provider database table.

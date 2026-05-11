@@ -360,6 +360,7 @@
                     or app.request.attributes.get('_route') starts with 'tag'
                     or app.request.attributes.get('_route') starts with 'app_settings'
                     or app.request.attributes.get('_route') starts with 'scheduler'
+                    or app.request.attributes.get('_route') starts with 'backup_'
                     or app.request.attributes.get('_route') starts with 'api_token'
                     or app.request.attributes.get('_route') starts with 'saml_provider' %}
                 <li class="nav-item dropdown">
@@ -386,6 +387,12 @@
                             </a>
                         </li>
                         <li><hr class="dropdown-divider"></li>
+                        <li>
+                            <a class="dropdown-item {{ app.request.attributes.get('_route') starts with 'backup_' ? 'active' }}"
+                               href="{{ path('backup_index') }}">
+                                <i class="bi bi-database-down me-1"></i>Backup &amp; Restore
+                            </a>
+                        </li>
                         <li>
                             <a class="dropdown-item {{ app.request.attributes.get('_route') starts with 'app_settings' ? 'active' }}"
                                href="{{ path('app_settings') }}">

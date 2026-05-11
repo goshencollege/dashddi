@@ -1,0 +1,226 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Database Backup{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-database-down me-2"></i>Database Backup</h1>
+    <form method="post" action="{{ path('backup_run') }}">
+        <input type="hidden" name="_token" value="{{ csrf_token('backup_run') }}">
+        <button type="submit" class="btn btn-primary"
+                onclick="return confirm('Run a backup now using the current settings?')">
+            <i class="bi bi-play-circle me-1"></i>Run Backup Now
+        </button>
+    </form>
+</div>
+
+{{ form_start(form, {attr: {novalidate: 'novalidate'}}) }}
+<div class="row g-4">
+
+    {# ── Destination ─────────────────────────────────────────────────── #}
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header"><strong>Backup Destination</strong></div>
+            <div class="card-body">
+                <div class="mb-3">
+                    {{ form_label(form.destinationType, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                    {{ form_widget(form.destinationType) }}
+                    {{ form_errors(form.destinationType) }}
+                </div>
+
+                <div id="local-fields">
+                    <div class="mb-0">
+                        {{ form_label(form.localPath, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                        {{ form_widget(form.localPath) }}
+                        {{ form_errors(form.localPath) }}
+                        {{ form_help(form.localPath) }}
+                    </div>
+                </div>
+
+                <div id="cifs-fields">
+                    <div class="mb-3">
+                        {{ form_label(form.cifsServer, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                        {{ form_widget(form.cifsServer) }}
+                        {{ form_errors(form.cifsServer) }}
+                    </div>
+                    <div class="mb-3">
+                        {{ form_label(form.cifsUsername, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                        {{ form_widget(form.cifsUsername, {attr: {class: 'form-control'}}) }}
+                        {{ form_errors(form.cifsUsername) }}
+                    </div>
+                    <div class="mb-3">
+                        {{ form_label(form.cifsPassword, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                        {{ form_widget(form.cifsPassword, {attr: {class: 'form-control'}}) }}
+                        {{ form_errors(form.cifsPassword) }}
+                        {{ form_help(form.cifsPassword) }}
+                    </div>
+                    <div class="mb-0">
+                        {{ form_label(form.cifsSubdir, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                        {{ form_widget(form.cifsSubdir) }}
+                        {{ form_errors(form.cifsSubdir) }}
+                        {{ form_help(form.cifsSubdir) }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# ── Encrypted fields & backup encryption ────────────────────────── #}
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header"><strong>Content &amp; Security</strong></div>
+            <div class="card-body">
+                <p class="text-muted small">
+                    Encrypted fields (SSH keys, passwords) are stored encrypted in the database.
+                    Choose how they appear in the backup.
+                </p>
+
+                <div class="mb-3 p-3 border rounded">
+                    <div class="form-check mb-1">
+                        {{ form_widget(form.decryptFields, {attr: {class: 'form-check-input'}}) }}
+                        {{ form_label(form.decryptFields, null, {label_attr: {class: 'form-check-label fw-semibold'}}) }}
+                    </div>
+                    {{ form_help(form.decryptFields) }}
+
+                    <hr class="my-2">
+
+                    <div class="form-check mb-1">
+                        {{ form_widget(form.includeEncryptionKey, {attr: {class: 'form-check-input'}}) }}
+                        {{ form_label(form.includeEncryptionKey, null, {label_attr: {class: 'form-check-label fw-semibold'}}) }}
+                    </div>
+                    {{ form_help(form.includeEncryptionKey) }}
+                </div>
+
+                <hr>
+
+                <div class="mb-3">
+                    <div class="form-check mb-1">
+                        {{ form_widget(form.encryptBackup, {attr: {class: 'form-check-input'}}) }}
+                        {{ form_label(form.encryptBackup, null, {label_attr: {class: 'form-check-label fw-semibold'}}) }}
+                    </div>
+                    {{ form_help(form.encryptBackup) }}
+                </div>
+
+                <div class="mb-3" id="backup-password-field">
+                    {{ form_label(form.backupPassword, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                    {{ form_widget(form.backupPassword, {attr: {class: 'form-control'}}) }}
+                    {{ form_errors(form.backupPassword) }}
+                    {{ form_help(form.backupPassword) }}
+                </div>
+
+                <hr>
+
+                <div class="mb-0">
+                    {{ form_label(form.retentionCount, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                    {{ form_widget(form.retentionCount, {attr: {class: 'form-control', style: 'width:120px'}}) }}
+                    {{ form_errors(form.retentionCount) }}
+                    {{ form_help(form.retentionCount) }}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="mt-4">
+    <button type="submit" class="btn btn-primary">
+        <i class="bi bi-check-lg me-1"></i>Save Settings
+    </button>
+</div>
+{{ form_end(form) }}
+
+{# ── Recent backups list ─────────────────────────────────────────────── #}
+<div class="row g-4 mt-0">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <strong><i class="bi bi-archive me-1"></i>Local Backups</strong>
+                <span class="text-muted small font-monospace">{{ localPath }}</span>
+            </div>
+            {% if backups is empty %}
+            <div class="card-body text-muted">No local backups found.</div>
+            {% else %}
+            <div class="table-responsive">
+                <table class="table table-hover table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>Filename</th>
+                            <th class="text-end">Size</th>
+                            <th class="text-end">Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for b in backups %}
+                        <tr>
+                            <td class="font-monospace">{{ b.name }}</td>
+                            <td class="text-end text-muted">{{ (b.size / 1024)|round(1) }} KB</td>
+                            <td class="text-end text-muted">{{ b.time|date('Y-m-d H:i') }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {# ── Restore ─────────────────────────────────────────────────────── #}
+    <div class="col-lg-4">
+        <div class="card border-warning">
+            <div class="card-header bg-warning-subtle"><strong><i class="bi bi-arrow-counterclockwise me-1"></i>Restore from Backup</strong></div>
+            <div class="card-body">
+                <p class="text-muted small">Upload a <code>.sql</code> or <code>.sql.enc</code> backup file.
+                    The current database will be overwritten and migrations will run automatically.</p>
+
+                <form method="post" action="{{ path('backup_restore') }}" enctype="multipart/form-data"
+                      onsubmit="return confirm('WARNING: This will overwrite the current database. Are you sure?')">
+                    <input type="hidden" name="_token" value="{{ csrf_token('backup_restore') }}">
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Backup File</label>
+                        <input type="file" name="backup_file" class="form-control" accept=".sql,.enc" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Decryption Password</label>
+                        <input type="password" name="backup_password" class="form-control"
+                               placeholder="Leave blank for unencrypted backups" autocomplete="off">
+                    </div>
+
+                    <button type="submit" class="btn btn-warning w-100">
+                        <i class="bi bi-arrow-counterclockwise me-1"></i>Restore Database
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    const select = document.getElementById('backup_destinationType');
+    const localFields = document.getElementById('local-fields');
+    const cifsFields  = document.getElementById('cifs-fields');
+
+    function toggle() {
+        const isCifs = select.value === 'cifs';
+        localFields.style.display = isCifs ? 'none' : '';
+        cifsFields.style.display  = isCifs ? ''     : 'none';
+    }
+
+    toggle();
+    select.addEventListener('change', toggle);
+
+    const encCheck  = document.getElementById('backup_encryptBackup');
+    const passField = document.getElementById('backup-password-field');
+
+    function togglePass() {
+        passField.style.display = encCheck.checked ? '' : 'none';
+    }
+
+    togglePass();
+    encCheck.addEventListener('change', togglePass);
+})();
+</script>
+{% endblock %}
