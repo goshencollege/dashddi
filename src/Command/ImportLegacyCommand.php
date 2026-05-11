@@ -320,7 +320,7 @@ class ImportLegacyCommand extends Command
 
         foreach ($pdo->query('SELECT cID, name FROM class ORDER BY cID')->fetchAll() as $row) {
             $tag = new Tag();
-            $tag->setName(substr($row['name'], 0, 50));
+            $tag->setName(substr('class:' . $row['name'], 0, 50));
             $map['c:' . $row['cID']] = $tag;
             if (!$dryRun) {
                 $this->em->persist($tag);
@@ -329,7 +329,7 @@ class ImportLegacyCommand extends Command
 
         foreach ($pdo->query('SELECT dID, name FROM dept ORDER BY dID')->fetchAll() as $row) {
             $tag = new Tag();
-            $tag->setName(substr($row['name'], 0, 50));
+            $tag->setName(substr('dept:' . $row['name'], 0, 50));
             $map['d:' . $row['dID']] = $tag;
             if (!$dryRun) {
                 $this->em->persist($tag);
