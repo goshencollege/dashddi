@@ -78,7 +78,7 @@
             <input type="search" name="q" class="form-control" placeholder="Search by name, location, subnet, IP address, MAC, or DNS name…" value="{{ query }}">
             <button type="submit" class="btn btn-outline-secondary">Search</button>
             {% if query or isAdvanced %}
-                <a href="{{ path('host_index') }}" class="btn btn-outline-secondary">Clear</a>
+                <a href="{{ path('host_index', {reset: 1}) }}" class="btn btn-outline-secondary">Clear</a>
             {% endif %}
             <button type="button" class="btn btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#advanced-search"
                     aria-expanded="{{ isAdvanced ? 'true' : 'false' }}">
@@ -148,7 +148,7 @@
                     <button type="submit" class="btn btn-sm btn-primary">
                         <i class="bi bi-search me-1"></i>Search
                     </button>
-                    <a href="{{ path('host_index') }}" class="btn btn-sm btn-outline-secondary">Clear</a>
+                    <a href="{{ path('host_index', {reset: 1}) }}" class="btn btn-sm btn-outline-secondary">Clear</a>
                     <span class="text-muted small ms-2">Use <code>*</code> as a wildcard (e.g. <code>web*</code>, <code>*.example.com</code>)</span>
                 </div>
             </div>
@@ -161,7 +161,7 @@
         <div class="card-body text-center text-muted py-5">
             {% if query %}
                 <i class="bi bi-search fs-1 d-block mb-3 opacity-25"></i>
-                No hosts matched <strong>{{ query }}</strong>. <a href="{{ path('host_index') }}">Clear search →</a>
+                No hosts matched <strong>{{ query }}</strong>. <a href="{{ path('host_index', {reset: 1}) }}">Clear search →</a>
             {% else %}
                 <i class="bi bi-pc-display fs-1 d-block mb-3 opacity-25"></i>
                 No hosts yet. <a href="{{ path('host_new') }}">Add the first one →</a>
