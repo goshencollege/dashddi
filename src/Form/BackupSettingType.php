@@ -77,6 +77,12 @@ class BackupSettingType extends AbstractType
                 'attr'         => ['autocomplete' => 'new-password'],
                 'help'         => 'Password used to encrypt/decrypt backup files. Leave blank to keep the existing password.',
             ])
+            ->add('excludeDhcpLeases', CheckboxType::class, [
+                'label'    => 'Exclude DHCP lease log',
+                'required' => false,
+                'help'     => 'Omits the <code>dhcp_lease</code> table from the backup. Useful for keeping backup files small when lease history is not required for a restore.',
+                'help_html' => true,
+            ])
             ->add('retentionCount', IntegerType::class, [
                 'label' => 'Backups to Keep',
                 'attr'  => ['placeholder' => '10', 'min' => '0'],
