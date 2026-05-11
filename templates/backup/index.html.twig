@@ -130,7 +130,7 @@
 
 {# ── Recent backups list ─────────────────────────────────────────────── #}
 <div class="row g-4 mt-0">
-    <div class="col-lg-8">
+    <div class="col-12">
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <strong><i class="bi bi-archive me-1"></i>Local Backups</strong>
@@ -140,20 +140,53 @@
             <div class="card-body text-muted">No local backups found.</div>
             {% else %}
             <div class="table-responsive">
-                <table class="table table-hover table-sm mb-0">
+                <table class="table table-hover table-sm mb-0 align-middle">
                     <thead>
                         <tr>
                             <th>Filename</th>
                             <th class="text-end">Size</th>
-                            <th class="text-end">Date</th>
+                            <th class="text-end">Created</th>
+                            <th class="text-end">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for b in backups %}
                         <tr>
-                            <td class="font-monospace">{{ b.name }}</td>
-                            <td class="text-end text-muted">{{ (b.size / 1024)|round(1) }} KB</td>
-                            <td class="text-end text-muted">{{ b.time|date('Y-m-d H:i') }}</td>
+                            <td class="font-monospace">
+                                {{ b.name }}
+                                {% if b.encrypted %}
+                                    <i class="bi bi-lock-fill text-warning ms-1"
+                                       title="{{ hasBackupPassword ? 'Encrypted — saved password will be used' : 'Encrypted — no saved password' }}"></i>
+                                {% endif %}
+                            </td>
+                            <td class="text-end text-muted text-nowrap">{{ (b.size / 1024)|round(1) }} KB</td>
+                            <td class="text-end text-muted text-nowrap">{{ b.time|date('Y-m-d H:i') }}</td>
+                            <td class="text-end text-nowrap">
+                                {# Restore #}
+                                <form method="post" action="{{ path('backup_restore_local') }}" class="d-inline"
+                                      onsubmit="return confirm('Restore from {{ b.name|e('js') }}?\n\nThe current database will be completely overwritten.')">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('backup_restore_local') }}">
+                                    <input type="hidden" name="filename" value="{{ b.name }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-warning" title="Restore database from this backup"
+                                            {% if b.encrypted and not hasBackupPassword %}disabled title="No saved backup password — set one in Backup Settings"{% endif %}>
+                                        <i class="bi bi-arrow-counterclockwise"></i>
+                                    </button>
+                                </form>
+                                {# Download #}
+                                <a href="{{ path('backup_download', {filename: b.name}) }}"
+                                   class="btn btn-sm btn-outline-secondary" title="Download">
+                                    <i class="bi bi-download"></i>
+                                </a>
+                                {# Delete #}
+                                <form method="post" action="{{ path('backup_delete') }}" class="d-inline"
+                                      onsubmit="return confirm('Delete {{ b.name|e('js') }}?\n\nThis cannot be undone.')">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('backup_delete') }}">
+                                    <input type="hidden" name="filename" value="{{ b.name }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -163,12 +196,14 @@
         </div>
     </div>
 
-    {# ── Restore ─────────────────────────────────────────────────────── #}
-    <div class="col-lg-4">
+    {# ── Upload restore ───────────────────────────────────────────────── #}
+    <div class="col-lg-5">
         <div class="card border-warning">
-            <div class="card-header bg-warning-subtle"><strong><i class="bi bi-arrow-counterclockwise me-1"></i>Restore from Backup</strong></div>
+            <div class="card-header bg-warning-subtle">
+                <strong><i class="bi bi-upload me-1"></i>Restore from Uploaded File</strong>
+            </div>
             <div class="card-body">
-                <p class="text-muted small">Upload a <code>.sql</code> or <code>.sql.enc</code> backup file.
+                <p class="text-muted small">Upload a <code>.sql</code> or <code>.sql.enc</code> file from your computer.
                     The current database will be overwritten and migrations will run automatically.</p>
 
                 <form method="post" action="{{ path('backup_restore') }}" enctype="multipart/form-data"
@@ -186,7 +221,7 @@
                                placeholder="Leave blank for unencrypted backups" autocomplete="off">
                     </div>
 
-                    <button type="submit" class="btn btn-warning w-100">
+                    <button type="submit" class="btn btn-warning">
                         <i class="bi bi-arrow-counterclockwise me-1"></i>Restore Database
                     </button>
                 </form>
