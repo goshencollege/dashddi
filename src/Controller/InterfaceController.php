@@ -145,9 +145,27 @@ class InterfaceController extends AbstractController
 
         if ($action === 'delete') {
             $interfaces = $ifaceRepo->findBy(['id' => $ids]);
-            $count = count($interfaces);
+
+            // Group selected interfaces by host so we can detect when all
+            // of a host's interfaces are being removed and delete the host instead.
+            $byHost = [];
             foreach ($interfaces as $iface) {
-                $em->remove($iface);
+                $hid = $iface->getHost()?->getId();
+                if ($hid !== null) {
+                    $byHost[$hid]['host']       = $iface->getHost();
+                    $byHost[$hid]['selected'][] = $iface;
+                }
+            }
+
+            $count = count($interfaces);
+            foreach ($byHost as ['host' => $host, 'selected' => $selected]) {
+                if (count($selected) >= $host->getInterfaces()->count()) {
+                    $em->remove($host);
+                } else {
+                    foreach ($selected as $iface) {
+                        $em->remove($iface);
+                    }
+                }
             }
             $em->flush();
             return $this->json(['message' => $count . ' interface(s) deleted.']);
@@ -159,8 +177,15 @@ class InterfaceController extends AbstractController
     #[Route('/interfaces/{id}/delete', name: 'interface_delete', methods: ['POST'])]
     public function delete(Request $request, NetworkInterface $interface, EntityManagerInterface $em): Response
     {
-        $hostId = $interface->getHost()?->getId();
+        $host   = $interface->getHost();
+        $hostId = $host?->getId();
         if ($this->isCsrfTokenValid('delete_interface_' . $interface->getId(), $request->request->get('_token'))) {
+            if ($host && $host->getInterfaces()->count() === 1) {
+                $em->remove($host);
+                $em->flush();
+                $this->addFlash('success', 'Interface and host "' . $host->getName() . '" deleted.');
+                return $this->redirectToRoute('host_index');
+            }
             $em->remove($interface);
             $em->flush();
             $this->addFlash('success', 'Interface deleted.');
