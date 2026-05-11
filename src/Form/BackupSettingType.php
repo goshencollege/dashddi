@@ -23,7 +23,7 @@ class BackupSettingType extends AbstractType
                     'Local path (inside container)' => 'local',
                     'CIFS / Windows share'          => 'cifs',
                 ],
-                'attr' => ['class' => 'form-select', 'id' => 'backup_destinationType'],
+                'attr' => ['class' => 'form-select'],
             ])
             ->add('localPath', TextType::class, [
                 'label'    => 'Local Path',
@@ -69,13 +69,12 @@ class BackupSettingType extends AbstractType
                 'label'    => 'Encrypt the backup file',
                 'required' => false,
                 'help'     => 'Uses AES-256-CBC + PBKDF2 to encrypt the backup file. Requires a backup password below.',
-                'attr'     => ['id' => 'backup_encryptBackup'],
             ])
             ->add('backupPassword', PasswordType::class, [
                 'label'        => 'Backup Encryption Password',
                 'required'     => false,
                 'always_empty' => false,
-                'attr'         => ['autocomplete' => 'new-password', 'id' => 'backup_backupPassword'],
+                'attr'         => ['autocomplete' => 'new-password'],
                 'help'         => 'Password used to encrypt/decrypt backup files. Leave blank to keep the existing password.',
             ])
             ->add('retentionCount', IntegerType::class, [
