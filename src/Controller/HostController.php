@@ -9,6 +9,7 @@ use App\Repository\DhcpLeaseRepository;
 use App\Repository\HostRepository;
 use App\Repository\SubnetRepository;
 use App\Repository\TagRepository;
+use App\Entity\UserPreference;
 use App\Repository\UserPreferenceRepository;
 use App\Service\IpAddressManager;
 use Doctrine\ORM\EntityManagerInterface;
@@ -28,20 +29,60 @@ class HostController extends AbstractController
     private const PER_PAGE = 50;
 
     #[Route('', name: 'host_index', methods: ['GET'])]
-    public function index(Request $request, HostRepository $repo, SubnetRepository $subnetRepo, BuildingRepository $buildingRepo, TagRepository $tagRepo, UserPreferenceRepository $prefRepo, DhcpLeaseRepository $leaseRepo): Response
+    public function index(Request $request, HostRepository $repo, SubnetRepository $subnetRepo, BuildingRepository $buildingRepo, TagRepository $tagRepo, UserPreferenceRepository $prefRepo, DhcpLeaseRepository $leaseRepo, EntityManagerInterface $em): Response
     {
+        $user  = $this->getUser();
+        $pref  = $user ? $prefRepo->findByIdentifier($user->getUserIdentifier()) : null;
         $page  = max(1, $request->query->getInt('page', 1));
-        $query = trim($request->query->getString('q'));
+        $reset = $request->query->getBoolean('reset');
 
         $advancedFields = ['name', 'building', 'room', 'subnet', 'ip', 'mac', 'dns', 'tag'];
-        $criteria = [];
-        foreach ($advancedFields as $field) {
-            $val = trim($request->query->getString($field));
-            if ($val !== '') {
-                $criteria[$field] = $val;
+
+        $hasExplicitState = $request->query->has('q')
+            || $request->query->has('page')
+            || (bool) array_filter($advancedFields, fn($f) => $request->query->has($f));
+
+        $query      = '';
+        $criteria   = [];
+        $needsFlush = false;
+
+        if ($reset) {
+            if ($user && $pref) {
+                $pref->setHostSearch(null);
+                $needsFlush = true;
+            }
+        } elseif ($hasExplicitState) {
+            $query = trim($request->query->getString('q'));
+            foreach ($advancedFields as $field) {
+                $val = trim($request->query->getString($field));
+                if ($val !== '') {
+                    $criteria[$field] = $val;
+                }
+            }
+            if ($user) {
+                if (!$pref) {
+                    $pref = new UserPreference($user->getUserIdentifier());
+                    $em->persist($pref);
+                }
+                $saved = array_filter(['q' => $query] + $criteria, fn($v) => $v !== '');
+                $pref->setHostSearch($saved ?: null);
+                $needsFlush = true;
+            }
+        } else {
+            $saved = $pref?->getHostSearch() ?? [];
+            $query = $saved['q'] ?? '';
+            foreach ($advancedFields as $field) {
+                if (!empty($saved[$field])) {
+                    $criteria[$field] = $saved[$field];
+                }
             }
         }
+
         $isAdvanced = !empty($criteria);
+
+        if ($needsFlush) {
+            $em->flush();
+        }
 
         if ($isAdvanced) {
             ['hosts' => $hosts, 'total' => $total] = $repo->advancedSearchPaginated($criteria, $page, self::PER_PAGE);
@@ -51,8 +92,6 @@ class HostController extends AbstractController
             ['hosts' => $hosts, 'total' => $total] = $repo->findAllPaginated($page, self::PER_PAGE);
         }
 
-        $user = $this->getUser();
-        $pref = $user ? $prefRepo->findByIdentifier($user->getUserIdentifier()) : null;
         $hostViewMode = $pref?->getHostViewMode() ?? 'host';
 
         $macs = [];

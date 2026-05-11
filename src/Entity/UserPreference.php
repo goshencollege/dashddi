@@ -29,6 +29,9 @@ class UserPreference
     #[ORM\Column(type: 'json', nullable: true)]
     private ?array $subnetSearch = null;
 
+    #[ORM\Column(type: 'json', nullable: true)]
+    private ?array $hostSearch = null;
+
     public function __construct(string $userIdentifier)
     {
         $this->userIdentifier = $userIdentifier;
@@ -49,4 +52,7 @@ class UserPreference
 
     public function getSubnetSearch(): ?array { return $this->subnetSearch; }
     public function setSubnetSearch(?array $search): static { $this->subnetSearch = $search; return $this; }
+
+    public function getHostSearch(): ?array { return $this->hostSearch; }
+    public function setHostSearch(?array $search): static { $this->hostSearch = $search; return $this; }
 }
