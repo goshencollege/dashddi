@@ -495,6 +495,26 @@
                 </div>
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
+            {% elseif label == 'encryption_key_notice' %}
+            <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                <strong><i class="bi bi-key-fill me-1"></i>Encryption Key Embedded in Backup</strong> —
+                This backup included an <code>APP_ENCRYPTION_KEY</code>. Encrypted database fields
+                (SSH keys, passwords) will only work if the app uses this key. Add or update the
+                following line in <code>.env.local</code> on the server, then restart the
+                <code>app</code> container:
+                <div class="input-group mt-2">
+                    <input type="text" class="form-control font-monospace small" readonly
+                           value="APP_ENCRYPTION_KEY={{ message }}">
+                    <button class="btn btn-outline-secondary" type="button"
+                            onclick="navigator.clipboard.writeText(this.previousElementSibling.value).then(() => this.innerHTML = '<i class=\'bi bi-check-lg\'></i> Copied')">
+                        <i class="bi bi-clipboard"></i>
+                    </button>
+                </div>
+                <div class="mt-2 small text-muted">
+                    Then run: <code>docker compose restart app</code>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
             {% else %}
             <div class="alert alert-{{ label == 'success' ? 'success' : 'danger' }} alert-dismissible fade show" role="alert">
                 {{ message }}
