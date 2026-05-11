@@ -158,6 +158,23 @@ class DatabaseRestoreCommand extends Command
         $this->cleanup($tmpDownload, $tmpDecrypt);
         $io->success("Database imported ({$count} statements executed).");
 
+        // -- Report embedded encryption key -----------------------------------
+        $embeddedKey = $this->extractEmbeddedKey($sql);
+        if ($embeddedKey !== null) {
+            // Prefix lets the web controller parse this line from stdout.
+            $io->writeln("EMBEDDED_KEY:{$embeddedKey}");
+            $io->warning([
+                'This backup contains an embedded APP_ENCRYPTION_KEY.',
+                'Encrypted database fields will only work if the application uses this key.',
+                '',
+                "Key: {$embeddedKey}",
+                '',
+                'Add or update this line in .env.local, then restart the app container:',
+                "  APP_ENCRYPTION_KEY={$embeddedKey}",
+                '  docker compose restart app',
+            ]);
+        }
+
         // -- Run migrations ----------------------------------------------------
         if (!$skipMigrations) {
             $io->writeln('Running pending migrations…');
@@ -183,6 +200,14 @@ class DatabaseRestoreCommand extends Command
     }
 
     // ---------------------------------------------------------------------------
+
+    private function extractEmbeddedKey(string $sql): ?string
+    {
+        if (preg_match('/^-- APP_ENCRYPTION_KEY:\s*(\S+)/m', $sql, $m)) {
+            return $m[1];
+        }
+        return null;
+    }
 
     /**
      * State-machine SQL splitter: handles quoted strings, `backtick` identifiers,

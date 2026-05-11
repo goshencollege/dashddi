@@ -116,6 +116,7 @@ class BackupController extends AbstractController
 
         if ($process->isSuccessful()) {
             $this->addFlash('success', 'Database restored successfully. Migrations have been applied.');
+            $this->flashEmbeddedKey($process->getOutput());
         } else {
             $this->addFlash('danger', 'Restore failed: ' . trim($process->getErrorOutput() ?: $process->getOutput()));
         }
@@ -165,6 +166,7 @@ class BackupController extends AbstractController
 
         if ($process->isSuccessful()) {
             $this->addFlash('success', "Database restored from {$filename}. Migrations have been applied.");
+            $this->flashEmbeddedKey($process->getOutput());
         } else {
             $this->addFlash('danger', 'Restore failed: ' . trim($process->getErrorOutput() ?: $process->getOutput()));
         }
@@ -223,6 +225,14 @@ class BackupController extends AbstractController
     }
 
     // -------------------------------------------------------------------------
+
+    /** Parses subprocess output for an embedded key notice and adds a flash if found. */
+    private function flashEmbeddedKey(string $processOutput): void
+    {
+        if (preg_match('/^EMBEDDED_KEY:(\S+)/m', $processOutput, $m)) {
+            $this->addFlash('encryption_key_notice', $m[1]);
+        }
+    }
 
     private function isValidBackupFilename(string $filename): bool
     {
