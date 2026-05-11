@@ -6,8 +6,10 @@ use App\Form\BackupSettingType;
 use App\Repository\BackupSettingRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\ResponseHeaderBag;
 use Symfony\Component\Process\Process;
 use Symfony\Component\Routing\Attribute\Route;
 
@@ -38,17 +40,19 @@ class BackupController extends AbstractController
             rsort($files);
             foreach ($files as $file) {
                 $backups[] = [
-                    'name' => basename($file),
-                    'size' => filesize($file),
-                    'time' => filemtime($file),
+                    'name'      => basename($file),
+                    'size'      => filesize($file),
+                    'time'      => filemtime($file),
+                    'encrypted' => str_ends_with($file, '.sql.enc'),
                 ];
             }
         }
 
         return $this->render('backup/index.html.twig', [
-            'form'      => $form,
-            'backups'   => $backups,
-            'localPath' => $localPath,
+            'form'              => $form,
+            'backups'           => $backups,
+            'localPath'         => $localPath,
+            'hasBackupPassword' => $setting->getBackupPassword() !== null && $setting->getBackupPassword() !== '',
         ]);
     }
 
@@ -117,5 +121,126 @@ class BackupController extends AbstractController
         }
 
         return $this->redirectToRoute('backup_index');
+    }
+
+    #[Route('/restore-local', name: 'restore_local', methods: ['POST'])]
+    public function restoreLocal(Request $request, BackupSettingRepository $repo): Response
+    {
+        if (!$this->isCsrfTokenValid('backup_restore_local', $request->request->get('_token'))) {
+            $this->addFlash('danger', 'Invalid CSRF token.');
+            return $this->redirectToRoute('backup_index');
+        }
+
+        $filename = $request->request->get('filename', '');
+        if (!$this->isValidBackupFilename($filename)) {
+            $this->addFlash('danger', 'Invalid backup filename.');
+            return $this->redirectToRoute('backup_index');
+        }
+
+        $setting  = $repo->getInstance();
+        $filePath = $this->resolveBackupPath($filename, $setting->getLocalPath());
+
+        if ($filePath === null) {
+            $this->addFlash('danger', 'Backup file not found.');
+            return $this->redirectToRoute('backup_index');
+        }
+
+        $isEncrypted = str_ends_with($filename, '.sql.enc');
+        $password    = $setting->getBackupPassword() ?? '';
+
+        if ($isEncrypted && $password === '') {
+            $this->addFlash('danger', 'This backup is encrypted but no backup password is saved in Backup Settings.');
+            return $this->redirectToRoute('backup_index');
+        }
+
+        $consolePath = $this->getParameter('kernel.project_dir') . '/bin/console';
+        $args        = ['php', $consolePath, 'app:database:restore', $filePath, '--no-interaction'];
+        if ($isEncrypted) {
+            $args[] = '--backup-password=' . $password;
+        }
+
+        $process = new Process($args);
+        $process->setTimeout(600);
+        $process->run();
+
+        if ($process->isSuccessful()) {
+            $this->addFlash('success', "Database restored from {$filename}. Migrations have been applied.");
+        } else {
+            $this->addFlash('danger', 'Restore failed: ' . trim($process->getErrorOutput() ?: $process->getOutput()));
+        }
+
+        return $this->redirectToRoute('backup_index');
+    }
+
+    #[Route('/download/{filename}', name: 'download', methods: ['GET'])]
+    public function download(string $filename, BackupSettingRepository $repo): Response
+    {
+        if (!$this->isValidBackupFilename($filename)) {
+            throw $this->createNotFoundException();
+        }
+
+        $setting  = $repo->getInstance();
+        $filePath = $this->resolveBackupPath($filename, $setting->getLocalPath());
+
+        if ($filePath === null) {
+            throw $this->createNotFoundException();
+        }
+
+        $response = new BinaryFileResponse($filePath);
+        $response->setContentDisposition(ResponseHeaderBag::DISPOSITION_ATTACHMENT, $filename);
+        return $response;
+    }
+
+    #[Route('/delete', name: 'delete', methods: ['POST'])]
+    public function delete(Request $request, BackupSettingRepository $repo): Response
+    {
+        if (!$this->isCsrfTokenValid('backup_delete', $request->request->get('_token'))) {
+            $this->addFlash('danger', 'Invalid CSRF token.');
+            return $this->redirectToRoute('backup_index');
+        }
+
+        $filename = $request->request->get('filename', '');
+        if (!$this->isValidBackupFilename($filename)) {
+            $this->addFlash('danger', 'Invalid backup filename.');
+            return $this->redirectToRoute('backup_index');
+        }
+
+        $setting  = $repo->getInstance();
+        $filePath = $this->resolveBackupPath($filename, $setting->getLocalPath());
+
+        if ($filePath === null) {
+            $this->addFlash('danger', 'Backup file not found.');
+            return $this->redirectToRoute('backup_index');
+        }
+
+        if (@unlink($filePath)) {
+            $this->addFlash('success', "Backup deleted: {$filename}");
+        } else {
+            $this->addFlash('danger', "Could not delete: {$filename}");
+        }
+
+        return $this->redirectToRoute('backup_index');
+    }
+
+    // -------------------------------------------------------------------------
+
+    private function isValidBackupFilename(string $filename): bool
+    {
+        return (bool) preg_match('/^dashddi_backup_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}\.sql(\.enc)?$/', $filename);
+    }
+
+    /** Returns the real, validated path to the file, or null if it doesn't exist / escapes the directory. */
+    private function resolveBackupPath(string $filename, ?string $configuredPath): ?string
+    {
+        $dir      = rtrim($configuredPath ?? $this->getParameter('kernel.project_dir') . '/var/backups', '/');
+        $filePath = $dir . '/' . $filename;
+        $realFile = realpath($filePath);
+        $realDir  = realpath($dir);
+
+        if ($realFile === false || $realDir === false || !str_starts_with($realFile, $realDir . '/')) {
+            return null;
+        }
+
+        return $realFile;
     }
 }
