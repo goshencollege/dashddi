@@ -199,20 +199,20 @@
 {% block scripts %}
 <script>
 (function () {
-    const select = document.getElementById('backup_destinationType');
+    const select     = document.getElementById('{{ form.destinationType.vars.id }}');
     const localFields = document.getElementById('local-fields');
     const cifsFields  = document.getElementById('cifs-fields');
 
-    function toggle() {
+    function toggleDest() {
         const isCifs = select.value === 'cifs';
         localFields.style.display = isCifs ? 'none' : '';
         cifsFields.style.display  = isCifs ? ''     : 'none';
     }
 
-    toggle();
-    select.addEventListener('change', toggle);
+    toggleDest();
+    select.addEventListener('change', toggleDest);
 
-    const encCheck  = document.getElementById('backup_encryptBackup');
+    const encCheck  = document.getElementById('{{ form.encryptBackup.vars.id }}');
     const passField = document.getElementById('backup-password-field');
 
     function togglePass() {
