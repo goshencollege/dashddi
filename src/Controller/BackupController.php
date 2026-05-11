@@ -167,6 +167,12 @@ class BackupController extends AbstractController
         if ($process->isSuccessful()) {
             $this->addFlash('success', "Database restored from {$filename}. Migrations have been applied.");
             $this->flashEmbeddedKey($process->getOutput());
+        } elseif ($isEncrypted && str_contains($process->getOutput(), 'WRONG_BACKUP_PASSWORD')) {
+            $this->addFlash('danger',
+                "The saved backup password does not match the password used to encrypt \"{$filename}\". " .
+                'This can happen if the password was changed after the backup was created. ' .
+                'To restore this backup, download it and use the "Restore from Uploaded File" form where you can enter the original password manually.'
+            );
         } else {
             $this->addFlash('danger', 'Restore failed: ' . trim($process->getErrorOutput() ?: $process->getOutput()));
         }
