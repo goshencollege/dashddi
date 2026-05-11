@@ -129,6 +129,33 @@ class InterfaceController extends AbstractController
         ]);
     }
 
+    #[Route('/interfaces/bulk', name: 'interface_bulk', methods: ['POST'])]
+    public function bulk(Request $request, NetworkInterfaceRepository $ifaceRepo, EntityManagerInterface $em): JsonResponse
+    {
+        $data   = json_decode($request->getContent(), true) ?? [];
+        $action = $data['action'] ?? '';
+        $ids    = array_values(array_filter(array_map('intval', $data['ids'] ?? []), fn($id) => $id > 0));
+
+        if (!$this->isCsrfTokenValid('bulk_interfaces', $data['_token'] ?? '')) {
+            return $this->json(['error' => 'Invalid CSRF token'], 403);
+        }
+        if (empty($ids)) {
+            return $this->json(['error' => 'No interfaces selected'], 400);
+        }
+
+        if ($action === 'delete') {
+            $interfaces = $ifaceRepo->findBy(['id' => $ids]);
+            $count = count($interfaces);
+            foreach ($interfaces as $iface) {
+                $em->remove($iface);
+            }
+            $em->flush();
+            return $this->json(['message' => $count . ' interface(s) deleted.']);
+        }
+
+        return $this->json(['error' => 'Unknown action'], 400);
+    }
+
     #[Route('/interfaces/{id}/delete', name: 'interface_delete', methods: ['POST'])]
     public function delete(Request $request, NetworkInterface $interface, EntityManagerInterface $em): Response
     {
