@@ -105,7 +105,8 @@ class DatabaseRestoreCommand extends Command
             $decrypted = $this->decryptContent(file_get_contents($filePath), $backupPassword);
 
             if ($decrypted === null) {
-                $io->error('Decryption failed. Wrong password or corrupted file.');
+                $io->writeln('WRONG_BACKUP_PASSWORD');
+                $io->error('Decryption failed. The password is incorrect or the file is corrupted.');
                 $this->cleanup($tmpDownload);
                 return Command::FAILURE;
             }
