@@ -110,6 +110,16 @@
 
                 <hr>
 
+                <div class="mb-3">
+                    <div class="form-check mb-1">
+                        {{ form_widget(form.excludeDhcpLeases, {attr: {class: 'form-check-input'}}) }}
+                        {{ form_label(form.excludeDhcpLeases, null, {label_attr: {class: 'form-check-label fw-semibold'}}) }}
+                    </div>
+                    {{ form_help(form.excludeDhcpLeases) }}
+                </div>
+
+                <hr>
+
                 <div class="mb-0">
                     {{ form_label(form.retentionCount, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
                     {{ form_widget(form.retentionCount, {attr: {class: 'form-control', style: 'width:120px'}}) }}
