@@ -181,8 +181,7 @@ class ImportLegacyCommand extends Command
     // -------------------------------------------------------------------------
 
     /**
-     * Returns subnets keyed by legacy nID for single-/24 subnets, or by
-     * "{nID}_{thirdOctet}" for subnets that span more than one /24 (e.g. O_234, O_235).
+     * Returns subnets keyed by legacy nID.
      *
      * @return array<string, Subnet>
      */
@@ -194,58 +193,50 @@ class ImportLegacyCommand extends Command
         $map  = [];
 
         foreach ($rows as $row) {
-            $nid    = $row['nID'];
-            $ranges = $addressRanges[$nid] ?? [];
-            $domain = $domains[(int) $row['zID']] ?? null;
-            $multi  = count($ranges) > 1;
+            $nid   = $row['nID'];
+            $range = $addressRanges[$nid] ?? null;
 
-            if (empty($ranges)) {
-                $subnet      = $this->makeSubnet($row['name'], (int) $row['vID'], null);
-                $map[$nid]   = $subnet;
+            if ($range === null) {
+                $subnet    = $this->makeSubnet($row['name'], (int) $row['vID'], null);
+                $map[$nid] = $subnet;
                 if (!$dryRun) {
                     $this->em->persist($subnet);
                 }
                 continue;
             }
 
-            foreach ($ranges as $range) {
-                $network   = $range['network'];
-                $thirdOctet = explode('.', $network)[2];
-                $cidr      = $network . '.0/24';
-                $mapKey    = $multi ? $nid . '_' . $thirdOctet : $nid;
-                $name      = $multi ? $row['name'] . ' (' . $cidr . ')' : $row['name'];
+            [$cidr, $network] = $this->computeCidr($range['min_ip'], $range['max_ip']);
 
-                $subnet       = $this->makeSubnet($name, (int) $row['vID'], $cidr, $network);
-                $map[$mapKey] = $subnet;
+            $subnet    = $this->makeSubnet($row['name'], (int) $row['vID'], $cidr, $network);
+            $map[$nid] = $subnet;
 
+            if (!$dryRun) {
+                $this->em->persist($subnet);
+            }
+
+            // Reserved block: .1 – .5 of network base
+            $reserved = new AddressBlock();
+            $reserved->setSubnet($subnet);
+            $reserved->setType(BlockType::Reserved);
+            $reserved->setLabel('Infrastructure');
+            $reserved->setStartIp(long2ip(ip2long($network) + 1));
+            $reserved->setEndIp(long2ip(ip2long($network) + 5));
+            if (!$dryRun) {
+                $this->em->persist($reserved);
+            }
+
+            // Fixed block: max(min_ip, base+6) – max_ip
+            $fixedStart = long2ip(max(ip2long($range['min_ip']), ip2long($network) + 6));
+            $fixedEnd   = $range['max_ip'];
+
+            if (ip2long($fixedEnd) >= ip2long($fixedStart)) {
+                $fixed = new AddressBlock();
+                $fixed->setSubnet($subnet);
+                $fixed->setType(BlockType::Fixed);
+                $fixed->setStartIp($fixedStart);
+                $fixed->setEndIp($fixedEnd);
                 if (!$dryRun) {
-                    $this->em->persist($subnet);
-                }
-
-                // Reserved block: .1 – .5
-                $reserved = new AddressBlock();
-                $reserved->setSubnet($subnet);
-                $reserved->setType(BlockType::Reserved);
-                $reserved->setLabel('Infrastructure');
-                $reserved->setStartIp($network . '.1');
-                $reserved->setEndIp($network . '.5');
-                if (!$dryRun) {
-                    $this->em->persist($reserved);
-                }
-
-                // Fixed block: max(min_ip, .6) – max_ip
-                $fixedStart = long2ip(max(ip2long($range['min_ip']), ip2long($network . '.6')));
-                $fixedEnd   = $range['max_ip'];
-
-                if (ip2long($fixedEnd) >= ip2long($fixedStart)) {
-                    $fixed = new AddressBlock();
-                    $fixed->setSubnet($subnet);
-                    $fixed->setType(BlockType::Fixed);
-                    $fixed->setStartIp($fixedStart);
-                    $fixed->setEndIp($fixedEnd);
-                    if (!$dryRun) {
-                        $this->em->persist($fixed);
-                    }
+                    $this->em->persist($fixed);
                 }
             }
         }
@@ -260,45 +251,69 @@ class ImportLegacyCommand extends Command
     }
 
     /**
-     * Groups address table by nID and /24 network prefix.
+     * Returns the smallest power-of-2 CIDR covering $minIp–$maxIp.
      *
-     * @return array<string, list<array{network: string, min_ip: string, max_ip: string}>>
+     * @return array{string, string} [$cidr, $networkIp]
+     */
+    private function computeCidr(string $minIp, string $maxIp): array
+    {
+        $minLong  = ip2long($minIp);
+        $maxLong  = ip2long($maxIp);
+        $diff     = $minLong ^ $maxLong;
+        $hostBits = 0;
+        while ((1 << $hostBits) <= $diff) {
+            $hostBits++;
+        }
+        $prefixLen   = 32 - $hostBits;
+        $mask        = $hostBits === 0 ? -1 : ~((1 << $hostBits) - 1);
+        $networkLong = $minLong & $mask;
+        $network     = long2ip($networkLong);
+
+        return [$network . '/' . $prefixLen, $network];
+    }
+
+    /**
+     * Groups address table by nID, returning overall min/max IP per subnet.
+     *
+     * @return array<string, array{min_ip: string, max_ip: string}>
      */
     private function loadAddressRanges(\PDO $pdo): array
     {
         $rows = $pdo->query(
             'SELECT
                 nID,
-                SUBSTRING_INDEX(ip, ".", 3)              AS network,
-                INET_NTOA(MIN(INET_ATON(ip)))            AS min_ip,
-                INET_NTOA(MAX(INET_ATON(ip)))            AS max_ip
+                INET_NTOA(MIN(INET_ATON(ip))) AS min_ip,
+                INET_NTOA(MAX(INET_ATON(ip))) AS max_ip
              FROM address
-             GROUP BY nID, SUBSTRING_INDEX(ip, ".", 3)
-             ORDER BY nID, INET_ATON(INET_NTOA(MIN(INET_ATON(ip))))'
+             GROUP BY nID
+             ORDER BY nID'
         )->fetchAll();
 
         $map = [];
         foreach ($rows as $row) {
-            $map[$row['nID']][] = $row;
+            $map[$row['nID']] = ['min_ip' => $row['min_ip'], 'max_ip' => $row['max_ip']];
         }
 
         return $map;
     }
 
-    private function makeSubnet(string $name, int $vlan, ?string $cidr, ?string $network = null): Subnet
+    private function makeSubnet(string $name, int $vlan, ?string $cidr, ?string $networkIp = null): Subnet
     {
         $subnet = new Subnet();
         $subnet->setName($name);
         $subnet->setVlan($vlan ?: null);
         $subnet->setIpv4Cidr($cidr);
 
-        if ($network !== null) {
-            $octets     = explode('.', $network);
-            $firstOctet = (int) $octets[0];
-            $thirdOctet = (int) $octets[2];
+        if ($networkIp !== null && $cidr !== null) {
+            $prefixLen   = (int) explode('/', $cidr)[1];
+            $octets      = explode('.', $networkIp);
+            $firstOctet  = (int) $octets[0];
+            $thirdOctet  = (int) $octets[2];
             $seventhByte = in_array($firstOctet, [198, 199], true) ? 0x01 : 0x00;
             $fourthGroup = dechex(($seventhByte << 8) | $thirdOctet);
-            $subnet->setIpv6Cidr('2001:18e8:408:' . $fourthGroup . '::/64');
+            // IPv4 /24 → IPv6 /64; each bit shorter prefix maps to one bit shorter IPv6 prefix
+            $ipv6PrefixLen = $prefixLen + 40;
+            $subnet->setIpv6Cidr('2001:18e8:408:' . $fourthGroup . '::/' . $ipv6PrefixLen);
         }
 
         return $subnet;
@@ -384,7 +399,7 @@ class ImportLegacyCommand extends Command
             $nid    = $row['nID'];
             $zid    = $subnetZones[$nid] ?? 1;
             $domain = $domains[$zid] ?? null;
-            $subnet = $this->resolveSubnet($nid, $row['ip'], $subnets);
+            $subnet = $subnets[$nid] ?? null;
 
             $host = new Host();
             $host->setName($row['name']);
@@ -505,24 +520,22 @@ class ImportLegacyCommand extends Command
             return null;
         }
 
+        // For subnets wider than /64 (e.g. a /63 spanning two /24s), adjust byte 7
+        // so the host lands in the correct /64 sub-block within the wider prefix.
+        $ipv4Cidr = $subnet->getIpv4Cidr();
+        if ($ipv4Cidr !== null) {
+            $ipv6PrefixLen = (int) explode('/', $subnet->getIpv6Cidr())[1];
+            if ($ipv6PrefixLen < 64) {
+                $baseThird = (int) explode('.', explode('/', $ipv4Cidr)[0])[2];
+                $offset    = (int) $octets[2] - $baseThird;
+                $raw[7]    = chr(ord($raw[7]) | $offset);
+            }
+        }
+
         $raw[15] = chr((int) $octets[3]);
         $result  = inet_ntop($raw);
 
         return $result !== false ? $result : null;
-    }
-
-    private function resolveSubnet(string $nid, ?string $ip, array $subnets): ?Subnet
-    {
-        // Multi-/24 subnets are keyed as "{nid}_{thirdOctet}" (e.g. O_234)
-        if ($ip && filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
-            $thirdOctet = explode('.', $ip)[2];
-            $multiKey   = $nid . '_' . $thirdOctet;
-            if (isset($subnets[$multiKey])) {
-                return $subnets[$multiKey];
-            }
-        }
-
-        return $subnets[$nid] ?? null;
     }
 
     private function isValidDnsLabel(string $name): bool
