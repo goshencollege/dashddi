@@ -113,6 +113,7 @@
                         <label class="form-label small fw-semibold mb-1">Subnet</label>
                         <select name="subnet" class="form-select form-select-sm">
                             <option value="">— Any —</option>
+                            <option value="none" {{ (criteria.subnet ?? '') == 'none' ? 'selected' }}>— No subnet —</option>
                             {% for subnet in subnets %}
                                 <option value="{{ subnet.id }}" {{ (criteria.subnet ?? '') == (subnet.id ~ '') ? 'selected' }}>
                                     {{ subnet }}

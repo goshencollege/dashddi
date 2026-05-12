@@ -142,8 +142,12 @@ class HostRepository extends ServiceEntityRepository
                ->setParameter('room', $this->toLike($criteria['room']));
         }
         if (!empty($criteria['subnet'])) {
-            $qb->andWhere('i.subnet = :subnet')
-               ->setParameter('subnet', (int) $criteria['subnet']);
+            if ($criteria['subnet'] === 'none') {
+                $qb->andWhere('i.subnet IS NULL');
+            } else {
+                $qb->andWhere('i.subnet = :subnet')
+                   ->setParameter('subnet', (int) $criteria['subnet']);
+            }
         }
         if (!empty($criteria['ip'])) {
             $qb->andWhere($qb->expr()->orX('ip4.address LIKE :ip', 'ip6.address LIKE :ip', 'dl.ipAddress LIKE :ip'))

@@ -37,7 +37,7 @@ class NetworkInterface
     private ?Host $host = null;
 
     #[ORM\ManyToOne(targetEntity: Subnet::class, inversedBy: 'interfaces')]
-    #[ORM\JoinColumn(nullable: true)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
     private ?Subnet $subnet = null;
 
     #[ORM\OneToOne(targetEntity: IpAddress::class, cascade: ['persist', 'remove'])]
