@@ -50,6 +50,8 @@ class ImportLegacyCommand extends Command
         $conn = $this->em->getConnection();
 
         if (!$dryRun) {
+            $io->section('Truncating');
+            $this->truncateImportedTables($conn, $io);
             $conn->beginTransaction();
         }
 
@@ -82,6 +84,33 @@ class ImportLegacyCommand extends Command
         $io->success($dryRun ? 'Dry run complete — no changes written' : 'Import complete');
 
         return Command::SUCCESS;
+    }
+
+    private function truncateImportedTables(\Doctrine\DBAL\Connection $conn, SymfonyStyle $io): void
+    {
+        $tables = [
+            'interface_name_dns_view',
+            'interface_name',
+            'ip_address',
+            'ipv6_address',
+            'network_interface',
+            'host_tag',
+            'host',
+            'subnet_tag',
+            'address_block',
+            'subnet',
+            'tag',
+            'domain',
+            'building',
+        ];
+
+        $conn->executeStatement('SET FOREIGN_KEY_CHECKS=0');
+        foreach ($tables as $table) {
+            $conn->executeStatement('TRUNCATE TABLE `' . $table . '`');
+        }
+        $conn->executeStatement('SET FOREIGN_KEY_CHECKS=1');
+
+        $io->writeln(sprintf('  Truncated %d tables', count($tables)));
     }
 
     private function connectLegacy(): \PDO
