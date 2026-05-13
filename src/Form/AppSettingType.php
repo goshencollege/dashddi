@@ -9,6 +9,7 @@ use Symfony\Component\Form\Extension\Core\Type\EmailType;
 use Symfony\Component\Form\Extension\Core\Type\IntegerType;
 use Symfony\Component\Form\Extension\Core\Type\PasswordType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
+use Symfony\Component\Form\Extension\Core\Type\TimezoneType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
@@ -17,6 +18,13 @@ class AppSettingType extends AbstractType
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
         $builder
+            ->add('timezone', TimezoneType::class, [
+                'label'       => 'Display Timezone',
+                'required'    => false,
+                'placeholder' => 'UTC (default)',
+                'attr'        => ['class' => 'form-select'],
+                'help'        => 'Timezone used for all date/time display throughout the application.',
+            ])
             ->add('defaultLeaseRetentionDays', IntegerType::class, [
                 'label'    => 'Default DHCP Lease Retention (days)',
                 'required' => false,
