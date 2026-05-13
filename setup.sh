@@ -4,8 +4,17 @@
 
 set -euo pipefail
 
+# Parse flags
+APP_ENV="prod"
+for arg in "$@"; do
+    case "$arg" in
+        --dev) APP_ENV="dev" ;;
+        *) echo "Unknown option: $arg" >&2; exit 1 ;;
+    esac
+done
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-COMPOSE_FILE="$SCRIPT_DIR/docker-compose.prod.yml"
+COMPOSE_FILE="$SCRIPT_DIR/docker-compose.${APP_ENV}.yml"
 SSL_DIR="$SCRIPT_DIR/docker/ssl"
 
 # ── Terminal colours (disabled when not a TTY) ────────────────────────────────
@@ -52,8 +61,13 @@ ask_yn() {
 cd "$SCRIPT_DIR"
 
 echo
-echo -e "${BOLD}DashDDI Production Setup${NC}"
-echo "  This wizard creates docker-compose.prod.yml and starts the stack."
+if [[ "$APP_ENV" == "dev" ]]; then
+    echo -e "${BOLD}DashDDI Development Setup${NC}"
+    echo "  This wizard creates docker-compose.dev.yml and starts the stack with APP_ENV=dev."
+else
+    echo -e "${BOLD}DashDDI Production Setup${NC}"
+    echo "  This wizard creates docker-compose.prod.yml and starts the stack."
+fi
 echo "  Have your IdP SAML metadata (XML file or URL) ready before you begin."
 echo
 
@@ -68,7 +82,7 @@ docker compose version >/dev/null 2>&1 || die "docker compose (plugin v2) is req
 ok "docker compose"
 
 if [[ -f "$COMPOSE_FILE" ]]; then
-    warn "docker-compose.prod.yml already exists."
+    warn "docker-compose.${APP_ENV}.yml already exists."
     ask_yn "Overwrite and re-run full setup?" "n" \
         || { echo "  Aborted."; exit 0; }
 fi
@@ -129,8 +143,8 @@ case "$SSL_CHOICE" in
     ln -sf "/etc/letsencrypt/live/${FQDN}/fullchain.pem" "$SSL_DIR/cert.pem"
     ln -sf "/etc/letsencrypt/live/${FQDN}/privkey.pem"   "$SSL_DIR/key.pem"
     ok "Let's Encrypt certificate obtained and linked into docker/ssl/"
-    warn "Set up auto-renewal: 'certbot renew --pre-hook \"docker compose -f $COMPOSE_FILE stop nginx\"'"
-    warn "                               --post-hook \"docker compose -f $COMPOSE_FILE start nginx\"'"
+    warn "Set up auto-renewal: 'certbot renew --pre-hook \"docker compose -f docker-compose.${APP_ENV}.yml stop nginx\"'"
+    warn "                               --post-hook \"docker compose -f docker-compose.${APP_ENV}.yml start nginx\"'"
     ;;
 3)
     if [[ -f "$SSL_DIR/cert.pem" && -f "$SSL_DIR/key.pem" ]]; then
@@ -246,7 +260,7 @@ services:
       - /tmp
       - /usr/local/var/run
     environment:
-      APP_ENV: prod
+      APP_ENV: ${APP_ENV}
       APP_SECRET: "${APP_SECRET}"
       APP_ENCRYPTION_KEY: "${APP_ENCRYPTION_KEY}"
       DATABASE_URL: "${DATABASE_URL}"
@@ -365,10 +379,10 @@ if [[ "$SSL_CHOICE" == "1" ]]; then
 fi
 
 echo "  Common commands:"
-echo "    Start:    docker compose -f docker-compose.prod.yml up -d"
-echo "    Stop:     docker compose -f docker-compose.prod.yml down"
-echo "    Logs:     docker compose -f docker-compose.prod.yml logs -f"
-echo "    Migrate:  docker compose -f docker-compose.prod.yml exec app php bin/console doctrine:migrations:migrate"
+echo "    Start:    docker compose -f docker-compose.${APP_ENV}.yml up -d"
+echo "    Stop:     docker compose -f docker-compose.${APP_ENV}.yml down"
+echo "    Logs:     docker compose -f docker-compose.${APP_ENV}.yml logs -f"
+echo "    Migrate:  docker compose -f docker-compose.${APP_ENV}.yml exec app php bin/console doctrine:migrations:migrate"
 echo
 echo -e "  ${BOLD}SP metadata URL for your IdP:${NC}  ${CYAN}${BASE_URL}/saml/metadata${NC}"
 echo
