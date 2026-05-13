@@ -1,4 +1,4 @@
-.PHONY: up down restart bash migrate cc logs db-shell cert
+.PHONY: up down restart bash migrate cc logs db-shell cert reset
 
 up:
 	docker compose up -d
@@ -22,7 +22,15 @@ logs:
 	docker compose logs -f
 
 db-shell:
-	docker compose exec db psql -U ipam -d ipam
+	docker compose exec db mysql -u ipam -pipam_password ipam
+
+reset:
+	docker compose down -v
+	docker compose up -d --build
+	@echo "Waiting for app container…"
+	@until docker compose exec -T app php -r 'echo ok;' 2>/dev/null | grep -q ok; do sleep 2; done
+	docker compose exec -T app php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
+	docker compose exec -T app php bin/console doctrine:fixtures:load --no-interaction
 
 cert:
 	mkdir -p docker/ssl
