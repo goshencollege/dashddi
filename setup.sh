@@ -198,8 +198,17 @@ if [[ "$USE_CONTAINER_DB" == "false" ]]; then
 fi
 DATABASE_URL="mysql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?serverVersion=${DB_SERVER_VERSION}&charset=utf8mb4"
 
-# ── 6. Write docker-compose.prod.yml ─────────────────────────────────────────
-header "Writing docker-compose.prod.yml"
+# ── 6. Write docker-compose file ─────────────────────────────────────────────
+header "Writing docker-compose.${APP_ENV}.yml"
+
+# Prod: read-only containers and volume mounts. Dev: writable for easier development.
+if [[ "$APP_ENV" == "prod" ]]; then
+    APP_READONLY="    read_only: true"
+    VOL_RO=":ro"
+else
+    APP_READONLY=""
+    VOL_RO=""
+fi
 
 # Build the db service block and app depends_on conditionally
 if [[ "$USE_CONTAINER_DB" == "true" ]]; then
@@ -251,10 +260,10 @@ cat > "$COMPOSE_FILE" << EOF
 services:
   app:
     build: .
-    read_only: true
+${APP_READONLY}
     restart: unless-stopped
     volumes:
-      - .:/var/www/html:ro
+      - .:/var/www/html${VOL_RO}
       - symfony_var:/var/www/html/var
     tmpfs:
       - /tmp
@@ -265,6 +274,27 @@ services:
       APP_ENCRYPTION_KEY: "${APP_ENCRYPTION_KEY}"
       DATABASE_URL: "${DATABASE_URL}"
       DEFAULT_URI: "${BASE_URL}"
+      MESSENGER_TRANSPORT_DSN: "doctrine://default?auto_setup=0"
+${DEPENDS_ON_BLOCK}
+
+  worker:
+    build: .
+${APP_READONLY}
+    restart: unless-stopped
+    command: ["php", "bin/console", "messenger:consume", "async", "failed", "--time-limit=3600"]
+    volumes:
+      - .:/var/www/html${VOL_RO}
+      - symfony_var:/var/www/html/var
+    tmpfs:
+      - /tmp
+      - /usr/local/var/run
+    environment:
+      APP_ENV: ${APP_ENV}
+      APP_SECRET: "${APP_SECRET}"
+      APP_ENCRYPTION_KEY: "${APP_ENCRYPTION_KEY}"
+      DATABASE_URL: "${DATABASE_URL}"
+      DEFAULT_URI: "${BASE_URL}"
+      MESSENGER_TRANSPORT_DSN: "doctrine://default?auto_setup=0"
 ${DEPENDS_ON_BLOCK}
 
   nginx:
@@ -288,7 +318,7 @@ ${DB_SERVICE_BLOCK}
 ${VOLUMES_BLOCK}
 EOF
 
-ok "docker-compose.prod.yml written"
+ok "docker-compose.${APP_ENV}.yml written"
 
 # ── 7. Start containers ───────────────────────────────────────────────────────
 header "Building and starting services"

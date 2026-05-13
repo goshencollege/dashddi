@@ -1,0 +1,185 @@
+{% extends 'base.html.twig' %}
+{% block title %}Push Logs{% endblock %}
+{% block body_class %}page-list-view{% endblock %}
+
+{% block stylesheets %}
+<style>
+    .detail-row td { background-color: var(--bs-tertiary-bg); padding: 1rem 1.25rem; }
+    .zone-list { margin: 0; padding: 0; list-style: none; }
+    .zone-list li + li { margin-top: .15rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="list-page-content">
+    <div class="sticky-list-header d-flex justify-content-between align-items-center mb-3">
+        <h1 class="h4 mb-0"><i class="bi bi-journal-code me-2"></i>Push Logs</h1>
+        <span class="text-muted small">Last {{ logs|length }} push operations</span>
+    </div>
+
+    {% if logs is empty %}
+        <div class="card">
+            <div class="card-body text-center text-muted py-5">
+                <i class="bi bi-journal-code fs-1 d-block mb-3 opacity-25"></i>
+                No push operations recorded yet. Use the <a href="{{ path('servers_index') }}">Servers</a> page to push a config.
+            </div>
+        </div>
+    {% else %}
+    <div class="list-scroll-card">
+        <div class="card">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0 align-middle">
+                    <thead>
+                        <tr>
+                            <th style="width:1%"></th>
+                            <th>Started</th>
+                            <th>Type</th>
+                            <th>Server</th>
+                            <th>Status</th>
+                            <th>Duration</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for log in logs %}
+                        {% set detailId = 'log-detail-' ~ log.id %}
+                        <tr class="cursor-pointer" data-bs-toggle="collapse" data-bs-target="#{{ detailId }}" style="cursor:pointer">
+                            <td class="ps-3">
+                                <i class="bi bi-chevron-right detail-chevron text-muted" style="transition:transform .15s; font-size:.75rem;"></i>
+                            </td>
+                            <td class="text-nowrap">
+                                <span title="{{ log.startedAt|date('Y-m-d H:i:s') }}">
+                                    {{ log.startedAt|date('M j, g:i:s a') }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if log.type == 'dns' %}
+                                    <span class="badge bg-primary">DNS</span>
+                                {% else %}
+                                    <span class="badge bg-success">DHCP</span>
+                                {% endif %}
+                            </td>
+                            <td class="fw-semibold">{{ log.serverName }}</td>
+                            <td>
+                                {% if log.success %}
+                                    <span class="badge bg-success"><i class="bi bi-check-lg me-1"></i>Success</span>
+                                {% else %}
+                                    <span class="badge bg-danger"><i class="bi bi-x-lg me-1"></i>Failed</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-muted font-monospace small">
+                                {{ log.durationMs >= 1000
+                                    ? (log.durationMs / 1000)|number_format(1) ~ 's'
+                                    : log.durationMs ~ 'ms' }}
+                            </td>
+                        </tr>
+                        <tr class="collapse detail-row" id="{{ detailId }}">
+                            <td colspan="6">
+                                {% if log.errorMessage %}
+                                    <div class="alert alert-danger mb-0">
+                                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                                        <strong>Exception:</strong> {{ log.errorMessage }}
+                                    </div>
+                                {% elseif log.type == 'dns' %}
+                                    {{ _self.renderDnsResult(log.result) }}
+                                {% else %}
+                                    {{ _self.renderDhcpResult(log.result) }}
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{# ── DNS result renderer ──────────────────────────────────────────────────── #}
+{% macro renderDnsResult(result) %}
+<ul class="zone-list">
+    {% for viewName, viewResult in result.views ?? {} %}
+        {% if viewResult.mkdir is defined and not viewResult.mkdir.success %}
+            <li class="d-flex align-items-start gap-2">
+                <i class="bi bi-x-circle-fill text-danger mt-1 flex-shrink-0"></i>
+                <div>
+                    <span class="badge bg-secondary me-1">{{ viewName }}</span>
+                    <span class="text-danger small">mkdir failed: {{ viewResult.mkdir.output }}</span>
+                </div>
+            </li>
+        {% endif %}
+        {% for zoneName, zone in viewResult.zones ?? {} %}
+            <li class="d-flex align-items-start gap-2">
+                <i class="bi {{ zone.success ? 'bi-check-circle-fill text-success' : 'bi-x-circle-fill text-danger' }} mt-1 flex-shrink-0"></i>
+                <div>
+                    <span class="badge bg-secondary me-1">{{ viewName }}</span>
+                    <span class="font-monospace small">{{ zone.file }}</span>
+                    {% if zone.output %}<div class="text-danger small font-monospace mt-1">{{ zone.output }}</div>{% endif %}
+                </div>
+            </li>
+        {% endfor %}
+    {% endfor %}
+    {% if result.conf is defined %}
+        <li class="d-flex align-items-start gap-2">
+            <i class="bi {{ result.conf.success ? 'bi-check-circle-fill text-success' : 'bi-x-circle-fill text-danger' }} mt-1 flex-shrink-0"></i>
+            <div>
+                <span class="font-monospace small">views.conf</span>
+                {% if result.conf.output %}<div class="text-danger small font-monospace mt-1">{{ result.conf.output }}</div>{% endif %}
+            </div>
+        </li>
+    {% endif %}
+    {% if result.reload is defined %}
+        <li class="d-flex align-items-start gap-2">
+            <i class="bi {{ result.reload.success ? 'bi-arrow-repeat text-success' : 'bi-x-circle-fill text-danger' }} mt-1 flex-shrink-0"></i>
+            <div>
+                <span class="badge {{ result.reload.success ? 'bg-success' : 'bg-danger' }} me-1">rndc reload</span>
+                {% if result.reload.output %}
+                    <span class="small font-monospace {{ result.reload.success ? 'text-muted' : 'text-danger' }}">{{ result.reload.output }}</span>
+                {% endif %}
+            </div>
+        </li>
+    {% endif %}
+</ul>
+{% endmacro %}
+
+{# ── DHCP result renderer ─────────────────────────────────────────────────── #}
+{% macro renderDhcpResult(result) %}
+<ul class="zone-list">
+    {% for type, info in result %}
+        <li class="d-flex align-items-start gap-2">
+            <i class="bi {{ info.success ? 'bi-check-circle-fill text-success' : 'bi-x-circle-fill text-danger' }} mt-1 flex-shrink-0"></i>
+            <div>
+                <span class="badge bg-secondary me-1">{{ type == 'dhcp4' ? 'DHCPv4' : 'DHCPv6' }}</span>
+                <span class="font-monospace small">{{ info.file }}</span>
+                {% if info.output %}<div class="text-danger small font-monospace mt-1">{{ info.output }}</div>{% endif %}
+                {% if info.reload is defined and info.reload is not null %}
+                    {% set r = info.reload %}
+                    <span class="badge {{ r.success ? 'bg-success' : 'bg-danger' }} ms-1">{{ r.stage ?? 'reload' }} {{ r.success ? 'ok' : 'failed' }}</span>
+                    {% if not r.success %}
+                        <div class="text-danger small font-monospace mt-1">{{ r.response }}</div>
+                        {% if r.restored %}<div class="text-warning small mt-1"><i class="bi bi-arrow-counterclockwise me-1"></i>Previous config restored.</div>{% endif %}
+                        {% if r.restore_error is defined and r.restore_error %}<div class="text-danger small mt-1"><i class="bi bi-exclamation-triangle me-1"></i>Restore failed: {{ r.restore_error }}</div>{% endif %}
+                    {% endif %}
+                {% endif %}
+            </div>
+        </li>
+    {% endfor %}
+</ul>
+{% endmacro %}
+
+{% block scripts %}
+<script>
+(function () {
+    // Rotate chevron when row expands/collapses
+    document.querySelectorAll('[data-bs-toggle="collapse"]').forEach(function (row) {
+        const targetId = row.getAttribute('data-bs-target');
+        const target   = document.querySelector(targetId);
+        const chevron  = row.querySelector('.detail-chevron');
+        if (!target || !chevron) return;
+        target.addEventListener('show.bs.collapse',  () => chevron.style.transform = 'rotate(90deg)');
+        target.addEventListener('hide.bs.collapse',  () => chevron.style.transform = '');
+    });
+})();
+</script>
+{% endblock %}

@@ -19,6 +19,9 @@ class AppSetting
     #[ORM\Column(nullable: true)]
     private ?int $defaultNewSubnetLeaseRetentionDays = null;
 
+    #[ORM\Column(nullable: true, options: ['default' => 30])]
+    private ?int $pushLogRetentionDays = 30;
+
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $smtpHost = null;
 
@@ -47,6 +50,9 @@ class AppSetting
 
     public function getDefaultNewSubnetLeaseRetentionDays(): ?int { return $this->defaultNewSubnetLeaseRetentionDays; }
     public function setDefaultNewSubnetLeaseRetentionDays(?int $days): static { $this->defaultNewSubnetLeaseRetentionDays = $days; return $this; }
+
+    public function getPushLogRetentionDays(): ?int { return $this->pushLogRetentionDays; }
+    public function setPushLogRetentionDays(?int $days): static { $this->pushLogRetentionDays = $days; return $this; }
 
     public function getSmtpHost(): ?string { return $this->smtpHost; }
     public function setSmtpHost(?string $smtpHost): static { $this->smtpHost = $smtpHost; return $this; }

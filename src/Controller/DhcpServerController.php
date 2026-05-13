@@ -4,14 +4,15 @@ namespace App\Controller;
 
 use App\Entity\DhcpServer;
 use App\Form\DhcpServerType;
+use App\Message\PushKeaMessage;
 use App\Repository\DhcpServerRepository;
-use App\Service\KeaDeployService;
 use App\Service\SshKeyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
 
 #[Route('/dhcp-servers')]
@@ -97,7 +98,7 @@ class DhcpServerController extends AbstractController
     }
 
     #[Route('/push', name: 'dhcp_server_push', methods: ['POST'])]
-    public function push(DhcpServerRepository $repo, KeaDeployService $deployer): JsonResponse
+    public function push(DhcpServerRepository $repo, MessageBusInterface $bus): JsonResponse
     {
         $servers = $repo->findBy([], ['name' => 'ASC']);
 
@@ -105,18 +106,10 @@ class DhcpServerController extends AbstractController
             return $this->json(['error' => 'No DHCP servers configured.'], 400);
         }
 
-        $results = [];
         foreach ($servers as $server) {
-            try {
-                $results[$server->getName()] = $deployer->deployToServer($server);
-            } catch (\Throwable $e) {
-                $results[$server->getName()] = [
-                    'dhcp4' => ['success' => false, 'output' => $e->getMessage(), 'file' => 'subnets4.json'],
-                    'dhcp6' => ['success' => false, 'output' => $e->getMessage(), 'file' => 'subnets6.json'],
-                ];
-            }
+            $bus->dispatch(new PushKeaMessage($server->getId()));
         }
 
-        return $this->json($results);
+        return $this->json(['queued' => true, 'count' => count($servers)], 202);
     }
 }
