@@ -4,7 +4,7 @@ namespace App\Command;
 
 use App\Entity\PushLog;
 use App\Repository\DhcpServerRepository;
-use App\Service\KeaDeployService;
+use App\Service\DhcpDeployService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -14,13 +14,13 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
 #[AsCommand(
-    name: 'app:generate-kea-config',
-    description: 'Generate and deploy Kea DHCP subnet JSON files from IPAM data',
+    name: 'app:generate-dhcp-config',
+    description: 'Generate and deploy DHCP subnet JSON files from IPAM data',
 )]
-class GenerateKeaConfigCommand extends Command
+class GenerateDhcpConfigCommand extends Command
 {
     public function __construct(
-        private readonly KeaDeployService      $deployer,
+        private readonly DhcpDeployService     $deployer,
         private readonly DhcpServerRepository  $serverRepo,
         private readonly EntityManagerInterface $em,
     ) {
@@ -30,8 +30,8 @@ class GenerateKeaConfigCommand extends Command
     protected function configure(): void
     {
         $this
-            ->addOption('output-dir', 'd', InputOption::VALUE_REQUIRED, 'Directory to write config files', '/tmp/kea')
-            ->addOption('reload', null, InputOption::VALUE_NONE, 'Reload Kea via the Control Agent after deploying')
+            ->addOption('output-dir', 'd', InputOption::VALUE_REQUIRED, 'Directory to write config files', '/tmp/dhcp')
+            ->addOption('reload', null, InputOption::VALUE_NONE, 'Reload DHCP via the Control Agent after deploying')
         ;
     }
 

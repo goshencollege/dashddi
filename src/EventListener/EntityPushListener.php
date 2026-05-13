@@ -3,7 +3,7 @@
 namespace App\EventListener;
 
 use App\Message\PushDnsMessage;
-use App\Message\PushKeaMessage;
+use App\Message\PushDhcpMessage;
 use App\Service\PushScopeService;
 use Doctrine\Bundle\DoctrineBundle\Attribute\AsDoctrineListener;
 use Doctrine\ORM\Event\PostFlushEventArgs;
@@ -58,7 +58,7 @@ class EntityPushListener
 
         if ($allDhcp) {
             foreach ($this->scope->allDhcpServerIds() as $id) {
-                $this->bus->dispatch(new PushKeaMessage($id));
+                $this->bus->dispatch(new PushDhcpMessage($id));
             }
         }
     }

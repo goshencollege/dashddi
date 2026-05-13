@@ -7,4 +7,4 @@ framework:
 
         routing:
             'App\Message\PushDnsMessage': async
-            'App\Message\PushKeaMessage': async
+            'App\Message\PushDhcpMessage': async

@@ -3,22 +3,22 @@
 namespace App\MessageHandler;
 
 use App\Entity\PushLog;
-use App\Message\PushKeaMessage;
+use App\Message\PushDhcpMessage;
 use App\Repository\DhcpServerRepository;
-use App\Service\KeaDeployService;
+use App\Service\DhcpDeployService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
 #[AsMessageHandler]
-final class PushKeaMessageHandler
+final class PushDhcpMessageHandler
 {
     public function __construct(
         private readonly DhcpServerRepository $repo,
-        private readonly KeaDeployService $deployer,
+        private readonly DhcpDeployService $deployer,
         private readonly EntityManagerInterface $em,
     ) {}
 
-    public function __invoke(PushKeaMessage $message): void
+    public function __invoke(PushDhcpMessage $message): void
     {
         $server = $this->repo->find($message->serverId);
         if ($server === null) {

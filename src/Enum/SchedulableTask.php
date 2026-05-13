@@ -25,7 +25,7 @@ enum SchedulableTask: string
     {
         return match($this) {
             self::PushDns        => 'Generates BIND zone files and views.conf, then deploys them to all configured DNS servers.',
-            self::PushDhcp       => 'Generates Kea DHCP subnet configuration and deploys it to all configured DHCP servers, then reloads Kea.',
+            self::PushDhcp       => 'Generates DHCP subnet configuration and deploys it to all configured DHCP servers.',
             self::PurgeLeases    => 'Deletes DHCP lease log entries that exceed each subnet\'s configured retention period. A default retention period (for subnets with no per-subnet setting and unmatched leases) can be configured in Application Settings.',
             self::PurgePushLogs  => 'Deletes DNS/DHCP push log entries older than the retention period configured in Application Settings (default 30 days).',
             self::DatabaseBackup => 'Creates a database backup using the destination and options configured in Backup Settings.',
