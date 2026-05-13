@@ -337,7 +337,8 @@ class ImportLegacyCommand extends Command
         while ((1 << $hostBits) <= $diff) {
             $hostBits++;
         }
-        $prefixLen   = 32 - $hostBits;
+        $prefixLen = max(32 - $hostBits, 24);  // never smaller than /24
+        $hostBits  = 32 - $prefixLen;
         $mask        = $hostBits === 0 ? -1 : ~((1 << $hostBits) - 1);
         $networkLong = $minLong & $mask;
         $network     = long2ip($networkLong);
@@ -386,9 +387,7 @@ class ImportLegacyCommand extends Command
                 $thirdOctet  = (int) $octets[2];
                 $seventhByte = in_array($firstOctet, [198, 199], true) ? 0x01 : 0x00;
                 $fourthGroup = dechex(($seventhByte << 8) | $thirdOctet);
-                // IPv4 /24 → IPv6 /64; each bit shorter prefix maps to one bit shorter IPv6 prefix
-                $ipv6PrefixLen = $prefixLen + 40;
-                $subnet->setIpv6Cidr('2001:18e8:408:' . $fourthGroup . '::/' . $ipv6PrefixLen);
+                $subnet->setIpv6Cidr('2001:18e8:408:' . $fourthGroup . '::/64');
             }
         }
 
@@ -594,18 +593,6 @@ class ImportLegacyCommand extends Command
         $raw = inet_pton($prefix);
         if ($raw === false || strlen($raw) !== 16) {
             return null;
-        }
-
-        // For subnets wider than /64 (e.g. a /63 spanning two /24s), adjust byte 7
-        // so the host lands in the correct /64 sub-block within the wider prefix.
-        $ipv4Cidr = $subnet->getIpv4Cidr();
-        if ($ipv4Cidr !== null) {
-            $ipv6PrefixLen = (int) explode('/', $subnet->getIpv6Cidr())[1];
-            if ($ipv6PrefixLen < 64) {
-                $baseThird = (int) explode('.', explode('/', $ipv4Cidr)[0])[2];
-                $offset    = (int) $octets[2] - $baseThird;
-                $raw[7]    = chr(ord($raw[7]) | $offset);
-            }
         }
 
         $raw[15] = chr((int) $octets[3]);
