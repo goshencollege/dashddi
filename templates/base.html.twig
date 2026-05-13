@@ -379,7 +379,8 @@
                     or app.request.attributes.get('_route') starts with 'scheduler'
                     or app.request.attributes.get('_route') starts with 'backup_'
                     or app.request.attributes.get('_route') starts with 'api_token'
-                    or app.request.attributes.get('_route') starts with 'saml_provider' %}
+                    or app.request.attributes.get('_route') starts with 'saml_provider'
+                    or app.request.attributes.get('_route') starts with 'radius_client' %}
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle {{ settingsActive ? 'active' }}" href="#" data-bs-toggle="dropdown">
                         <i class="bi bi-gear me-1"></i>Other Settings
@@ -426,6 +427,12 @@
                             <a class="dropdown-item {{ app.request.attributes.get('_route') starts with 'saml_provider' ? 'active' }}"
                                href="{{ path('saml_provider_index') }}">
                                 <i class="bi bi-shield-lock me-1"></i>SAML Providers
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item {{ app.request.attributes.get('_route') starts with 'radius_client' ? 'active' }}"
+                               href="{{ path('radius_client_index') }}">
+                                <i class="bi bi-shield-check me-1"></i>RADIUS Clients
                             </a>
                         </li>
                     </ul>

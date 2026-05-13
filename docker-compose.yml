@@ -93,6 +93,27 @@ services:
         max-size: "20m"
         max-file: "5"
 
+  freeradius:
+    build: ./docker/freeradius
+    profiles: [radius]
+    ports:
+      - "1812:1812/udp"
+      - "1813:1813/udp"
+    environment:
+      RADIUS_DB_HOST: db
+      RADIUS_DB_PORT: 3306
+      RADIUS_DB_NAME: ipam
+      RADIUS_DB_PASSWORD: ipam_password
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
 volumes:
   mysql_data:
   symfony_var:
