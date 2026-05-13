@@ -4,6 +4,7 @@ namespace App\Command;
 
 use App\Entity\AddressBlock;
 use App\Entity\Building;
+use App\Entity\DnsView;
 use App\Entity\Domain;
 use App\Entity\Host;
 use App\Entity\InterfaceName;
@@ -65,6 +66,9 @@ class ImportLegacyCommand extends Command
             $io->section('Subnets');
             $subnets = $this->importSubnets($pdo, $io, $dryRun, $domains);
 
+            $io->section('DNS Views');
+            $this->setupDnsViews($io, $dryRun, $domains, $subnets);
+
             $io->section('Tags');
             $tags = $this->importTags($pdo, $io, $dryRun);
 
@@ -86,6 +90,43 @@ class ImportLegacyCommand extends Command
         return Command::SUCCESS;
     }
 
+    private function setupDnsViews(SymfonyStyle $io, bool $dryRun, array $domains, array $subnets): void
+    {
+        $internal = new DnsView();
+        $internal->setName('internal');
+
+        $external = new DnsView();
+        $external->setName('external');
+
+        if (!$dryRun) {
+            $this->em->persist($internal);
+            $this->em->persist($external);
+            $this->em->flush();
+        }
+
+        foreach ($domains as $domain) {
+            $domain->addView($internal);
+            if ($domain->getName() !== 'printers.goshen.edu') {
+                $domain->addView($external);
+            }
+        }
+
+        foreach ($subnets as $subnet) {
+            $cidr       = $subnet->getIpv4Cidr();
+            $firstOctet = $cidr !== null ? (int) explode('.', $cidr)[0] : null;
+            $subnet->addView($internal);
+            if (in_array($firstOctet, [198, 199], true)) {
+                $subnet->addView($external);
+            }
+        }
+
+        if (!$dryRun) {
+            $this->em->flush();
+        }
+
+        $io->writeln('  Created views: internal, external');
+    }
+
     private function truncateImportedTables(\Doctrine\DBAL\Connection $conn, SymfonyStyle $io): void
     {
         $tables = [
@@ -96,11 +137,14 @@ class ImportLegacyCommand extends Command
             'network_interface',
             'host_tag',
             'host',
+            'subnet_dns_view',
+            'domain_dns_view',
             'subnet_tag',
             'address_block',
             'subnet',
             'tag',
             'domain',
+            'dns_view',
             'building',
         ];
 
