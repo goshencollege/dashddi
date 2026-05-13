@@ -337,7 +337,7 @@ class ImportLegacyCommand extends Command
         while ((1 << $hostBits) <= $diff) {
             $hostBits++;
         }
-        $prefixLen = max(32 - $hostBits, 24);  // never smaller than /24
+        $prefixLen = min(32 - $hostBits, 24);  // never a prefix longer than /24
         $hostBits  = 32 - $prefixLen;
         $mask        = $hostBits === 0 ? -1 : ~((1 << $hostBits) - 1);
         $networkLong = $minLong & $mask;
