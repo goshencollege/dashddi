@@ -12,4 +12,16 @@ class DhcpServerRepository extends ServiceEntityRepository
     {
         parent::__construct($registry, DhcpServer::class);
     }
+
+    /** @return int[] */
+    public function findAllIds(): array
+    {
+        return array_column(
+            $this->createQueryBuilder('s')
+                ->select('s.id')
+                ->getQuery()
+                ->getArrayResult(),
+            'id'
+        );
+    }
 }
