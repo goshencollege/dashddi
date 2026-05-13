@@ -2,6 +2,9 @@
 .idea/
 .vscode/
 
+# Local fixture overrides — copy fixtures.local.yaml.dist and fill in site-specific values
+/fixtures.local.yaml
+
 # TLS certificates — generate with: make cert
 /docker/ssl/*.pem
 /docker/ssl/*.crt
