@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use App\Entity\Trait\AuditableTrait;
 use App\Repository\SamlProviderRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Validator\Constraints as Assert;
@@ -10,6 +11,8 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\Table(name: 'saml_provider')]
 class SamlProvider
 {
+    use AuditableTrait;
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
@@ -58,12 +61,6 @@ class SamlProvider
     #[Assert\NotBlank]
     private string $idpCert = '';
 
-    #[ORM\Column]
-    private \DateTimeImmutable $createdAt;
-
-    #[ORM\Column]
-    private \DateTimeImmutable $updatedAt;
-
     public function __construct()
     {
         $this->createdAt = new \DateTimeImmutable();
@@ -102,7 +99,4 @@ class SamlProvider
     public function getIdpCert(): string { return $this->idpCert; }
     public function setIdpCert(string $idpCert): static { $this->idpCert = trim($idpCert); return $this; }
 
-    public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
-    public function getUpdatedAt(): \DateTimeImmutable { return $this->updatedAt; }
-    public function setUpdatedAt(\DateTimeImmutable $updatedAt): static { $this->updatedAt = $updatedAt; return $this; }
 }
