@@ -1,36 +1,36 @@
 .PHONY: up down restart bash migrate cc logs db-shell cert reset
 
 up:
-	docker compose up -d
+	docker compose -f docker-compose.dev.yml up -d
 
 down:
-	docker compose down
+	docker compose -f docker-compose.dev.yml down
 
 restart:
-	docker compose restart
+	docker compose -f docker-compose.dev.yml restart
 
 bash:
-	docker compose exec app bash
+	docker compose -f docker-compose.dev.yml exec app bash
 
 migrate:
-	docker compose exec app php bin/console doctrine:migrations:migrate --no-interaction
+	docker compose -f docker-compose.dev.yml exec app php bin/console doctrine:migrations:migrate --no-interaction
 
 cc:
-	docker compose exec app php bin/console cache:clear
+	docker compose -f docker-compose.dev.yml exec app php bin/console cache:clear
 
 logs:
-	docker compose logs -f
+	docker compose -f docker-compose.dev.yml logs -f
 
 db-shell:
-	docker compose exec db mysql -u ipam -pipam_password ipam
+	docker compose -f docker-compose.dev.yml exec db mysql -u ipam -pipam_password ipam
 
 reset:
-	docker compose down -v
-	docker compose up -d --build
+	docker compose -f docker-compose.dev.yml down -v
+	docker compose -f docker-compose.dev.yml up -d --build
 	@echo "Waiting for app container…"
-	@until docker compose exec -T app php -r 'echo ok;' 2>/dev/null | grep -q ok; do sleep 2; done
-	docker compose exec -T app php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
-	docker compose exec -T app php bin/console doctrine:fixtures:load --no-interaction
+	@until docker compose -f docker-compose.dev.yml exec -T app php -r 'echo ok;' 2>/dev/null | grep -q ok; do sleep 2; done
+	docker compose -f docker-compose.dev.yml exec -T app php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
+	docker compose -f docker-compose.dev.yml exec -T app php bin/console doctrine:fixtures:load --no-interaction
 
 cert:
 	mkdir -p docker/ssl
