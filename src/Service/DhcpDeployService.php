@@ -5,10 +5,10 @@ namespace App\Service;
 use App\Entity\DhcpServer;
 use phpseclib3\Net\SFTP;
 
-class KeaDeployService
+class DhcpDeployService
 {
     public function __construct(
-        private readonly KeaConfigGenerator $generator,
+        private readonly DhcpConfigGenerator $generator,
         private readonly SshKeyService $sshKeys,
     ) {}
 
@@ -38,7 +38,7 @@ class KeaDeployService
     public function deployToServer(DhcpServer $server, bool $reload = true): array
     {
         $sftp  = $this->getSftp($server);
-        $files = $this->generateFiles(sys_get_temp_dir() . '/kea');
+        $files = $this->generateFiles(sys_get_temp_dir() . '/dhcp');
         $results = [];
 
         foreach ($files as $type => $localFile) {
@@ -67,7 +67,7 @@ class KeaDeployService
                 continue;
             }
 
-            // Reload — Kea validates the config before applying it, so a bad file will
+            // Reload — the server validates config before applying it, so a bad file will
             // fail here without affecting the running service.
             $keaService   = $type === 'dhcp4' ? 'dhcp4' : 'dhcp6';
             $reloadResult = $this->controlCommand('config-reload', $keaService, $server);
@@ -93,7 +93,7 @@ class KeaDeployService
         return $results;
     }
 
-    public function reloadKea(string $controlUrl, string $service, ?string $user = null, ?string $password = null): array
+    public function reloadDhcp(string $controlUrl, string $service, ?string $user = null, ?string $password = null): array
     {
         return $this->controlRequest($controlUrl, 'config-reload', $service, $user, $password);
     }
@@ -140,7 +140,7 @@ class KeaDeployService
 
         $body = @file_get_contents($url, false, $context);
         if ($body === false) {
-            return ['success' => false, 'response' => 'Could not connect to Kea Control Agent'];
+            return ['success' => false, 'response' => 'Could not connect to DHCP Control Agent'];
         }
 
         $data = json_decode($body, true);

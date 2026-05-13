@@ -3,7 +3,7 @@
 namespace App\Controller\Api;
 
 use App\Entity\DhcpServer;
-use App\Message\PushKeaMessage;
+use App\Message\PushDhcpMessage;
 use App\Repository\DhcpServerRepository;
 use App\Service\SshKeyService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -109,7 +109,7 @@ class DhcpServerApiController extends AbstractController
     #[Route('/{id}/push', name: 'api_dhcp_servers_push', methods: ['POST'])]
     public function push(DhcpServer $server, MessageBusInterface $bus): JsonResponse
     {
-        $bus->dispatch(new PushKeaMessage($server->getId()));
+        $bus->dispatch(new PushDhcpMessage($server->getId()));
 
         return $this->json(['queued' => true], Response::HTTP_ACCEPTED);
     }

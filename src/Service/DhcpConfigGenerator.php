@@ -5,7 +5,7 @@ namespace App\Service;
 use App\Enum\BlockType;
 use App\Repository\SubnetRepository;
 
-class KeaConfigGenerator
+class DhcpConfigGenerator
 {
     public function __construct(
         private readonly SubnetRepository $subnetRepository,
