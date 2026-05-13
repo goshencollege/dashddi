@@ -334,15 +334,18 @@ class ImportLegacyCommand extends Command
         $subnet->setIpv4Cidr($cidr);
 
         if ($networkIp !== null && $cidr !== null) {
-            $prefixLen   = (int) explode('/', $cidr)[1];
-            $octets      = explode('.', $networkIp);
-            $firstOctet  = (int) $octets[0];
-            $thirdOctet  = (int) $octets[2];
-            $seventhByte = in_array($firstOctet, [198, 199], true) ? 0x01 : 0x00;
-            $fourthGroup = dechex(($seventhByte << 8) | $thirdOctet);
-            // IPv4 /24 → IPv6 /64; each bit shorter prefix maps to one bit shorter IPv6 prefix
-            $ipv6PrefixLen = $prefixLen + 40;
-            $subnet->setIpv6Cidr('2001:18e8:408:' . $fourthGroup . '::/' . $ipv6PrefixLen);
+            $prefixLen  = (int) explode('/', $cidr)[1];
+            $octets     = explode('.', $networkIp);
+            $firstOctet = (int) $octets[0];
+
+            if ($firstOctet !== 10) {
+                $thirdOctet  = (int) $octets[2];
+                $seventhByte = in_array($firstOctet, [198, 199], true) ? 0x01 : 0x00;
+                $fourthGroup = dechex(($seventhByte << 8) | $thirdOctet);
+                // IPv4 /24 → IPv6 /64; each bit shorter prefix maps to one bit shorter IPv6 prefix
+                $ipv6PrefixLen = $prefixLen + 40;
+                $subnet->setIpv6Cidr('2001:18e8:408:' . $fourthGroup . '::/' . $ipv6PrefixLen);
+            }
         }
 
         return $subnet;
