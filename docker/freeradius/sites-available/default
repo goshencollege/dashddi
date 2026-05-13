@@ -1,0 +1,44 @@
+server default {
+    listen {
+        type   = auth
+        ipaddr = *
+        port   = 1812
+    }
+
+    listen {
+        type   = acct
+        ipaddr = *
+        port   = 1813
+    }
+
+    authorize {
+        sql
+        if (notfound) {
+            reject
+        }
+    }
+
+    authenticate {
+        Auth-Type Accept {
+            ok
+        }
+    }
+
+    post-auth {
+        Post-Auth-Type REJECT {
+        }
+    }
+
+    accounting {
+        ok
+    }
+
+    session {
+    }
+
+    pre-proxy {
+    }
+
+    post-proxy {
+    }
+}

@@ -1,0 +1,55 @@
+{% extends 'base.html.twig' %}
+{% block title %}Add RADIUS Client{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0"><i class="bi bi-shield-check me-2"></i>Add RADIUS Client</h1>
+    <a href="{{ path('radius_client_index') }}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i>Back
+    </a>
+</div>
+
+{{ form_start(form, {attr: {class: 'card'}}) }}
+<div class="card-body">
+    <div class="mb-3">
+        {{ form_label(form.name, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+        {{ form_widget(form.name, {attr: {class: 'form-control'}}) }}
+        {{ form_errors(form.name) }}
+        <div class="form-text">{{ form_help(form.name) }}</div>
+    </div>
+    <div class="mb-3">
+        {{ form_label(form.nasname, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+        {{ form_widget(form.nasname, {attr: {class: 'form-control', placeholder: '10.0.0.5'}}) }}
+        {{ form_errors(form.nasname) }}
+        <div class="form-text">{{ form_help(form.nasname) }}</div>
+    </div>
+    <div class="mb-3">
+        {{ form_label(form.shortname, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+        {{ form_widget(form.shortname, {attr: {class: 'form-control'}}) }}
+        {{ form_errors(form.shortname) }}
+        <div class="form-text">{{ form_help(form.shortname) }}</div>
+    </div>
+    <div class="mb-3">
+        {{ form_label(form.secret, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+        {{ form_widget(form.secret, {attr: {class: 'form-control'}}) }}
+        {{ form_errors(form.secret) }}
+    </div>
+    <div class="mb-3">
+        {{ form_label(form.description, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+        {{ form_widget(form.description, {attr: {class: 'form-control'}}) }}
+        {{ form_errors(form.description) }}
+    </div>
+    <div class="mb-0">
+        {{ form_widget(form.enabled) }}
+        {{ form_label(form.enabled) }}
+        <div class="form-text">{{ form_help(form.enabled) }}</div>
+    </div>
+</div>
+<div class="card-footer d-flex justify-content-end gap-2">
+    <a href="{{ path('radius_client_index') }}" class="btn btn-outline-secondary">Cancel</a>
+    <button type="submit" class="btn btn-primary">
+        <i class="bi bi-plus-lg me-1"></i>Add Client
+    </button>
+</div>
+{{ form_end(form) }}
+{% endblock %}
