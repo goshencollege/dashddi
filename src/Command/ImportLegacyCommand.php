@@ -529,12 +529,17 @@ class ImportLegacyCommand extends Command
                 }
             }
 
+            $sharedViews = $this->intersectViews($domain, $subnet);
+
             // Canonical name from host.name
             if ($this->isValidDnsLabel($row['name'])) {
                 $canonical = new InterfaceName();
                 $canonical->setName($row['name']);
                 $canonical->setDomain($domain);
                 $canonical->setIsCanonical(true);
+                foreach ($sharedViews as $view) {
+                    $canonical->addView($view);
+                }
                 $iface->addName($canonical);
                 if (!$dryRun) {
                     $this->em->persist($canonical);
@@ -550,6 +555,9 @@ class ImportLegacyCommand extends Command
                 $alias->setName($aliasName);
                 $alias->setDomain($domain);
                 $alias->setIsCanonical(false);
+                foreach ($sharedViews as $view) {
+                    $alias->addView($view);
+                }
                 $iface->addName($alias);
                 if (!$dryRun) {
                     $this->em->persist($alias);
@@ -599,6 +607,41 @@ class ImportLegacyCommand extends Command
         $result  = inet_ntop($raw);
 
         return $result !== false ? $result : null;
+    }
+
+    /**
+     * Returns the views shared by both the domain and the subnet (intersection).
+     * Uses spl_object_id so it works in dry-run (where IDs are null) as well.
+     *
+     * @return DnsView[]
+     */
+    private function intersectViews(?Domain $domain, ?Subnet $subnet): array
+    {
+        if ($domain === null) {
+            return [];
+        }
+
+        $domainViewIds = [];
+        foreach ($domain->getViews() as $v) {
+            $domainViewIds[spl_object_id($v)] = $v;
+        }
+
+        if (empty($domainViewIds)) {
+            return [];
+        }
+
+        if ($subnet === null) {
+            return array_values($domainViewIds);
+        }
+
+        $shared = [];
+        foreach ($subnet->getViews() as $v) {
+            if (isset($domainViewIds[spl_object_id($v)])) {
+                $shared[] = $v;
+            }
+        }
+
+        return $shared;
     }
 
     private function isValidDnsLabel(string $name): bool
