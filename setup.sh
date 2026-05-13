@@ -281,7 +281,6 @@ if [[ "$USE_RADIUS" == "true" ]]; then
 
   freeradius:
     build: ./docker/freeradius
-    profiles: [radius]
     restart: unless-stopped
     ports:
       - "${RADIUS_AUTH_PORT}:1812/udp"
@@ -408,7 +407,7 @@ if [[ "$USE_RADIUS" == "true" ]]; then
     fi
 
     header "Starting FreeRADIUS container"
-    docker compose -f "$COMPOSE_FILE" --profile radius up -d --build freeradius
+    docker compose -f "$COMPOSE_FILE" up -d --build freeradius
     ok "FreeRADIUS started"
 fi
 
@@ -475,9 +474,9 @@ if [[ "$USE_RADIUS" == "true" ]]; then
     echo "    DB user:    radius / $RADIUS_DB_PASSWORD"
     echo
     echo "  RADIUS commands:"
-    echo "    Start:    docker compose -f docker-compose.${APP_ENV}.yml --profile radius up -d freeradius"
+    echo "    Start:    docker compose -f docker-compose.${APP_ENV}.yml up -d freeradius"
     echo "    Stop:     docker compose -f docker-compose.${APP_ENV}.yml stop freeradius"
-    echo "    Restart:  docker compose -f docker-compose.${APP_ENV}.yml --profile radius restart freeradius"
+    echo "    Restart:  docker compose -f docker-compose.${APP_ENV}.yml restart freeradius"
     echo "    Logs:     docker compose -f docker-compose.${APP_ENV}.yml logs -f freeradius"
     echo "  Manage RADIUS clients at:  ${BASE_URL}/settings/radius-clients"
     echo
