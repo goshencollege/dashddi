@@ -37,7 +37,7 @@ enum SchedulableTask: string
     {
         return match($this) {
             self::PushDns        => 'app:generate-dns-config --deploy',
-            self::PushDhcp       => 'app:generate-kea-config --reload',
+            self::PushDhcp       => 'app:generate-dhcp-config --reload',
             self::PurgeLeases    => 'app:purge-dhcp-leases',
             self::PurgePushLogs  => 'app:purge-push-logs',
             self::DatabaseBackup => 'app:database:backup',
