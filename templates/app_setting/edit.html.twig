@@ -11,6 +11,17 @@
 <div class="row g-4">
     <div class="col-lg-6">
         <div class="card">
+            <div class="card-header"><strong>General</strong></div>
+            <div class="card-body">
+                <div class="mb-0">
+                    {{ form_label(form.timezone, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                    {{ form_widget(form.timezone) }}
+                    {{ form_errors(form.timezone) }}
+                    {{ form_help(form.timezone) }}
+                </div>
+            </div>
+        </div>
+        <div class="card mt-4">
             <div class="card-header"><strong>DHCP Lease Log</strong></div>
             <div class="card-body">
                 <div class="mb-3">

@@ -43,6 +43,9 @@ class AppSetting
     #[ORM\Column(length: 10, nullable: true, options: ['default' => 'tls'])]
     private ?string $smtpEncryption = 'tls';
 
+    #[ORM\Column(length: 50, nullable: true)]
+    private ?string $timezone = null;
+
     public function getId(): int { return $this->id; }
 
     public function getDefaultLeaseRetentionDays(): ?int { return $this->defaultLeaseRetentionDays; }
@@ -74,4 +77,7 @@ class AppSetting
 
     public function getSmtpEncryption(): ?string { return $this->smtpEncryption; }
     public function setSmtpEncryption(?string $smtpEncryption): static { $this->smtpEncryption = $smtpEncryption; return $this; }
+
+    public function getTimezone(): ?string { return $this->timezone; }
+    public function setTimezone(?string $timezone): static { $this->timezone = $timezone; return $this; }
 }
