@@ -3,6 +3,7 @@
 namespace App\Service;
 
 use App\Entity\ScheduledTask;
+use App\Repository\AppSettingRepository;
 use Cron\CronExpression;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Process\Process;
@@ -11,8 +12,9 @@ class ScheduledTaskRunnerService
 {
     public function __construct(
         private readonly EntityManagerInterface $em,
-        private readonly string $projectDir,
-        private readonly SmtpMailerService $mailer,
+        private readonly string                 $projectDir,
+        private readonly SmtpMailerService      $mailer,
+        private readonly AppSettingRepository   $settingRepo,
     ) {}
 
     public function isDue(ScheduledTask $task): bool
@@ -23,7 +25,9 @@ class ScheduledTaskRunnerService
             return false;
         }
 
-        $now = new \DateTime();
+        $tzName = $this->settingRepo->getInstance()->getTimezone() ?? 'UTC';
+        $tz     = new \DateTimeZone($tzName);
+        $now    = new \DateTime('now', $tz);
 
         if (!$cron->isDue($now)) {
             return false;
@@ -31,7 +35,7 @@ class ScheduledTaskRunnerService
 
         // Avoid re-running if already fired within this minute
         if ($task->getLastRunAt() !== null) {
-            $minuteStart = \DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $now->format('Y-m-d H:i:00'));
+            $minuteStart = \DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $now->format('Y-m-d H:i:00'), $tz);
             if ($task->getLastRunAt() >= $minuteStart) {
                 return false;
             }
