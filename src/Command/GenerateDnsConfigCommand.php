@@ -2,9 +2,11 @@
 
 namespace App\Command;
 
+use App\Entity\PushLog;
 use App\Repository\DnsServerRepository;
 use App\Service\DnsConfigGenerator;
 use App\Service\DnsDeployService;
+use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -16,9 +18,10 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 class GenerateDnsConfigCommand extends Command
 {
     public function __construct(
-        private readonly DnsConfigGenerator  $generator,
-        private readonly DnsDeployService    $deployer,
-        private readonly DnsServerRepository $serverRepo,
+        private readonly DnsConfigGenerator    $generator,
+        private readonly DnsDeployService      $deployer,
+        private readonly DnsServerRepository   $serverRepo,
+        private readonly EntityManagerInterface $em,
     ) {
         parent::__construct();
     }
@@ -83,9 +86,23 @@ class GenerateDnsConfigCommand extends Command
             $io->writeln(' <info>Wrote</info> ' . $confFile);
 
             if ($deploy) {
-                $results = $this->deployer->deployToServer($server);
+                $startedAt = new \DateTimeImmutable();
+                try {
+                    $results   = $this->deployer->deployToServer($server);
+                    $success   = $this->isSuccess($results);
+                    $error     = null;
+                } catch (\Throwable $e) {
+                    $results = [];
+                    $success = false;
+                    $error   = $e->getMessage();
+                    $io->error($e->getMessage());
+                    $failed = true;
+                }
 
-                foreach ($results['views'] as $viewName => $viewResult) {
+                $this->em->persist(new PushLog('dns', $server->getName(), $success, $results, $startedAt, new \DateTimeImmutable(), $error));
+                $this->em->flush();
+
+                foreach ($results['views'] ?? [] as $viewName => $viewResult) {
                     if (!$viewResult['mkdir']['success']) {
                         $io->writeln(' <error>mkdir failed</error> ' . $viewName . ': ' . $viewResult['mkdir']['output']);
                         $failed = true;
@@ -100,7 +117,7 @@ class GenerateDnsConfigCommand extends Command
                     }
                 }
 
-                if ($results['conf'] !== null) {
+                if (($results['conf'] ?? null) !== null) {
                     if ($results['conf']['success']) {
                         $io->writeln(' <info>Deployed</info> views.conf');
                     } else {
@@ -109,7 +126,7 @@ class GenerateDnsConfigCommand extends Command
                     }
                 }
 
-                if ($results['reload'] !== null) {
+                if (($results['reload'] ?? null) !== null) {
                     if ($results['reload']['success']) {
                         $io->writeln(' <info>rndc reload</info> OK');
                     } else {
@@ -121,5 +138,26 @@ class GenerateDnsConfigCommand extends Command
         }
 
         return $failed ? Command::FAILURE : Command::SUCCESS;
+    }
+
+    private function isSuccess(array $result): bool
+    {
+        foreach ($result['views'] ?? [] as $viewResult) {
+            if (isset($viewResult['mkdir']) && !$viewResult['mkdir']['success']) {
+                return false;
+            }
+            foreach ($viewResult['zones'] ?? [] as $zone) {
+                if (!$zone['success']) {
+                    return false;
+                }
+            }
+        }
+        if (isset($result['conf']) && !$result['conf']['success']) {
+            return false;
+        }
+        if (isset($result['reload']) && !$result['reload']['success']) {
+            return false;
+        }
+        return true;
     }
 }

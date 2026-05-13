@@ -23,6 +23,12 @@ class AppSettingType extends AbstractType
                 'attr'     => ['placeholder' => 'e.g. 365 — leave blank to keep forever'],
                 'help'     => 'Fallback retention period for leases that do not match any known subnet. Leave blank to keep those records forever.',
             ])
+            ->add('pushLogRetentionDays', IntegerType::class, [
+                'label'    => 'Push Log Retention (days)',
+                'required' => false,
+                'attr'     => ['placeholder' => '30'],
+                'help'     => 'How long to keep DNS/DHCP push log entries. Leave blank to keep forever.',
+            ])
             ->add('defaultNewSubnetLeaseRetentionDays', IntegerType::class, [
                 'label'    => 'Default Retention for New Subnets (days)',
                 'required' => false,

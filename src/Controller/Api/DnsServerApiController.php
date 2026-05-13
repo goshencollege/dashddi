@@ -3,15 +3,16 @@
 namespace App\Controller\Api;
 
 use App\Entity\DnsServer;
+use App\Message\PushDnsMessage;
 use App\Repository\DnsServerRepository;
 use App\Repository\DnsViewRepository;
-use App\Service\DnsDeployService;
 use App\Service\SshKeyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
 
 #[Route('/api/dns-servers')]
@@ -147,15 +148,11 @@ class DnsServerApiController extends AbstractController
     }
 
     #[Route('/{id}/push', name: 'api_dns_servers_push', methods: ['POST'])]
-    public function push(DnsServer $server, DnsDeployService $deployer): JsonResponse
+    public function push(DnsServer $server, MessageBusInterface $bus): JsonResponse
     {
-        try {
-            $result = $deployer->deployToServer($server);
-        } catch (\Throwable $e) {
-            return $this->json(['error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
+        $bus->dispatch(new PushDnsMessage($server->getId()));
 
-        return $this->json($result);
+        return $this->json(['queued' => true], Response::HTTP_ACCEPTED);
     }
 
     private function serialize(DnsServer $server): array

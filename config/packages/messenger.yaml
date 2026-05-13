@@ -1,0 +1,10 @@
+framework:
+    messenger:
+        transports:
+            async: '%env(MESSENGER_TRANSPORT_DSN)%'
+            failed: 'doctrine://default?queue_name=failed'
+        failure_transport: failed
+
+        routing:
+            'App\Message\PushDnsMessage': async
+            'App\Message\PushKeaMessage': async

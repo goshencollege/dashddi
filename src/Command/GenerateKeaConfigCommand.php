@@ -2,8 +2,10 @@
 
 namespace App\Command;
 
+use App\Entity\PushLog;
 use App\Repository\DhcpServerRepository;
 use App\Service\KeaDeployService;
+use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -18,8 +20,9 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 class GenerateKeaConfigCommand extends Command
 {
     public function __construct(
-        private readonly KeaDeployService $deployer,
-        private readonly DhcpServerRepository $serverRepo,
+        private readonly KeaDeployService      $deployer,
+        private readonly DhcpServerRepository  $serverRepo,
+        private readonly EntityManagerInterface $em,
     ) {
         parent::__construct();
     }
@@ -60,7 +63,21 @@ class GenerateKeaConfigCommand extends Command
         $failed = false;
 
         foreach ($servers as $server) {
-            $results = $this->deployer->deployToServer($server, $reload);
+            $startedAt = new \DateTimeImmutable();
+            try {
+                $results = $this->deployer->deployToServer($server, $reload);
+                $success = $this->isSuccess($results);
+                $error   = null;
+            } catch (\Throwable $e) {
+                $results = [];
+                $success = false;
+                $error   = $e->getMessage();
+                $io->error($e->getMessage());
+                $failed = true;
+            }
+
+            $this->em->persist(new PushLog('dhcp', $server->getName(), $success, $results, $startedAt, new \DateTimeImmutable(), $error));
+            $this->em->flush();
 
             foreach ($results as $type => $result) {
                 $label = $type === 'dhcp4' ? 'DHCPv4' : 'DHCPv6';
@@ -95,5 +112,18 @@ class GenerateKeaConfigCommand extends Command
         }
 
         return $failed ? Command::FAILURE : Command::SUCCESS;
+    }
+
+    private function isSuccess(array $result): bool
+    {
+        foreach ($result as $svc) {
+            if (!$svc['success']) {
+                return false;
+            }
+            if (isset($svc['reload']) && $svc['reload'] !== null && !$svc['reload']['success']) {
+                return false;
+            }
+        }
+        return true;
     }
 }

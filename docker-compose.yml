@@ -1,9 +1,8 @@
 services:
   app:
     build: .
-    read_only: true
     volumes:
-      - .:/var/www/html:ro
+      - .:/var/www/html
       - symfony_var:/var/www/html/var
     tmpfs:
       - /tmp
@@ -12,9 +11,34 @@ services:
       APP_ENV: dev
       APP_SECRET: changeme_in_production_32chars_min
       DATABASE_URL: "mysql://ipam:ipam_password@db:3306/ipam?serverVersion=8.0&charset=utf8mb4"
+      MESSENGER_TRANSPORT_DSN: "doctrine://default"
     depends_on:
       db:
         condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  worker:
+    build: .
+    command: ["php", "bin/console", "messenger:consume", "async", "--time-limit=3600"]
+    volumes:
+      - .:/var/www/html
+      - symfony_var:/var/www/html/var
+    tmpfs:
+      - /tmp
+      - /usr/local/var/run
+    environment:
+      APP_ENV: dev
+      APP_SECRET: changeme_in_production_32chars_min
+      DATABASE_URL: "mysql://ipam:ipam_password@db:3306/ipam?serverVersion=8.0&charset=utf8mb4"
+      MESSENGER_TRANSPORT_DSN: "doctrine://default"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
     logging:
       driver: json-file
       options:

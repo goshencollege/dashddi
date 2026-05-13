@@ -178,7 +178,7 @@
 
         btn.addEventListener('click', function () {
             btn.disabled  = true;
-            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Pushing…';
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Queuing…';
             results.style.display = 'none';
             results.innerHTML = '';
 
@@ -190,12 +190,11 @@
             .then(data => {
                 if (data.error) {
                     results.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
-                    results.style.display = '';
-                    return;
+                } else {
+                    const n = data.count === 1 ? '1 server' : `${data.count} servers`;
+                    results.innerHTML = `<div class="alert alert-info mb-0"><i class="bi bi-send-check me-2"></i>Push queued for ${n} — deploying in the background. <a href="{{ path('push_log_index') }}">View Push Logs</a> to see the output.</div>`;
                 }
-                results.innerHTML = buildDhcpResults(data, resultsId);
                 results.style.display = '';
-                bindCollapse('dhcp-collapse-body');
             })
             .catch(err => {
                 results.innerHTML = `<div class="alert alert-danger">Request failed: ${err}</div>`;
@@ -208,142 +207,8 @@
         });
     }
 
-    function resultsHeader(collapseId, containerId) {
-        return `<div class="card-header d-flex justify-content-between align-items-center">
-            <button class="btn btn-link p-0 fw-semibold text-body text-decoration-none d-flex align-items-center gap-1"
-                    data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="true">
-                <i class="bi bi-chevron-down me-1 results-chevron" style="transition:transform .2s"></i>Push Results
-            </button>
-            <button class="btn-close" title="Dismiss"
-                    onclick="var el=document.getElementById('${containerId}');el.innerHTML='';el.style.display='none'"></button>
-        </div><div id="${collapseId}" class="collapse show"><ul class="list-group list-group-flush">`;
-    }
-
-    function bindCollapse(collapseId) {
-        const el      = document.getElementById(collapseId);
-        if (!el) return;
-        const chevron = el.closest('.card').querySelector('.results-chevron');
-        el.addEventListener('hide.bs.collapse', () => { if (chevron) chevron.style.transform = 'rotate(-90deg)'; });
-        el.addEventListener('show.bs.collapse', () => { if (chevron) chevron.style.transform = ''; });
-    }
-
-    function buildDhcpResults(data, containerId) {
-        let html = `<div class="card">${resultsHeader('dhcp-collapse-body', containerId)}`;
-        for (const [serverName, files] of Object.entries(data)) {
-            for (const [type, info] of Object.entries(files)) {
-                const ok    = info.success;
-                const icon  = ok ? 'bi-check-circle-fill text-success' : 'bi-x-circle-fill text-danger';
-                const label = type === 'dhcp4' ? 'DHCPv4' : 'DHCPv6';
-                let reloadBadge = '', reloadDetail = '';
-                if (info.reload !== null && info.reload !== undefined) {
-                    const r = info.reload;
-                    reloadBadge = `<span class="badge ${r.success ? 'bg-success' : 'bg-danger'} ms-1">${r.stage ?? 'reload'} ${r.success ? 'ok' : 'failed'}</span>`;
-                    if (!r.success) {
-                        reloadDetail += `<div class="text-danger small font-monospace mt-1">${r.response}</div>`;
-                        if (r.restored)       reloadDetail += `<div class="text-warning small mt-1"><i class="bi bi-arrow-counterclockwise me-1"></i>Previous config restored.</div>`;
-                        else if (r.restore_error) reloadDetail += `<div class="text-danger small mt-1"><i class="bi bi-exclamation-triangle me-1"></i>Restore failed: ${r.restore_error}</div>`;
-                    }
-                }
-                html += `<li class="list-group-item d-flex align-items-start gap-2">
-                    <i class="bi ${icon} mt-1 flex-shrink-0"></i>
-                    <div>
-                        <span class="fw-semibold">${serverName}</span>
-                        <span class="badge bg-secondary ms-1">${label}</span>
-                        <span class="text-muted ms-1 font-monospace small">${info.file}</span>
-                        ${reloadBadge}
-                        ${info.output ? `<div class="text-danger small font-monospace mt-1">${info.output}</div>` : ''}
-                        ${reloadDetail}
-                    </div>
-                </li>`;
-            }
-        }
-        return html + '</ul></div></div></div>';
-    }
-
-    function buildDnsResults(data, containerId) {
-        let html = `<div class="card">${resultsHeader('dns-collapse-body', containerId)}`;
-        for (const [serverName, result] of Object.entries(data)) {
-            for (const [viewName, viewResult] of Object.entries(result.views ?? {})) {
-                if (viewResult.mkdir && !viewResult.mkdir.success) {
-                    html += `<li class="list-group-item d-flex align-items-start gap-2">
-                        <i class="bi bi-x-circle-fill text-danger mt-1 flex-shrink-0"></i>
-                        <div><span class="fw-semibold">${serverName}</span>
-                        <span class="badge bg-secondary ms-1">${viewName}</span>
-                        <span class="text-danger ms-1 small">mkdir failed: ${viewResult.mkdir.output}</span></div>
-                    </li>`;
-                }
-                for (const [domainName, zone] of Object.entries(viewResult.zones ?? {})) {
-                    const icon = zone.success ? 'bi-check-circle-fill text-success' : 'bi-x-circle-fill text-danger';
-                    html += `<li class="list-group-item d-flex align-items-start gap-2">
-                        <i class="bi ${icon} mt-1 flex-shrink-0"></i>
-                        <div><span class="fw-semibold">${serverName}</span>
-                        <span class="badge bg-secondary ms-1">${viewName}</span>
-                        <span class="text-muted mx-1">→</span>
-                        <span class="font-monospace small">${zone.file}</span>
-                        ${zone.output ? `<div class="text-danger small font-monospace mt-1">${zone.output}</div>` : ''}</div>
-                    </li>`;
-                }
-            }
-            if (result.conf !== null && result.conf !== undefined) {
-                const icon = result.conf.success ? 'bi-check-circle-fill text-success' : 'bi-x-circle-fill text-danger';
-                html += `<li class="list-group-item d-flex align-items-start gap-2">
-                    <i class="bi ${icon} mt-1 flex-shrink-0"></i>
-                    <div><span class="fw-semibold">${serverName}</span>
-                    <span class="text-muted mx-1">→</span>
-                    <span class="font-monospace small">views.conf</span>
-                    ${result.conf.output ? `<div class="text-danger small font-monospace mt-1">${result.conf.output}</div>` : ''}</div>
-                </li>`;
-            }
-            if (result.reload !== null && result.reload !== undefined) {
-                const r    = result.reload;
-                const icon = r.success ? 'bi-arrow-repeat text-success' : 'bi-x-circle-fill text-danger';
-                html += `<li class="list-group-item d-flex align-items-start gap-2">
-                    <i class="bi ${icon} mt-1 flex-shrink-0"></i>
-                    <div><span class="fw-semibold">${serverName}</span>
-                    <span class="badge ${r.success ? 'bg-success' : 'bg-danger'} ms-1">rndc reload</span>
-                    ${r.output ? `<div class="small font-monospace mt-1 ${r.success ? 'text-muted' : 'text-danger'}">${r.output}</div>` : ''}</div>
-                </li>`;
-            }
-        }
-        return html + '</ul></div></div></div>';
-    }
-
     bindPushButton('dhcp-push-btn', 'dhcp-push-results', '{{ path('dhcp_server_push') }}');
-
-    const dnsBtn     = document.getElementById('dns-push-btn');
-    const dnsResults = document.getElementById('dns-push-results');
-    if (dnsBtn) {
-        dnsBtn.addEventListener('click', function () {
-            dnsBtn.disabled  = true;
-            dnsBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Pushing…';
-            dnsResults.style.display = 'none';
-            dnsResults.innerHTML = '';
-
-            fetch('{{ path('dns_server_push') }}', {
-                method: 'POST',
-                headers: { 'X-Requested-With': 'XMLHttpRequest' },
-            })
-            .then(r => r.json())
-            .then(data => {
-                if (data.error) {
-                    dnsResults.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
-                    dnsResults.style.display = '';
-                    return;
-                }
-                dnsResults.innerHTML = buildDnsResults(data, 'dns-push-results');
-                dnsResults.style.display = '';
-                bindCollapse('dns-collapse-body');
-            })
-            .catch(err => {
-                dnsResults.innerHTML = `<div class="alert alert-danger">Request failed: ${err}</div>`;
-                dnsResults.style.display = '';
-            })
-            .finally(() => {
-                dnsBtn.disabled  = false;
-                dnsBtn.innerHTML = '<i class="bi bi-cloud-upload me-1"></i>Push to All';
-            });
-        });
-    }
+    bindPushButton('dns-push-btn',  'dns-push-results',  '{{ path('dns_server_push') }}');
 })();
 </script>
 {% endblock %}

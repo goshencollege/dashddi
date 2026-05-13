@@ -3,14 +3,15 @@
 namespace App\Controller\Api;
 
 use App\Entity\DhcpServer;
+use App\Message\PushKeaMessage;
 use App\Repository\DhcpServerRepository;
-use App\Service\KeaDeployService;
 use App\Service\SshKeyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
 
 #[Route('/api/dhcp-servers')]
@@ -106,15 +107,11 @@ class DhcpServerApiController extends AbstractController
     }
 
     #[Route('/{id}/push', name: 'api_dhcp_servers_push', methods: ['POST'])]
-    public function push(DhcpServer $server, KeaDeployService $deployer): JsonResponse
+    public function push(DhcpServer $server, MessageBusInterface $bus): JsonResponse
     {
-        try {
-            $result = $deployer->deployToServer($server);
-        } catch (\Throwable $e) {
-            return $this->json(['error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
+        $bus->dispatch(new PushKeaMessage($server->getId()));
 
-        return $this->json($result);
+        return $this->json(['queued' => true], Response::HTTP_ACCEPTED);
     }
 
     private function serialize(DhcpServer $server): array

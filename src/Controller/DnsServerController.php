@@ -4,14 +4,15 @@ namespace App\Controller;
 
 use App\Entity\DnsServer;
 use App\Form\DnsServerType;
+use App\Message\PushDnsMessage;
 use App\Repository\DnsServerRepository;
-use App\Service\DnsDeployService;
 use App\Service\SshKeyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
 
 #[Route('/dns-servers')]
@@ -93,7 +94,7 @@ class DnsServerController extends AbstractController
     }
 
     #[Route('/push', name: 'dns_server_push', methods: ['POST'])]
-    public function push(DnsServerRepository $repo, DnsDeployService $deployer): JsonResponse
+    public function push(DnsServerRepository $repo, MessageBusInterface $bus): JsonResponse
     {
         $servers = $repo->findBy([], ['name' => 'ASC']);
 
@@ -101,18 +102,10 @@ class DnsServerController extends AbstractController
             return $this->json(['error' => 'No DNS servers configured.'], 400);
         }
 
-        $results = [];
         foreach ($servers as $server) {
-            try {
-                $results[$server->getName()] = $deployer->deployToServer($server);
-            } catch (\Throwable $e) {
-                $results[$server->getName()] = [
-                    'views'  => [],
-                    'reload' => ['success' => false, 'output' => $e->getMessage()],
-                ];
-            }
+            $bus->dispatch(new PushDnsMessage($server->getId()));
         }
 
-        return $this->json($results);
+        return $this->json(['queued' => true, 'count' => count($servers)], 202);
     }
 }
