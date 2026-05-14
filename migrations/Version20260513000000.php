@@ -16,7 +16,7 @@ final class Version20260513000000 extends AbstractMigration
 
     public function up(Schema $schema): void
     {
-        $this->addSql("CREATE TABLE messenger_messages (
+        $this->addSql("CREATE TABLE IF NOT EXISTS messenger_messages (
             id BIGINT AUTO_INCREMENT NOT NULL,
             body LONGTEXT NOT NULL,
             headers LONGTEXT NOT NULL,
