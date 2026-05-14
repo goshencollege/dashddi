@@ -15,6 +15,12 @@ services:
       DATABASE_URL: "mysql://ipam:ipam_password@db:3306/ipam?serverVersion=8.0&charset=utf8mb4"
       LEGACY_DATABASE_URL: ""
       MESSENGER_TRANSPORT_DSN: "doctrine://default"
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 9000"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
     depends_on:
       db:
         condition: service_healthy
@@ -65,8 +71,10 @@ services:
       - /var/cache/nginx
       - /var/run
       - /tmp
+    restart: unless-stopped
     depends_on:
-      - app
+      app:
+        condition: service_healthy
     logging:
       driver: json-file
       options:
