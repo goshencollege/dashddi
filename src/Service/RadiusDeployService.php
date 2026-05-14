@@ -15,38 +15,58 @@ class RadiusDeployService
     {
         $sftp       = $this->getSftp($server);
         $remotePath = rtrim($server->getRemotePath(), '/');
-        $tmpFile    = '/tmp/dashddi_clients.conf';
-        $destFile   = $remotePath . '/clients.conf';
         $results    = [];
 
-        // SFTP into /tmp (no elevated permissions needed), then sudo cp into place
-        $ok = $sftp->put($tmpFile, $this->generator->generateClientsConf());
+        $results['clients.conf'] = $this->deployFile(
+            $sftp,
+            $this->generator->generateClientsConf(),
+            '/tmp/dashddi_clients.conf',
+            $remotePath . '/clients.conf',
+            'clients.conf',
+        );
 
-        $results['clients.conf'] = [
-            'success' => $ok,
-            'file'    => 'clients.conf',
-            'output'  => $ok ? '' : 'SFTP upload to /tmp failed',
-            'reload'  => null,
-        ];
+        $results['authorize'] = $this->deployFile(
+            $sftp,
+            $this->generator->generateAuthorizeFile(),
+            '/tmp/dashddi_authorize',
+            $remotePath . '/mods-config/files/authorize',
+            'mods-config/files/authorize',
+        );
 
-        if (!$ok) {
-            return $results;
+        // Reload once after all files are in place
+        if ($results['clients.conf']['success'] && $results['authorize']['success']) {
+            $reloadOut = $sftp->exec('sudo systemctl reload freeradius 2>&1');
+            $results['authorize']['reload'] = [
+                'success' => $sftp->getExitStatus() === 0,
+                'output'  => trim((string) $reloadOut),
+            ];
         }
-
-        $copyOut = $sftp->exec('sudo cp ' . escapeshellarg($tmpFile) . ' ' . escapeshellarg($destFile) . ' 2>&1');
-        if ($sftp->getExitStatus() !== 0) {
-            $results['clients.conf']['success'] = false;
-            $results['clients.conf']['output']  = 'sudo cp failed: ' . trim((string) $copyOut);
-            return $results;
-        }
-
-        $reloadOut = $sftp->exec('sudo systemctl reload freeradius 2>&1');
-        $results['clients.conf']['reload'] = [
-            'success' => $sftp->getExitStatus() === 0,
-            'output'  => trim((string) $reloadOut),
-        ];
 
         return $results;
+    }
+
+    private function deployFile(
+        \phpseclib3\Net\SFTP $sftp,
+        string $content,
+        string $tmpPath,
+        string $destPath,
+        string $label,
+    ): array {
+        $result = ['success' => false, 'file' => $label, 'output' => '', 'reload' => null];
+
+        if (!$sftp->put($tmpPath, $content)) {
+            $result['output'] = 'SFTP upload to /tmp failed';
+            return $result;
+        }
+
+        $out = $sftp->exec('sudo cp ' . escapeshellarg($tmpPath) . ' ' . escapeshellarg($destPath) . ' 2>&1');
+        if ($sftp->getExitStatus() !== 0) {
+            $result['output'] = 'sudo cp failed: ' . trim((string) $out);
+            return $result;
+        }
+
+        $result['success'] = true;
+        return $result;
     }
 
     private function getSftp(RadiusServer $server): \phpseclib3\Net\SFTP
