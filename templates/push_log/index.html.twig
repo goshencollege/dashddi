@@ -54,8 +54,12 @@
                             <td>
                                 {% if log.type == 'dns' %}
                                     <span class="badge bg-primary">DNS</span>
-                                {% else %}
+                                {% elseif log.type == 'dhcp' %}
                                     <span class="badge bg-success">DHCP</span>
+                                {% elseif log.type == 'radius' %}
+                                    <span class="badge bg-warning text-dark">RADIUS</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">{{ log.type|upper }}</span>
                                 {% endif %}
                             </td>
                             <td class="fw-semibold">{{ log.serverName }}</td>
@@ -81,6 +85,8 @@
                                     </div>
                                 {% elseif log.type == 'dns' %}
                                     {{ _self.renderDnsResult(log.result) }}
+                                {% elseif log.type == 'radius' %}
+                                    {{ _self.renderRadiusResult(log.result) }}
                                 {% else %}
                                     {{ _self.renderDhcpResult(log.result) }}
                                 {% endif %}
@@ -140,6 +146,29 @@
             </div>
         </li>
     {% endif %}
+</ul>
+{% endmacro %}
+
+{# ── RADIUS result renderer ───────────────────────────────────────────────── #}
+{% macro renderRadiusResult(result) %}
+<ul class="zone-list">
+    {% for file, info in result %}
+        <li class="d-flex align-items-start gap-2">
+            <i class="bi {{ info.success ? 'bi-check-circle-fill text-success' : 'bi-x-circle-fill text-danger' }} mt-1 flex-shrink-0"></i>
+            <div>
+                <span class="badge bg-warning text-dark me-1">RADIUS</span>
+                <span class="font-monospace small">{{ info.file }}</span>
+                {% if info.output %}<div class="text-danger small font-monospace mt-1">{{ info.output }}</div>{% endif %}
+                {% if info.reload is defined and info.reload is not null %}
+                    {% set r = info.reload %}
+                    <span class="badge {{ r.success ? 'bg-success' : 'bg-danger' }} ms-1">reload {{ r.success ? 'ok' : 'failed' }}</span>
+                    {% if not r.success and r.output %}
+                        <div class="text-danger small font-monospace mt-1">{{ r.output }}</div>
+                    {% endif %}
+                {% endif %}
+            </div>
+        </li>
+    {% endfor %}
 </ul>
 {% endmacro %}
 
