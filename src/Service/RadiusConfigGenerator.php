@@ -23,11 +23,12 @@ class RadiusConfigGenerator
         foreach ($clients as $client) {
             $blockName = preg_replace('/[^a-zA-Z0-9_-]/', '_', $client->getName());
             $lines[] = 'client ' . $blockName . ' {';
-            $lines[] = '    ipaddr    = ' . $client->getNasname();
-            $lines[] = '    secret    = ' . $client->getSecret();
+            $lines[] = '    ipaddr                        = ' . $client->getNasname();
+            $lines[] = '    secret                        = ' . $client->getSecret();
             if ($client->getShortname() !== null) {
-                $lines[] = '    shortname = ' . $client->getShortname();
+                $lines[] = '    shortname                     = ' . $client->getShortname();
             }
+            $lines[] = '    require_message_authenticator = true';
             $lines[] = '}';
             $lines[] = '';
         }
