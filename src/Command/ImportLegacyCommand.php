@@ -207,8 +207,8 @@ class ImportLegacyCommand extends Command
 
         foreach ($pdo->query('SELECT bID, name FROM building ORDER BY bID')->fetchAll() as $row) {
             $building = new Building();
-            $building->setName($row['name']);
-            $building->setDescription('Legacy code: ' . $row['bID']);
+            $building->setName($row['bID']);
+            $building->setDescription($row['name']);
             $map[$row['bID']] = $building;
             if (!$dryRun) {
                 $this->em->persist($building);
