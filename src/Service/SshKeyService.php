@@ -18,6 +18,11 @@ class SshKeyService
         ];
     }
 
+    public function extractPublicKey(string $privateKey): string
+    {
+        return PublicKeyLoader::load($privateKey)->getPublicKey()->toString('OpenSSH');
+    }
+
     public function connect(string $hostname, string $user, string $privateKey): SFTP
     {
         $key  = PublicKeyLoader::load($privateKey);

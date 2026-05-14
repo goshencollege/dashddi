@@ -3,12 +3,15 @@
 namespace App\DataFixtures;
 
 use App\Entity\DhcpServer;
+use App\Service\SshKeyService;
 use Doctrine\Bundle\FixturesBundle\Fixture;
 use Doctrine\Persistence\ObjectManager;
 use Symfony\Component\Yaml\Yaml;
 
 class DhcpServerFixtures extends Fixture
 {
+    public function __construct(private readonly SshKeyService $sshKeys) {}
+
     public function load(ObjectManager $manager): void
     {
         $servers = $this->loadLocalConfig()['dhcp_servers'] ?? [
@@ -31,7 +34,8 @@ class DhcpServerFixtures extends Fixture
                 ->setControlUrl($data['control_url'] ?? null)
                 ->setControlUser($data['control_user'] ?? null)
                 ->setControlPassword($data['control_password'] ?? null)
-                ->setSshPrivateKey($data['ssh_private_key'] ?? null);
+                ->setSshPrivateKey($data['ssh_private_key'] ?? null)
+                ->setSshPublicKey(isset($data['ssh_private_key']) ? $this->sshKeys->extractPublicKey($data['ssh_private_key']) : null);
 
             $manager->persist($server);
         }

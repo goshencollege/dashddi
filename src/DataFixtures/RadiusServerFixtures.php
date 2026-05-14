@@ -3,12 +3,15 @@
 namespace App\DataFixtures;
 
 use App\Entity\RadiusServer;
+use App\Service\SshKeyService;
 use Doctrine\Bundle\FixturesBundle\Fixture;
 use Doctrine\Persistence\ObjectManager;
 use Symfony\Component\Yaml\Yaml;
 
 class RadiusServerFixtures extends Fixture
 {
+    public function __construct(private readonly SshKeyService $sshKeys) {}
+
     public function load(ObjectManager $manager): void
     {
         $servers = $this->loadLocalConfig()['radius_servers'] ?? [
@@ -27,6 +30,7 @@ class RadiusServerFixtures extends Fixture
                 ->setSshUser($data['ssh_user'] ?? 'root')
                 ->setRemotePath($data['remote_path'] ?? '/etc/freeradius/3.0')
                 ->setSshPrivateKey($data['ssh_private_key'] ?? null)
+                ->setSshPublicKey(isset($data['ssh_private_key']) ? $this->sshKeys->extractPublicKey($data['ssh_private_key']) : null)
                 ->setDescription($data['description'] ?? null);
 
             $manager->persist($server);
