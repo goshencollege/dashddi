@@ -59,7 +59,7 @@ class RadiusDeployService
             return $result;
         }
 
-        $out = $sftp->exec('sudo cp ' . escapeshellarg($tmpPath) . ' ' . escapeshellarg($destPath) . ' 2>&1');
+        $out = $sftp->exec('sudo /usr/bin/cp ' . escapeshellarg($tmpPath) . ' ' . escapeshellarg($destPath) . ' 2>&1');
         if ($sftp->getExitStatus() !== 0) {
             $result['output'] = 'sudo cp failed: ' . trim((string) $out);
             return $result;
