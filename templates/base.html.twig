@@ -352,6 +352,7 @@
                 </li>
                 {% set serversActive = app.request.attributes.get('_route') starts with 'dhcp_server'
                     or app.request.attributes.get('_route') starts with 'dns_server'
+                    or app.request.attributes.get('_route') starts with 'radius_server'
                     or app.request.attributes.get('_route') starts with 'servers'
                     or app.request.attributes.get('_route') starts with 'push_log' %}
                 <li class="nav-item dropdown">
@@ -360,7 +361,7 @@
                     </a>
                     <ul class="dropdown-menu">
                         <li>
-                            <a class="dropdown-item {{ app.request.attributes.get('_route') starts with 'dhcp_server' or app.request.attributes.get('_route') starts with 'dns_server' or app.request.attributes.get('_route') starts with 'servers' ? 'active' }}"
+                            <a class="dropdown-item {{ app.request.attributes.get('_route') starts with 'dhcp_server' or app.request.attributes.get('_route') starts with 'dns_server' or app.request.attributes.get('_route') starts with 'radius_server' or app.request.attributes.get('_route') starts with 'servers' ? 'active' }}"
                                href="{{ path('servers_index') }}">
                                 <i class="bi bi-server me-1"></i>Servers
                             </a>

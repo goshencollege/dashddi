@@ -4,6 +4,7 @@ namespace App\EventListener;
 
 use App\Message\PushDnsMessage;
 use App\Message\PushDhcpMessage;
+use App\Message\PushRadiusMessage;
 use App\Service\PushScopeService;
 use Doctrine\Bundle\DoctrineBundle\Attribute\AsDoctrineListener;
 use Doctrine\ORM\Event\PostFlushEventArgs;
@@ -22,6 +23,7 @@ class EntityPushListener
     /** @var array<int, true> Keyed by server ID for deduplication */
     private array $pendingDnsIds = [];
     private bool $pendingAllDhcp = false;
+    private bool $pendingAllRadius = false;
 
     public function __construct(
         private readonly PushScopeService    $scope,
@@ -45,12 +47,14 @@ class EntityPushListener
 
     public function postFlush(PostFlushEventArgs $args): void
     {
-        $dnsIds = $this->pendingDnsIds;
-        $allDhcp = $this->pendingAllDhcp;
+        $dnsIds    = $this->pendingDnsIds;
+        $allDhcp   = $this->pendingAllDhcp;
+        $allRadius = $this->pendingAllRadius;
 
         // Reset before dispatching to avoid double-dispatch if flush triggers another flush
-        $this->pendingDnsIds = [];
-        $this->pendingAllDhcp = false;
+        $this->pendingDnsIds     = [];
+        $this->pendingAllDhcp    = false;
+        $this->pendingAllRadius  = false;
 
         foreach (array_keys($dnsIds) as $id) {
             $this->bus->dispatch(new PushDnsMessage($id));
@@ -59,6 +63,12 @@ class EntityPushListener
         if ($allDhcp) {
             foreach ($this->scope->allDhcpServerIds() as $id) {
                 $this->bus->dispatch(new PushDhcpMessage($id));
+            }
+        }
+
+        if ($allRadius) {
+            foreach ($this->scope->allRadiusServerIds() as $id) {
+                $this->bus->dispatch(new PushRadiusMessage($id));
             }
         }
     }
@@ -71,6 +81,10 @@ class EntityPushListener
 
         if ($this->scope->affectsDhcp($entity)) {
             $this->pendingAllDhcp = true;
+        }
+
+        if ($this->scope->affectsRadius($entity)) {
+            $this->pendingAllRadius = true;
         }
     }
 }

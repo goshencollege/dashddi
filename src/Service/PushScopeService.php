@@ -9,14 +9,17 @@ use App\Entity\IpAddress;
 use App\Entity\Ipv6Address;
 use App\Entity\NetworkInterface;
 use App\Entity\Subnet;
+use App\Entity\RadiusClient;
 use App\Repository\DhcpServerRepository;
 use App\Repository\DnsServerRepository;
+use App\Repository\RadiusServerRepository;
 
 class PushScopeService
 {
     public function __construct(
-        private readonly DnsServerRepository  $dnsRepo,
-        private readonly DhcpServerRepository $dhcpRepo,
+        private readonly DnsServerRepository    $dnsRepo,
+        private readonly DhcpServerRepository   $dhcpRepo,
+        private readonly RadiusServerRepository $radiusRepo,
     ) {}
 
     /** @return int[] DNS server IDs whose zones are affected by this entity change */
@@ -42,6 +45,17 @@ class PushScopeService
     public function allDhcpServerIds(): array
     {
         return $this->dhcpRepo->findAllIds();
+    }
+
+    public function affectsRadius(object $entity): bool
+    {
+        return $entity instanceof RadiusClient;
+    }
+
+    /** @return int[] */
+    public function allRadiusServerIds(): array
+    {
+        return $this->radiusRepo->findAllIds();
     }
 
     private function viewIdsFor(object $entity): array
