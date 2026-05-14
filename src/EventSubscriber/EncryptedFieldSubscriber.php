@@ -6,6 +6,7 @@ use App\Entity\BackupSetting;
 use App\Entity\DhcpServer;
 use App\Entity\DnsServer;
 use App\Entity\RadiusClient;
+use App\Entity\RadiusServer;
 use App\Service\EncryptionService;
 use Doctrine\Bundle\DoctrineBundle\Attribute\AsDoctrineListener;
 use Doctrine\ORM\Event\PostLoadEventArgs;
@@ -28,6 +29,7 @@ class EncryptedFieldSubscriber
         DhcpServer::class    => ['sshPrivateKey', 'controlPassword'],
         DnsServer::class     => ['sshPrivateKey'],
         RadiusClient::class  => ['secret'],
+        RadiusServer::class  => ['sshPrivateKey'],
     ];
 
     public function __construct(private readonly EncryptionService $encryption) {}
