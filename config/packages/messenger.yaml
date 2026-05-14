@@ -8,3 +8,4 @@ framework:
         routing:
             'App\Message\PushDnsMessage': async
             'App\Message\PushDhcpMessage': async
+            'App\Message\PushRadiusMessage': async
