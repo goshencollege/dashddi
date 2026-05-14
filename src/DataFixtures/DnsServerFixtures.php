@@ -4,12 +4,15 @@ namespace App\DataFixtures;
 
 use App\Entity\DnsServer;
 use App\Entity\DnsView;
+use App\Service\SshKeyService;
 use Doctrine\Bundle\FixturesBundle\Fixture;
 use Doctrine\Persistence\ObjectManager;
 use Symfony\Component\Yaml\Yaml;
 
 class DnsServerFixtures extends Fixture
 {
+    public function __construct(private readonly SshKeyService $sshKeys) {}
+
     public function load(ObjectManager $manager): void
     {
         $servers = $this->loadLocalConfig()['dns_servers'] ?? [
@@ -45,7 +48,8 @@ class DnsServerFixtures extends Fixture
                 ->setServerType($data['server_type'] ?? 'primary')
                 ->setPrimaryHostname($data['primary_hostname'] ?? null)
                 ->setKeyDirectory($data['key_directory'] ?? null)
-                ->setSshPrivateKey($data['ssh_private_key'] ?? null);
+                ->setSshPrivateKey($data['ssh_private_key'] ?? null)
+                ->setSshPublicKey(isset($data['ssh_private_key']) ? $this->sshKeys->extractPublicKey($data['ssh_private_key']) : null);
             $server->addView($defaultView);
 
             $manager->persist($server);
