@@ -16,8 +16,8 @@ class PushLog
     #[ORM\Column]
     private int $id;
 
-    #[ORM\Column(length: 4)]
-    private string $type;  // 'dns' | 'dhcp' (actually 4 chars max for 'dhcp')
+    #[ORM\Column(length: 16)]
+    private string $type;  // 'dns' | 'dhcp' | 'radius'
 
     #[ORM\Column(length: 255)]
     private string $serverName;
