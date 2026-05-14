@@ -33,8 +33,19 @@ class RadiusDeployService
             'mods-config/files/authorize',
         );
 
+        $results['sites-available/default'] = $this->deployFile(
+            $sftp,
+            $this->generator->generateDefaultSite(),
+            '/tmp/dashddi_default_site',
+            $remotePath . '/sites-available/default',
+            'sites-available/default',
+        );
+
+        $results['mods-enabled']  = $this->syncEnabled($sftp, $remotePath . '/mods-enabled',  $remotePath . '/mods-available',  ['files', 'always']);
+        $results['sites-enabled'] = $this->syncEnabled($sftp, $remotePath . '/sites-enabled', $remotePath . '/sites-available', ['default']);
+
         // Reload once after all files are in place
-        if ($results['clients.conf']['success'] && $results['authorize']['success']) {
+        if ($results['clients.conf']['success'] && $results['authorize']['success'] && $results['sites-available/default']['success'] && $results['mods-enabled']['success'] && $results['sites-enabled']['success']) {
             $reloadOut = $sftp->exec('sudo systemctl reload freeradius 2>&1');
             $results['reload'] = [
                 'success' => $sftp->getExitStatus() === 0,
@@ -43,6 +54,27 @@ class RadiusDeployService
         }
 
         return $results;
+    }
+
+    private function syncEnabled(\phpseclib3\Net\SFTP $sftp, string $enabledDir, string $availableDir, array $names): array
+    {
+        $label = basename($enabledDir);
+
+        $out = $sftp->exec('sudo /usr/bin/find ' . escapeshellarg($enabledDir) . ' -maxdepth 1 -type l -delete 2>&1');
+        if ($sftp->getExitStatus() !== 0) {
+            return ['success' => false, 'file' => $label, 'output' => 'clear failed: ' . trim((string) $out)];
+        }
+
+        foreach ($names as $name) {
+            $target = $availableDir . '/' . $name;
+            $link   = $enabledDir . '/' . $name;
+            $out    = $sftp->exec('sudo /bin/ln -sf ' . escapeshellarg($target) . ' ' . escapeshellarg($link) . ' 2>&1');
+            if ($sftp->getExitStatus() !== 0) {
+                return ['success' => false, 'file' => $label, 'output' => 'enable ' . $name . ' failed: ' . trim((string) $out)];
+            }
+        }
+
+        return ['success' => true, 'file' => $label, 'output' => ''];
     }
 
     private function deployFile(
@@ -59,7 +91,7 @@ class RadiusDeployService
             return $result;
         }
 
-        $out = $sftp->exec('sudo /usr/bin/cp ' . escapeshellarg($tmpPath) . ' ' . escapeshellarg($destPath) . ' 2>&1');
+        $out = $sftp->exec('sudo /bin/cp ' . escapeshellarg($tmpPath) . ' ' . escapeshellarg($destPath) . ' 2>&1');
         if ($sftp->getExitStatus() !== 0) {
             $result['output'] = 'sudo cp failed: ' . trim((string) $out);
             return $result;
