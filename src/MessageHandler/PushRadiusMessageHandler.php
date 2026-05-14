@@ -45,7 +45,7 @@ final class PushRadiusMessageHandler
 
     private function isSuccess(array $result): bool
     {
-        foreach (['clients.conf', 'authorize'] as $key) {
+        foreach (['clients.conf', 'authorize', 'sites-available/default', 'mods-enabled', 'sites-enabled'] as $key) {
             if (!($result[$key]['success'] ?? false)) {
                 return false;
             }
