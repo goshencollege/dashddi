@@ -40,6 +40,8 @@ class ImportLegacyCommand extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
+        ini_set('memory_limit', '512M');
+
         $io     = new SymfonyStyle($input, $output);
         $dryRun = $input->getOption('dry-run');
 
