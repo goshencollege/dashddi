@@ -41,3 +41,20 @@ dhcp_servers:
     control_url: "http://kea.example.com:8000"
     control_user: "admin"
     # control_password: ""        # optional
+
+radius_servers:
+  - name: "radius.example.com"
+    hostname: "radius.example.com"
+    ssh_user: "root"
+    remote_path: "/etc/freeradius/3.0"
+    # ssh_private_key: |          # omit to generate a key via the UI
+    #   -----BEGIN OPENSSH PRIVATE KEY-----
+    #   ...
+    #   -----END OPENSSH PRIVATE KEY-----
+
+radius_clients:
+  - name: "switch-01"
+    nasname: "192.168.1.1"
+    shortname: "switch-01"
+    secret: "change-me"
+    enabled: true
