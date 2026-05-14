@@ -36,7 +36,7 @@ class RadiusDeployService
         // Reload once after all files are in place
         if ($results['clients.conf']['success'] && $results['authorize']['success']) {
             $reloadOut = $sftp->exec('sudo systemctl reload freeradius 2>&1');
-            $results['authorize']['reload'] = [
+            $results['reload'] = [
                 'success' => $sftp->getExitStatus() === 0,
                 'output'  => trim((string) $reloadOut),
             ];
@@ -52,7 +52,7 @@ class RadiusDeployService
         string $destPath,
         string $label,
     ): array {
-        $result = ['success' => false, 'file' => $label, 'output' => '', 'reload' => null];
+        $result = ['success' => false, 'file' => $label, 'output' => ''];
 
         if (!$sftp->put($tmpPath, $content)) {
             $result['output'] = 'SFTP upload to /tmp failed';

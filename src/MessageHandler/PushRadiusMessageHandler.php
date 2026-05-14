@@ -44,13 +44,13 @@ final class PushRadiusMessageHandler
 
     private function isSuccess(array $result): bool
     {
-        foreach ($result as $file) {
-            if (!$file['success']) {
+        foreach (['clients.conf', 'authorize'] as $key) {
+            if (!($result[$key]['success'] ?? false)) {
                 return false;
             }
-            if (isset($file['reload']) && $file['reload'] !== null && !$file['reload']['success']) {
-                return false;
-            }
+        }
+        if (isset($result['reload']) && !$result['reload']['success']) {
+            return false;
         }
         return true;
     }
