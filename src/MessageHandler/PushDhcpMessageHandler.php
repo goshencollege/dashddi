@@ -38,6 +38,7 @@ final class PushDhcpMessageHandler
         }
 
         $log = new PushLog('dhcp', $server->getName(), $success, $result, $startedAt, new \DateTimeImmutable(), $error);
+        $this->em->clear();
         $this->em->persist($log);
         $this->em->flush();
     }

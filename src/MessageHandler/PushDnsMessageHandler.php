@@ -38,6 +38,7 @@ final class PushDnsMessageHandler
         }
 
         $log = new PushLog('dns', $server->getName(), $success, $result, $startedAt, new \DateTimeImmutable(), $error);
+        $this->em->clear();
         $this->em->persist($log);
         $this->em->flush();
     }
