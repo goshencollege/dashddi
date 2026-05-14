@@ -9,33 +9,6 @@
     </a>
 </div>
 
-<div class="alert alert-info mb-4">
-    <i class="bi bi-info-circle me-2"></i>
-    <strong>FreeRADIUS container commands</strong> — run these on the host where the stack is deployed:
-    <table class="table table-sm mb-0 mt-2">
-        <tbody>
-            <tr>
-                <td class="text-nowrap pe-3 text-muted small">Start (first time or after setup)</td>
-                <td><code>docker compose --profile radius up -d freeradius</code></td>
-            </tr>
-            <tr>
-                <td class="text-nowrap pe-3 text-muted small">Restart after client changes</td>
-                <td><code>docker compose --profile radius restart freeradius</code></td>
-            </tr>
-            <tr>
-                <td class="text-nowrap pe-3 text-muted small">Stop</td>
-                <td><code>docker compose stop freeradius</code></td>
-            </tr>
-        </tbody>
-    </table>
-    <div class="mt-2 small text-muted">
-        If FreeRADIUS was not enabled during <code>setup.sh</code>, the
-        <em>Start</em> command above will build and launch it. The read-only
-        <code>radius</code> database user must exist first — see the
-        <code>setup.sh</code> RADIUS section or create it manually.
-    </div>
-</div>
-
 {% if clients is empty %}
     <div class="card">
         <div class="card-body text-center text-muted py-5">
