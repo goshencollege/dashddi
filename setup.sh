@@ -275,6 +275,12 @@ ${APP_READONLY}
       DATABASE_URL: "${DATABASE_URL}"
       DEFAULT_URI: "${BASE_URL}"
       MESSENGER_TRANSPORT_DSN: "doctrine://default?auto_setup=0"
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 9000"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
 ${DEPENDS_ON_BLOCK}
 
   worker:
@@ -313,7 +319,8 @@ ${DEPENDS_ON_BLOCK}
       - /var/run
       - /tmp
     depends_on:
-      - app
+      app:
+        condition: service_healthy
 ${DB_SERVICE_BLOCK}
 ${VOLUMES_BLOCK}
 EOF
