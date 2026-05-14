@@ -198,26 +198,7 @@ if [[ "$USE_CONTAINER_DB" == "false" ]]; then
 fi
 DATABASE_URL="mysql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?serverVersion=${DB_SERVER_VERSION}&charset=utf8mb4"
 
-# ── 6. RADIUS / FreeRADIUS ────────────────────────────────────────────────────
-header "RADIUS / FreeRADIUS (optional)"
-echo "  FreeRADIUS enables MAC Authentication Bypass for NAC integration."
-echo "  It runs as a separate container with a read-only database user."
-echo "  Skip this if you do not need NAC integration."
-echo
-
-USE_RADIUS=false
-RADIUS_DB_PASSWORD=""
-RADIUS_AUTH_PORT="1812"
-RADIUS_ACCT_PORT="1813"
-if ask_yn "Enable FreeRADIUS?" "n"; then
-    USE_RADIUS=true
-    RADIUS_DB_PASSWORD=$(openssl rand -hex 24)
-    ok "RADIUS DB password generated"
-    ask RADIUS_AUTH_PORT "RADIUS authentication port (UDP)" "1812"
-    ask RADIUS_ACCT_PORT "RADIUS accounting port (UDP)"    "1813"
-fi
-
-# ── 7. Write docker-compose file ─────────────────────────────────────────────
+# ── 6. Write docker-compose file ─────────────────────────────────────────────
 header "Writing docker-compose.${APP_ENV}.yml"
 
 # Prod: read-only containers and volume mounts. Dev: writable for easier development.
@@ -273,33 +254,6 @@ else
 volumes:
   symfony_var:
 YAML
-fi
-
-# Build the freeradius service block conditionally
-if [[ "$USE_RADIUS" == "true" ]]; then
-    read -r -d '' RADIUS_SERVICE_BLOCK << YAML || true
-
-  freeradius:
-    build: ./docker/freeradius
-    restart: unless-stopped
-    ports:
-      - "${RADIUS_AUTH_PORT}:1812/udp"
-      - "${RADIUS_ACCT_PORT}:1813/udp"
-    environment:
-      RADIUS_DB_HOST: ${DB_HOST}
-      RADIUS_DB_PORT: ${DB_PORT}
-      RADIUS_DB_NAME: ${DB_NAME}
-      RADIUS_DB_PASSWORD: ${RADIUS_DB_PASSWORD}
-${DEPENDS_ON_BLOCK}
-    logging:
-      driver: json-file
-      options:
-        max-size: "20m"
-        max-file: "5"
-
-YAML
-else
-    RADIUS_SERVICE_BLOCK=""
 fi
 
 cat > "$COMPOSE_FILE" << EOF
@@ -361,13 +315,12 @@ ${DEPENDS_ON_BLOCK}
     depends_on:
       - app
 ${DB_SERVICE_BLOCK}
-${RADIUS_SERVICE_BLOCK}
 ${VOLUMES_BLOCK}
 EOF
 
 ok "docker-compose.${APP_ENV}.yml written"
 
-# ── 7. Start containers ───────────────────────────────────────────────────────
+# ── 7. Start containers ──────────────────────────────────────────────────────
 header "Building and starting services"
 
 docker compose -f "$COMPOSE_FILE" up -d --build
@@ -391,34 +344,14 @@ docker compose -f "$COMPOSE_FILE" exec -T app \
     php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
 ok "Migrations complete"
 
-# ── 9. RADIUS database user and container ────────────────────────────────────
-if [[ "$USE_RADIUS" == "true" ]]; then
-    header "Creating RADIUS read-only database user"
-    if [[ "$USE_CONTAINER_DB" == "true" ]]; then
-        docker compose -f "$COMPOSE_FILE" exec -T db mysql \
-            -u root -p"${DB_ROOT_PASSWORD}" \
-            -e "CREATE USER IF NOT EXISTS 'radius'@'%' IDENTIFIED BY '${RADIUS_DB_PASSWORD}'; GRANT SELECT ON \`${DB_NAME}\`.* TO 'radius'@'%'; FLUSH PRIVILEGES;"
-        ok "radius@% user created with SELECT on ${DB_NAME}"
-    else
-        warn "External database detected — create the RADIUS user manually before starting FreeRADIUS:"
-        warn "  CREATE USER IF NOT EXISTS 'radius'@'%' IDENTIFIED BY '${RADIUS_DB_PASSWORD}';"
-        warn "  GRANT SELECT ON \`${DB_NAME}\`.* TO 'radius'@'%';"
-        warn "  FLUSH PRIVILEGES;"
-    fi
-
-    header "Starting FreeRADIUS container"
-    docker compose -f "$COMPOSE_FILE" up -d --build freeradius
-    ok "FreeRADIUS started"
-fi
-
-# ── 10. Cache warmup ─────────────────────────────────────────────────────────
+# ── 9. Cache warmup ──────────────────────────────────────────────────────────
 header "Warming up cache"
 
 docker compose -f "$COMPOSE_FILE" exec -T app \
     php bin/console cache:warmup
 ok "Cache warm"
 
-# ── 11. SAML identity provider setup ─────────────────────────────────────────
+# ── 10. SAML identity provider setup ─────────────────────────────────────────
 header "SAML Identity Provider"
 echo
 echo -e "  ${BOLD}SP metadata URL (give this to your IdP administrator):${NC}"
@@ -456,7 +389,7 @@ else
     warn "  docker compose -f docker-compose.prod.yml exec app php bin/console app:saml:import-metadata <file-or-url> --activate"
 fi
 
-# ── 11. Summary ───────────────────────────────────────────────────────────────
+# ── 11. Summary ──────────────────────────────────────────────────────────────
 header "Setup complete"
 echo
 echo -e "  ${BOLD}DashDDI is running at:  ${CYAN}${BASE_URL}${NC}"
@@ -466,19 +399,6 @@ if [[ "$USE_CONTAINER_DB" == "true" ]]; then
     echo -e "  ${BOLD}MySQL credentials (save these — they are not stored elsewhere):${NC}"
     echo "    App user:   $DB_USER / $DB_PASSWORD"
     echo "    Root:       root / $DB_ROOT_PASSWORD"
-    echo
-fi
-
-if [[ "$USE_RADIUS" == "true" ]]; then
-    echo -e "  ${BOLD}RADIUS credentials (save these — they are not stored elsewhere):${NC}"
-    echo "    DB user:    radius / $RADIUS_DB_PASSWORD"
-    echo
-    echo "  RADIUS commands:"
-    echo "    Start:    docker compose -f docker-compose.${APP_ENV}.yml up -d freeradius"
-    echo "    Stop:     docker compose -f docker-compose.${APP_ENV}.yml stop freeradius"
-    echo "    Restart:  docker compose -f docker-compose.${APP_ENV}.yml restart freeradius"
-    echo "    Logs:     docker compose -f docker-compose.${APP_ENV}.yml logs -f freeradius"
-    echo "  Manage RADIUS clients at:  ${BASE_URL}/settings/radius-clients"
     echo
 fi
 
