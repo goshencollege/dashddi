@@ -36,6 +36,7 @@
                         <th>Name</th>
                         <th>Owner</th>
                         <th>Allowed Endpoints</th>
+                        <th>Allowed IPs</th>
                         <th>Expires</th>
                         <th>Last Used</th>
                         <th>Created</th>
@@ -56,6 +57,15 @@
                                 {% for route in token.allowedRoutes %}
                                     <code class="d-block small">{{ route }}</code>
                                 {% endfor %}
+                            </td>
+                            <td class="text-muted small">
+                                {% if token.allowedCidrs is empty %}
+                                    <span class="text-muted">Any</span>
+                                {% else %}
+                                    {% for cidr in token.allowedCidrs %}
+                                        <code class="d-block">{{ cidr }}</code>
+                                    {% endfor %}
+                                {% endif %}
                             </td>
                             <td class="text-muted small">
                                 {{ token.expiresAt ? token.expiresAt|date('Y-m-d') : '—' }}

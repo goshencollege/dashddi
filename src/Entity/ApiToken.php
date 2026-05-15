@@ -30,6 +30,15 @@ class ApiToken
     #[Assert\Count(min: 1, minMessage: 'Select at least one endpoint.')]
     private array $allowedRoutes = [];
 
+    #[ORM\Column(type: 'json')]
+    #[Assert\All([
+        new Assert\Regex(
+            pattern: '/^(\d{1,3}\.){3}\d{1,3}(\/\d{1,2})?$|^[0-9a-fA-F:]+:+[0-9a-fA-F]*(\/\d{1,3})?$/',
+            message: 'Each entry must be a valid IPv4 address, CIDR range (e.g. 10.0.0.0/8), or IPv6 address/range.',
+        ),
+    ])]
+    private array $allowedCidrs = [];
+
     #[ORM\Column(nullable: true)]
     private ?\DateTimeImmutable $expiresAt = null;
 
@@ -58,6 +67,9 @@ class ApiToken
     public function getAllowedRoutes(): array { return $this->allowedRoutes; }
     public function setAllowedRoutes(array $routes): static { $this->allowedRoutes = $routes; return $this; }
 
+    public function getAllowedCidrs(): array { return $this->allowedCidrs; }
+    public function setAllowedCidrs(array $cidrs): static { $this->allowedCidrs = $cidrs; return $this; }
+
     public function getExpiresAt(): ?\DateTimeImmutable { return $this->expiresAt; }
     public function setExpiresAt(?\DateTimeImmutable $dt): static { $this->expiresAt = $dt; return $this; }
 
@@ -74,5 +86,52 @@ class ApiToken
     public function isAllowedOnRoute(string $route): bool
     {
         return in_array($route, $this->allowedRoutes, true);
+    }
+
+    public function isAllowedFromIp(string $ip): bool
+    {
+        if (empty($this->allowedCidrs)) {
+            return true;
+        }
+
+        foreach ($this->allowedCidrs as $cidr) {
+            if ($this->ipMatchesCidr($ip, $cidr)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function ipMatchesCidr(string $ip, string $cidr): bool
+    {
+        if (!str_contains($cidr, '/')) {
+            return $ip === $cidr;
+        }
+
+        [$subnet, $prefixLen] = explode('/', $cidr, 2);
+        $bits = (int) $prefixLen;
+
+        if (str_contains($ip, ':')) {
+            $ipBin     = inet_pton($ip);
+            $subnetBin = inet_pton($subnet);
+            if ($ipBin === false || $subnetBin === false) {
+                return false;
+            }
+            $fullBytes  = intdiv($bits, 8);
+            $remainder  = $bits % 8;
+            $mask       = str_repeat("\xff", $fullBytes)
+                        . ($remainder ? chr(0xff << (8 - $remainder)) : '')
+                        . str_repeat("\x00", 16 - $fullBytes - ($remainder ? 1 : 0));
+            return ($ipBin & $mask) === ($subnetBin & $mask);
+        }
+
+        $ipLong     = ip2long($ip);
+        $subnetLong = ip2long($subnet);
+        if ($ipLong === false || $subnetLong === false) {
+            return false;
+        }
+        $mask = $bits === 0 ? 0 : (int) (~0 << (32 - $bits));
+        return ($ipLong & $mask) === ($subnetLong & $mask);
     }
 }
