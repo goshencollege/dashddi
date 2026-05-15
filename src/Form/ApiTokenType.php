@@ -48,7 +48,7 @@ class ApiTokenType extends AbstractType
 
         $builder->get('allowedCidrs')->addModelTransformer(new CallbackTransformer(
             fn(array $cidrs) => implode("\n", $cidrs),
-            fn(string $text) => array_values(array_filter(array_map('trim', explode("\n", $text)))),
+            fn(?string $text) => array_values(array_filter(array_map('trim', explode("\n", $text ?? '')))),
         ));
     }
 
