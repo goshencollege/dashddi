@@ -3,6 +3,7 @@
 namespace App\EventSubscriber;
 
 use App\Entity\BackupSetting;
+use App\Entity\ClearpassServer;
 use App\Entity\DhcpServer;
 use App\Entity\DnsServer;
 use App\Entity\RadiusClient;
@@ -25,11 +26,12 @@ class EncryptedFieldSubscriber
 {
     // entity class => list of property names to encrypt
     private const FIELDS = [
-        BackupSetting::class => ['backupPassword'],
-        DhcpServer::class    => ['sshPrivateKey', 'controlPassword'],
-        DnsServer::class     => ['sshPrivateKey'],
-        RadiusClient::class  => ['secret'],
-        RadiusServer::class  => ['sshPrivateKey'],
+        BackupSetting::class    => ['backupPassword'],
+        ClearpassServer::class  => ['clientSecret'],
+        DhcpServer::class       => ['sshPrivateKey', 'controlPassword'],
+        DnsServer::class        => ['sshPrivateKey'],
+        RadiusClient::class     => ['secret'],
+        RadiusServer::class     => ['sshPrivateKey'],
     ];
 
     public function __construct(private readonly EncryptionService $encryption) {}
