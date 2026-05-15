@@ -28,9 +28,14 @@ final class PushClearpassMessageHandler
         $startedAt = new \DateTimeImmutable();
 
         try {
-            $result  = $this->deployer->deployToServer($server);
-            $success = $result['success'];
-            $error   = null;
+            if ($message->mac !== null) {
+                $result  = $this->deployer->pushSingleInterface($server, $message->mac);
+                $success = $result['success'];
+            } else {
+                $result  = $this->deployer->deployToServer($server);
+                $success = $result['success'];
+            }
+            $error = null;
         } catch (\Throwable $e) {
             $result  = [];
             $success = false;

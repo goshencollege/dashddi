@@ -20,12 +20,24 @@ class ClearpassDeployService
     {
         $mac   = $this->normaliseMac($mac);
         $iface = $this->interfaceRepo->findOneBy(['macAddress' => $mac]);
+        $token = $this->getAccessToken($server);
 
         if ($iface === null) {
-            throw new \RuntimeException('No interface found with MAC ' . $mac);
+            // Interface was deleted — remove from ClearPass if we manage it
+            $get = $this->request($server, $token, 'GET', '/api/endpoint/mac-address/' . rawurlencode($mac), null);
+            if (!$get['success']) {
+                // Already gone or never existed — treat as success
+                return ['success' => true, 'action' => 'deleted', 'mac' => $mac, 'error' => '', 'response' => ''];
+            }
+            $data   = json_decode($get['body'], true);
+            $attrs  = $data['attributes'] ?? [];
+            if (($attrs[self::MANAGED_BY_KEY] ?? '') !== self::MANAGED_BY_VALUE) {
+                return ['success' => true, 'action' => 'skipped', 'mac' => $mac, 'error' => '', 'response' => ''];
+            }
+            $del = $this->request($server, $token, 'DELETE', '/api/endpoint/' . $data['id'], null);
+            return ['success' => $del['success'], 'action' => 'deleted', 'mac' => $mac, 'error' => $del['error'], 'response' => $del['body']];
         }
 
-        $token   = $this->getAccessToken($server);
         $payload = $this->buildEndpointPayload($iface);
         $macPath = '/api/endpoint/mac-address/' . rawurlencode($mac);
 

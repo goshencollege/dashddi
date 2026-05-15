@@ -23,7 +23,8 @@ class EntityPushListener
 {
     /** @var array<int, true> Keyed by server ID for deduplication */
     private array $pendingDnsIds = [];
-    private bool $pendingAllClearpass = false;
+    /** @var array<string, true> Keyed by MAC for deduplication */
+    private array $pendingClearpassMacs = [];
     private bool $pendingAllDhcp = false;
     private bool $pendingAllRadius = false;
 
@@ -49,14 +50,14 @@ class EntityPushListener
 
     public function postFlush(PostFlushEventArgs $args): void
     {
-        $dnsIds       = $this->pendingDnsIds;
-        $allClearpass = $this->pendingAllClearpass;
-        $allDhcp      = $this->pendingAllDhcp;
-        $allRadius    = $this->pendingAllRadius;
+        $dnsIds        = $this->pendingDnsIds;
+        $clearpassMacs = $this->pendingClearpassMacs;
+        $allDhcp       = $this->pendingAllDhcp;
+        $allRadius     = $this->pendingAllRadius;
 
         // Reset before dispatching to avoid double-dispatch if flush triggers another flush
         $this->pendingDnsIds        = [];
-        $this->pendingAllClearpass  = false;
+        $this->pendingClearpassMacs = [];
         $this->pendingAllDhcp       = false;
         $this->pendingAllRadius     = false;
 
@@ -64,9 +65,11 @@ class EntityPushListener
             $this->bus->dispatch(new PushDnsMessage($id));
         }
 
-        if ($allClearpass) {
-            foreach ($this->scope->allClearpassServerIds() as $id) {
-                $this->bus->dispatch(new PushClearpassMessage($id));
+        if (!empty($clearpassMacs)) {
+            foreach ($this->scope->allClearpassServerIds() as $serverId) {
+                foreach (array_keys($clearpassMacs) as $mac) {
+                    $this->bus->dispatch(new PushClearpassMessage($serverId, $mac));
+                }
             }
         }
 
@@ -89,8 +92,8 @@ class EntityPushListener
             $this->pendingDnsIds[$id] = true;
         }
 
-        if ($this->scope->affectsClearpass($entity)) {
-            $this->pendingAllClearpass = true;
+        foreach ($this->scope->clearpassMacsFor($entity) as $mac) {
+            $this->pendingClearpassMacs[$mac] = true;
         }
 
         if ($this->scope->affectsDhcp($entity)) {

@@ -2,6 +2,8 @@
 
 namespace App\Repository;
 
+use App\Entity\IpAddress;
+use App\Entity\Ipv6Address;
 use App\Entity\NetworkInterface;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
@@ -34,6 +36,32 @@ class NetworkInterfaceRepository extends ServiceEntityRepository
             ->orderBy('ni.macAddress', 'ASC')
             ->getQuery()
             ->getResult();
+    }
+
+    public function findMacByIpAddress(IpAddress $ip): ?string
+    {
+        $result = $this->createQueryBuilder('ni')
+            ->select('ni.macAddress')
+            ->where('ni.ipAddress = :ip')
+            ->setParameter('ip', $ip)
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        return $result ? $result['macAddress'] : null;
+    }
+
+    public function findMacByIpv6Address(Ipv6Address $ip): ?string
+    {
+        $result = $this->createQueryBuilder('ni')
+            ->select('ni.macAddress')
+            ->where('ni.ipv6Address = :ip')
+            ->setParameter('ip', $ip)
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        return $result ? $result['macAddress'] : null;
     }
 
     /**

@@ -13,15 +13,17 @@ use App\Entity\RadiusClient;
 use App\Repository\ClearpassServerRepository;
 use App\Repository\DhcpServerRepository;
 use App\Repository\DnsServerRepository;
+use App\Repository\NetworkInterfaceRepository;
 use App\Repository\RadiusServerRepository;
 
 class PushScopeService
 {
     public function __construct(
-        private readonly ClearpassServerRepository $clearpassRepo,
-        private readonly DnsServerRepository       $dnsRepo,
-        private readonly DhcpServerRepository      $dhcpRepo,
-        private readonly RadiusServerRepository    $radiusRepo,
+        private readonly ClearpassServerRepository  $clearpassRepo,
+        private readonly DnsServerRepository        $dnsRepo,
+        private readonly DhcpServerRepository       $dhcpRepo,
+        private readonly RadiusServerRepository     $radiusRepo,
+        private readonly NetworkInterfaceRepository $ifaceRepo,
     ) {}
 
     /** @return int[] DNS server IDs whose zones are affected by this entity change */
@@ -49,11 +51,30 @@ class PushScopeService
         return $this->dhcpRepo->findAllIds();
     }
 
-    public function affectsClearpass(object $entity): bool
+    /**
+     * Returns the MAC addresses affected by a change to this entity for ClearPass.
+     * Returns an empty array if the entity doesn't affect ClearPass endpoints.
+     *
+     * @return string[]
+     */
+    public function clearpassMacsFor(object $entity): array
     {
-        return $entity instanceof NetworkInterface
-            || $entity instanceof IpAddress
-            || $entity instanceof Ipv6Address;
+        if ($entity instanceof NetworkInterface) {
+            $mac = $entity->getMacAddress();
+            return ($mac !== '' && $mac !== '00:00:00:00:00:00') ? [$mac] : [];
+        }
+
+        if ($entity instanceof IpAddress) {
+            $mac = $this->ifaceRepo->findMacByIpAddress($entity);
+            return $mac !== null ? [$mac] : [];
+        }
+
+        if ($entity instanceof Ipv6Address) {
+            $mac = $this->ifaceRepo->findMacByIpv6Address($entity);
+            return $mac !== null ? [$mac] : [];
+        }
+
+        return [];
     }
 
     /** @return int[] */
