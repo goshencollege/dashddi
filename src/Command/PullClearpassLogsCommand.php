@@ -27,6 +27,7 @@ class PullClearpassLogsCommand extends Command
     protected function configure(): void
     {
         $this->addOption('debug', null, InputOption::VALUE_NONE, 'Dump the first raw session record and exit (useful for inspecting field names)');
+        $this->addOption('mac', null, InputOption::VALUE_REQUIRED, 'Filter debug output to sessions matching this MAC address');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -41,9 +42,10 @@ class PullClearpassLogsCommand extends Command
 
         if ($input->getOption('debug')) {
             $server = $servers[0];
-            $io->section('Probing API endpoints on: ' . $server->getName());
+            $mac    = (string) ($input->getOption('mac') ?? '');
+            $io->section('Probing API endpoints on: ' . $server->getName() . ($mac !== '' ? ' (mac: ' . $mac . ')' : ''));
             try {
-                $probes = $this->logService->probeEndpoints($server);
+                $probes = $this->logService->probeEndpoints($server, $mac);
                 foreach ($probes as $path => $result) {
                     $io->writeln('<comment>' . $path . '</comment>');
                     $io->writeln(is_string($result)

@@ -125,6 +125,9 @@
                     <th>Status</th>
                     <th>Username</th>
                     <th>Protocol</th>
+                    <th>Service</th>
+                    <th>NAS IP</th>
+                    <th>NAS Port ID</th>
                     <th>Role</th>
                     <th>VLAN</th>
                     <th>Timestamp</th>
@@ -146,6 +149,9 @@
                         </td>
                         <td>{{ log.username ?: '—' }}</td>
                         <td>{{ log.authProtocol ?: '—' }}</td>
+                        <td>{{ log.service ?: '—' }}</td>
+                        <td>{{ log.nasIp ?: '—' }}</td>
+                        <td>{{ log.nasPortId ?: '—' }}</td>
                         <td>{{ log.role ?: '—' }}</td>
                         <td>{{ log.vlan ?: '—' }}</td>
                         <td class="text-nowrap">{{ log.authTimestamp|date('Y-m-d H:i') }}</td>

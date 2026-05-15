@@ -23,6 +23,8 @@ class ClearpassAuthLogRepository extends ServiceEntityRepository
         string $vlan,
         string $protocol,
         string $service,
+        string $nasIp,
+        string $nasPortId,
         int $page,
         int $perPage = 50,
     ): Paginator {
@@ -58,6 +60,14 @@ class ClearpassAuthLogRepository extends ServiceEntityRepository
         if ($service !== '') {
             $qb->andWhere('l.service = :service')
                ->setParameter('service', $service);
+        }
+        if ($nasIp !== '') {
+            $qb->andWhere('l.nasIp LIKE :nasIp')
+               ->setParameter('nasIp', '%' . $nasIp . '%');
+        }
+        if ($nasPortId !== '') {
+            $qb->andWhere('l.nasPortId LIKE :nasPortId')
+               ->setParameter('nasPortId', '%' . $nasPortId . '%');
         }
 
         $qb->setFirstResult(($page - 1) * $perPage)
