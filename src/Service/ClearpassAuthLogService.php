@@ -19,22 +19,50 @@ class ClearpassAuthLogService
     ) {}
 
     /**
-     * Pulls authentication sessions from ClearPass with IDs greater than the
-     * largest ID already stored. On first run, fetches all sessions.
+     * Probes candidate API paths and returns a map of path => first record (or error string).
+     * Used by the --debug command to discover which Insight endpoint is available.
+     *
+     * @return array<string, array|string>
+     */
+    public function probeEndpoints(ClearpassServer $server): array
+    {
+        $token = $this->getAccessToken($server);
+
+        $candidates = [
+            '/api/v1/session',
+        ];
+
+        $results = [];
+        foreach ($candidates as $path) {
+            $result = $this->request($server, $token, 'GET', $path . '?limit=1', null);
+            if (!$result['success']) {
+                $results[$path] = 'HTTP ' . $result['status'] . ': ' . substr($result['error'], 0, 120);
+            } else {
+                $data = json_decode($result['body'], true);
+                $results[$path] = $data['_embedded']['items'][0] ?? $data;
+            }
+        }
+
+        return $results;
+    }
+
+    /**
+     * Pulls authentication sessions from ClearPass with acctstarttime greater than
+     * the latest record already stored. On first run, fetches all sessions.
      *
      * @return array{imported: int, errors: string[]}
      */
     public function pullFromServer(ClearpassServer $server): array
     {
-        $token    = $this->getAccessToken($server);
-        $imported = 0;
-        $errors   = [];
-        $offset   = 0;
-        $maxId    = $this->logRepo->findMaxSessionId($server);
+        $token     = $this->getAccessToken($server);
+        $imported  = 0;
+        $errors    = [];
+        $offset    = 0;
+        $latestTs  = $this->logRepo->findLatestAuthTimestamp($server);
 
-        $params = ['sort' => '+id', 'limit' => self::PAGE_SIZE];
-        if ($maxId !== null) {
-            $params['filter'] = json_encode(['id' => ['$gt' => (int) $maxId]]);
+        $params = ['sort' => '+acctstarttime', 'limit' => self::PAGE_SIZE];
+        if ($latestTs !== null) {
+            $params['filter'] = json_encode(['acctstarttime' => ['$gt' => (string) $latestTs->getTimestamp()]]);
         }
 
         do {
@@ -51,17 +79,17 @@ class ClearpassAuthLogService
 
             foreach ($items as $item) {
                 $sessionId = (string) ($item['id'] ?? '');
-                $macRaw    = (string) ($item['mac_address'] ?? '');
+                $macRaw    = (string) ($item['mac_address'] ?? $item['callingstationid'] ?? '');
                 $mac       = $this->normaliseMac($macRaw);
 
                 if ($sessionId === '' || $mac === '') {
                     continue;
                 }
 
-                $startTime = $item['start_time'] ?? $item['timestamp'] ?? $item['login_time'] ?? null;
+                $acctStart = $item['acctstarttime'] ?? null;
                 try {
-                    $authTs = $startTime !== null
-                        ? new \DateTimeImmutable($startTime)
+                    $authTs = $acctStart !== null
+                        ? (new \DateTimeImmutable())->setTimestamp((int) $acctStart)
                         : new \DateTimeImmutable();
                 } catch (\Throwable) {
                     $authTs = new \DateTimeImmutable();
@@ -69,12 +97,14 @@ class ClearpassAuthLogService
 
                 $log = new ClearpassAuthLog($sessionId, $mac, $authTs);
                 $log->setClearpassServer($server);
-                $log->setIpAddress($item['ip_address'] ?? null ?: null);
+                $log->setIpAddress($item['framedipaddress'] ?? $item['ip_address'] ?? null ?: null);
                 $log->setUsername($item['username'] ?? null ?: null);
-                $log->setService($item['service'] ?? $item['service_name'] ?? null ?: null);
-                $log->setAuthStatus($item['auth_status'] ?? null ?: null);
-                $log->setAuthProtocol($item['protocol_name'] ?? $item['auth_protocol'] ?? null ?: null);
-                $log->setNasIp($item['network_device_ip'] ?? $item['nas_ip_address'] ?? null ?: null);
+                $log->setService($item['servicetype'] ?? $item['service_name'] ?? null ?: null);
+                $log->setAuthStatus($item['state'] ?? null ?: null);
+                $log->setAuthProtocol($item['nasporttype'] ?? null ?: null);
+                $log->setNasIp($item['nasipaddress'] ?? $item['nas_ip_address'] ?? null ?: null);
+                $log->setRole($item['arubauserrole'] ?? null ?: null);
+                $log->setVlan($item['arubauservlan'] ?? null ?: null);
                 $log->setNetworkInterface($this->ifaceRepo->findOneBy(['macAddress' => $mac]));
 
                 $this->em->persist($log);

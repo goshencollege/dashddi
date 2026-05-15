@@ -7,6 +7,7 @@ use App\Service\ClearpassAuthLogService;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
@@ -23,6 +24,11 @@ class PullClearpassLogsCommand extends Command
         parent::__construct();
     }
 
+    protected function configure(): void
+    {
+        $this->addOption('debug', null, InputOption::VALUE_NONE, 'Dump the first raw session record and exit (useful for inspecting field names)');
+    }
+
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io      = new SymfonyStyle($input, $output);
@@ -30,6 +36,25 @@ class PullClearpassLogsCommand extends Command
 
         if (empty($servers)) {
             $io->note('No ClearPass servers configured — skipping.');
+            return Command::SUCCESS;
+        }
+
+        if ($input->getOption('debug')) {
+            $server = $servers[0];
+            $io->section('Probing API endpoints on: ' . $server->getName());
+            try {
+                $probes = $this->logService->probeEndpoints($server);
+                foreach ($probes as $path => $result) {
+                    $io->writeln('<comment>' . $path . '</comment>');
+                    $io->writeln(is_string($result)
+                        ? '  <error>' . $result . '</error>'
+                        : json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+                    $io->newLine();
+                }
+            } catch (\Throwable $e) {
+                $io->error($e->getMessage());
+                return Command::FAILURE;
+            }
             return Command::SUCCESS;
         }
 

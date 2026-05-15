@@ -18,8 +18,11 @@ class ClearpassAuthLogRepository extends ServiceEntityRepository
     public function search(
         string $mac,
         string $username,
-        ?ClearpassServer $server,
-        ?string $status,
+        string $status,
+        string $role,
+        string $vlan,
+        string $protocol,
+        string $service,
         int $page,
         int $perPage = 50,
     ): Paginator {
@@ -36,13 +39,25 @@ class ClearpassAuthLogRepository extends ServiceEntityRepository
             $qb->andWhere('l.username LIKE :username')
                ->setParameter('username', '%' . $username . '%');
         }
-        if ($server !== null) {
-            $qb->andWhere('l.clearpassServer = :server')
-               ->setParameter('server', $server);
-        }
         if ($status !== '') {
             $qb->andWhere('l.authStatus = :status')
                ->setParameter('status', $status);
+        }
+        if ($role !== '') {
+            $qb->andWhere('l.role = :role')
+               ->setParameter('role', $role);
+        }
+        if ($vlan !== '') {
+            $qb->andWhere('l.vlan = :vlan')
+               ->setParameter('vlan', $vlan);
+        }
+        if ($protocol !== '') {
+            $qb->andWhere('l.authProtocol = :protocol')
+               ->setParameter('protocol', $protocol);
+        }
+        if ($service !== '') {
+            $qb->andWhere('l.service = :service')
+               ->setParameter('service', $service);
         }
 
         $qb->setFirstResult(($page - 1) * $perPage)
@@ -88,15 +103,17 @@ class ClearpassAuthLogRepository extends ServiceEntityRepository
         return $map;
     }
 
-    /** Returns the largest session ID stored for the given server, or null if none. */
-    public function findMaxSessionId(ClearpassServer $server): ?string
+    /** Returns the most recent authTimestamp stored for the given server, or null if none. */
+    public function findLatestAuthTimestamp(ClearpassServer $server): ?\DateTimeImmutable
     {
-        return $this->createQueryBuilder('l')
-            ->select('MAX(l.sessionId)')
+        $result = $this->createQueryBuilder('l')
+            ->select('MAX(l.authTimestamp)')
             ->where('l.clearpassServer = :server')
             ->setParameter('server', $server)
             ->getQuery()
             ->getSingleScalarResult();
+
+        return $result !== null ? new \DateTimeImmutable($result) : null;
     }
 
     public function purgeOlderThan(\DateTimeImmutable $cutoff): int
@@ -120,5 +137,53 @@ class ClearpassAuthLogRepository extends ServiceEntityRepository
             ->getScalarResult();
 
         return array_column($rows, 'authStatus');
+    }
+
+    public function findDistinctRoles(): array
+    {
+        $rows = $this->createQueryBuilder('l')
+            ->select('DISTINCT l.role')
+            ->where('l.role IS NOT NULL')
+            ->orderBy('l.role', 'ASC')
+            ->getQuery()
+            ->getScalarResult();
+
+        return array_column($rows, 'role');
+    }
+
+    public function findDistinctVlans(): array
+    {
+        $rows = $this->createQueryBuilder('l')
+            ->select('DISTINCT l.vlan')
+            ->where('l.vlan IS NOT NULL')
+            ->orderBy('l.vlan', 'ASC')
+            ->getQuery()
+            ->getScalarResult();
+
+        return array_column($rows, 'vlan');
+    }
+
+    public function findDistinctServices(): array
+    {
+        $rows = $this->createQueryBuilder('l')
+            ->select('DISTINCT l.service')
+            ->where('l.service IS NOT NULL')
+            ->orderBy('l.service', 'ASC')
+            ->getQuery()
+            ->getScalarResult();
+
+        return array_column($rows, 'service');
+    }
+
+    public function findDistinctProtocols(): array
+    {
+        $rows = $this->createQueryBuilder('l')
+            ->select('DISTINCT l.authProtocol')
+            ->where('l.authProtocol IS NOT NULL')
+            ->orderBy('l.authProtocol', 'ASC')
+            ->getQuery()
+            ->getScalarResult();
+
+        return array_column($rows, 'authProtocol');
     }
 }
