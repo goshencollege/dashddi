@@ -58,3 +58,10 @@ radius_clients:
     shortname: "switch-01"
     secret: "change-me"
     enabled: true
+
+clearpass_servers:
+  - name: "ClearPass"
+    api_url: "https://clearpass.example.com"
+    client_id: "DashDDI"
+    client_secret: "enc:base64encodedencryptedvalue"   # use the UI to set the real secret; copy the enc:... value from the DB
+    verify_tls: true
