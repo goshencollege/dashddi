@@ -31,6 +31,14 @@ class ClearpassServerController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
+            if (!$server->getClientSecret()) {
+                $this->addFlash('error', 'OAuth client secret is required.');
+                return $this->render('clearpass_server/form.html.twig', [
+                    'form'   => $form,
+                    'server' => $server,
+                    'title'  => 'Add ClearPass Server',
+                ]);
+            }
             $em->persist($server);
             $em->flush();
             $this->addFlash('success', 'ClearPass server "' . $server->getName() . '" added.');
