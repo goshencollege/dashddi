@@ -24,12 +24,20 @@ class ApiTokenAuthenticator extends AbstractAuthenticator
 
     public function supports(Request $request): ?bool
     {
-        return str_starts_with($request->headers->get('Authorization', ''), 'Bearer ');
+        $auth = $request->headers->get('Authorization', '');
+        return str_starts_with($auth, 'Bearer ') || str_starts_with($auth, 'Basic ');
     }
 
     public function authenticate(Request $request): Passport
     {
-        $raw = substr($request->headers->get('Authorization', ''), 7);
+        $auth = $request->headers->get('Authorization', '');
+
+        if (str_starts_with($auth, 'Basic ')) {
+            $decoded = base64_decode(substr($auth, 6), strict: true);
+            $raw = $decoded !== false ? (explode(':', $decoded, 2)[1] ?? '') : '';
+        } else {
+            $raw = substr($auth, 7);
+        }
 
         if ($raw === '') {
             throw new CustomUserMessageAuthenticationException('No token provided.');
