@@ -19,28 +19,26 @@ class ClearpassAuthLogService
     ) {}
 
     /**
-     * Pulls authentication sessions from the given ClearPass server that started
-     * on or after $since, persists new records, and returns counts.
+     * Pulls authentication sessions from ClearPass with IDs greater than the
+     * largest ID already stored. On first run, fetches all sessions.
      *
-     * @return array{imported: int, skipped: int, errors: string[]}
+     * @return array{imported: int, errors: string[]}
      */
-    public function pullFromServer(ClearpassServer $server, \DateTimeImmutable $since): array
+    public function pullFromServer(ClearpassServer $server): array
     {
         $token    = $this->getAccessToken($server);
         $imported = 0;
-        $skipped  = 0;
         $errors   = [];
         $offset   = 0;
+        $maxId    = $this->logRepo->findMaxSessionId($server);
 
-        $filter = json_encode(['start_time' => ['$gte' => $since->format(\DateTimeInterface::ATOM)]]);
+        $params = ['sort' => '+id', 'limit' => self::PAGE_SIZE];
+        if ($maxId !== null) {
+            $params['filter'] = json_encode(['id' => ['$gt' => (int) $maxId]]);
+        }
 
         do {
-            $query  = '?' . http_build_query([
-                'filter' => $filter,
-                'sort'   => '+start_time',
-                'limit'  => self::PAGE_SIZE,
-                'offset' => $offset,
-            ]);
+            $query  = '?' . http_build_query(array_merge($params, ['offset' => $offset]));
             $result = $this->request($server, $token, 'GET', '/api/v1/session' . $query, null);
 
             if (!$result['success']) {
@@ -57,17 +55,10 @@ class ClearpassAuthLogService
                 $mac       = $this->normaliseMac($macRaw);
 
                 if ($sessionId === '' || $mac === '') {
-                    $skipped++;
                     continue;
                 }
 
-                // Skip if already imported
-                if ($this->logRepo->findOneBy(['clearpassServer' => $server, 'sessionId' => $sessionId]) !== null) {
-                    $skipped++;
-                    continue;
-                }
-
-                $startTime = $item['start_time'] ?? null;
+                $startTime = $item['start_time'] ?? $item['timestamp'] ?? $item['login_time'] ?? null;
                 try {
                     $authTs = $startTime !== null
                         ? new \DateTimeImmutable($startTime)
@@ -100,7 +91,7 @@ class ClearpassAuthLogService
             $offset += count($items);
         } while (count($items) === self::PAGE_SIZE && $offset < $total);
 
-        return ['imported' => $imported, 'skipped' => $skipped, 'errors' => $errors];
+        return ['imported' => $imported, 'errors' => $errors];
     }
 
     private function getAccessToken(ClearpassServer $server): string
