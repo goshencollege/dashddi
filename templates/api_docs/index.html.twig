@@ -302,7 +302,7 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
                     {name: 'subnet_id', type: 'integer', desc: 'Filter by subnet ID.'},
                     {name: 'mac_address', type: 'string', desc: 'Exact MAC address match.'},
                 ],
-                response_example: '[\n  {\n    "id": 1,\n    "name": "eth0",\n    "mac_address": "aa:bb:cc:dd:ee:ff",\n    "host_id": 1,\n    "subnet_id": 2,\n    "ip_address": "10.0.0.5",\n    "ipv6_address": null,\n    "created_at": "2024-01-01T00:00:00+00:00",\n    "updated_at": "2024-01-01T00:00:00+00:00",\n    "created_by": "user@example.com",\n    "updated_by": "user@example.com"\n  }\n]',
+                response_example: '[\n  {\n    "id": 1,\n    "name": "eth0",\n    "mac_address": "aa:bb:cc:dd:ee:ff",\n    "host_id": 1,\n    "host_name": "server01",\n    "subnet_id": 2,\n    "ip_address": "10.0.0.5",\n    "ipv6_address": null,\n    "canonical_name": "server01.example.com",\n    "created_at": "2024-01-01T00:00:00+00:00",\n    "updated_at": "2024-01-01T00:00:00+00:00",\n    "created_by": "user@example.com",\n    "updated_by": "user@example.com"\n  }\n]',
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
