@@ -86,6 +86,10 @@ class ClearpassAuthLogService
                     continue;
                 }
 
+                if ($this->logRepo->findOneBy(['clearpassServer' => $server, 'sessionId' => $sessionId]) !== null) {
+                    continue;
+                }
+
                 $acctStart = $item['acctstarttime'] ?? null;
                 try {
                     $authTs = $acctStart !== null
