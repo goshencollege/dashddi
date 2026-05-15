@@ -66,14 +66,14 @@
                         <span class="badge bg-secondary">Never run</span>
                     {% endif %}
                 </td>
-                <td class="text-muted small">
+                <td class="text-muted small text-nowrap">
                     {% if task.lastRunAt %}
                         {{ task.lastRunAt|date('Y-m-d H:i:s') }}
                     {% else %}
                         —
                     {% endif %}
                 </td>
-                <td class="text-muted small">
+                <td class="text-muted small text-nowrap">
                     {% if task.enabled and nextRun[task.id] %}
                         {{ nextRun[task.id]|date('Y-m-d H:i') }}
                     {% else %}
