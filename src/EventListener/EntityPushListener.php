@@ -2,8 +2,9 @@
 
 namespace App\EventListener;
 
-use App\Message\PushDnsMessage;
+use App\Message\PushClearpassMessage;
 use App\Message\PushDhcpMessage;
+use App\Message\PushDnsMessage;
 use App\Message\PushRadiusMessage;
 use App\Service\PushScopeService;
 use Doctrine\Bundle\DoctrineBundle\Attribute\AsDoctrineListener;
@@ -22,6 +23,8 @@ class EntityPushListener
 {
     /** @var array<int, true> Keyed by server ID for deduplication */
     private array $pendingDnsIds = [];
+    /** @var array<string, true> Keyed by MAC for deduplication */
+    private array $pendingClearpassMacs = [];
     private bool $pendingAllDhcp = false;
     private bool $pendingAllRadius = false;
 
@@ -47,17 +50,27 @@ class EntityPushListener
 
     public function postFlush(PostFlushEventArgs $args): void
     {
-        $dnsIds    = $this->pendingDnsIds;
-        $allDhcp   = $this->pendingAllDhcp;
-        $allRadius = $this->pendingAllRadius;
+        $dnsIds        = $this->pendingDnsIds;
+        $clearpassMacs = $this->pendingClearpassMacs;
+        $allDhcp       = $this->pendingAllDhcp;
+        $allRadius     = $this->pendingAllRadius;
 
         // Reset before dispatching to avoid double-dispatch if flush triggers another flush
-        $this->pendingDnsIds     = [];
-        $this->pendingAllDhcp    = false;
-        $this->pendingAllRadius  = false;
+        $this->pendingDnsIds        = [];
+        $this->pendingClearpassMacs = [];
+        $this->pendingAllDhcp       = false;
+        $this->pendingAllRadius     = false;
 
         foreach (array_keys($dnsIds) as $id) {
             $this->bus->dispatch(new PushDnsMessage($id));
+        }
+
+        if (!empty($clearpassMacs)) {
+            foreach ($this->scope->allClearpassServerIds() as $serverId) {
+                foreach (array_keys($clearpassMacs) as $mac) {
+                    $this->bus->dispatch(new PushClearpassMessage($serverId, $mac));
+                }
+            }
         }
 
         if ($allDhcp) {
@@ -77,6 +90,10 @@ class EntityPushListener
     {
         foreach ($this->scope->dnsServerIdsFor($entity) as $id) {
             $this->pendingDnsIds[$id] = true;
+        }
+
+        foreach ($this->scope->clearpassMacsFor($entity) as $mac) {
+            $this->pendingClearpassMacs[$mac] = true;
         }
 
         if ($this->scope->affectsDhcp($entity)) {

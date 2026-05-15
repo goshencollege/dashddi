@@ -4,6 +4,7 @@ namespace App\Enum;
 
 enum SchedulableTask: string
 {
+    case PushClearpass  = 'push_clearpass';
     case PushDns        = 'push_dns';
     case PushDhcp       = 'push_dhcp';
     case PushRadius     = 'push_radius';
@@ -14,6 +15,7 @@ enum SchedulableTask: string
     public function label(): string
     {
         return match($this) {
+            self::PushClearpass  => 'Push ClearPass Endpoints',
             self::PushDns        => 'Push DNS Configs',
             self::PushDhcp       => 'Push DHCP Configs',
             self::PushRadius     => 'Push RADIUS Configs',
@@ -26,6 +28,7 @@ enum SchedulableTask: string
     public function description(): string
     {
         return match($this) {
+            self::PushClearpass  => 'Syncs interface data to the endpoint repository on all configured ClearPass servers. Creates, updates, and removes only endpoints managed by DashDDI.',
             self::PushDns        => 'Generates BIND zone files and views.conf, then deploys them to all configured DNS servers.',
             self::PushDhcp       => 'Generates DHCP subnet configuration and deploys it to all configured DHCP servers.',
             self::PushRadius     => 'Generates FreeRADIUS clients.conf from RADIUS client data and deploys it to all configured RADIUS servers.',
@@ -39,6 +42,7 @@ enum SchedulableTask: string
     public function consoleCommand(): string
     {
         return match($this) {
+            self::PushClearpass  => 'app:push-clearpass',
             self::PushDns        => 'app:generate-dns-config --deploy',
             self::PushDhcp       => 'app:generate-dhcp-config --reload',
             self::PushRadius     => 'app:generate-radius-config',
@@ -51,6 +55,7 @@ enum SchedulableTask: string
     public function defaultCron(): string
     {
         return match($this) {
+            self::PushClearpass  => '0 2 * * *',
             self::PushDns        => '0 2 * * *',
             self::PushDhcp       => '0 2 * * *',
             self::PushRadius     => '0 2 * * *',

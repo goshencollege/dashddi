@@ -58,6 +58,8 @@
                                     <span class="badge bg-success">DHCP</span>
                                 {% elseif log.type == 'radius' %}
                                     <span class="badge bg-warning text-dark">RADIUS</span>
+                                {% elseif log.type == 'clearpass' %}
+                                    <span class="badge bg-info text-dark">ClearPass</span>
                                 {% else %}
                                     <span class="badge bg-secondary">{{ log.type|upper }}</span>
                                 {% endif %}
@@ -87,6 +89,8 @@
                                     {{ _self.renderDnsResult(log.result) }}
                                 {% elseif log.type == 'radius' %}
                                     {{ _self.renderRadiusResult(log.result) }}
+                                {% elseif log.type == 'clearpass' %}
+                                    {{ _self.renderClearpassResult(log.result) }}
                                 {% else %}
                                     {{ _self.renderDhcpResult(log.result) }}
                                 {% endif %}
@@ -174,6 +178,41 @@
                 {% endif %}
             </div>
         </li>
+    {% endif %}
+</ul>
+{% endmacro %}
+
+{# ── ClearPass result renderer ────────────────────────────────────────────── #}
+{% macro renderClearpassResult(result) %}
+<ul class="zone-list">
+    {% if result is empty %}
+        <li class="text-muted small">No result data.</li>
+    {% elseif result.mac is defined %}
+        {# Single-interface push #}
+        <li class="d-flex align-items-start gap-2">
+            <i class="bi {{ result.success ? 'bi-check-circle-fill text-success' : 'bi-x-circle-fill text-danger' }} mt-1 flex-shrink-0"></i>
+            <div>
+                <span class="badge bg-secondary me-1">{{ result.action ?? 'push' }}</span>
+                <span class="font-monospace small">{{ result.mac }}</span>
+                {% if result.error %}<div class="text-danger small font-monospace mt-1">{{ result.error }}</div>{% endif %}
+            </div>
+        </li>
+    {% else %}
+        {# Full sync #}
+        <li class="d-flex align-items-start gap-2">
+            <i class="bi bi-arrow-repeat text-muted mt-1 flex-shrink-0"></i>
+            <div>
+                <span class="badge bg-success me-1">+{{ result.created ?? 0 }}</span> created
+                <span class="badge bg-primary me-1 ms-2">~{{ result.updated ?? 0 }}</span> updated
+                <span class="badge bg-secondary me-1 ms-2">-{{ result.deleted ?? 0 }}</span> removed
+            </div>
+        </li>
+        {% for err in result.errors ?? [] %}
+            <li class="d-flex align-items-start gap-2">
+                <i class="bi bi-x-circle-fill text-danger mt-1 flex-shrink-0"></i>
+                <div class="text-danger small font-monospace">{{ err }}</div>
+            </li>
+        {% endfor %}
     {% endif %}
 </ul>
 {% endmacro %}
