@@ -32,6 +32,13 @@
     </div>
 
     <div class="mb-3">
+        {{ form_label(form.allowedCidrs, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+        {{ form_widget(form.allowedCidrs, {attr: {class: 'form-control font-monospace'}}) }}
+        {{ form_errors(form.allowedCidrs) }}
+        <div class="form-text">{{ form_help(form.allowedCidrs) }}</div>
+    </div>
+
+    <div class="mb-3">
         {{ form_label(form.expiresAt, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
         {{ form_widget(form.expiresAt, {attr: {class: 'form-control', style: 'max-width:200px'}}) }}
         {{ form_errors(form.expiresAt) }}

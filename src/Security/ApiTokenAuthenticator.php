@@ -68,6 +68,10 @@ class ApiTokenAuthenticator extends AbstractAuthenticator
             return new JsonResponse(['error' => 'Token not permitted for this endpoint.'], Response::HTTP_FORBIDDEN);
         }
 
+        if ($apiToken && !$apiToken->isAllowedFromIp((string) $request->getClientIp())) {
+            return new JsonResponse(['error' => 'Token not permitted from this IP address.'], Response::HTTP_FORBIDDEN);
+        }
+
         if ($apiToken) {
             $apiToken->setLastUsedAt(new \DateTimeImmutable());
             $this->em->flush();
