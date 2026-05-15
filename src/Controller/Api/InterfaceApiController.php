@@ -274,6 +274,7 @@ class InterfaceApiController extends AbstractController
             'host_id'        => $iface->getHost()?->getId(),
             'host_name'      => $iface->getHost()?->getName(),
             'subnet_id'      => $iface->getSubnet()?->getId(),
+            'vlan'           => $iface->getSubnet()?->getVlan(),
             'ip_address'     => $iface->getIpAddress()?->getAddress(),
             'ipv6_address'   => $iface->getIpv6Address()?->getAddress(),
             'canonical_name' => $canonical ? $canonical->getFullyQualifiedName() : null,
