@@ -124,9 +124,9 @@
                 <tr>
                     <th>Status</th>
                     <th>Username</th>
-                    <th>IP Address</th>
                     <th>Protocol</th>
-                    <th>Service</th>
+                    <th>Role</th>
+                    <th>VLAN</th>
                     <th>Timestamp</th>
                 </tr>
             </thead>
@@ -145,9 +145,9 @@
                             {% endif %}
                         </td>
                         <td>{{ log.username ?: '—' }}</td>
-                        <td>{% if log.ipAddress %}<code>{{ log.ipAddress }}</code>{% else %}—{% endif %}</td>
                         <td>{{ log.authProtocol ?: '—' }}</td>
-                        <td>{{ log.service ?: '—' }}</td>
+                        <td>{{ log.role ?: '—' }}</td>
+                        <td>{{ log.vlan ?: '—' }}</td>
                         <td class="text-nowrap">{{ log.authTimestamp|date('Y-m-d H:i') }}</td>
                     </tr>
                 {% endfor %}

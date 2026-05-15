@@ -22,22 +22,47 @@
                        placeholder="e.g. user@domain" value="{{ filter_username }}">
             </div>
             <div class="col-md-2">
-                <label class="form-label small text-muted mb-1">Server</label>
-                <select name="server" class="form-select form-select-sm">
-                    <option value="">— All servers —</option>
-                    {% for s in servers %}
-                        <option value="{{ s.id }}" {{ filter_server == s.id ? 'selected' : '' }}>
-                            {{ s.name }}
-                        </option>
+                <label class="form-label small text-muted mb-1">Status</label>
+                <select name="status" class="form-select form-select-sm">
+                    <option value="">— All —</option>
+                    {% for s in statuses %}
+                        <option value="{{ s }}" {{ filter_status == s ? 'selected' : '' }}>{{ s }}</option>
                     {% endfor %}
                 </select>
             </div>
             <div class="col-md-2">
-                <label class="form-label small text-muted mb-1">Status</label>
-                <select name="status" class="form-select form-select-sm">
-                    <option value="">— All statuses —</option>
-                    {% for s in statuses %}
-                        <option value="{{ s }}" {{ filter_status == s ? 'selected' : '' }}>{{ s }}</option>
+                <label class="form-label small text-muted mb-1">Role</label>
+                <select name="role" class="form-select form-select-sm">
+                    <option value="">— All —</option>
+                    {% for r in roles %}
+                        <option value="{{ r }}" {{ filter_role == r ? 'selected' : '' }}>{{ r }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-1">
+                <label class="form-label small text-muted mb-1">VLAN</label>
+                <select name="vlan" class="form-select form-select-sm">
+                    <option value="">— All —</option>
+                    {% for v in vlans %}
+                        <option value="{{ v }}" {{ filter_vlan == v ? 'selected' : '' }}>{{ v }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small text-muted mb-1">Protocol</label>
+                <select name="protocol" class="form-select form-select-sm">
+                    <option value="">— All —</option>
+                    {% for p in protocols %}
+                        <option value="{{ p }}" {{ filter_protocol == p ? 'selected' : '' }}>{{ p }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small text-muted mb-1">Service</label>
+                <select name="service" class="form-select form-select-sm">
+                    <option value="">— All —</option>
+                    {% for s in services %}
+                        <option value="{{ s }}" {{ filter_service == s ? 'selected' : '' }}>{{ s }}</option>
                     {% endfor %}
                 </select>
             </div>
@@ -65,12 +90,11 @@
                     <tr>
                         <th>MAC Address</th>
                         <th>Username</th>
-                        <th>IP Address</th>
                         <th>Status</th>
                         <th>Protocol</th>
                         <th>Service</th>
-                        <th>NAS IP</th>
-                        <th>Server</th>
+                        <th>Role</th>
+                        <th>VLAN</th>
                         <th>Timestamp</th>
                     </tr>
                 </thead>
@@ -86,7 +110,6 @@
                                 {% endif %}
                             </td>
                             <td>{{ log.username ?: '—' }}</td>
-                            <td>{% if log.ipAddress %}<code>{{ log.ipAddress }}</code>{% else %}—{% endif %}</td>
                             <td>
                                 {% if log.authStatus == 'Access-Accept' %}
                                     <span class="badge bg-success">{{ log.authStatus }}</span>
@@ -100,8 +123,8 @@
                             </td>
                             <td>{{ log.authProtocol ?: '—' }}</td>
                             <td>{{ log.service ?: '—' }}</td>
-                            <td>{% if log.nasIp %}<code>{{ log.nasIp }}</code>{% else %}—{% endif %}</td>
-                            <td>{{ log.clearpassServer ? log.clearpassServer.name : '—' }}</td>
+                            <td>{{ log.role ?: '—' }}</td>
+                            <td>{{ log.vlan ?: '—' }}</td>
                             <td class="text-nowrap">{{ log.authTimestamp|date('Y-m-d H:i') }}</td>
                         </tr>
                     {% endfor %}
@@ -113,14 +136,15 @@
             <div class="card-footer d-flex justify-content-between align-items-center">
                 <span class="text-muted small">Page {{ page }} of {{ (total / per_page)|round(0, 'ceil') }}</span>
                 <div>
+                    {% set pagerParams = {mac: filter_mac, username: filter_username, status: filter_status, role: filter_role, vlan: filter_vlan, protocol: filter_protocol, service: filter_service} %}
                     {% if page > 1 %}
-                        <a href="{{ path('clearpass_auth_log_index', {mac: filter_mac, username: filter_username, server: filter_server, status: filter_status, page: page - 1}) }}"
+                        <a href="{{ path('clearpass_auth_log_index', pagerParams|merge({page: page - 1})) }}"
                            class="btn btn-sm btn-outline-secondary me-1">
                             <i class="bi bi-chevron-left"></i> Prev
                         </a>
                     {% endif %}
                     {% if page * per_page < total %}
-                        <a href="{{ path('clearpass_auth_log_index', {mac: filter_mac, username: filter_username, server: filter_server, status: filter_status, page: page + 1}) }}"
+                        <a href="{{ path('clearpass_auth_log_index', pagerParams|merge({page: page + 1})) }}"
                            class="btn btn-sm btn-outline-secondary">
                             Next <i class="bi bi-chevron-right"></i>
                         </a>

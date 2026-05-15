@@ -45,6 +45,15 @@ class ClearpassAuthLog
     #[ORM\Column(length: 45, nullable: true)]
     private ?string $nasIp = null;
 
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $enforcementProfile = null;
+
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $role = null;
+
+    #[ORM\Column(length: 50, nullable: true)]
+    private ?string $vlan = null;
+
     #[ORM\Column]
     private \DateTimeImmutable $authTimestamp;
 
@@ -89,6 +98,15 @@ class ClearpassAuthLog
 
     public function getNasIp(): ?string { return $this->nasIp; }
     public function setNasIp(?string $ip): static { $this->nasIp = $ip; return $this; }
+
+    public function getEnforcementProfile(): ?string { return $this->enforcementProfile; }
+    public function setEnforcementProfile(?string $profile): static { $this->enforcementProfile = $profile; return $this; }
+
+    public function getRole(): ?string { return $this->role; }
+    public function setRole(?string $role): static { $this->role = $role; return $this; }
+
+    public function getVlan(): ?string { return $this->vlan; }
+    public function setVlan(?string $vlan): static { $this->vlan = $vlan; return $this; }
 
     public function getAuthTimestamp(): \DateTimeImmutable { return $this->authTimestamp; }
 
