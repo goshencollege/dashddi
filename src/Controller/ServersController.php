@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\Repository\ClearpassServerRepository;
 use App\Repository\DhcpServerRepository;
 use App\Repository\DnsServerRepository;
 use App\Repository\RadiusServerRepository;
@@ -13,12 +14,13 @@ use Symfony\Component\Routing\Attribute\Route;
 class ServersController extends AbstractController
 {
     #[Route('', name: 'servers_index', methods: ['GET'])]
-    public function index(DhcpServerRepository $dhcpRepo, DnsServerRepository $dnsRepo, RadiusServerRepository $radiusRepo): Response
+    public function index(ClearpassServerRepository $clearpassRepo, DhcpServerRepository $dhcpRepo, DnsServerRepository $dnsRepo, RadiusServerRepository $radiusRepo): Response
     {
         return $this->render('servers/index.html.twig', [
-            'dhcpServers'   => $dhcpRepo->findBy([], ['name' => 'ASC']),
-            'dnsServers'    => $dnsRepo->findBy([], ['name' => 'ASC']),
-            'radiusServers' => $radiusRepo->findBy([], ['name' => 'ASC']),
+            'clearpassServers' => $clearpassRepo->findBy([], ['name' => 'ASC']),
+            'dhcpServers'      => $dhcpRepo->findBy([], ['name' => 'ASC']),
+            'dnsServers'       => $dnsRepo->findBy([], ['name' => 'ASC']),
+            'radiusServers'    => $radiusRepo->findBy([], ['name' => 'ASC']),
         ]);
     }
 }
