@@ -9,6 +9,7 @@ use App\Entity\NetworkInterface;
 use App\Entity\Subnet;
 use App\Form\InterfaceNameType;
 use App\Form\NetworkInterfaceType;
+use App\Repository\ClearpassAuthLogRepository;
 use App\Repository\DhcpLeaseRepository;
 use App\Repository\DomainRepository;
 use App\Repository\NetworkInterfaceRepository;
@@ -71,11 +72,12 @@ class InterfaceController extends AbstractController
     }
 
     #[Route('/interfaces/{id}', name: 'interface_show', methods: ['GET'])]
-    public function show(NetworkInterface $interface, DhcpLeaseRepository $leaseRepo): Response
+    public function show(NetworkInterface $interface, DhcpLeaseRepository $leaseRepo, ClearpassAuthLogRepository $authLogRepo): Response
     {
         return $this->render('interface/show.html.twig', [
-            'interface'   => $interface,
-            'dhcp_leases' => $leaseRepo->findByMac($interface->getMacAddress(), 10),
+            'interface'    => $interface,
+            'dhcp_leases'  => $leaseRepo->findByMac($interface->getMacAddress(), 10),
+            'auth_logs'    => $authLogRepo->findByMac($interface->getMacAddress(), 10),
         ]);
     }
 

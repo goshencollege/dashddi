@@ -37,6 +37,12 @@ class AppSettingType extends AbstractType
                 'attr'     => ['placeholder' => '30'],
                 'help'     => 'How long to keep DNS/DHCP push log entries. Leave blank to keep forever.',
             ])
+            ->add('clearpassAuthLogRetentionDays', IntegerType::class, [
+                'label'    => 'ClearPass Auth Log Retention (days)',
+                'required' => false,
+                'attr'     => ['placeholder' => '30'],
+                'help'     => 'How long to keep ClearPass authentication log entries. Leave blank to keep forever.',
+            ])
             ->add('defaultNewSubnetLeaseRetentionDays', IntegerType::class, [
                 'label'    => 'Default Retention for New Subnets (days)',
                 'required' => false,

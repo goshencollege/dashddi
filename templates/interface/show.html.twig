@@ -110,6 +110,59 @@
     </div>
 </div>
 
+{% if auth_logs is defined and auth_logs|length > 0 %}
+<div class="card mt-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-shield-lock me-1"></i>ClearPass Authentication History</span>
+        <a href="{{ path('clearpass_auth_log_index', {mac: interface.macAddress}) }}" class="btn btn-sm btn-outline-secondary">
+            View all
+        </a>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm mb-0">
+            <thead>
+                <tr>
+                    <th>Status</th>
+                    <th>Username</th>
+                    <th>Protocol</th>
+                    <th>Service</th>
+                    <th>Switch IP</th>
+                    <th>Switch Port</th>
+                    <th>Role</th>
+                    <th>VLAN</th>
+                    <th>Timestamp</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in auth_logs %}
+                    <tr>
+                        <td>
+                            {% if log.authStatus == 'Access-Accept' %}
+                                <span class="badge bg-success">{{ log.authStatus }}</span>
+                            {% elseif log.authStatus == 'Access-Reject' %}
+                                <span class="badge bg-danger">{{ log.authStatus }}</span>
+                            {% elseif log.authStatus %}
+                                <span class="badge bg-secondary">{{ log.authStatus }}</span>
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ log.username ?: '—' }}</td>
+                        <td>{{ log.authProtocol ?: '—' }}</td>
+                        <td>{{ log.service ?: '—' }}</td>
+                        <td>{{ log.nasIp ?: '—' }}</td>
+                        <td>{{ log.nasPortId ?: '—' }}</td>
+                        <td>{{ log.role ?: '—' }}</td>
+                        <td>{{ log.vlan ?: '—' }}</td>
+                        <td class="text-nowrap">{{ log.authTimestamp|date('Y-m-d H:i') }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
 {% if dhcp_leases is defined and dhcp_leases|length > 0 %}
 <div class="card mt-3">
     <div class="card-header d-flex justify-content-between align-items-center">

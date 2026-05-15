@@ -282,7 +282,8 @@
                 </li>
                 {% set dhcpActive = app.request.attributes.get('_route') starts with 'subnet'
                     or app.request.attributes.get('_route') starts with 'vrf'
-                    or app.request.attributes.get('_route') starts with 'dhcp_lease' %}
+                    or app.request.attributes.get('_route') starts with 'dhcp_lease'
+                    or app.request.attributes.get('_route') starts with 'clearpass_auth_log' %}
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle {{ dhcpActive ? 'active' }}" href="#" data-bs-toggle="dropdown">
                         <i class="bi bi-diagram-2 me-1"></i>DHCP
@@ -304,6 +305,12 @@
                             <a class="dropdown-item {{ app.request.attributes.get('_route') starts with 'dhcp_lease' ? 'active' }}"
                                href="{{ path('dhcp_lease_index') }}">
                                 <i class="bi bi-journal-text me-1"></i>DHCP Leases
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item {{ app.request.attributes.get('_route') starts with 'clearpass_auth_log' ? 'active' }}"
+                               href="{{ path('clearpass_auth_log_index') }}">
+                                <i class="bi bi-shield-lock me-1"></i>ClearPass Auth Logs
                             </a>
                         </li>
                     </ul>
