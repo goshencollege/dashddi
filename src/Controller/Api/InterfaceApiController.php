@@ -265,23 +265,18 @@ class InterfaceApiController extends AbstractController
 
     private function serialize(NetworkInterface $iface): array
     {
-        $canonical = $iface->getNames()->filter(fn($n) => $n->isCanonical())->first();
-
         return [
-            'id'             => $iface->getId(),
-            'name'           => $iface->getName(),
-            'mac_address'    => $iface->getMacAddress(),
-            'host_id'        => $iface->getHost()?->getId(),
-            'host_name'      => $iface->getHost()?->getName(),
-            'subnet_id'      => $iface->getSubnet()?->getId(),
-            'vlan'           => $iface->getSubnet()?->getVlan(),
-            'ip_address'     => $iface->getIpAddress()?->getAddress(),
-            'ipv6_address'   => $iface->getIpv6Address()?->getAddress(),
-            'canonical_name' => $canonical ? $canonical->getFullyQualifiedName() : null,
-            'created_at'     => $iface->getCreatedAt()->format(\DateTimeInterface::ATOM),
-            'updated_at'     => $iface->getUpdatedAt()->format(\DateTimeInterface::ATOM),
-            'created_by'     => $iface->getCreatedBy(),
-            'updated_by'     => $iface->getUpdatedBy(),
+            'id'           => $iface->getId(),
+            'name'         => $iface->getName(),
+            'mac_address'  => $iface->getMacAddress(),
+            'host_id'      => $iface->getHost()?->getId(),
+            'subnet_id'    => $iface->getSubnet()?->getId(),
+            'ip_address'   => $iface->getIpAddress()?->getAddress(),
+            'ipv6_address' => $iface->getIpv6Address()?->getAddress(),
+            'created_at'   => $iface->getCreatedAt()->format(\DateTimeInterface::ATOM),
+            'updated_at'   => $iface->getUpdatedAt()->format(\DateTimeInterface::ATOM),
+            'created_by'   => $iface->getCreatedBy(),
+            'updated_by'   => $iface->getUpdatedBy(),
         ];
     }
 }
