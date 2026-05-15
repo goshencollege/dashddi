@@ -22,8 +22,8 @@ class AppSetting
     #[ORM\Column(nullable: true, options: ['default' => 30])]
     private ?int $pushLogRetentionDays = 30;
 
-    #[ORM\Column(nullable: true, options: ['default' => 90])]
-    private ?int $clearpassAuthLogRetentionDays = 90;
+    #[ORM\Column(nullable: true, options: ['default' => 30])]
+    private ?int $clearpassAuthLogRetentionDays = 30;
 
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $smtpHost = null;
