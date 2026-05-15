@@ -297,6 +297,7 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
 
             {% include 'api_docs/_endpoint.html.twig' with {
                 method: 'GET', path: '/api/interfaces', name: 'List interfaces',
+                notes: 'Each object includes <code>host_name</code> (the name of the owning host) and <code>canonical_name</code> (the fully-qualified DNS name marked as canonical for this interface, or <code>null</code> if none is set).',
                 query: [
                     {name: 'host_id', type: 'integer', desc: 'Filter by host ID.'},
                     {name: 'subnet_id', type: 'integer', desc: 'Filter by subnet ID.'},
