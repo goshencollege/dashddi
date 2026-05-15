@@ -49,7 +49,7 @@
                     <div class="fw-semibold">{{ task.name }}</div>
                     <div class="text-muted small">{{ task.description }}</div>
                 </td>
-                <td>
+                <td class="text-nowrap">
                     <code>{{ task.cronExpression }}</code>
                     {% if not task.enabled %}
                         <span class="badge bg-secondary ms-1">Disabled</span>
@@ -80,7 +80,7 @@
                         —
                     {% endif %}
                 </td>
-                <td class="text-end">
+                <td class="text-end text-nowrap">
                     {% if task.lastRunOutput %}
                         <a href="{{ path('scheduler_output', {id: task.id}) }}" class="btn btn-sm btn-outline-secondary me-1" title="View last output">
                             <i class="bi bi-terminal"></i>
