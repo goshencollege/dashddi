@@ -46,6 +46,9 @@ class ClearpassAuthLog
     private ?string $nasIp = null;
 
     #[ORM\Column(length: 255, nullable: true)]
+    private ?string $nasPortId = null;
+
+    #[ORM\Column(length: 255, nullable: true)]
     private ?string $enforcementProfile = null;
 
     #[ORM\Column(length: 255, nullable: true)]
@@ -98,6 +101,9 @@ class ClearpassAuthLog
 
     public function getNasIp(): ?string { return $this->nasIp; }
     public function setNasIp(?string $ip): static { $this->nasIp = $ip; return $this; }
+
+    public function getNasPortId(): ?string { return $this->nasPortId; }
+    public function setNasPortId(?string $portId): static { $this->nasPortId = $portId; return $this; }
 
     public function getEnforcementProfile(): ?string { return $this->enforcementProfile; }
     public function setEnforcementProfile(?string $profile): static { $this->enforcementProfile = $profile; return $this; }

@@ -21,10 +21,11 @@ class ClearpassAuthLogService
     /**
      * Probes candidate API paths and returns a map of path => first record (or error string).
      * Used by the --debug command to discover which Insight endpoint is available.
+     * If $mac is provided, filters results to sessions matching that MAC address.
      *
      * @return array<string, array|string>
      */
-    public function probeEndpoints(ClearpassServer $server): array
+    public function probeEndpoints(ClearpassServer $server, string $mac = ''): array
     {
         $token = $this->getAccessToken($server);
 
@@ -34,7 +35,14 @@ class ClearpassAuthLogService
 
         $results = [];
         foreach ($candidates as $path) {
-            $result = $this->request($server, $token, 'GET', $path . '?limit=1', null);
+            $params = ['limit' => 1];
+            if ($mac !== '') {
+                $normalised = $this->normaliseMac($mac);
+                $filterMac  = $normalised !== '' ? $normalised : $mac;
+                $params['filter'] = json_encode(['mac_address' => $filterMac]);
+            }
+            $query  = '?' . http_build_query($params);
+            $result = $this->request($server, $token, 'GET', $path . $query, null);
             if (!$result['success']) {
                 $results[$path] = 'HTTP ' . $result['status'] . ': ' . substr($result['error'], 0, 120);
             } else {
@@ -107,6 +115,7 @@ class ClearpassAuthLogService
                 $log->setAuthStatus($item['state'] ?? null ?: null);
                 $log->setAuthProtocol($item['nasporttype'] ?? null ?: null);
                 $log->setNasIp($item['nasipaddress'] ?? $item['nas_ip_address'] ?? null ?: null);
+                $log->setNasPortId($item['nasportid'] ?? null ?: null);
                 $log->setRole($item['arubauserrole'] ?? null ?: null);
                 $log->setVlan($item['arubauservlan'] ?? null ?: null);
                 $log->setNetworkInterface($this->ifaceRepo->findOneBy(['macAddress' => $mac]));

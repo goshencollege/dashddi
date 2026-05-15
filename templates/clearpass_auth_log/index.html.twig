@@ -66,6 +66,16 @@
                     {% endfor %}
                 </select>
             </div>
+            <div class="col-md-2">
+                <label class="form-label small text-muted mb-1">NAS IP</label>
+                <input type="text" name="nas_ip" class="form-control form-control-sm"
+                       placeholder="e.g. 10.0.0.1" value="{{ filter_nas_ip }}">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small text-muted mb-1">NAS Port ID</label>
+                <input type="text" name="nas_port_id" class="form-control form-control-sm"
+                       placeholder="e.g. GigabitEthernet" value="{{ filter_nas_port_id }}">
+            </div>
             <div class="col-md-auto">
                 <button type="submit" class="btn btn-sm btn-primary">
                     <i class="bi bi-search me-1"></i>Search
@@ -93,6 +103,8 @@
                         <th>Status</th>
                         <th>Protocol</th>
                         <th>Service</th>
+                        <th>NAS IP</th>
+                        <th>NAS Port ID</th>
                         <th>Role</th>
                         <th>VLAN</th>
                         <th>Timestamp</th>
@@ -123,6 +135,8 @@
                             </td>
                             <td>{{ log.authProtocol ?: '—' }}</td>
                             <td>{{ log.service ?: '—' }}</td>
+                            <td>{{ log.nasIp ?: '—' }}</td>
+                            <td>{{ log.nasPortId ?: '—' }}</td>
                             <td>{{ log.role ?: '—' }}</td>
                             <td>{{ log.vlan ?: '—' }}</td>
                             <td class="text-nowrap">{{ log.authTimestamp|date('Y-m-d H:i') }}</td>
@@ -136,7 +150,7 @@
             <div class="card-footer d-flex justify-content-between align-items-center">
                 <span class="text-muted small">Page {{ page }} of {{ (total / per_page)|round(0, 'ceil') }}</span>
                 <div>
-                    {% set pagerParams = {mac: filter_mac, username: filter_username, status: filter_status, role: filter_role, vlan: filter_vlan, protocol: filter_protocol, service: filter_service} %}
+                    {% set pagerParams = {mac: filter_mac, username: filter_username, status: filter_status, role: filter_role, vlan: filter_vlan, protocol: filter_protocol, service: filter_service, nas_ip: filter_nas_ip, nas_port_id: filter_nas_port_id} %}
                     {% if page > 1 %}
                         <a href="{{ path('clearpass_auth_log_index', pagerParams|merge({page: page - 1})) }}"
                            class="btn btn-sm btn-outline-secondary me-1">
