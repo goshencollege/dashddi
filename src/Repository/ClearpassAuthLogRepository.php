@@ -88,6 +88,17 @@ class ClearpassAuthLogRepository extends ServiceEntityRepository
         return $map;
     }
 
+    /** Returns the largest session ID stored for the given server, or null if none. */
+    public function findMaxSessionId(ClearpassServer $server): ?string
+    {
+        return $this->createQueryBuilder('l')
+            ->select('MAX(l.sessionId)')
+            ->where('l.clearpassServer = :server')
+            ->setParameter('server', $server)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
     public function purgeOlderThan(\DateTimeImmutable $cutoff): int
     {
         return $this->createQueryBuilder('l')
