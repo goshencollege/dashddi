@@ -40,6 +40,9 @@ class ClearpassServer
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $description = null;
 
+    #[ORM\Column(nullable: true)]
+    private ?\DateTimeImmutable $lastAuthLogPull = null;
+
     public function getId(): ?int { return $this->id; }
 
     public function getName(): string { return $this->name; }
@@ -59,4 +62,7 @@ class ClearpassServer
 
     public function getDescription(): ?string { return $this->description; }
     public function setDescription(?string $description): static { $this->description = $description; return $this; }
+
+    public function getLastAuthLogPull(): ?\DateTimeImmutable { return $this->lastAuthLogPull; }
+    public function setLastAuthLogPull(?\DateTimeImmutable $dt): static { $this->lastAuthLogPull = $dt; return $this; }
 }
