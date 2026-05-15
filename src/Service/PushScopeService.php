@@ -10,6 +10,7 @@ use App\Entity\Ipv6Address;
 use App\Entity\NetworkInterface;
 use App\Entity\Subnet;
 use App\Entity\RadiusClient;
+use App\Repository\ClearpassServerRepository;
 use App\Repository\DhcpServerRepository;
 use App\Repository\DnsServerRepository;
 use App\Repository\RadiusServerRepository;
@@ -17,9 +18,10 @@ use App\Repository\RadiusServerRepository;
 class PushScopeService
 {
     public function __construct(
-        private readonly DnsServerRepository    $dnsRepo,
-        private readonly DhcpServerRepository   $dhcpRepo,
-        private readonly RadiusServerRepository $radiusRepo,
+        private readonly ClearpassServerRepository $clearpassRepo,
+        private readonly DnsServerRepository       $dnsRepo,
+        private readonly DhcpServerRepository      $dhcpRepo,
+        private readonly RadiusServerRepository    $radiusRepo,
     ) {}
 
     /** @return int[] DNS server IDs whose zones are affected by this entity change */
@@ -45,6 +47,19 @@ class PushScopeService
     public function allDhcpServerIds(): array
     {
         return $this->dhcpRepo->findAllIds();
+    }
+
+    public function affectsClearpass(object $entity): bool
+    {
+        return $entity instanceof NetworkInterface
+            || $entity instanceof IpAddress
+            || $entity instanceof Ipv6Address;
+    }
+
+    /** @return int[] */
+    public function allClearpassServerIds(): array
+    {
+        return $this->clearpassRepo->findAllIds();
     }
 
     public function affectsRadius(object $entity): bool
