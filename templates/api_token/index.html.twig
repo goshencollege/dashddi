@@ -16,7 +16,8 @@
 
 <p class="text-muted mb-4">
     Tokens allow programmatic access to API endpoints without SAML authentication.
-    Send the token in the <code>Authorization: Bearer &lt;token&gt;</code> header.
+    Send the token as <code>Authorization: Bearer &lt;token&gt;</code>, or as the password in an HTTP Basic Auth header.
+    Tokens can be restricted to specific source IP addresses or CIDR ranges.
     See the <a href="{{ path('api_docs') }}">API documentation</a> for available endpoints and request formats.
 </p>
 
