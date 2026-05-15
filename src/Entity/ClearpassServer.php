@@ -31,9 +31,8 @@ class ClearpassServer
     #[Assert\NotBlank]
     private string $clientId = '';
 
-    #[ORM\Column(length: 255)]
-    #[Assert\NotBlank]
-    private string $clientSecret = '';
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $clientSecret = null;
 
     #[ORM\Column]
     private bool $verifyTls = true;
@@ -52,8 +51,8 @@ class ClearpassServer
     public function getClientId(): string { return $this->clientId; }
     public function setClientId(string $clientId): static { $this->clientId = $clientId; return $this; }
 
-    public function getClientSecret(): string { return $this->clientSecret; }
-    public function setClientSecret(string $clientSecret): static { $this->clientSecret = $clientSecret; return $this; }
+    public function getClientSecret(): ?string { return $this->clientSecret; }
+    public function setClientSecret(?string $clientSecret): static { $this->clientSecret = $clientSecret; return $this; }
 
     public function isVerifyTls(): bool { return $this->verifyTls; }
     public function setVerifyTls(bool $verifyTls): static { $this->verifyTls = $verifyTls; return $this; }
