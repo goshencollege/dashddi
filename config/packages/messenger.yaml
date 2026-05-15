@@ -6,6 +6,7 @@ framework:
         failure_transport: failed
 
         routing:
+            'App\Message\PushClearpassMessage': async
             'App\Message\PushDnsMessage': async
             'App\Message\PushDhcpMessage': async
             'App\Message\PushRadiusMessage': async
