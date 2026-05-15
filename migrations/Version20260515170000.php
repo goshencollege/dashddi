@@ -18,7 +18,7 @@ final class Version20260515170000 extends AbstractMigration
     {
         $this->addSql('ALTER TABLE clearpass_server ADD last_auth_log_pull DATETIME DEFAULT NULL COMMENT \'(DC2Type:datetime_immutable)\'');
 
-        $this->addSql('ALTER TABLE app_setting ADD clearpass_auth_log_retention_days INT DEFAULT 90');
+        $this->addSql('ALTER TABLE app_setting ADD clearpass_auth_log_retention_days INT DEFAULT 30');
 
         $this->addSql('CREATE TABLE clearpass_auth_log (
             id INT AUTO_INCREMENT NOT NULL,
