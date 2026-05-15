@@ -46,7 +46,10 @@
             <p>All API endpoints require a token. Tokens are created and managed on the <a href="{{ path('api_token_index') }}">API Tokens</a> page. Two header formats are supported:</p>
 
             <h3 class="h6 mt-3 mb-1">Bearer token <span class="text-muted fw-normal">(preferred)</span></h3>
-            <pre class="bg-dark text-light rounded p-3 small"><code>Authorization: Bearer &lt;your-token&gt;</code></pre>
+            <pre class="bg-dark text-light rounded p-3 small"><code>Authorization: Bearer &lt;your-token&gt;
+
+# Example with curl:
+curl -H "Authorization: Bearer &lt;your-token&gt;" https://example.com/api/...</code></pre>
 
             <h3 class="h6 mt-3 mb-1">HTTP Basic Auth</h3>
             <p class="small">For clients that only support HTTP Basic Auth, send the token as the <strong>password</strong>. The username field is ignored.</p>
