@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\Dto\NetworkEvent;
 use App\Entity\Domain;
 use App\Entity\Host;
 use App\Entity\InterfaceName;
@@ -74,10 +75,20 @@ class InterfaceController extends AbstractController
     #[Route('/interfaces/{id}', name: 'interface_show', methods: ['GET'])]
     public function show(NetworkInterface $interface, DhcpLeaseRepository $leaseRepo, ClearpassAuthLogRepository $authLogRepo): Response
     {
+        $events = [];
+
+        foreach ($authLogRepo->findByMac($interface->getMacAddress(), 10) as $log) {
+            $events[] = new NetworkEvent($log->getAuthTimestamp(), 'auth', $log);
+        }
+        foreach ($leaseRepo->findByMac($interface->getMacAddress(), 10) as $lease) {
+            $events[] = new NetworkEvent($lease->getLeaseStart(), 'dhcp', $lease);
+        }
+
+        usort($events, fn(NetworkEvent $a, NetworkEvent $b) => $b->timestamp <=> $a->timestamp);
+
         return $this->render('interface/show.html.twig', [
-            'interface'    => $interface,
-            'dhcp_leases'  => $leaseRepo->findByMac($interface->getMacAddress(), 10),
-            'auth_logs'    => $authLogRepo->findByMac($interface->getMacAddress(), 10),
+            'interface' => $interface,
+            'events'    => $events,
         ]);
     }
 
