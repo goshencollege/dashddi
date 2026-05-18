@@ -360,7 +360,8 @@
                 {% set serversActive = app.request.attributes.get('_route') starts with 'dhcp_server'
                     or app.request.attributes.get('_route') starts with 'dns_server'
                     or app.request.attributes.get('_route') starts with 'servers'
-                    or app.request.attributes.get('_route') starts with 'push_log' %}
+                    or app.request.attributes.get('_route') starts with 'push_log'
+                    or app.request.attributes.get('_route') starts with 'worker_queue' %}
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle {{ serversActive ? 'active' }}" href="#" data-bs-toggle="dropdown">
                         <i class="bi bi-server me-1"></i>Servers
@@ -376,6 +377,12 @@
                             <a class="dropdown-item {{ app.request.attributes.get('_route') starts with 'push_log' ? 'active' }}"
                                href="{{ path('push_log_index') }}">
                                 <i class="bi bi-journal-code me-1"></i>Push Logs
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item {{ app.request.attributes.get('_route') starts with 'worker_queue' ? 'active' }}"
+                               href="{{ path('worker_queue') }}">
+                                <i class="bi bi-stack me-1"></i>Worker Queue
                             </a>
                         </li>
                     </ul>
