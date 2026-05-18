@@ -5,7 +5,6 @@ namespace App\EventListener;
 use App\Message\PushClearpassMessage;
 use App\Message\PushDhcpMessage;
 use App\Message\PushDnsMessage;
-use App\Message\PushRadiusMessage;
 use App\Service\PushScopeService;
 use Doctrine\Bundle\DoctrineBundle\Attribute\AsDoctrineListener;
 use Doctrine\ORM\Event\PostFlushEventArgs;
@@ -26,7 +25,6 @@ class EntityPushListener
     /** @var array<string, true> Keyed by MAC for deduplication */
     private array $pendingClearpassMacs = [];
     private bool $pendingAllDhcp = false;
-    private bool $pendingAllRadius = false;
 
     public function __construct(
         private readonly PushScopeService    $scope,
@@ -53,13 +51,10 @@ class EntityPushListener
         $dnsIds        = $this->pendingDnsIds;
         $clearpassMacs = $this->pendingClearpassMacs;
         $allDhcp       = $this->pendingAllDhcp;
-        $allRadius     = $this->pendingAllRadius;
-
         // Reset before dispatching to avoid double-dispatch if flush triggers another flush
         $this->pendingDnsIds        = [];
         $this->pendingClearpassMacs = [];
         $this->pendingAllDhcp       = false;
-        $this->pendingAllRadius     = false;
 
         foreach (array_keys($dnsIds) as $id) {
             $this->bus->dispatch(new PushDnsMessage($id));
@@ -79,11 +74,6 @@ class EntityPushListener
             }
         }
 
-        if ($allRadius) {
-            foreach ($this->scope->allRadiusServerIds() as $id) {
-                $this->bus->dispatch(new PushRadiusMessage($id));
-            }
-        }
     }
 
     private function collect(object $entity): void
@@ -100,8 +90,5 @@ class EntityPushListener
             $this->pendingAllDhcp = true;
         }
 
-        if ($this->scope->affectsRadius($entity)) {
-            $this->pendingAllRadius = true;
-        }
     }
 }
