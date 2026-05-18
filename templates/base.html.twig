@@ -361,14 +361,15 @@
                     or app.request.attributes.get('_route') starts with 'dns_server'
                     or app.request.attributes.get('_route') starts with 'servers'
                     or app.request.attributes.get('_route') starts with 'push_log'
-                    or app.request.attributes.get('_route') starts with 'worker_queue' %}
+                    or app.request.attributes.get('_route') starts with 'worker_queue'
+                    or app.request.attributes.get('_route') starts with 'snipe_it_server' %}
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle {{ serversActive ? 'active' }}" href="#" data-bs-toggle="dropdown">
                         <i class="bi bi-server me-1"></i>Servers
                     </a>
                     <ul class="dropdown-menu">
                         <li>
-                            <a class="dropdown-item {{ app.request.attributes.get('_route') starts with 'dhcp_server' or app.request.attributes.get('_route') starts with 'dns_server' or app.request.attributes.get('_route') starts with 'servers' ? 'active' }}"
+                            <a class="dropdown-item {{ app.request.attributes.get('_route') starts with 'dhcp_server' or app.request.attributes.get('_route') starts with 'dns_server' or app.request.attributes.get('_route') starts with 'servers' or app.request.attributes.get('_route') starts with 'snipe_it_server' ? 'active' }}"
                                href="{{ path('servers_index') }}">
                                 <i class="bi bi-server me-1"></i>Servers
                             </a>

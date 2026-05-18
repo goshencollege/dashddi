@@ -12,6 +12,7 @@ enum SchedulableTask: string
     case PurgeLeases             = 'purge_leases';
     case PurgePushLogs           = 'purge_push_logs';
     case DatabaseBackup          = 'database_backup';
+    case PullSnipeIt             = 'pull_snipe_it';
 
     public function label(): string
     {
@@ -24,6 +25,7 @@ enum SchedulableTask: string
             self::PurgeLeases            => 'Purge DHCP Lease Logs',
             self::PurgePushLogs          => 'Purge Push Logs',
             self::DatabaseBackup         => 'Database Backup',
+            self::PullSnipeIt            => 'Pull Snipe-IT Assets',
         };
     }
 
@@ -38,6 +40,7 @@ enum SchedulableTask: string
             self::PurgeLeases            => 'Deletes DHCP lease log entries that exceed each subnet\'s configured retention period. A default retention period (for subnets with no per-subnet setting and unmatched leases) can be configured in Application Settings.',
             self::PurgePushLogs          => 'Deletes DNS/DHCP push log entries older than the retention period configured in Application Settings (default 30 days).',
             self::DatabaseBackup         => 'Creates a database backup using the destination and options configured in Backup Settings.',
+            self::PullSnipeIt            => 'Fetches assets from all configured Snipe-IT servers. Creates a host for each asset that has a MAC address in any configured custom field, updates existing hosts, and removes hosts whose assets have been deleted or archived.',
         };
     }
 
@@ -53,6 +56,7 @@ enum SchedulableTask: string
             self::PurgeLeases            => 'app:purge-dhcp-leases',
             self::PurgePushLogs          => 'app:purge-push-logs',
             self::DatabaseBackup         => 'app:database:backup',
+            self::PullSnipeIt            => 'app:pull-snipe-it',
         };
     }
 
@@ -67,6 +71,7 @@ enum SchedulableTask: string
             self::PurgeLeases            => '0 3 * * 0',
             self::PurgePushLogs          => '0 3 * * 0',
             self::DatabaseBackup         => '0 2 * * *',
+            self::PullSnipeIt            => '0 3 * * *',
         };
     }
 }
