@@ -13,6 +13,7 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\DeduplicateStamp;
 use Symfony\Component\Routing\Attribute\Route;
 
 #[Route('/api/dns-servers')]
@@ -150,7 +151,7 @@ class DnsServerApiController extends AbstractController
     #[Route('/{id}/push', name: 'api_dns_servers_push', methods: ['POST'])]
     public function push(DnsServer $server, MessageBusInterface $bus): JsonResponse
     {
-        $bus->dispatch(new PushDnsMessage($server->getId()));
+        $bus->dispatch(new PushDnsMessage($server->getId()), [new DeduplicateStamp('push_dns_' . $server->getId())]);
 
         return $this->json(['queued' => true], Response::HTTP_ACCEPTED);
     }

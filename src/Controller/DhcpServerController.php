@@ -13,6 +13,7 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\DeduplicateStamp;
 use Symfony\Component\Routing\Attribute\Route;
 
 #[Route('/dhcp-servers')]
@@ -107,7 +108,7 @@ class DhcpServerController extends AbstractController
         }
 
         foreach ($servers as $server) {
-            $bus->dispatch(new PushDhcpMessage($server->getId()));
+            $bus->dispatch(new PushDhcpMessage($server->getId()), [new DeduplicateStamp('push_dhcp_' . $server->getId())]);
         }
 
         return $this->json(['queued' => true, 'count' => count($servers)], 202);

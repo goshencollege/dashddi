@@ -54,7 +54,7 @@ class ScheduledTaskRunnerService
         $consolePath = $this->projectDir . '/bin/console';
         $parts       = array_merge([$consolePath], explode(' ', $schedulable->consoleCommand()));
         $process     = new Process(array_merge(['php'], $parts));
-        $process->setTimeout(300);
+        $process->setTimeout(null);
         $process->run();
 
         $status = $process->isSuccessful() ? 'success' : 'failure';
@@ -64,6 +64,9 @@ class ScheduledTaskRunnerService
         $task->setLastRunStatus($status);
         $task->setLastRunOutput($output);
 
+        // Reconnect before flushing — the subprocess may have run for a long time
+        // and the worker's database connection could have been dropped while idle.
+        $this->em->getConnection()->close();
         $this->em->flush();
 
         if ($status === 'failure' && $task->getNotificationEmail() !== null && $this->mailer->isConfigured()) {
