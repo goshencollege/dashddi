@@ -40,8 +40,8 @@
                     <tr>
                         <td class="fw-semibold">{{ row.label }}</td>
                         <td><span class="badge bg-secondary">{{ row.queue_name }}</span></td>
-                        <td class="text-nowrap text-muted small">{{ row.created_at }}</td>
-                        <td class="text-nowrap text-muted small">{{ row.delivered_at }}</td>
+                        <td class="text-nowrap text-muted small">{{ row.created_at|date('M j, g:i a', tz) }}</td>
+                        <td class="text-nowrap text-muted small">{{ row.delivered_at ? row.delivered_at|date('M j, g:i a', tz) : '—' }}</td>
                     </tr>
                 {% endfor %}
                 </tbody>
@@ -71,8 +71,8 @@
                     <tr>
                         <td class="fw-semibold">{{ row.label }}</td>
                         <td><span class="badge bg-secondary">{{ row.queue_name }}</span></td>
-                        <td class="text-nowrap text-muted small">{{ row.created_at }}</td>
-                        <td class="text-nowrap text-muted small">{{ row.available_at }}</td>
+                        <td class="text-nowrap text-muted small">{{ row.created_at|date('M j, g:i a', tz) }}</td>
+                        <td class="text-nowrap text-muted small">{{ row.available_at ? row.available_at|date('M j, g:i a', tz) : '—' }}</td>
                         <td class="text-end pe-3">
                             <form method="post" action="{{ path('worker_queue_cancel', {id: row.id}) }}" class="d-inline" onsubmit="return confirm('Cancel this queued task?')">
                                 <input type="hidden" name="_token" value="{{ csrf_token('wq_cancel_' ~ row.id) }}">
@@ -108,8 +108,8 @@
                 {% for row in failed %}
                     <tr>
                         <td class="fw-semibold">{{ row.label }}</td>
-                        <td class="text-nowrap text-muted small">{{ row.created_at }}</td>
-                        <td class="text-nowrap text-muted small">{{ row.delivered_at }}</td>
+                        <td class="text-nowrap text-muted small">{{ row.created_at|date('M j, g:i a', tz) }}</td>
+                        <td class="text-nowrap text-muted small">{{ row.delivered_at ? row.delivered_at|date('M j, g:i a', tz) : '—' }}</td>
                         <td class="text-end pe-3">
                             <form method="post" action="{{ path('worker_queue_retry', {id: row.id}) }}" class="d-inline">
                                 <input type="hidden" name="_token" value="{{ csrf_token('wq_retry_' ~ row.id) }}">
