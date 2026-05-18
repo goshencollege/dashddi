@@ -110,91 +110,63 @@
     </div>
 </div>
 
-{% if auth_logs is defined and auth_logs|length > 0 %}
+{% if events is defined and events|length > 0 %}
 <div class="card mt-3">
     <div class="card-header d-flex justify-content-between align-items-center">
-        <span><i class="bi bi-shield-lock me-1"></i>ClearPass Authentication History</span>
-        <a href="{{ path('clearpass_auth_log_index', {mac: interface.macAddress}) }}" class="btn btn-sm btn-outline-secondary">
-            View all
-        </a>
+        <span><i class="bi bi-clock-history me-1"></i>Event History</span>
+        <div>
+            <a href="{{ path('clearpass_auth_log_index', {mac: interface.macAddress}) }}" class="btn btn-sm btn-outline-secondary me-1">View Auth logs</a>
+            <a href="{{ path('dhcp_lease_index', {mac: interface.macAddress}) }}" class="btn btn-sm btn-outline-secondary">View DHCP logs</a>
+        </div>
     </div>
     <div class="table-responsive">
         <table class="table table-sm mb-0">
             <thead>
                 <tr>
-                    <th>Status</th>
-                    <th>Username</th>
-                    <th>Protocol</th>
-                    <th>Service</th>
-                    <th>Switch IP</th>
-                    <th>Switch Port</th>
-                    <th>Role</th>
-                    <th>VLAN</th>
                     <th>Timestamp</th>
+                    <th>Type</th>
+                    <th>IP Address</th>
+                    <th>Details</th>
                 </tr>
             </thead>
             <tbody>
-                {% for log in auth_logs %}
+                {% for event in events %}
                     <tr>
+                        <td class="text-nowrap">{{ event.timestamp|date('Y-m-d H:i') }}</td>
                         <td>
-                            {% if log.authStatus == 'Access-Accept' %}
-                                <span class="badge bg-success">{{ log.authStatus }}</span>
-                            {% elseif log.authStatus == 'Access-Reject' %}
-                                <span class="badge bg-danger">{{ log.authStatus }}</span>
-                            {% elseif log.authStatus %}
-                                <span class="badge bg-secondary">{{ log.authStatus }}</span>
+                            {% if event.type == 'auth' %}
+                                <span class="badge bg-primary">Auth</span>
                             {% else %}
-                                <span class="text-muted">—</span>
+                                <span class="badge bg-success">DHCP</span>
                             {% endif %}
                         </td>
-                        <td>{{ log.username ?: '—' }}</td>
-                        <td>{{ log.authProtocol ?: '—' }}</td>
-                        <td>{{ log.service ?: '—' }}</td>
-                        <td>{{ log.nasIp ?: '—' }}</td>
-                        <td>{{ log.nasPortId ?: '—' }}</td>
-                        <td>{{ log.role ?: '—' }}</td>
-                        <td>{{ log.vlan ?: '—' }}</td>
-                        <td class="text-nowrap">{{ log.authTimestamp|date('Y-m-d H:i') }}</td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</div>
-{% endif %}
-
-{% if dhcp_leases is defined and dhcp_leases|length > 0 %}
-<div class="card mt-3">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <span><i class="bi bi-journal-text me-1"></i>DHCP Lease History</span>
-        <a href="{{ path('dhcp_lease_index', {mac: interface.macAddress}) }}" class="btn btn-sm btn-outline-secondary">
-            View all
-        </a>
-    </div>
-    <div class="table-responsive">
-        <table class="table table-sm mb-0">
-            <thead>
-                <tr>
-                    <th>IP Address</th>
-                    <th>Subnet</th>
-                    <th>Hostname</th>
-                    <th>Lease Start</th>
-                    <th>Expires</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for lease in dhcp_leases %}
-                    <tr>
-                        <td><code>{{ lease.ipAddress }}</code></td>
                         <td>
-                            {% if lease.subnet %}
-                                <a href="{{ path('subnet_show', {id: lease.subnet.id}) }}">{{ lease.subnet.name }}</a>
-                            {% else %}—{% endif %}
+                            {% if event.entity.ipAddress %}
+                                <code>{{ event.entity.ipAddress }}</code>
+                            {% else %}
+                                —
+                            {% endif %}
                         </td>
-                        <td>{{ lease.hostname ?: '—' }}</td>
-                        <td class="text-nowrap">{{ lease.leaseStart|date('Y-m-d H:i') }}</td>
-                        <td class="text-nowrap">
-                            {{ lease.leaseExpires ? lease.leaseExpires|date('Y-m-d H:i') : '—' }}
+                        <td>
+                            {% if event.type == 'auth' %}
+                                {% if event.entity.authStatus == 'Access-Accept' %}
+                                    <span class="badge bg-success">{{ event.entity.authStatus }}</span>
+                                {% elseif event.entity.authStatus == 'Access-Reject' %}
+                                    <span class="badge bg-danger">{{ event.entity.authStatus }}</span>
+                                {% elseif event.entity.authStatus %}
+                                    <span class="badge bg-secondary">{{ event.entity.authStatus }}</span>
+                                {% endif %}
+                                {% if event.entity.username %} · {{ event.entity.username }}{% endif %}
+                                {% if event.entity.authProtocol %} · {{ event.entity.authProtocol }}{% endif %}
+                                {% if event.entity.vlan %} · VLAN {{ event.entity.vlan }}{% endif %}
+                                {% if event.entity.nasIp %} · {{ event.entity.nasIp }}{% if event.entity.nasPortId %} / {{ event.entity.nasPortId }}{% endif %}{% endif %}
+                            {% else %}
+                                {% if event.entity.subnet %}
+                                    <a href="{{ path('subnet_show', {id: event.entity.subnet.id}) }}">{{ event.entity.subnet.name }}</a> ·
+                                {% endif %}
+                                {{ event.entity.hostname ?: '—' }}
+                                {% if event.entity.leaseExpires %} · expires {{ event.entity.leaseExpires|date('Y-m-d H:i') }}{% endif %}
+                            {% endif %}
                         </td>
                     </tr>
                 {% endfor %}
