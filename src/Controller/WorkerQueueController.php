@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\Repository\AppSettingRepository;
 use App\Repository\ScheduledTaskRepository;
 use Doctrine\DBAL\Connection;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -13,8 +14,9 @@ use Symfony\Component\Routing\Attribute\Route;
 class WorkerQueueController extends AbstractController
 {
     #[Route('', name: 'worker_queue', methods: ['GET'])]
-    public function index(Connection $conn, ScheduledTaskRepository $taskRepo): Response
+    public function index(Connection $conn, ScheduledTaskRepository $taskRepo, AppSettingRepository $settingRepo): Response
     {
+        $tz = $settingRepo->getInstance()->getTimezone() ?? 'UTC';
         $rows = $conn->fetchAllAssociative(
             'SELECT id, queue_name, created_at, available_at, delivered_at, body
              FROM messenger_messages
@@ -46,6 +48,7 @@ class WorkerQueueController extends AbstractController
             'running' => $running,
             'pending' => $pending,
             'failed'  => $failed,
+            'tz'      => $tz,
         ]);
     }
 
