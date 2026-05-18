@@ -94,6 +94,8 @@ class WorkerQueueController extends AbstractController
 
     private function parseLabel(string $body, array $taskNames): string
     {
+        $body = stripslashes($body);
+
         if (!preg_match('/O:\d+:"App\\\\Message\\\\(\w+)"/', $body, $m)) {
             return 'Unknown';
         }
