@@ -74,6 +74,40 @@ class WorkerQueueController extends AbstractController
         return $this->redirectToRoute('worker_queue');
     }
 
+    #[Route('/purge-failed', name: 'worker_queue_purge_failed', methods: ['POST'])]
+    public function purgeFailed(Request $request, Connection $conn): Response
+    {
+        if (!$this->isCsrfTokenValid('wq_purge_failed', $request->request->get('_token'))) {
+            $this->addFlash('danger', 'Invalid CSRF token.');
+            return $this->redirectToRoute('worker_queue');
+        }
+
+        $count = $conn->executeStatement("DELETE FROM messenger_messages WHERE queue_name = 'failed'");
+
+        $this->addFlash('success', $count . ' failed ' . ($count === 1 ? 'message' : 'messages') . ' deleted.');
+        return $this->redirectToRoute('worker_queue');
+    }
+
+    #[Route('/{id}/delete', name: 'worker_queue_delete', methods: ['POST'])]
+    public function delete(int $id, Request $request, Connection $conn): Response
+    {
+        if (!$this->isCsrfTokenValid('wq_delete_' . $id, $request->request->get('_token'))) {
+            $this->addFlash('danger', 'Invalid CSRF token.');
+            return $this->redirectToRoute('worker_queue');
+        }
+
+        $affected = $conn->executeStatement(
+            "DELETE FROM messenger_messages WHERE id = ? AND queue_name = 'failed'",
+            [$id]
+        );
+
+        $this->addFlash(
+            $affected ? 'success' : 'warning',
+            $affected ? 'Message deleted.' : 'Message not found.'
+        );
+        return $this->redirectToRoute('worker_queue');
+    }
+
     #[Route('/{id}/cancel', name: 'worker_queue_cancel', methods: ['POST'])]
     public function cancel(int $id, Request $request, Connection $conn): Response
     {
