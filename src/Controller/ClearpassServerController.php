@@ -12,6 +12,7 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\DeduplicateStamp;
 use Symfony\Component\Routing\Attribute\Route;
 
 #[Route('/clearpass-servers')]
@@ -96,7 +97,7 @@ class ClearpassServerController extends AbstractController
         }
 
         foreach ($servers as $server) {
-            $bus->dispatch(new PushClearpassMessage($server->getId()));
+            $bus->dispatch(new PushClearpassMessage($server->getId()), [new DeduplicateStamp('push_clearpass_' . $server->getId() . '_all', ttl: 3600)]);
         }
 
         return $this->json(['queued' => true, 'count' => count($servers)], 202);

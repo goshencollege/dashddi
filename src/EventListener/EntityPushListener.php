@@ -13,6 +13,7 @@ use Doctrine\ORM\Event\PostUpdateEventArgs;
 use Doctrine\ORM\Event\PreRemoveEventArgs;
 use Doctrine\ORM\Events;
 use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\DeduplicateStamp;
 
 #[AsDoctrineListener(event: Events::postPersist)]
 #[AsDoctrineListener(event: Events::postUpdate)]
@@ -57,20 +58,20 @@ class EntityPushListener
         $this->pendingAllDhcp       = false;
 
         foreach (array_keys($dnsIds) as $id) {
-            $this->bus->dispatch(new PushDnsMessage($id));
+            $this->bus->dispatch(new PushDnsMessage($id), [new DeduplicateStamp('push_dns_' . $id)]);
         }
 
         if (!empty($clearpassMacs)) {
             foreach ($this->scope->allClearpassServerIds() as $serverId) {
                 foreach (array_keys($clearpassMacs) as $mac) {
-                    $this->bus->dispatch(new PushClearpassMessage($serverId, $mac));
+                    $this->bus->dispatch(new PushClearpassMessage($serverId, $mac), [new DeduplicateStamp('push_clearpass_' . $serverId . '_' . $mac)]);
                 }
             }
         }
 
         if ($allDhcp) {
             foreach ($this->scope->allDhcpServerIds() as $id) {
-                $this->bus->dispatch(new PushDhcpMessage($id));
+                $this->bus->dispatch(new PushDhcpMessage($id), [new DeduplicateStamp('push_dhcp_' . $id)]);
             }
         }
 
