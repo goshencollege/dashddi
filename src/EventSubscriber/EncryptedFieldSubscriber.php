@@ -6,6 +6,7 @@ use App\Entity\BackupSetting;
 use App\Entity\ClearpassServer;
 use App\Entity\DhcpServer;
 use App\Entity\DnsServer;
+use App\Entity\SnipeItServer;
 use App\Service\EncryptionService;
 use Doctrine\Bundle\DoctrineBundle\Attribute\AsDoctrineListener;
 use Doctrine\ORM\Event\PostLoadEventArgs;
@@ -28,6 +29,7 @@ class EncryptedFieldSubscriber
         ClearpassServer::class  => ['clientSecret'],
         DhcpServer::class       => ['sshPrivateKey', 'controlPassword'],
         DnsServer::class        => ['sshPrivateKey'],
+        SnipeItServer::class    => ['apiKey'],
     ];
 
     public function __construct(private readonly EncryptionService $encryption) {}
