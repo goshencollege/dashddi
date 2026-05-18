@@ -4,14 +4,15 @@ namespace App\Controller;
 
 use App\Entity\ScheduledTask;
 use App\Form\ScheduledTaskFormType;
+use App\Message\RunScheduledTaskMessage;
 use App\Repository\AppSettingRepository;
 use App\Repository\ScheduledTaskRepository;
-use App\Service\ScheduledTaskRunnerService;
 use Cron\CronExpression;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
 
 class ScheduledTaskController extends AbstractController
@@ -66,23 +67,17 @@ class ScheduledTaskController extends AbstractController
     public function run(
         Request $request,
         ScheduledTask $task,
-        ScheduledTaskRunnerService $runner,
+        MessageBusInterface $bus,
     ): Response {
         if (!$this->isCsrfTokenValid('run_task_' . $task->getId(), $request->request->get('_token'))) {
             $this->addFlash('danger', 'Invalid CSRF token.');
             return $this->redirectToRoute('scheduler_index');
         }
 
-        $runner->run($task);
+        $bus->dispatch(new RunScheduledTaskMessage($task->getId()));
 
-        $status = $task->getLastRunStatus();
-        if ($status === 'success') {
-            $this->addFlash('success', '"' . $task->getName() . '" completed successfully.');
-        } else {
-            $this->addFlash('danger', '"' . $task->getName() . '" failed. Check the output for details.');
-        }
-
-        return $this->redirectToRoute('scheduler_output', ['id' => $task->getId()]);
+        $this->addFlash('info', '"' . $task->getName() . '" is running in the background. Check the output page in a moment to see the result.');
+        return $this->redirectToRoute('scheduler_index');
     }
 
     #[Route('/scheduler/{id}/output', name: 'scheduler_output', methods: ['GET'])]
