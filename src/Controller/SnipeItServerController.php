@@ -4,13 +4,15 @@ namespace App\Controller;
 
 use App\Entity\SnipeItServer;
 use App\Form\SnipeItServerType;
+use App\Message\PullSnipeItMessage;
 use App\Repository\SnipeItServerRepository;
-use App\Service\SnipeItSyncService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\DeduplicateStamp;
 use Symfony\Component\Routing\Attribute\Route;
 
 #[Route('/snipe-it-servers')]
@@ -86,7 +88,7 @@ class SnipeItServerController extends AbstractController
     }
 
     #[Route('/pull', name: 'snipe_it_server_pull', methods: ['POST'])]
-    public function pull(SnipeItServerRepository $repo, SnipeItSyncService $syncService): JsonResponse
+    public function pull(SnipeItServerRepository $repo, MessageBusInterface $bus): JsonResponse
     {
         $servers = $repo->findBy([], ['name' => 'ASC']);
 
@@ -94,27 +96,13 @@ class SnipeItServerController extends AbstractController
             return $this->json(['error' => 'No Snipe-IT servers configured.'], 400);
         }
 
-        $totals = ['created' => 0, 'updated' => 0, 'deleted' => 0, 'skipped' => 0];
-        $errors = [];
-
         foreach ($servers as $server) {
-            try {
-                $result = $syncService->syncFromServer($server);
-                foreach ($totals as $k => $_) {
-                    $totals[$k] += $result[$k];
-                }
-                foreach ($result['errors'] as $e) {
-                    $errors[] = $server->getName() . ': ' . $e;
-                }
-            } catch (\Throwable $e) {
-                $errors[] = $server->getName() . ': ' . $e->getMessage();
-            }
+            $bus->dispatch(
+                new PullSnipeItMessage($server->getId()),
+                [new DeduplicateStamp('pull_snipe_it_' . $server->getId(), ttl: 3600)],
+            );
         }
 
-        return $this->json([
-            'count'   => count($servers),
-            'totals'  => $totals,
-            'errors'  => $errors,
-        ], 200);
+        return $this->json(['queued' => true, 'count' => count($servers)], 202);
     }
 }

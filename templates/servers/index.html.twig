@@ -362,7 +362,7 @@
 
         btn.addEventListener('click', function () {
             btn.disabled  = true;
-            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Pulling…';
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Queuing…';
             results.style.display = 'none';
             results.innerHTML = '';
 
@@ -375,13 +375,8 @@
                 if (data.error) {
                     results.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
                 } else {
-                    const t = data.totals;
-                    let msg = `<div class="alert alert-info mb-0"><i class="bi bi-cloud-download me-2"></i>Sync complete — created: ${t.created}, updated: ${t.updated}, deleted: ${t.deleted}, skipped: ${t.skipped}.`;
-                    if (data.errors && data.errors.length) {
-                        msg += `<ul class="mb-0 mt-2">${data.errors.map(e => `<li>${e}</li>`).join('')}</ul>`;
-                    }
-                    msg += '</div>';
-                    results.innerHTML = msg;
+                    const n = data.count === 1 ? '1 server' : `${data.count} servers`;
+                    results.innerHTML = `<div class="alert alert-info mb-0"><i class="bi bi-send-check me-2"></i>Pull queued for ${n} — syncing in the background. <a href="{{ path('push_log_index') }}">View Push Logs</a> to see the result.</div>`;
                 }
                 results.style.display = '';
             })
