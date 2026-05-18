@@ -9,12 +9,10 @@ use App\Entity\IpAddress;
 use App\Entity\Ipv6Address;
 use App\Entity\NetworkInterface;
 use App\Entity\Subnet;
-use App\Entity\RadiusClient;
 use App\Repository\ClearpassServerRepository;
 use App\Repository\DhcpServerRepository;
 use App\Repository\DnsServerRepository;
 use App\Repository\NetworkInterfaceRepository;
-use App\Repository\RadiusServerRepository;
 
 class PushScopeService
 {
@@ -22,7 +20,6 @@ class PushScopeService
         private readonly ClearpassServerRepository  $clearpassRepo,
         private readonly DnsServerRepository        $dnsRepo,
         private readonly DhcpServerRepository       $dhcpRepo,
-        private readonly RadiusServerRepository     $radiusRepo,
         private readonly NetworkInterfaceRepository $ifaceRepo,
     ) {}
 
@@ -83,16 +80,6 @@ class PushScopeService
         return $this->clearpassRepo->findAllIds();
     }
 
-    public function affectsRadius(object $entity): bool
-    {
-        return $entity instanceof RadiusClient;
-    }
-
-    /** @return int[] */
-    public function allRadiusServerIds(): array
-    {
-        return $this->radiusRepo->findAllIds();
-    }
 
     private function viewIdsFor(object $entity): array
     {

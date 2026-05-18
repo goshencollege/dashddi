@@ -56,8 +56,6 @@
                                     <span class="badge bg-primary">DNS</span>
                                 {% elseif log.type == 'dhcp' %}
                                     <span class="badge bg-success">DHCP</span>
-                                {% elseif log.type == 'radius' %}
-                                    <span class="badge bg-warning text-dark">RADIUS</span>
                                 {% elseif log.type == 'clearpass' %}
                                     <span class="badge bg-info text-dark">ClearPass</span>
                                 {% else %}
@@ -87,8 +85,6 @@
                                     </div>
                                 {% elseif log.type == 'dns' %}
                                     {{ _self.renderDnsResult(log.result) }}
-                                {% elseif log.type == 'radius' %}
-                                    {{ _self.renderRadiusResult(log.result) }}
                                 {% elseif log.type == 'clearpass' %}
                                     {{ _self.renderClearpassResult(log.result) }}
                                 {% else %}
@@ -144,35 +140,6 @@
             <i class="bi {{ result.reload.success ? 'bi-arrow-repeat text-success' : 'bi-x-circle-fill text-danger' }} mt-1 flex-shrink-0"></i>
             <div>
                 <span class="badge {{ result.reload.success ? 'bg-success' : 'bg-danger' }} me-1">rndc reload</span>
-                {% if result.reload.output %}
-                    <span class="small font-monospace {{ result.reload.success ? 'text-muted' : 'text-danger' }}">{{ result.reload.output }}</span>
-                {% endif %}
-            </div>
-        </li>
-    {% endif %}
-</ul>
-{% endmacro %}
-
-{# ── RADIUS result renderer ───────────────────────────────────────────────── #}
-{% macro renderRadiusResult(result) %}
-<ul class="zone-list">
-    {% for file, info in result %}
-        {% if file != 'reload' %}
-        <li class="d-flex align-items-start gap-2">
-            <i class="bi {{ info.success ? 'bi-check-circle-fill text-success' : 'bi-x-circle-fill text-danger' }} mt-1 flex-shrink-0"></i>
-            <div>
-                <span class="badge bg-warning text-dark me-1">RADIUS</span>
-                <span class="font-monospace small">{{ info.file }}</span>
-                {% if info.output %}<div class="text-danger small font-monospace mt-1">{{ info.output }}</div>{% endif %}
-            </div>
-        </li>
-        {% endif %}
-    {% endfor %}
-    {% if result.reload is defined %}
-        <li class="d-flex align-items-start gap-2">
-            <i class="bi {{ result.reload.success ? 'bi-arrow-repeat text-success' : 'bi-x-circle-fill text-danger' }} mt-1 flex-shrink-0"></i>
-            <div>
-                <span class="badge {{ result.reload.success ? 'bg-success' : 'bg-danger' }} me-1">systemctl reload freeradius</span>
                 {% if result.reload.output %}
                     <span class="small font-monospace {{ result.reload.success ? 'text-muted' : 'text-danger' }}">{{ result.reload.output }}</span>
                 {% endif %}
