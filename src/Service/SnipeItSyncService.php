@@ -57,7 +57,13 @@ class SnipeItSyncService
             }
 
             $activeAssetIds[] = $assetId;
-            $assetName = trim((string) ($asset['name'] ?? $asset['asset_tag'] ?? 'Asset ' . $assetId));
+            $assetName   = trim((string) ($asset['name'] ?? ''));
+            if ($assetName === '') {
+                $assetName = trim((string) ($asset['asset_tag'] ?? ''));
+            }
+            if ($assetName === '') {
+                $assetName = 'Asset ' . $assetId;
+            }
             $assetTagStr = trim((string) ($asset['asset_tag'] ?? ''));
 
             $link = $this->linkRepo->findByServerAndAssetId($server, $assetId);
@@ -69,6 +75,10 @@ class SnipeItSyncService
                     $result['updated']++;
                 } else {
                     $host = $this->createHost($assetName, $macs, $snipeTag, $result['errors']);
+                    if ($host === null) {
+                        $result['skipped']++;
+                        continue;
+                    }
                     $link = new SnipeItAssetLink();
                     $link->setServer($server);
                     $link->setHost($host);
@@ -98,13 +108,14 @@ class SnipeItSyncService
         return $result;
     }
 
-    private function createHost(string $name, array $macs, Tag $snipeTag, array &$errors): Host
+    /** Returns null if no interfaces could be created (all MACs already assigned elsewhere). */
+    private function createHost(string $name, array $macs, Tag $snipeTag, array &$errors): ?Host
     {
         $host = new Host();
         $host->setName($name);
         $host->addTag($snipeTag);
-        $this->em->persist($host);
 
+        $added = 0;
         foreach ($macs as $mac) {
             $existing = $this->ifaceRepo->findOneBy(['macAddress' => $this->normalizeMac($mac)]);
             if ($existing !== null) {
@@ -115,8 +126,14 @@ class SnipeItSyncService
             $iface->setMacAddress($mac);
             $iface->setHost($host);
             $this->em->persist($iface);
+            $added++;
         }
 
+        if ($added === 0) {
+            return null;
+        }
+
+        $this->em->persist($host);
         return $host;
     }
 
