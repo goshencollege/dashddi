@@ -279,6 +279,7 @@ class SnipeItSyncService
         }
 
         $context  = stream_context_create(['http' => $httpOptions, 'ssl' => $sslOptions]);
+        error_clear_last();
         $raw      = @file_get_contents($url, false, $context);
         $httpMeta = $http_response_header ?? [];
 
@@ -291,9 +292,16 @@ class SnipeItSyncService
         }
 
         if ($raw === false || ($status >= 400)) {
+            if ($raw === false) {
+                $phpError = error_get_last();
+                $detail   = $phpError ? preg_replace('/^.*?: /', '', $phpError['message']) : 'Connection failed';
+                $error    = 'Connection failed: ' . $detail;
+            } else {
+                $error = 'HTTP ' . $status;
+            }
             return [
                 'success' => false,
-                'error'   => $raw === false ? 'Connection failed' : 'HTTP ' . $status,
+                'error'   => $error,
                 'body'    => $raw ?: '',
                 'status'  => $status,
             ];
