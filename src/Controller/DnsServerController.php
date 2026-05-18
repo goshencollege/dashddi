@@ -13,6 +13,7 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\DeduplicateStamp;
 use Symfony\Component\Routing\Attribute\Route;
 
 #[Route('/dns-servers')]
@@ -103,7 +104,7 @@ class DnsServerController extends AbstractController
         }
 
         foreach ($servers as $server) {
-            $bus->dispatch(new PushDnsMessage($server->getId()));
+            $bus->dispatch(new PushDnsMessage($server->getId()), [new DeduplicateStamp('push_dns_' . $server->getId())]);
         }
 
         return $this->json(['queued' => true, 'count' => count($servers)], 202);

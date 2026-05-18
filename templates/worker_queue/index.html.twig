@@ -1,0 +1,144 @@
+{% extends 'base.html.twig' %}
+{% block title %}Worker Queue{% endblock %}
+{% block body_class %}page-list-scroll{% endblock %}
+
+{% block content %}
+<div class="list-page-content">
+    <div class="sticky-list-header d-flex justify-content-between align-items-center mb-3">
+        <h1 class="h4 mb-0"><i class="bi bi-stack me-2"></i>Worker Queue</h1>
+        <span class="text-muted small">
+            {{ running|length }} running &middot; {{ pending|length }} pending &middot; {{ failed|length }} failed
+        </span>
+    </div>
+
+    {% if running is empty and pending is empty and failed is empty %}
+        <div class="card">
+            <div class="card-body text-center text-muted py-5">
+                <i class="bi bi-check-circle fs-1 d-block mb-3 opacity-25"></i>
+                The worker queue is empty.
+            </div>
+        </div>
+    {% endif %}
+
+    {% if running is not empty %}
+    <h6 class="text-muted text-uppercase small fw-semibold mb-2 mt-3">
+        <i class="bi bi-arrow-repeat me-1"></i>Running
+    </h6>
+    <div class="card mb-4">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0 align-middle">
+                <thead>
+                    <tr>
+                        <th>Task</th>
+                        <th>Queue</th>
+                        <th>Created</th>
+                        <th>Claimed At</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for row in running %}
+                    <tr>
+                        <td class="fw-semibold">{{ row.label }}</td>
+                        <td><span class="badge bg-secondary">{{ row.queue_name }}</span></td>
+                        <td class="text-nowrap text-muted small">{{ row.created_at|date('M j, g:i a', tz) }}</td>
+                        <td class="text-nowrap text-muted small">{{ row.delivered_at ? row.delivered_at|date('M j, g:i a', tz) : '—' }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if pending is not empty %}
+    <h6 class="text-muted text-uppercase small fw-semibold mb-2 {% if running is not empty %}mt-2{% else %}mt-3{% endif %}">
+        <i class="bi bi-hourglass-split me-1"></i>Pending
+    </h6>
+    <div class="card mb-4">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0 align-middle">
+                <thead>
+                    <tr>
+                        <th>Task</th>
+                        <th>Queue</th>
+                        <th>Created</th>
+                        <th>Available At</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for row in pending %}
+                    <tr>
+                        <td class="fw-semibold">{{ row.label }}</td>
+                        <td><span class="badge bg-secondary">{{ row.queue_name }}</span></td>
+                        <td class="text-nowrap text-muted small">{{ row.created_at|date('M j, g:i a', tz) }}</td>
+                        <td class="text-nowrap text-muted small">{{ row.available_at ? row.available_at|date('M j, g:i a', tz) : '—' }}</td>
+                        <td class="text-end pe-3">
+                            <form method="post" action="{{ path('worker_queue_cancel', {id: row.id}) }}" class="d-inline" onsubmit="return confirm('Cancel this queued task?')">
+                                <input type="hidden" name="_token" value="{{ csrf_token('wq_cancel_' ~ row.id) }}">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">
+                                    <i class="bi bi-x-lg me-1"></i>Cancel
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if failed is not empty %}
+    <div class="d-flex justify-content-between align-items-center mb-2 mt-2">
+        <h6 class="text-muted text-uppercase small fw-semibold mb-0">
+            <i class="bi bi-exclamation-triangle me-1 text-danger"></i>Failed
+        </h6>
+        <form method="post" action="{{ path('worker_queue_purge_failed') }}" onsubmit="return confirm('Delete all {{ failed|length }} failed messages? This cannot be undone.')">
+            <input type="hidden" name="_token" value="{{ csrf_token('wq_purge_failed') }}">
+            <button type="submit" class="btn btn-sm btn-outline-danger">
+                <i class="bi bi-trash me-1"></i>Delete All Failed
+            </button>
+        </form>
+    </div>
+    <div class="card mb-4">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0 align-middle">
+                <thead>
+                    <tr>
+                        <th>Task</th>
+                        <th>Created</th>
+                        <th>Failed At</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for row in failed %}
+                    <tr>
+                        <td class="fw-semibold">{{ row.label }}</td>
+                        <td class="text-nowrap text-muted small">{{ row.created_at|date('M j, g:i a', tz) }}</td>
+                        <td class="text-nowrap text-muted small">{{ row.delivered_at ? row.delivered_at|date('M j, g:i a', tz) : '—' }}</td>
+                        <td class="text-end pe-3">
+                            <form method="post" action="{{ path('worker_queue_retry', {id: row.id}) }}" class="d-inline">
+                                <input type="hidden" name="_token" value="{{ csrf_token('wq_retry_' ~ row.id) }}">
+                                <button type="submit" class="btn btn-sm btn-outline-warning">
+                                    <i class="bi bi-arrow-repeat me-1"></i>Retry
+                                </button>
+                            </form>
+                            <form method="post" action="{{ path('worker_queue_delete', {id: row.id}) }}" class="d-inline" onsubmit="return confirm('Delete this failed message?')">
+                                <input type="hidden" name="_token" value="{{ csrf_token('wq_delete_' ~ row.id) }}">
+                                <button type="submit" class="btn btn-sm btn-outline-secondary">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}
