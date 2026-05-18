@@ -70,9 +70,16 @@ class SnipeItSyncService
 
             try {
                 if ($link !== null) {
-                    $this->updateHost($link, $assetName, $assetTagStr, $macs, $result['errors']);
-                    $link->setSyncedAt(new \DateTimeImmutable());
-                    $result['updated']++;
+                    $kept = $this->updateHost($link, $assetName, $assetTagStr, $macs, $result['errors']);
+                    if (!$kept) {
+                        $this->em->remove($link);
+                        $result['deleted']++;
+                        // Remove from activeAssetIds so the cleanup loop doesn't double-count
+                        $activeAssetIds = array_diff($activeAssetIds, [$assetId]);
+                    } else {
+                        $link->setSyncedAt(new \DateTimeImmutable());
+                        $result['updated']++;
+                    }
                 } else {
                     $host = $this->createHost($assetName, $macs, $snipeTag, $result['errors']);
                     if ($host === null) {
@@ -137,7 +144,8 @@ class SnipeItSyncService
         return $host;
     }
 
-    private function updateHost(SnipeItAssetLink $link, string $name, string $assetTagStr, array $macs, array &$errors): void
+    /** Returns false (and removes the host) if it ends up with no interfaces after the update. */
+    private function updateHost(SnipeItAssetLink $link, string $name, string $assetTagStr, array $macs, array &$errors): bool
     {
         $host = $link->getHost();
         $host->setName($name);
@@ -173,6 +181,13 @@ class SnipeItSyncService
             $iface->setHost($host);
             $this->em->persist($iface);
         }
+
+        if ($host->getInterfaces()->isEmpty()) {
+            $this->em->remove($host);
+            return false;
+        }
+
+        return true;
     }
 
     private function ensureTag(string $tagName): Tag
