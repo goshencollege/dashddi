@@ -1,2 +1,5 @@
 framework:
-    lock: '%env(LOCK_DSN)%'
+    lock:
+        resources:
+            default:
+                - doctrine.dbal.default_connection
