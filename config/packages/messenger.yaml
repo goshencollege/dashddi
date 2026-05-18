@@ -9,3 +9,4 @@ framework:
             'App\Message\PushClearpassMessage': async
             'App\Message\PushDnsMessage': async
             'App\Message\PushDhcpMessage': async
+            'App\Message\RunScheduledTaskMessage': async
