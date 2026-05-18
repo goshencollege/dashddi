@@ -13,6 +13,7 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\DeduplicateStamp;
 use Symfony\Component\Routing\Attribute\Route;
 
 class ScheduledTaskController extends AbstractController
@@ -74,7 +75,7 @@ class ScheduledTaskController extends AbstractController
             return $this->redirectToRoute('scheduler_index');
         }
 
-        $bus->dispatch(new RunScheduledTaskMessage($task->getId()));
+        $bus->dispatch(new RunScheduledTaskMessage($task->getId()), [new DeduplicateStamp('run_task_' . $task->getId(), ttl: 3600)]);
 
         $this->addFlash('info', '"' . $task->getName() . '" is running in the background. Check the output page in a moment to see the result.');
         return $this->redirectToRoute('scheduler_index');
