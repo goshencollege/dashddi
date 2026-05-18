@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\ScheduledTask;
 use App\Form\ScheduledTaskFormType;
+use App\Repository\AppSettingRepository;
 use App\Repository\ScheduledTaskRepository;
 use App\Service\ScheduledTaskRunnerService;
 use Cron\CronExpression;
@@ -16,15 +17,16 @@ use Symfony\Component\Routing\Attribute\Route;
 class ScheduledTaskController extends AbstractController
 {
     #[Route('/scheduler', name: 'scheduler_index', methods: ['GET'])]
-    public function index(ScheduledTaskRepository $repo): Response
+    public function index(ScheduledTaskRepository $repo, AppSettingRepository $settingRepo): Response
     {
         $tasks   = $repo->findBy([], ['id' => 'ASC']);
         $nextRun = [];
+        $tz      = new \DateTimeZone($settingRepo->getInstance()->getTimezone() ?? 'UTC');
 
         foreach ($tasks as $task) {
             try {
-                $cron            = new CronExpression($task->getCronExpression());
-                $nextRun[$task->getId()] = $cron->getNextRunDate();
+                $cron = new CronExpression($task->getCronExpression());
+                $nextRun[$task->getId()] = $cron->getNextRunDate('now', 0, false, $tz->getName());
             } catch (\Exception) {
                 $nextRun[$task->getId()] = null;
             }
