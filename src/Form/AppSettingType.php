@@ -37,6 +37,12 @@ class AppSettingType extends AbstractType
                 'attr'     => ['placeholder' => '30'],
                 'help'     => 'How long to keep DNS/DHCP push log entries. Leave blank to keep forever.',
             ])
+            ->add('deletedHostRetentionDays', IntegerType::class, [
+                'label'    => 'Deleted Host/Interface Retention (days)',
+                'required' => false,
+                'attr'     => ['placeholder' => '90'],
+                'help'     => 'How long to keep soft-deleted hosts and interfaces before permanently removing them. Leave blank to keep forever.',
+            ])
             ->add('clearpassAuthLogRetentionDays', IntegerType::class, [
                 'label'    => 'ClearPass Auth Log Retention (days)',
                 'required' => false,

@@ -162,7 +162,7 @@ class InterfaceApiController extends AbstractController
     #[Route('/{id}', name: 'api_interfaces_delete', methods: ['DELETE'])]
     public function delete(NetworkInterface $interface, EntityManagerInterface $em): JsonResponse
     {
-        $em->remove($interface);
+        $interface->softDelete();
         $em->flush();
 
         return $this->json(null, Response::HTTP_NO_CONTENT);

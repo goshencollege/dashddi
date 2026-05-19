@@ -173,10 +173,10 @@ class InterfaceController extends AbstractController
             $count = count($interfaces);
             foreach ($byHost as ['host' => $host, 'selected' => $selected]) {
                 if (count($selected) >= $host->getInterfaces()->count()) {
-                    $em->remove($host);
+                    $host->softDeleteWithInterfaces();
                 } else {
                     foreach ($selected as $iface) {
-                        $em->remove($iface);
+                        $iface->softDelete();
                     }
                 }
             }
@@ -194,12 +194,12 @@ class InterfaceController extends AbstractController
         $hostId = $host?->getId();
         if ($this->isCsrfTokenValid('delete_interface_' . $interface->getId(), $request->request->get('_token'))) {
             if ($host && $host->getInterfaces()->count() === 1) {
-                $em->remove($host);
+                $host->softDeleteWithInterfaces();
                 $em->flush();
                 $this->addFlash('success', 'Interface and host "' . $host->getName() . '" deleted.');
                 return $this->redirectToRoute('host_index');
             }
-            $em->remove($interface);
+            $interface->softDelete();
             $em->flush();
             $this->addFlash('success', 'Interface deleted.');
         }

@@ -3,6 +3,7 @@
 namespace App\Entity;
 
 use App\Entity\Trait\AuditableTrait;
+use App\Entity\Trait\SoftDeletableTrait;
 use App\Repository\NetworkInterfaceRepository;
 use App\Validator\UniqueMacAddress;
 use Doctrine\Common\Collections\ArrayCollection;
@@ -16,6 +17,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 class NetworkInterface
 {
     use AuditableTrait;
+    use SoftDeletableTrait;
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
