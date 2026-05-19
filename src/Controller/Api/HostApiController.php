@@ -19,7 +19,8 @@ class HostApiController extends AbstractController
     #[Route('', name: 'api_hosts_index', methods: ['GET'])]
     public function index(Request $request, HostRepository $repo): JsonResponse
     {
-        $qb = $repo->createQueryBuilder('h');
+        $qb = $repo->createQueryBuilder('h')
+            ->where('h.deletedAt IS NULL');
 
         if ($name = $request->query->get('name')) {
             $qb->andWhere('h.name LIKE :name')->setParameter('name', '%' . $name . '%');
@@ -36,6 +37,9 @@ class HostApiController extends AbstractController
     #[Route('/{id}', name: 'api_hosts_show', methods: ['GET'])]
     public function show(Host $host): JsonResponse
     {
+        if ($host->isDeleted()) {
+            return $this->json(['error' => 'Not found'], Response::HTTP_NOT_FOUND);
+        }
         return $this->json($this->serialize($host));
     }
 
@@ -85,6 +89,9 @@ class HostApiController extends AbstractController
         BuildingRepository $buildingRepo,
         TagRepository $tagRepo,
     ): JsonResponse {
+        if ($host->isDeleted()) {
+            return $this->json(['error' => 'Not found'], Response::HTTP_NOT_FOUND);
+        }
         $data = json_decode($request->getContent(), true) ?? [];
 
         if (array_key_exists('name', $data)) {
@@ -130,6 +137,9 @@ class HostApiController extends AbstractController
     #[Route('/{id}', name: 'api_hosts_delete', methods: ['DELETE'])]
     public function delete(Host $host, EntityManagerInterface $em): JsonResponse
     {
+        if ($host->isDeleted()) {
+            return $this->json(null, Response::HTTP_NO_CONTENT);
+        }
         $host->softDeleteWithInterfaces();
         $em->flush();
 
