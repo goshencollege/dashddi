@@ -35,69 +35,106 @@ class SnipeItSyncService
     {
         $result = ['created' => 0, 'updated' => 0, 'deleted' => 0, 'skipped' => 0, 'errors' => []];
 
+        // Cache scalar values before any em->clear() detaches $server
+        $serverId      = $server->getId();
+        $macFieldNames = $server->getMacCustomFieldNames();
+
         $snipeTag = $this->ensureTag(self::TAG_NAME);
+        $this->em->flush(); // persist new tag before first clear
 
-        $assets = $this->fetchAllAssets($server);
         $activeAssetIds = [];
+        $offset = 0;
+        $total  = PHP_INT_MAX;
 
-        foreach ($assets as $asset) {
-            $assetId = (int) ($asset['id'] ?? 0);
-            if ($assetId === 0) {
-                continue;
+        while ($offset < $total) {
+            $response = $this->request($server, 'GET', '/api/v1/hardware', null, [
+                'limit'  => self::FETCH_LIMIT,
+                'offset' => $offset,
+                'sort'   => 'id',
+                'order'  => 'asc',
+            ]);
+
+            if (!$response['success']) {
+                throw new \RuntimeException('Snipe-IT API error: ' . $response['error']);
             }
 
-            if ($this->isArchived($asset)) {
-                continue;
+            $data  = json_decode($response['body'], true, 512, JSON_THROW_ON_ERROR);
+            $rows  = $data['rows'] ?? [];
+            $total = (int) ($data['total'] ?? 0);
+
+            if (empty($rows)) {
+                break;
             }
 
-            $macs = $this->extractMacs($asset, $server->getMacCustomFieldNames());
-            if (empty($macs)) {
-                $result['skipped']++;
-                continue;
-            }
-
-            $activeAssetIds[] = $assetId;
-            $assetName   = trim((string) ($asset['name'] ?? ''));
-            if ($assetName === '') {
-                $assetName = trim((string) ($asset['asset_tag'] ?? ''));
-            }
-            if ($assetName === '') {
-                $assetName = 'Asset ' . $assetId;
-            }
-            $assetTagStr = trim((string) ($asset['asset_tag'] ?? ''));
-
-            $link = $this->linkRepo->findByServerAndAssetId($server, $assetId);
-
-            try {
-                if ($link !== null) {
-                    $kept = $this->updateHost($link, $assetName, $assetTagStr, $macs, $result['errors']);
-                    if (!$kept) {
-                        $this->em->remove($link);
-                        $result['deleted']++;
-                        // Remove from activeAssetIds so the cleanup loop doesn't double-count
-                        $activeAssetIds = array_diff($activeAssetIds, [$assetId]);
-                    } else {
-                        $link->setSyncedAt(new \DateTimeImmutable());
-                        $result['updated']++;
-                    }
-                } else {
-                    $host = $this->createHost($assetName, $macs, $snipeTag, $result['errors']);
-                    if ($host === null) {
-                        $result['skipped']++;
-                        continue;
-                    }
-                    $link = new SnipeItAssetLink();
-                    $link->setServer($server);
-                    $link->setHost($host);
-                    $link->setSnipeAssetId($assetId);
-                    $link->setSnipeAssetTag($assetTagStr);
-                    $link->setSnipeAssetName($assetName);
-                    $this->em->persist($link);
-                    $result['created']++;
+            foreach ($rows as $asset) {
+                $assetId = (int) ($asset['id'] ?? 0);
+                if ($assetId === 0) {
+                    continue;
                 }
-            } catch (\Throwable $e) {
-                $result['errors'][] = sprintf('Asset %d (%s): %s', $assetId, $assetName, $e->getMessage());
+
+                if ($this->isArchived($asset)) {
+                    continue;
+                }
+
+                $macs = $this->extractMacs($asset, $macFieldNames);
+                if (empty($macs)) {
+                    $result['skipped']++;
+                    continue;
+                }
+
+                $activeAssetIds[] = $assetId;
+                $assetName   = trim((string) ($asset['name'] ?? ''));
+                if ($assetName === '') {
+                    $assetName = trim((string) ($asset['asset_tag'] ?? ''));
+                }
+                if ($assetName === '') {
+                    $assetName = 'Asset ' . $assetId;
+                }
+                $assetTagStr = trim((string) ($asset['asset_tag'] ?? ''));
+
+                $link = $this->linkRepo->findByServerAndAssetId($server, $assetId);
+
+                try {
+                    if ($link !== null) {
+                        $kept = $this->updateHost($link, $assetName, $assetTagStr, $macs, $result['errors']);
+                        if (!$kept) {
+                            $this->em->remove($link);
+                            $result['deleted']++;
+                            $activeAssetIds = array_diff($activeAssetIds, [$assetId]);
+                        } else {
+                            $link->setSyncedAt(new \DateTimeImmutable());
+                            $result['updated']++;
+                        }
+                    } else {
+                        $host = $this->createHost($assetName, $macs, $snipeTag, $result['errors']);
+                        if ($host === null) {
+                            $result['skipped']++;
+                            continue;
+                        }
+                        $link = new SnipeItAssetLink();
+                        $link->setServer($server);
+                        $link->setHost($host);
+                        $link->setSnipeAssetId($assetId);
+                        $link->setSnipeAssetTag($assetTagStr);
+                        $link->setSnipeAssetName($assetName);
+                        $this->em->persist($link);
+                        $result['created']++;
+                    }
+                } catch (\Throwable $e) {
+                    $result['errors'][] = sprintf('Asset %d (%s): %s', $assetId, $assetName, $e->getMessage());
+                }
             }
+
+            // Flush and clear after each page to prevent Doctrine's identity map from
+            // accumulating thousands of hydrated entities and exhausting PHP memory.
+            $this->em->flush();
+            $this->em->clear();
+
+            // Re-acquire entities detached by clear()
+            $server   = $this->em->find(SnipeItServer::class, $serverId);
+            $snipeTag = $this->ensureTag(self::TAG_NAME);
+
+            $offset += self::FETCH_LIMIT;
         }
 
         // Remove hosts for assets no longer active in Snipe-IT
@@ -199,35 +236,6 @@ class SnipeItSyncService
             $this->em->persist($tag);
         }
         return $tag;
-    }
-
-    /** Fetch every page of assets from the Snipe-IT API. */
-    private function fetchAllAssets(SnipeItServer $server): array
-    {
-        $assets = [];
-        $offset = 0;
-
-        do {
-            $response = $this->request($server, 'GET', '/api/v1/hardware', null, [
-                'limit'  => self::FETCH_LIMIT,
-                'offset' => $offset,
-                'sort'   => 'id',
-                'order'  => 'asc',
-            ]);
-
-            if (!$response['success']) {
-                throw new \RuntimeException('Snipe-IT API error: ' . $response['error']);
-            }
-
-            $data  = json_decode($response['body'], true, 512, JSON_THROW_ON_ERROR);
-            $rows  = $data['rows'] ?? [];
-            $total = (int) ($data['total'] ?? 0);
-
-            $assets = array_merge($assets, $rows);
-            $offset += self::FETCH_LIMIT;
-        } while (count($assets) < $total && !empty($rows));
-
-        return $assets;
     }
 
     private function isArchived(array $asset): bool
