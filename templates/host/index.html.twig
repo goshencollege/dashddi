@@ -219,7 +219,7 @@
                     </thead>
                     <tbody>
                         {% for host in hosts %}
-                            <tr>
+                            <tr class="{{ host.deleted ? 'table-warning' : '' }}">
                                 <td class="ps-3">
                                     <input type="checkbox" class="form-check-input bulk-host-cb" value="{{ host.id }}">
                                 </td>
@@ -227,6 +227,9 @@
                                     <a href="{{ path('host_show', {id: host.id}) }}" class="fw-semibold text-decoration-none">
                                         {{ host.name }}
                                     </a>
+                                    {% if host.deleted %}
+                                        <span class="badge text-bg-warning ms-1">Deleted</span>
+                                    {% endif %}
                                     {% set snipeLink = host.snipeItAssetLink %}
                                     {% if snipeLink and snipeLink.snipeAssetName != host.name %}
                                         <div class="text-muted small"><i class="bi bi-box-seam me-1"></i>{{ snipeLink.snipeAssetName }}</div>
@@ -292,16 +295,25 @@
                                 </td>
                                 <td class="text-end">
                                     <div class="d-flex gap-1 justify-content-end align-items-center">
-                                        <a href="{{ path('host_edit', {id: host.id}) }}" class="btn btn-sm btn-outline-secondary">
-                                            <i class="bi bi-pencil"></i>
-                                        </a>
-                                        <form method="post" action="{{ path('host_delete', {id: host.id}) }}"
-                                              onsubmit="return confirm('Delete host {{ host.name|e('js') }}?')">
-                                            <input type="hidden" name="_token" value="{{ csrf_token('delete_host_' ~ host.id) }}">
-                                            <button type="submit" class="btn btn-sm btn-outline-danger">
-                                                <i class="bi bi-trash"></i>
-                                            </button>
-                                        </form>
+                                        {% if host.deleted %}
+                                            <form method="post" action="{{ path('host_restore', {id: host.id}) }}">
+                                                <input type="hidden" name="_token" value="{{ csrf_token('restore_host_' ~ host.id) }}">
+                                                <button type="submit" class="btn btn-sm btn-outline-warning" title="Restore">
+                                                    <i class="bi bi-arrow-counterclockwise"></i>
+                                                </button>
+                                            </form>
+                                        {% else %}
+                                            <a href="{{ path('host_edit', {id: host.id}) }}" class="btn btn-sm btn-outline-secondary">
+                                                <i class="bi bi-pencil"></i>
+                                            </a>
+                                            <form method="post" action="{{ path('host_delete', {id: host.id}) }}"
+                                                  onsubmit="return confirm('Delete host {{ host.name|e('js') }}?')">
+                                                <input type="hidden" name="_token" value="{{ csrf_token('delete_host_' ~ host.id) }}">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </form>
+                                        {% endif %}
                                     </div>
                                 </td>
                             </tr>
@@ -345,7 +357,8 @@
                     <tbody>
                         {% for host in hosts %}
                             {% for iface in host.interfaces %}
-                                <tr>
+                                {% set row_deleted = iface.deleted or host.deleted %}
+                                <tr class="{{ row_deleted ? 'table-warning' : '' }}">
                                     <td class="ps-3">
                                         <input type="checkbox" class="form-check-input bulk-iface-cb" value="{{ iface.id }}">
                                     </td>
@@ -353,6 +366,9 @@
                                         <a href="{{ path('host_show', {id: host.id}) }}" class="fw-semibold text-decoration-none">
                                             {{ host.name }}
                                         </a>
+                                        {% if host.deleted %}
+                                            <span class="badge text-bg-warning ms-1">Deleted</span>
+                                        {% endif %}
                                         {% set snipeLink = host.snipeItAssetLink %}
                                         {% if snipeLink and snipeLink.snipeAssetName != host.name %}
                                             <div class="text-muted small"><i class="bi bi-box-seam me-1"></i>{{ snipeLink.snipeAssetName }}</div>
@@ -373,6 +389,9 @@
                                             <div class="fw-semibold">{{ iface.name }}</div>
                                         {% endif %}
                                         <div class="font-monospace text-muted">{{ iface.macAddress }}</div>
+                                        {% if iface.deleted %}
+                                            <span class="badge text-bg-warning mt-1">Interface deleted</span>
+                                        {% endif %}
                                     </td>
                                     <td class="small">{{ iface.subnet ? iface.subnet.name : '—' }}</td>
                                     <td class="ip-address small">
@@ -415,16 +434,25 @@
                                     </td>
                                     <td class="text-end">
                                         <div class="d-flex gap-1 justify-content-end align-items-center">
-                                            <a href="{{ path('interface_edit', {id: iface.id}) }}" class="btn btn-sm btn-outline-secondary">
-                                                <i class="bi bi-pencil"></i>
-                                            </a>
-                                            <form method="post" action="{{ path('interface_delete', {id: iface.id}) }}"
-                                                  onsubmit="return confirm({% if host.interfaces|length == 1 %}'Delete interface {{ iface.macAddress|e('js') }}? It is the only interface on {{ host.name|e('js') }}, so the host will also be deleted.'{% else %}'Delete interface {{ iface.macAddress|e('js') }} from {{ host.name|e('js') }}?'{% endif %})">
-                                                <input type="hidden" name="_token" value="{{ csrf_token('delete_interface_' ~ iface.id) }}">
-                                                <button type="submit" class="btn btn-sm btn-outline-danger">
-                                                    <i class="bi bi-trash"></i>
-                                                </button>
-                                            </form>
+                                            {% if row_deleted %}
+                                                <form method="post" action="{{ path('interface_restore', {id: iface.id}) }}">
+                                                    <input type="hidden" name="_token" value="{{ csrf_token('restore_interface_' ~ iface.id) }}">
+                                                    <button type="submit" class="btn btn-sm btn-outline-warning" title="Restore">
+                                                        <i class="bi bi-arrow-counterclockwise"></i>
+                                                    </button>
+                                                </form>
+                                            {% else %}
+                                                <a href="{{ path('interface_edit', {id: iface.id}) }}" class="btn btn-sm btn-outline-secondary">
+                                                    <i class="bi bi-pencil"></i>
+                                                </a>
+                                                <form method="post" action="{{ path('interface_delete', {id: iface.id}) }}"
+                                                      onsubmit="return confirm({% if host.interfaces|filter(i => not i.deleted)|length == 1 %}'Delete interface {{ iface.macAddress|e('js') }}? It is the only active interface on {{ host.name|e('js') }}, so the host will also be deleted.'{% else %}'Delete interface {{ iface.macAddress|e('js') }} from {{ host.name|e('js') }}?'{% endif %})">
+                                                    <input type="hidden" name="_token" value="{{ csrf_token('delete_interface_' ~ iface.id) }}">
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                </form>
+                                            {% endif %}
                                         </div>
                                     </td>
                                 </tr>
