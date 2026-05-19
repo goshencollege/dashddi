@@ -118,17 +118,34 @@ class SnipeItSyncService
                             }
                         }
 
-                        if (count($conflictHosts) > 1) {
-                            $result['errors'][] = sprintf(
-                                'Asset %d (%s): MACs belong to multiple existing hosts — skipped.',
-                                $assetId, $assetName
-                            );
-                            $result['skipped']++;
-                            continue;
-                        }
-
                         $adopted = false;
-                        if (count($conflictHosts) === 1) {
+                        if (count($conflictHosts) > 1) {
+                            // MACs span multiple DashDDI hosts — merge if all are unlinked
+                            // (typical cause: dual-NIC machines with one entry per interface in old IPAM)
+                            $hasLinked = false;
+                            foreach ($conflictHosts as $hId => $h) {
+                                if ($h->getSnipeItAssetLink() !== null || isset($adoptedHostIds[$hId])) {
+                                    $hasLinked = true;
+                                    break;
+                                }
+                            }
+                            if ($hasLinked) {
+                                $result['errors'][] = sprintf(
+                                    'Asset %d (%s): MACs span multiple already-linked hosts — skipped.',
+                                    $assetId, $assetName
+                                );
+                                $result['skipped']++;
+                                continue;
+                            }
+                            // All unlinked — pick the host with the most interfaces as primary
+                            $hosts = array_values($conflictHosts);
+                            usort($hosts, fn($a, $b) => $b->getInterfaces()->count() <=> $a->getInterfaces()->count());
+                            $host = $hosts[0];
+                            $this->mergeHosts($host, array_slice($hosts, 1));
+                            $this->adoptHost($host, $normalizedMacs, $snipeTag);
+                            $adoptedHostIds[$host->getId()] = true;
+                            $adopted = true;
+                        } elseif (count($conflictHosts) === 1) {
                             $host   = array_values($conflictHosts)[0];
                             $hostId = $host->getId();
                             // Skip if already linked in the DB or adopted earlier in this session
@@ -199,6 +216,26 @@ class SnipeItSyncService
         $this->em->flush();
 
         return $result;
+    }
+
+    /**
+     * Moves all interfaces from each host in $others into $primary, then deletes the now-empty hosts.
+     * Uses DBAL directly to avoid Doctrine's orphan-removal scheduling interfering with the UPDATE
+     * before the DELETE. host_tag rows are cleaned up by the DB-level ON DELETE CASCADE on host.
+     */
+    private function mergeHosts(Host $primary, array $others): void
+    {
+        $conn = $this->em->getConnection();
+        foreach ($others as $other) {
+            $conn->executeStatement(
+                'UPDATE network_interface SET host_id = ? WHERE host_id = ?',
+                [$primary->getId(), $other->getId()]
+            );
+            $conn->executeStatement('DELETE FROM host WHERE id = ?', [$other->getId()]);
+            $this->em->detach($other);
+        }
+        // Reload primary so Doctrine's identity map reflects the moved interfaces
+        $this->em->refresh($primary);
     }
 
     /**
@@ -289,13 +326,35 @@ class SnipeItSyncService
             fn(NetworkInterface $i) => $i->getMacAddress(),
             $host->getInterfaces()->toArray()
         );
+        $conn = $this->em->getConnection();
         foreach ($normalizedMacs as $mac) {
             if (in_array($mac, $existingMacs, true)) {
                 continue;
             }
             $conflict = $this->ifaceRepo->findOneBy(['macAddress' => $mac]);
             if ($conflict !== null && $conflict->getHost()?->getId() !== $host->getId()) {
-                $errors[] = sprintf('MAC %s already assigned to another host — skipped for asset "%s".', $mac, $name);
+                $conflictHost = $conflict->getHost();
+                if ($conflictHost?->getSnipeItAssetLink() !== null) {
+                    $errors[] = sprintf('MAC %s already linked via another Snipe asset — skipped for "%s".', $mac, $name);
+                    continue;
+                }
+                // Unlinked host — move this interface to the Snipe-linked host via DBAL to avoid
+                // Doctrine's orphan-removal race with the host deletion on flush.
+                $conn->executeStatement(
+                    'UPDATE network_interface SET host_id = ? WHERE id = ?',
+                    [$host->getId(), $conflict->getId()]
+                );
+                $remaining = (int) $conn->fetchOne(
+                    'SELECT COUNT(*) FROM network_interface WHERE host_id = ?',
+                    [$conflictHost->getId()]
+                );
+                if ($remaining === 0) {
+                    $conn->executeStatement('DELETE FROM host WHERE id = ?', [$conflictHost->getId()]);
+                }
+                $this->em->detach($conflict);
+                $this->em->detach($conflictHost);
+                // Record the MAC so the loop below doesn't try to create a duplicate interface
+                $existingMacs[] = $mac;
                 continue;
             }
             $iface = new NetworkInterface();
