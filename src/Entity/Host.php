@@ -14,6 +14,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: HostRepository::class)]
 #[ORM\Table(name: 'host')]
+#[ORM\Index(columns: ['deleted_at'], name: 'idx_host_deleted_at')]
 class Host
 {
     use AuditableTrait;
