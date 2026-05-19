@@ -145,6 +145,84 @@
     </div>
 {% endif %}
 
+{# ── Snipe-IT Servers ─────────────────────────────────────────────────────── #}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="h5 mb-0"><i class="bi bi-box-seam me-2"></i>Snipe-IT Servers</h2>
+    <div class="d-flex gap-2">
+        <button id="snipeit-pull-btn" class="btn btn-sm btn-success" {% if snipeItServers is empty %}disabled{% endif %}>
+            <i class="bi bi-cloud-download me-1"></i>Pull Now
+        </button>
+        <a href="{{ path('snipe_it_server_new') }}" class="btn btn-sm btn-primary">
+            <i class="bi bi-plus-lg me-1"></i>Add Server
+        </a>
+    </div>
+</div>
+
+<div id="snipeit-pull-results" class="mb-3" style="display:none"></div>
+
+{% if snipeItServers is empty %}
+    <div class="card mb-5">
+        <div class="card-body text-center text-muted py-4">
+            <i class="bi bi-box-seam fs-1 d-block mb-3 opacity-25"></i>
+            No Snipe-IT servers configured yet. <a href="{{ path('snipe_it_server_new') }}">Add the first one →</a>
+        </div>
+    </div>
+{% else %}
+    <div class="card mb-5">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>API URL</th>
+                        <th>MAC Fields</th>
+                        <th>TLS</th>
+                        <th>Last Sync</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for server in snipeItServers %}
+                        <tr>
+                            <td class="fw-semibold">{{ server.name }}</td>
+                            <td class="font-monospace small">{{ server.apiUrl }}</td>
+                            <td class="small text-muted">{{ server.macCustomFields }}</td>
+                            <td>
+                                {% if server.verifyTls %}
+                                    <span class="badge bg-success">Verified</span>
+                                {% else %}
+                                    <span class="badge bg-warning text-dark">Unverified</span>
+                                {% endif %}
+                            </td>
+                            <td class="small">
+                                {% if server.lastSyncAt %}
+                                    {{ server.lastSyncAt|date('Y-m-d H:i') }}
+                                {% else %}
+                                    <span class="text-muted">Never</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">
+                                <div class="d-flex gap-1 justify-content-end align-items-center">
+                                    <a href="{{ path('snipe_it_server_edit', {id: server.id}) }}" class="btn btn-sm btn-outline-secondary">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <form method="post" action="{{ path('snipe_it_server_delete', {id: server.id}) }}"
+                                          onsubmit="return confirm('Remove {{ server.name|e('js') }}? This will delete all hosts imported from this server.')">
+                                        <input type="hidden" name="_token" value="{{ csrf_token('delete_snipe_it_server_' ~ server.id) }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endif %}
+
 {# ── DNS Servers ──────────────────────────────────────────────────────────── #}
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h2 class="h5 mb-0"><i class="bi bi-globe2 me-2"></i>DNS Servers</h2>
@@ -277,9 +355,46 @@
         });
     }
 
+    function bindPullButton(btnId, resultsId, endpoint) {
+        const btn     = document.getElementById(btnId);
+        const results = document.getElementById(resultsId);
+        if (!btn) return;
+
+        btn.addEventListener('click', function () {
+            btn.disabled  = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Queuing…';
+            results.style.display = 'none';
+            results.innerHTML = '';
+
+            fetch(endpoint, {
+                method: 'POST',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) {
+                    results.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+                } else {
+                    const n = data.count === 1 ? '1 server' : `${data.count} servers`;
+                    results.innerHTML = `<div class="alert alert-info mb-0"><i class="bi bi-send-check me-2"></i>Pull queued for ${n} — syncing in the background. <a href="{{ path('push_log_index') }}">View Push Logs</a> to see the result.</div>`;
+                }
+                results.style.display = '';
+            })
+            .catch(err => {
+                results.innerHTML = `<div class="alert alert-danger">Request failed: ${err}</div>`;
+                results.style.display = '';
+            })
+            .finally(() => {
+                btn.disabled  = false;
+                btn.innerHTML = '<i class="bi bi-cloud-download me-1"></i>Pull Now';
+            });
+        });
+    }
+
     bindPushButton('clearpass-push-btn', 'clearpass-push-results', '{{ path('clearpass_server_push') }}');
     bindPushButton('dhcp-push-btn',     'dhcp-push-results',     '{{ path('dhcp_server_push') }}');
     bindPushButton('dns-push-btn',      'dns-push-results',      '{{ path('dns_server_push') }}');
+    bindPullButton('snipeit-pull-btn',  'snipeit-pull-results',  '{{ path('snipe_it_server_pull') }}');
 })();
 </script>
 {% endblock %}
