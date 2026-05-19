@@ -255,7 +255,7 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
                 query: [
                     {name: 'name', type: 'string', desc: 'Partial name match (case-insensitive).'},
                     {name: 'building_id', type: 'integer', desc: 'Filter by building ID.'},
-                    {name: 'deleted', type: 'boolean', desc: 'Pass <code>true</code> to list soft-deleted hosts instead of active ones. Default: false.'},
+                    {name: 'deleted', type: 'string', desc: 'Omit or pass <code>false</code> for active hosts only (default). Pass <code>true</code> for deleted hosts only. Pass <code>all</code> to return both active and deleted.'},
                 ],
                 response_example: '[\n  {\n    "id": 1,\n    "name": "server01",\n    "room": "A101",\n    "building_id": 3,\n    "tag_ids": [1, 2],\n    "deleted_at": null,\n    "created_at": "2024-01-01T00:00:00+00:00",\n    "updated_at": "2024-01-01T00:00:00+00:00",\n    "created_by": "user@example.com",\n    "updated_by": "user@example.com"\n  }\n]',
             } %}
@@ -312,7 +312,7 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
                     {name: 'host_id', type: 'integer', desc: 'Filter by host ID.'},
                     {name: 'subnet_id', type: 'integer', desc: 'Filter by subnet ID.'},
                     {name: 'mac_address', type: 'string', desc: 'Exact MAC address match.'},
-                    {name: 'deleted', type: 'boolean', desc: 'Pass <code>true</code> to list soft-deleted interfaces instead of active ones. Default: false.'},
+                    {name: 'deleted', type: 'string', desc: 'Omit or pass <code>false</code> for active interfaces only (default). Pass <code>true</code> for deleted interfaces only. Pass <code>all</code> to return both active and deleted.'},
                 ],
                 response_example: '[\n  {\n    "id": 1,\n    "name": "eth0",\n    "mac_address": "aa:bb:cc:dd:ee:ff",\n    "host_id": 1,\n    "subnet_id": 2,\n    "ip_address": "10.0.0.5",\n    "ipv6_address": null,\n    "deleted_at": null,\n    "created_at": "2024-01-01T00:00:00+00:00",\n    "updated_at": "2024-01-01T00:00:00+00:00",\n    "created_by": "user@example.com",\n    "updated_by": "user@example.com"\n  }\n]',
             } %}
