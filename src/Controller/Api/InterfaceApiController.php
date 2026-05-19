@@ -20,9 +20,11 @@ class InterfaceApiController extends AbstractController
     #[Route('', name: 'api_interfaces_index', methods: ['GET'])]
     public function index(Request $request, NetworkInterfaceRepository $repo): JsonResponse
     {
-        $deleted = $request->query->getBoolean('deleted');
-        $qb = $repo->createQueryBuilder('i')
-            ->where($deleted ? 'i.deletedAt IS NOT NULL' : 'i.deletedAt IS NULL');
+        $deletedParam = $request->query->get('deleted');
+        $qb = $repo->createQueryBuilder('i');
+        if ($deletedParam !== 'all') {
+            $qb->where($request->query->getBoolean('deleted') ? 'i.deletedAt IS NOT NULL' : 'i.deletedAt IS NULL');
+        }
 
         if ($hostId = $request->query->getInt('host_id')) {
             $qb->andWhere('i.host = :hid')->setParameter('hid', $hostId);

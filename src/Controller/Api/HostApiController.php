@@ -19,9 +19,11 @@ class HostApiController extends AbstractController
     #[Route('', name: 'api_hosts_index', methods: ['GET'])]
     public function index(Request $request, HostRepository $repo): JsonResponse
     {
-        $deleted = $request->query->getBoolean('deleted');
-        $qb = $repo->createQueryBuilder('h')
-            ->where($deleted ? 'h.deletedAt IS NOT NULL' : 'h.deletedAt IS NULL');
+        $deletedParam = $request->query->get('deleted');
+        $qb = $repo->createQueryBuilder('h');
+        if ($deletedParam !== 'all') {
+            $qb->where($request->query->getBoolean('deleted') ? 'h.deletedAt IS NOT NULL' : 'h.deletedAt IS NULL');
+        }
 
         if ($name = $request->query->get('name')) {
             $qb->andWhere('h.name LIKE :name')->setParameter('name', '%' . $name . '%');
