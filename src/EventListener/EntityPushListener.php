@@ -7,6 +7,7 @@ use App\Message\PushDhcpMessage;
 use App\Message\PushDnsMessage;
 use App\Service\PushScopeService;
 use Doctrine\Bundle\DoctrineBundle\Attribute\AsDoctrineListener;
+use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Event\PostFlushEventArgs;
 use Doctrine\ORM\Event\PostPersistEventArgs;
 use Doctrine\ORM\Event\PostUpdateEventArgs;
@@ -25,6 +26,8 @@ class EntityPushListener
     private array $pendingDnsIds = [];
     /** @var array<string, true> Keyed by MAC for deduplication */
     private array $pendingClearpassMacs = [];
+    /** @var array<string, true> MACs whose interfaces were just soft-deleted — dispatched with a separate dedup key so they are never blocked by a pending update message */
+    private array $pendingClearpassDeleteMacs = [];
     private bool $pendingAllDhcp = false;
 
     public function __construct(
@@ -39,7 +42,24 @@ class EntityPushListener
 
     public function postUpdate(PostUpdateEventArgs $args): void
     {
-        $this->collect($args->getObject());
+        $entity = $args->getObject();
+        $this->collect($entity);
+
+        // When an entity is soft-deleted (deletedAt: null → value), dispatch an additional
+        // push with a different dedup key so it cannot be silently dropped by a pending
+        // update message that shares the normal key.
+        $em = $args->getObjectManager();
+        if ($em instanceof EntityManagerInterface) {
+            $changeset = $em->getUnitOfWork()->getEntityChangeSet($entity);
+            if (isset($changeset['deletedAt'])
+                && $changeset['deletedAt'][0] === null
+                && $changeset['deletedAt'][1] !== null
+            ) {
+                foreach ($this->scope->clearpassMacsFor($entity) as $mac) {
+                    $this->pendingClearpassDeleteMacs[$mac] = true;
+                }
+            }
+        }
     }
 
     public function preRemove(PreRemoveEventArgs $args): void
@@ -51,11 +71,13 @@ class EntityPushListener
     {
         $dnsIds        = $this->pendingDnsIds;
         $clearpassMacs = $this->pendingClearpassMacs;
+        $deleteMacs    = $this->pendingClearpassDeleteMacs;
         $allDhcp       = $this->pendingAllDhcp;
         // Reset before dispatching to avoid double-dispatch if flush triggers another flush
-        $this->pendingDnsIds        = [];
-        $this->pendingClearpassMacs = [];
-        $this->pendingAllDhcp       = false;
+        $this->pendingDnsIds              = [];
+        $this->pendingClearpassMacs       = [];
+        $this->pendingClearpassDeleteMacs = [];
+        $this->pendingAllDhcp             = false;
 
         foreach (array_keys($dnsIds) as $id) {
             $this->bus->dispatch(new PushDnsMessage($id), [new DeduplicateStamp('push_dns_' . $id)]);
@@ -69,12 +91,21 @@ class EntityPushListener
             }
         }
 
+        // Soft-delete pushes use a separate key so they are never blocked by a
+        // pending regular-update message with the same MAC.
+        if (!empty($deleteMacs)) {
+            foreach ($this->scope->allClearpassServerIds() as $serverId) {
+                foreach (array_keys($deleteMacs) as $mac) {
+                    $this->bus->dispatch(new PushClearpassMessage($serverId, $mac), [new DeduplicateStamp('push_clearpass_delete_' . $serverId . '_' . $mac)]);
+                }
+            }
+        }
+
         if ($allDhcp) {
             foreach ($this->scope->allDhcpServerIds() as $id) {
                 $this->bus->dispatch(new PushDhcpMessage($id), [new DeduplicateStamp('push_dhcp_' . $id)]);
             }
         }
-
     }
 
     private function collect(object $entity): void
