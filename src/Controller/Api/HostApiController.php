@@ -130,7 +130,7 @@ class HostApiController extends AbstractController
     #[Route('/{id}', name: 'api_hosts_delete', methods: ['DELETE'])]
     public function delete(Host $host, EntityManagerInterface $em): JsonResponse
     {
-        $em->remove($host);
+        $host->softDeleteWithInterfaces();
         $em->flush();
 
         return $this->json(null, Response::HTTP_NO_CONTENT);

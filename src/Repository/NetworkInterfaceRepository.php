@@ -32,6 +32,7 @@ class NetworkInterfaceRepository extends ServiceEntityRepository
             ->leftJoin('ni.names', 'iname')
             ->leftJoin('iname.domain', 'd')
             ->where('ni.macAddress != :zero')
+            ->andWhere('ni.deletedAt IS NULL')
             ->setParameter('zero', '00:00:00:00:00:00')
             ->orderBy('ni.macAddress', 'ASC')
             ->getQuery()
@@ -43,6 +44,7 @@ class NetworkInterfaceRepository extends ServiceEntityRepository
         $result = $this->createQueryBuilder('ni')
             ->select('ni.macAddress')
             ->where('ni.ipAddress = :ip')
+            ->andWhere('ni.deletedAt IS NULL')
             ->setParameter('ip', $ip)
             ->setMaxResults(1)
             ->getQuery()
@@ -56,6 +58,7 @@ class NetworkInterfaceRepository extends ServiceEntityRepository
         $result = $this->createQueryBuilder('ni')
             ->select('ni.macAddress')
             ->where('ni.ipv6Address = :ip')
+            ->andWhere('ni.deletedAt IS NULL')
             ->setParameter('ip', $ip)
             ->setMaxResults(1)
             ->getQuery()
@@ -76,6 +79,7 @@ class NetworkInterfaceRepository extends ServiceEntityRepository
 
         $rows = $this->createQueryBuilder('i')
             ->where('i.macAddress IN (:macs)')
+            ->andWhere('i.deletedAt IS NULL')
             ->setParameter('macs', array_map('strtolower', $macs))
             ->getQuery()
             ->getResult();
@@ -85,5 +89,28 @@ class NetworkInterfaceRepository extends ServiceEntityRepository
             $map[$iface->getMacAddress()] = $iface;
         }
         return $map;
+    }
+
+    /** Finds an active (non-deleted) interface by MAC address. */
+    public function findActiveByMac(string $mac): ?NetworkInterface
+    {
+        return $this->createQueryBuilder('ni')
+            ->where('ni.macAddress = :mac')
+            ->andWhere('ni.deletedAt IS NULL')
+            ->setParameter('mac', $mac)
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
+    public function purgeDeletedBefore(\DateTimeImmutable $before): int
+    {
+        return (int) $this->createQueryBuilder('ni')
+            ->delete()
+            ->where('ni.deletedAt IS NOT NULL')
+            ->andWhere('ni.deletedAt < :before')
+            ->setParameter('before', $before)
+            ->getQuery()
+            ->execute();
     }
 }

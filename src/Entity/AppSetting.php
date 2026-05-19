@@ -46,6 +46,9 @@ class AppSetting
     #[ORM\Column(length: 10, nullable: true, options: ['default' => 'tls'])]
     private ?string $smtpEncryption = 'tls';
 
+    #[ORM\Column(nullable: true, options: ['default' => 90])]
+    private ?int $deletedHostRetentionDays = 90;
+
     #[ORM\Column(length: 50, nullable: true)]
     private ?string $timezone = null;
 
@@ -83,6 +86,9 @@ class AppSetting
 
     public function getSmtpEncryption(): ?string { return $this->smtpEncryption; }
     public function setSmtpEncryption(?string $smtpEncryption): static { $this->smtpEncryption = $smtpEncryption; return $this; }
+
+    public function getDeletedHostRetentionDays(): ?int { return $this->deletedHostRetentionDays; }
+    public function setDeletedHostRetentionDays(?int $days): static { $this->deletedHostRetentionDays = $days; return $this; }
 
     public function getTimezone(): ?string { return $this->timezone; }
     public function setTimezone(?string $timezone): static { $this->timezone = $timezone; return $this; }

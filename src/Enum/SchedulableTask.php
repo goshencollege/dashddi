@@ -11,6 +11,7 @@ enum SchedulableTask: string
     case PushDhcp                = 'push_dhcp';
     case PurgeLeases             = 'purge_leases';
     case PurgePushLogs           = 'purge_push_logs';
+    case PurgeDeletedHosts       = 'purge_deleted_hosts';
     case DatabaseBackup          = 'database_backup';
     case PullSnipeIt             = 'pull_snipe_it';
 
@@ -24,6 +25,7 @@ enum SchedulableTask: string
             self::PushDhcp               => 'Push DHCP Configs',
             self::PurgeLeases            => 'Purge DHCP Lease Logs',
             self::PurgePushLogs          => 'Purge Push Logs',
+            self::PurgeDeletedHosts      => 'Purge Deleted Hosts',
             self::DatabaseBackup         => 'Database Backup',
             self::PullSnipeIt            => 'Pull Snipe-IT Assets',
         };
@@ -39,6 +41,7 @@ enum SchedulableTask: string
             self::PushDhcp               => 'Generates DHCP subnet configuration and deploys it to all configured DHCP servers.',
             self::PurgeLeases            => 'Deletes DHCP lease log entries that exceed each subnet\'s configured retention period. A default retention period (for subnets with no per-subnet setting and unmatched leases) can be configured in Application Settings.',
             self::PurgePushLogs          => 'Deletes DNS/DHCP push log entries older than the retention period configured in Application Settings (default 30 days).',
+            self::PurgeDeletedHosts      => 'Hard-deletes hosts and interfaces that were soft-deleted more than the configured retention period ago (default 90 days). Configured in Application Settings.',
             self::DatabaseBackup         => 'Creates a database backup using the destination and options configured in Backup Settings.',
             self::PullSnipeIt            => 'Fetches assets from all configured Snipe-IT servers. Creates a host for each asset that has a MAC address in any configured custom field, updates existing hosts, and removes hosts whose assets have been deleted or archived.',
         };
@@ -55,6 +58,7 @@ enum SchedulableTask: string
             self::PushDhcp               => 'app:generate-dhcp-config --reload',
             self::PurgeLeases            => 'app:purge-dhcp-leases',
             self::PurgePushLogs          => 'app:purge-push-logs',
+            self::PurgeDeletedHosts      => 'app:purge-deleted-hosts',
             self::DatabaseBackup         => 'app:database:backup',
             self::PullSnipeIt            => 'app:pull-snipe-it',
         };
@@ -70,6 +74,7 @@ enum SchedulableTask: string
             self::PushDhcp               => '0 2 * * *',
             self::PurgeLeases            => '0 3 * * 0',
             self::PurgePushLogs          => '0 3 * * 0',
+            self::PurgeDeletedHosts      => '0 3 * * 0',
             self::DatabaseBackup         => '0 2 * * *',
             self::PullSnipeIt            => '0 3 * * *',
         };

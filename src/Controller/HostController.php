@@ -218,7 +218,7 @@ class HostController extends AbstractController
         if ($action === 'delete') {
             $count = count($hosts);
             foreach ($hosts as $host) {
-                $em->remove($host);
+                $host->softDeleteWithInterfaces();
             }
             $em->flush();
             return $this->json(['message' => $count . ' host(s) deleted.']);
@@ -278,7 +278,7 @@ class HostController extends AbstractController
     public function delete(Request $request, Host $host, EntityManagerInterface $em): Response
     {
         if ($this->isCsrfTokenValid('delete_host_' . $host->getId(), $request->request->get('_token'))) {
-            $em->remove($host);
+            $host->softDeleteWithInterfaces();
             $em->flush();
             $this->addFlash('success', 'Host deleted.');
         }

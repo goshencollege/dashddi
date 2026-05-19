@@ -103,7 +103,12 @@ class SnipeItSyncService
                     if ($link !== null) {
                         $kept = $this->updateHost($link, $assetName, $assetTagStr, $macs, $result['errors'], $categorySubnetIdMap, $categoryId);
                         if (!$kept) {
-                            $this->em->remove($link);
+                            // soft-delete done inside updateHost; delete only the link row
+                            $this->em->getConnection()->executeStatement(
+                                'DELETE FROM snipe_it_asset_link WHERE id = ?',
+                                [$link->getId()]
+                            );
+                            $this->em->detach($link);
                             $result['deleted']++;
                             $activeAssetIds = array_diff($activeAssetIds, [$assetId]);
                         } else {
@@ -115,7 +120,7 @@ class SnipeItSyncService
                         $normalizedMacs = array_values(array_unique(array_map([$this, 'normalizeMac'], $macs)));
                         $conflictHosts  = [];
                         foreach ($normalizedMacs as $mac) {
-                            $iface = $this->ifaceRepo->findOneBy(['macAddress' => $mac]);
+                            $iface = $this->ifaceRepo->findActiveByMac($mac);
                             if ($iface !== null) {
                                 $h = $iface->getHost();
                                 $conflictHosts[$h->getId()] = $h;
@@ -211,7 +216,13 @@ class SnipeItSyncService
                         ->execute();
                     $this->em->detach($link);
                 } else {
-                    $this->em->remove($link); // cascade also removes the sync-created host
+                    // Soft-delete the sync-created host and its interfaces; delete only the link row
+                    $link->getHost()->softDeleteWithInterfaces();
+                    $this->em->getConnection()->executeStatement(
+                        'DELETE FROM snipe_it_asset_link WHERE id = ?',
+                        [$link->getId()]
+                    );
+                    $this->em->detach($link);
                 }
                 $result['deleted']++;
             }
@@ -302,11 +313,14 @@ class SnipeItSyncService
         $host->addTag($snipeTag);
         $existingMacs = array_map(
             fn(NetworkInterface $i) => $i->getMacAddress(),
-            $host->getInterfaces()->toArray()
+            $host->getInterfaces()->filter(fn(NetworkInterface $i) => !$i->isDeleted())->toArray()
         );
 
-        // Fill in subnet on existing interfaces that don't have one
+        // Fill in subnet on existing active interfaces that don't have one
         foreach ($host->getInterfaces() as $existingIface) {
+            if ($existingIface->isDeleted()) {
+                continue;
+            }
             $this->assignSubnetIfMissing($existingIface, $categorySubnetIdMap, $categoryId);
         }
 
@@ -314,8 +328,8 @@ class SnipeItSyncService
             if (in_array($mac, $existingMacs, true)) {
                 continue;
             }
-            // Safety check: only add if not already assigned to a different host
-            $conflict = $this->ifaceRepo->findOneBy(['macAddress' => $mac]);
+            // Safety check: only add if not already assigned to a different active interface
+            $conflict = $this->ifaceRepo->findActiveByMac($mac);
             if ($conflict !== null && $conflict->getHost()?->getId() !== $host->getId()) {
                 continue;
             }
@@ -336,7 +350,7 @@ class SnipeItSyncService
 
         $added = 0;
         foreach ($macs as $mac) {
-            $existing = $this->ifaceRepo->findOneBy(['macAddress' => $this->normalizeMac($mac)]);
+            $existing = $this->ifaceRepo->findActiveByMac($this->normalizeMac($mac));
             if ($existing !== null) {
                 $errors[] = sprintf('MAC %s already assigned to another host — skipped for asset "%s".', $mac, $name);
                 continue;
@@ -376,30 +390,41 @@ class SnipeItSyncService
 
         $normalizedMacs = array_map([$this, 'normalizeMac'], $macs);
 
-        // Remove interfaces whose MACs are no longer in the asset
+        // Soft-delete interfaces whose MACs are no longer in the asset
         foreach ($host->getInterfaces() as $iface) {
-            if (!in_array($iface->getMacAddress(), $normalizedMacs, true)) {
-                $host->removeInterface($iface);
-                $this->em->remove($iface);
+            if (!$iface->isDeleted() && !in_array($iface->getMacAddress(), $normalizedMacs, true)) {
+                $iface->softDelete();
             }
         }
 
-        // Assign default subnet to existing interfaces that don't have one
+        // Assign default subnet to existing active interfaces that don't have one
         foreach ($host->getInterfaces() as $iface) {
+            if ($iface->isDeleted()) {
+                continue;
+            }
             $this->assignSubnetIfMissing($iface, $categorySubnetIdMap, $categoryId);
         }
 
-        // Add new interfaces for MACs not yet on this host
+        // Add new interfaces for MACs not yet on this host (restore soft-deleted ones if possible)
         $existingMacs = array_map(
             fn(NetworkInterface $i) => $i->getMacAddress(),
-            $host->getInterfaces()->toArray()
+            $host->getInterfaces()->filter(fn(NetworkInterface $i) => !$i->isDeleted())->toArray()
         );
         $conn = $this->em->getConnection();
         foreach ($normalizedMacs as $mac) {
             if (in_array($mac, $existingMacs, true)) {
                 continue;
             }
-            $conflict = $this->ifaceRepo->findOneBy(['macAddress' => $mac]);
+            // Restore a soft-deleted interface on this host instead of creating a new one
+            foreach ($host->getInterfaces() as $existing) {
+                if ($existing->isDeleted() && $existing->getMacAddress() === $mac) {
+                    $existing->restore();
+                    $this->assignSubnetIfMissing($existing, $categorySubnetIdMap, $categoryId);
+                    $existingMacs[] = $mac;
+                    continue 2;
+                }
+            }
+            $conflict = $this->ifaceRepo->findActiveByMac($mac);
             if ($conflict !== null && $conflict->getHost()?->getId() !== $host->getId()) {
                 $conflictHost = $conflict->getHost();
                 if ($conflictHost?->getSnipeItAssetLink() !== null) {
@@ -432,8 +457,9 @@ class SnipeItSyncService
             $this->em->persist($iface);
         }
 
-        if ($host->getInterfaces()->isEmpty()) {
-            $this->em->remove($host);
+        $activeCount = $host->getInterfaces()->filter(fn(NetworkInterface $i) => !$i->isDeleted())->count();
+        if ($activeCount === 0) {
+            $host->softDelete();
             return false;
         }
 
@@ -478,8 +504,7 @@ class SnipeItSyncService
             return true;
         }
         $statusMeta = $asset['status_label']['status_meta'] ?? '';
-        $statusType = $asset['status_label']['status_type'] ?? '';
-        return $statusMeta === 'archived' || $statusType === 'archived';
+        return !in_array($statusMeta, ['deployable', 'deployed'], true);
     }
 
     private function extractMacs(array $asset, array $fieldNames): array
