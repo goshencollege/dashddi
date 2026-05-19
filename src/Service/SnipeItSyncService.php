@@ -127,6 +127,27 @@ class SnipeItSyncService
                             }
                         }
 
+                        // No active match — look for soft-deleted interfaces/hosts to restore
+                        // instead of creating duplicate records.
+                        if (empty($conflictHosts)) {
+                            foreach ($normalizedMacs as $mac) {
+                                $iface = $this->ifaceRepo->findDeletedByMac($mac);
+                                if ($iface === null) {
+                                    continue;
+                                }
+                                $h = $iface->getHost();
+                                // Skip if already linked to a different Snipe asset
+                                if ($h->getSnipeItAssetLink() !== null) {
+                                    continue;
+                                }
+                                if ($h->isDeleted()) {
+                                    $h->restore();
+                                }
+                                $iface->restore();
+                                $conflictHosts[$h->getId()] = $h;
+                            }
+                        }
+
                         $adopted = false;
                         if (count($conflictHosts) > 1) {
                             // MACs span multiple DashDDI hosts — merge if all are unlinked
@@ -379,6 +400,14 @@ class SnipeItSyncService
     private function updateHost(SnipeItAssetLink $link, string $name, string $assetTagStr, array $macs, array &$errors, array $categorySubnetIdMap, int $categoryId): bool
     {
         $host = $link->getHost();
+
+        // Restore a host that was manually soft-deleted while still linked in Snipe-IT
+        if ($host->isDeleted()) {
+            $host->restore();
+            foreach ($host->getInterfaces() as $iface) {
+                $iface->restore();
+            }
+        }
 
         // Only sync the host name when it still matches the Snipe name from the last sync.
         // If they've diverged (adopted host or manual rename), leave the DashDDI name alone.
