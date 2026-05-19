@@ -1,3 +1,29 @@
+x-worker-base: &worker-base
+  build: .
+  volumes:
+    - .:/var/www/html
+    - symfony_var:/var/www/html/var
+  tmpfs:
+    - /tmp
+    - /usr/local/var/run
+  environment:
+    APP_ENV: dev
+    APP_SECRET: "replace_with_32plus_char_secret"
+    APP_ENCRYPTION_KEY: "run: docker compose exec app php bin/console app:generate-encryption-key"
+    DEFAULT_URI: "https://your-dev-hostname.example.com"
+    DATABASE_URL: "mysql://ipam:ipam_password@db:3306/ipam?serverVersion=8.0&charset=utf8mb4"
+    LEGACY_DATABASE_URL: ""
+    MESSENGER_TRANSPORT_DSN: "doctrine://default"
+  depends_on:
+    db:
+      condition: service_healthy
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options:
+      max-size: "20m"
+      max-file: "5"
+
 services:
   app:
     build: .
@@ -30,32 +56,17 @@ services:
         max-size: "20m"
         max-file: "5"
 
-  worker:
-    build: .
-    command: ["php", "bin/console", "messenger:consume", "async", "--time-limit=3600"]
-    volumes:
-      - .:/var/www/html
-      - symfony_var:/var/www/html/var
-    tmpfs:
-      - /tmp
-      - /usr/local/var/run
-    environment:
-      APP_ENV: dev
-      APP_SECRET: "replace_with_32plus_char_secret"
-      APP_ENCRYPTION_KEY: "run: docker compose exec app php bin/console app:generate-encryption-key"
-      DEFAULT_URI: "https://your-dev-hostname.example.com"
-      DATABASE_URL: "mysql://ipam:ipam_password@db:3306/ipam?serverVersion=8.0&charset=utf8mb4"
-      LEGACY_DATABASE_URL: ""
-      MESSENGER_TRANSPORT_DSN: "doctrine://default"
-    depends_on:
-      db:
-        condition: service_healthy
-    restart: unless-stopped
-    logging:
-      driver: json-file
-      options:
-        max-size: "20m"
-        max-file: "5"
+  # Handles quick push messages (ClearPass, DNS, DHCP) and their failed-message retries.
+  worker_priority:
+    <<: *worker-base
+    command: ["php", "bin/console", "messenger:consume", "async_priority", "failed_priority", "--time-limit=3600"]
+
+  # Handles long-running jobs (Snipe-IT pull, scheduled tasks) and their failed-message retries.
+  # Also picks up priority messages when idle — async_priority is listed first so it is
+  # always checked before pulling a bulk job.
+  worker_bulk:
+    <<: *worker-base
+    command: ["php", "bin/console", "messenger:consume", "async_priority", "async_bulk", "failed_bulk", "--time-limit=3600"]
 
   nginx:
     image: nginx:alpine

@@ -1,13 +1,30 @@
 framework:
     messenger:
         transports:
-            async: '%env(MESSENGER_TRANSPORT_DSN)%'
-            failed: 'doctrine://default?queue_name=failed'
-        failure_transport: failed
+            # Quick push messages — consumed by the priority worker so they are
+            # never blocked by a long-running bulk job.
+            async_priority:
+                dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
+                options:
+                    queue_name: priority
+                failure_transport: failed_priority
+
+            # Long-running jobs (Snipe-IT pull, scheduled tasks) — consumed by a
+            # dedicated bulk worker so they cannot starve the priority queue.
+            async_bulk:
+                dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
+                options:
+                    queue_name: bulk
+                failure_transport: failed_bulk
+
+            # Each failure transport is consumed by its own worker so retries
+            # never cross queue boundaries.
+            failed_priority: 'doctrine://default?queue_name=failed_priority'
+            failed_bulk:     'doctrine://default?queue_name=failed_bulk'
 
         routing:
-            'App\Message\PushClearpassMessage': async
-            'App\Message\PushDnsMessage': async
-            'App\Message\PushDhcpMessage': async
-            'App\Message\RunScheduledTaskMessage': async
-            'App\Message\PullSnipeItMessage': async
+            'App\Message\PushClearpassMessage':   async_priority
+            'App\Message\PushDnsMessage':         async_priority
+            'App\Message\PushDhcpMessage':        async_priority
+            'App\Message\RunScheduledTaskMessage': async_bulk
+            'App\Message\PullSnipeItMessage':     async_bulk
