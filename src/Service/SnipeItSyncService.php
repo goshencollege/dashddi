@@ -95,7 +95,7 @@ class SnipeItSyncService
                     $assetName = 'Asset ' . $assetId;
                 }
                 $assetTagStr = trim((string) ($asset['asset_tag'] ?? ''));
-                $categoryId  = (int) ($asset['model']['category']['id'] ?? 0);
+                $categoryId  = (int) ($asset['category']['id'] ?? 0);
 
                 $link = $this->linkRepo->findByServerAndAssetId($server, $assetId);
 
