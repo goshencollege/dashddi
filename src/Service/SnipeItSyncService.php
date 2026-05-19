@@ -42,7 +42,8 @@ class SnipeItSyncService
         $snipeTag = $this->ensureTag(self::TAG_NAME);
         $this->em->flush(); // persist new tag before first clear
 
-        $activeAssetIds = [];
+        $activeAssetIds  = [];
+        $adoptedHostIds  = []; // host IDs adopted this session; checked before DB flush makes the link visible
         $offset = 0;
         $total  = PHP_INT_MAX;
 
@@ -106,17 +107,55 @@ class SnipeItSyncService
                             $result['updated']++;
                         }
                     } else {
-                        $host = $this->createHost($assetName, $macs, $snipeTag, $result['errors']);
-                        if ($host === null) {
+                        // No existing link — check if any of these MACs already belong to a DashDDI host
+                        $normalizedMacs = array_values(array_unique(array_map([$this, 'normalizeMac'], $macs)));
+                        $conflictHosts  = [];
+                        foreach ($normalizedMacs as $mac) {
+                            $iface = $this->ifaceRepo->findOneBy(['macAddress' => $mac]);
+                            if ($iface !== null) {
+                                $h = $iface->getHost();
+                                $conflictHosts[$h->getId()] = $h;
+                            }
+                        }
+
+                        if (count($conflictHosts) > 1) {
+                            $result['errors'][] = sprintf(
+                                'Asset %d (%s): MACs belong to multiple existing hosts — skipped.',
+                                $assetId, $assetName
+                            );
                             $result['skipped']++;
                             continue;
                         }
+
+                        $adopted = false;
+                        if (count($conflictHosts) === 1) {
+                            $host   = array_values($conflictHosts)[0];
+                            $hostId = $host->getId();
+                            // Skip if already linked in the DB or adopted earlier in this session
+                            // (two Snipe assets sharing the same MAC both try to adopt the same host)
+                            if ($host->getSnipeItAssetLink() !== null || isset($adoptedHostIds[$hostId])) {
+                                $result['skipped']++;
+                                continue;
+                            }
+                            $adoptedHostIds[$hostId] = true;
+                            // Adopt the pre-existing DashDDI host instead of creating a new one
+                            $adopted = true;
+                            $this->adoptHost($host, $normalizedMacs, $snipeTag);
+                        } else {
+                            $host = $this->createHost($assetName, $macs, $snipeTag, $result['errors']);
+                            if ($host === null) {
+                                $result['skipped']++;
+                                continue;
+                            }
+                        }
+
                         $link = new SnipeItAssetLink();
                         $link->setServer($server);
                         $link->setHost($host);
                         $link->setSnipeAssetId($assetId);
                         $link->setSnipeAssetTag($assetTagStr);
                         $link->setSnipeAssetName($assetName);
+                        $link->setAdopted($adopted);
                         $this->em->persist($link);
                         $result['created']++;
                     }
@@ -137,11 +176,21 @@ class SnipeItSyncService
             $offset += self::FETCH_LIMIT;
         }
 
-        // Remove hosts for assets no longer active in Snipe-IT
+        // Remove or unlink hosts whose Snipe-IT assets are no longer active
+        $snipeTag      = $this->ensureTag(self::TAG_NAME);
         $existingLinks = $this->linkRepo->findByServer($server);
         foreach ($existingLinks as $link) {
             if (!in_array($link->getSnipeAssetId(), $activeAssetIds, true)) {
-                $this->em->remove($link);
+                if ($link->isAdopted()) {
+                    // Preserve the pre-existing host; just remove the link and the snipeit tag
+                    $link->getHost()->removeTag($snipeTag);
+                    $this->em->createQuery('DELETE FROM App\Entity\SnipeItAssetLink l WHERE l.id = :id')
+                        ->setParameter('id', $link->getId())
+                        ->execute();
+                    $this->em->detach($link);
+                } else {
+                    $this->em->remove($link); // cascade also removes the sync-created host
+                }
                 $result['deleted']++;
             }
         }
@@ -150,6 +199,33 @@ class SnipeItSyncService
         $this->em->flush();
 
         return $result;
+    }
+
+    /**
+     * Adds the snipeit tag and any missing MAC interfaces to a pre-existing host.
+     * Does not change the host's name.
+     */
+    private function adoptHost(Host $host, array $normalizedMacs, Tag $snipeTag): void
+    {
+        $host->addTag($snipeTag);
+        $existingMacs = array_map(
+            fn(NetworkInterface $i) => $i->getMacAddress(),
+            $host->getInterfaces()->toArray()
+        );
+        foreach ($normalizedMacs as $mac) {
+            if (in_array($mac, $existingMacs, true)) {
+                continue;
+            }
+            // Safety check: only add if not already assigned to a different host
+            $conflict = $this->ifaceRepo->findOneBy(['macAddress' => $mac]);
+            if ($conflict !== null && $conflict->getHost()?->getId() !== $host->getId()) {
+                continue;
+            }
+            $iface = new NetworkInterface();
+            $iface->setMacAddress($mac);
+            $iface->setHost($host);
+            $this->em->persist($iface);
+        }
     }
 
     /** Returns null if no interfaces could be created (all MACs already assigned elsewhere). */
@@ -181,11 +257,20 @@ class SnipeItSyncService
         return $host;
     }
 
-    /** Returns false (and removes the host) if it ends up with no interfaces after the update. */
+    /**
+     * Returns false (and removes the host) if it ends up with no interfaces after the update.
+     * Preserves the DashDDI host name when it has been customised or adopted (differs from the
+     * previously stored Snipe name); otherwise updates it to track renames in Snipe-IT.
+     */
     private function updateHost(SnipeItAssetLink $link, string $name, string $assetTagStr, array $macs, array &$errors): bool
     {
         $host = $link->getHost();
-        $host->setName($name);
+
+        // Only sync the host name when it still matches the Snipe name from the last sync.
+        // If they've diverged (adopted host or manual rename), leave the DashDDI name alone.
+        if ($host->getName() === $link->getSnipeAssetName()) {
+            $host->setName($name);
+        }
         $link->setSnipeAssetName($name);
         $link->setSnipeAssetTag($assetTagStr);
 
