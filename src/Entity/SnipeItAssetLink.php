@@ -23,7 +23,7 @@ class SnipeItAssetLink
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     private ?SnipeItServer $server = null;
 
-    #[ORM\OneToOne(targetEntity: Host::class, cascade: ['remove'])]
+    #[ORM\OneToOne(targetEntity: Host::class, inversedBy: 'snipeItAssetLink', cascade: ['remove'])]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     private ?Host $host = null;
 
@@ -38,6 +38,10 @@ class SnipeItAssetLink
 
     #[ORM\Column]
     private \DateTimeImmutable $syncedAt;
+
+    /** True when this link was created by adopting a pre-existing DashDDI host rather than creating a new one. */
+    #[ORM\Column(options: ['default' => false])]
+    private bool $adopted = false;
 
     public function __construct()
     {
@@ -63,4 +67,7 @@ class SnipeItAssetLink
 
     public function getSyncedAt(): \DateTimeImmutable { return $this->syncedAt; }
     public function setSyncedAt(\DateTimeImmutable $syncedAt): static { $this->syncedAt = $syncedAt; return $this; }
+
+    public function isAdopted(): bool { return $this->adopted; }
+    public function setAdopted(bool $adopted): static { $this->adopted = $adopted; return $this; }
 }

@@ -214,6 +214,10 @@
                                     <a href="{{ path('host_show', {id: host.id}) }}" class="fw-semibold text-decoration-none">
                                         {{ host.name }}
                                     </a>
+                                    {% set snipeLink = host.snipeItAssetLink %}
+                                    {% if snipeLink and snipeLink.snipeAssetName != host.name %}
+                                        <div class="text-muted small"><i class="bi bi-box-seam me-1"></i>{{ snipeLink.snipeAssetName }}</div>
+                                    {% endif %}
                                     {% if host.location %}
                                         <div class="text-muted small">{{ host.location }}</div>
                                     {% endif %}
@@ -336,6 +340,10 @@
                                         <a href="{{ path('host_show', {id: host.id}) }}" class="fw-semibold text-decoration-none">
                                             {{ host.name }}
                                         </a>
+                                        {% set snipeLink = host.snipeItAssetLink %}
+                                        {% if snipeLink and snipeLink.snipeAssetName != host.name %}
+                                            <div class="text-muted small"><i class="bi bi-box-seam me-1"></i>{{ snipeLink.snipeAssetName }}</div>
+                                        {% endif %}
                                         {% if host.location %}
                                             <div class="text-muted small">{{ host.location }}</div>
                                         {% endif %}

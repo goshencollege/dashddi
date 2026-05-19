@@ -7,6 +7,7 @@ use App\Message\PullSnipeItMessage;
 use App\Repository\SnipeItServerRepository;
 use App\Service\SnipeItSyncService;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\Persistence\ManagerRegistry;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
 #[AsMessageHandler]
@@ -16,6 +17,7 @@ final class PullSnipeItMessageHandler
         private readonly SnipeItServerRepository $repo,
         private readonly SnipeItSyncService      $syncService,
         private readonly EntityManagerInterface  $em,
+        private readonly ManagerRegistry         $registry,
     ) {}
 
     public function __invoke(PullSnipeItMessage $message): void
@@ -25,7 +27,8 @@ final class PullSnipeItMessageHandler
             return;
         }
 
-        $startedAt = new \DateTimeImmutable();
+        $serverName = $server->getName();
+        $startedAt  = new \DateTimeImmutable();
 
         try {
             $result  = $this->syncService->syncFromServer($server);
@@ -37,9 +40,11 @@ final class PullSnipeItMessageHandler
             $error   = $e->getMessage();
         }
 
-        $log = new PushLog('snipeit', $server->getName(), $success, $result, $startedAt, new \DateTimeImmutable(), $error);
-        $this->em->clear();
-        $this->em->persist($log);
-        $this->em->flush();
+        // A DB exception during sync closes the EM — reset it so we can still write the log
+        $em = $this->em->isOpen() ? $this->em : $this->registry->resetManager();
+        $log = new PushLog('snipeit', $serverName, $success, $result, $startedAt, new \DateTimeImmutable(), $error);
+        $em->clear();
+        $em->persist($log);
+        $em->flush();
     }
 }
