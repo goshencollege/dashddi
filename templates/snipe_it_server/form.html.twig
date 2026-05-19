@@ -47,4 +47,77 @@
         </div>
     </div>
 </div>
+
+{% if server.id %}
+<div class="row justify-content-center mt-4">
+    <div class="col-md-7">
+        <div class="card">
+            <div class="card-header"><h5 class="mb-0">Category → Subnet Mappings</h5></div>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>Category ID</th>
+                            <th>Category Name</th>
+                            <th>Default Subnet</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for mapping in server.categorySubnetMaps %}
+                        <tr>
+                            <td class="align-middle">{{ mapping.snipeCategoryId }}</td>
+                            <td class="align-middle">{{ mapping.snipeCategoryName }}</td>
+                            <td class="align-middle">
+                                {% if mapping.subnet %}
+                                    {{ mapping.subnet.name }}{% if mapping.subnet.ipv4Cidr %} <span class="text-muted">({{ mapping.subnet.ipv4Cidr }})</span>{% endif %}
+                                {% else %}
+                                    <span class="text-muted fst-italic">subnet deleted</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end align-middle">
+                                <form method="post" action="{{ path('snipe_it_category_map_delete', {server: server.id, map: mapping.id}) }}" class="d-inline">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('delete_category_map_' ~ mapping.id) }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Remove this mapping?')">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="4" class="text-muted text-center py-3">No mappings configured.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="card-footer">
+                <p class="small text-muted mb-2">When the sync creates or updates an interface with no subnet assigned, it will use this mapping to assign one based on the asset's Snipe-IT model category.</p>
+                {{ form_start(mapForm) }}
+                <div class="row g-2 align-items-end">
+                    <div class="col-auto">
+                        {{ form_label(mapForm.snipeCategoryId, null, {label_attr: {class: 'form-label form-label-sm fw-semibold'}}) }}
+                        {{ form_widget(mapForm.snipeCategoryId, {attr: {class: 'form-control form-control-sm', style: 'width: 100px'}}) }}
+                    </div>
+                    <div class="col">
+                        {{ form_label(mapForm.snipeCategoryName, null, {label_attr: {class: 'form-label form-label-sm fw-semibold'}}) }}
+                        {{ form_widget(mapForm.snipeCategoryName, {attr: {class: 'form-control form-control-sm'}}) }}
+                    </div>
+                    <div class="col">
+                        {{ form_label(mapForm.subnet, null, {label_attr: {class: 'form-label form-label-sm fw-semibold'}}) }}
+                        {{ form_widget(mapForm.subnet, {attr: {class: 'form-select form-select-sm'}}) }}
+                    </div>
+                    <div class="col-auto">
+                        <button type="submit" class="btn btn-sm btn-primary">
+                            <i class="bi bi-plus-lg me-1"></i>Add
+                        </button>
+                    </div>
+                </div>
+                {{ form_end(mapForm) }}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
 {% endblock %}
