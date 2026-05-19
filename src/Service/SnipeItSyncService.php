@@ -6,6 +6,7 @@ use App\Entity\Host;
 use App\Entity\NetworkInterface;
 use App\Entity\SnipeItAssetLink;
 use App\Entity\SnipeItServer;
+use App\Entity\Subnet;
 use App\Entity\Tag;
 use App\Repository\NetworkInterfaceRepository;
 use App\Repository\SnipeItAssetLinkRepository;
@@ -41,6 +42,8 @@ class SnipeItSyncService
 
         $snipeTag = $this->ensureTag(self::TAG_NAME);
         $this->em->flush(); // persist new tag before first clear
+
+        $categorySubnetIdMap = $this->buildCategorySubnetIdMap($server);
 
         $activeAssetIds  = [];
         $adoptedHostIds  = []; // host IDs adopted this session; checked before DB flush makes the link visible
@@ -92,12 +95,13 @@ class SnipeItSyncService
                     $assetName = 'Asset ' . $assetId;
                 }
                 $assetTagStr = trim((string) ($asset['asset_tag'] ?? ''));
+                $categoryId  = (int) ($asset['model']['category']['id'] ?? 0);
 
                 $link = $this->linkRepo->findByServerAndAssetId($server, $assetId);
 
                 try {
                     if ($link !== null) {
-                        $kept = $this->updateHost($link, $assetName, $assetTagStr, $macs, $result['errors']);
+                        $kept = $this->updateHost($link, $assetName, $assetTagStr, $macs, $result['errors'], $categorySubnetIdMap, $categoryId);
                         if (!$kept) {
                             $this->em->remove($link);
                             $result['deleted']++;
@@ -142,7 +146,7 @@ class SnipeItSyncService
                             usort($hosts, fn($a, $b) => $b->getInterfaces()->count() <=> $a->getInterfaces()->count());
                             $host = $hosts[0];
                             $this->mergeHosts($host, array_slice($hosts, 1));
-                            $this->adoptHost($host, $normalizedMacs, $snipeTag);
+                            $this->adoptHost($host, $normalizedMacs, $snipeTag, $categorySubnetIdMap, $categoryId);
                             $adoptedHostIds[$host->getId()] = true;
                             $adopted = true;
                         } elseif (count($conflictHosts) === 1) {
@@ -157,9 +161,9 @@ class SnipeItSyncService
                             $adoptedHostIds[$hostId] = true;
                             // Adopt the pre-existing DashDDI host instead of creating a new one
                             $adopted = true;
-                            $this->adoptHost($host, $normalizedMacs, $snipeTag);
+                            $this->adoptHost($host, $normalizedMacs, $snipeTag, $categorySubnetIdMap, $categoryId);
                         } else {
-                            $host = $this->createHost($assetName, $macs, $snipeTag, $result['errors']);
+                            $host = $this->createHost($assetName, $macs, $snipeTag, $result['errors'], $categorySubnetIdMap, $categoryId);
                             if ($host === null) {
                                 $result['skipped']++;
                                 continue;
@@ -187,8 +191,9 @@ class SnipeItSyncService
             $this->em->clear();
 
             // Re-acquire entities detached by clear()
-            $server   = $this->em->find(SnipeItServer::class, $serverId);
-            $snipeTag = $this->ensureTag(self::TAG_NAME);
+            $server              = $this->em->find(SnipeItServer::class, $serverId);
+            $snipeTag            = $this->ensureTag(self::TAG_NAME);
+            $categorySubnetIdMap = $this->buildCategorySubnetIdMap($server);
 
             $offset += self::FETCH_LIMIT;
         }
@@ -240,15 +245,22 @@ class SnipeItSyncService
 
     /**
      * Adds the snipeit tag and any missing MAC interfaces to a pre-existing host.
-     * Does not change the host's name.
+     * Does not change the host's name. Assigns a default subnet to interfaces that
+     * have none, based on the category→subnet mapping.
      */
-    private function adoptHost(Host $host, array $normalizedMacs, Tag $snipeTag): void
+    private function adoptHost(Host $host, array $normalizedMacs, Tag $snipeTag, array $categorySubnetIdMap, int $categoryId): void
     {
         $host->addTag($snipeTag);
         $existingMacs = array_map(
             fn(NetworkInterface $i) => $i->getMacAddress(),
             $host->getInterfaces()->toArray()
         );
+
+        // Fill in subnet on existing interfaces that don't have one
+        foreach ($host->getInterfaces() as $existingIface) {
+            $this->assignSubnetIfMissing($existingIface, $categorySubnetIdMap, $categoryId);
+        }
+
         foreach ($normalizedMacs as $mac) {
             if (in_array($mac, $existingMacs, true)) {
                 continue;
@@ -261,12 +273,13 @@ class SnipeItSyncService
             $iface = new NetworkInterface();
             $iface->setMacAddress($mac);
             $iface->setHost($host);
+            $this->assignSubnetIfMissing($iface, $categorySubnetIdMap, $categoryId);
             $this->em->persist($iface);
         }
     }
 
     /** Returns null if no interfaces could be created (all MACs already assigned elsewhere). */
-    private function createHost(string $name, array $macs, Tag $snipeTag, array &$errors): ?Host
+    private function createHost(string $name, array $macs, Tag $snipeTag, array &$errors, array $categorySubnetIdMap, int $categoryId): ?Host
     {
         $host = new Host();
         $host->setName($name);
@@ -282,6 +295,7 @@ class SnipeItSyncService
             $iface = new NetworkInterface();
             $iface->setMacAddress($mac);
             $iface->setHost($host);
+            $this->assignSubnetIfMissing($iface, $categorySubnetIdMap, $categoryId);
             $this->em->persist($iface);
             $added++;
         }
@@ -299,7 +313,7 @@ class SnipeItSyncService
      * Preserves the DashDDI host name when it has been customised or adopted (differs from the
      * previously stored Snipe name); otherwise updates it to track renames in Snipe-IT.
      */
-    private function updateHost(SnipeItAssetLink $link, string $name, string $assetTagStr, array $macs, array &$errors): bool
+    private function updateHost(SnipeItAssetLink $link, string $name, string $assetTagStr, array $macs, array &$errors, array $categorySubnetIdMap, int $categoryId): bool
     {
         $host = $link->getHost();
 
@@ -319,6 +333,11 @@ class SnipeItSyncService
                 $host->removeInterface($iface);
                 $this->em->remove($iface);
             }
+        }
+
+        // Assign default subnet to existing interfaces that don't have one
+        foreach ($host->getInterfaces() as $iface) {
+            $this->assignSubnetIfMissing($iface, $categorySubnetIdMap, $categoryId);
         }
 
         // Add new interfaces for MACs not yet on this host
@@ -360,6 +379,7 @@ class SnipeItSyncService
             $iface = new NetworkInterface();
             $iface->setMacAddress($mac);
             $iface->setHost($host);
+            $this->assignSubnetIfMissing($iface, $categorySubnetIdMap, $categoryId);
             $this->em->persist($iface);
         }
 
@@ -369,6 +389,27 @@ class SnipeItSyncService
         }
 
         return true;
+    }
+
+    /** Returns [snipeCategoryId => subnetId] for all configured mappings on this server. */
+    private function buildCategorySubnetIdMap(SnipeItServer $server): array
+    {
+        $map = [];
+        foreach ($server->getCategorySubnetMaps() as $csm) {
+            if ($csm->getSubnet() !== null) {
+                $map[$csm->getSnipeCategoryId()] = $csm->getSubnet()->getId();
+            }
+        }
+        return $map;
+    }
+
+    /** Sets the subnet on $iface if it has none and a mapping exists for $categoryId. */
+    private function assignSubnetIfMissing(NetworkInterface $iface, array $categorySubnetIdMap, int $categoryId): void
+    {
+        if ($iface->getSubnet() !== null || $categoryId === 0 || !isset($categorySubnetIdMap[$categoryId])) {
+            return;
+        }
+        $iface->setSubnet($this->em->getReference(Subnet::class, $categorySubnetIdMap[$categoryId]));
     }
 
     private function ensureTag(string $tagName): Tag

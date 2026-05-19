@@ -4,6 +4,8 @@ namespace App\Entity;
 
 use App\Entity\Trait\AuditableTrait;
 use App\Repository\SnipeItServerRepository;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Validator\Constraints as Assert;
 
@@ -44,6 +46,15 @@ class SnipeItServer
     #[ORM\Column(nullable: true)]
     private ?\DateTimeImmutable $lastSyncAt = null;
 
+    #[ORM\OneToMany(targetEntity: SnipeItCategorySubnetMap::class, mappedBy: 'server', cascade: ['remove'], orphanRemoval: true)]
+    #[ORM\OrderBy(['snipeCategoryName' => 'ASC'])]
+    private Collection $categorySubnetMaps;
+
+    public function __construct()
+    {
+        $this->categorySubnetMaps = new ArrayCollection();
+    }
+
     public function getId(): ?int { return $this->id; }
 
     public function getName(): string { return $this->name; }
@@ -78,4 +89,7 @@ class SnipeItServer
     {
         return preg_replace('#/api/v1$#', '', $this->apiUrl);
     }
+
+    /** @return Collection<int, SnipeItCategorySubnetMap> */
+    public function getCategorySubnetMaps(): Collection { return $this->categorySubnetMaps; }
 }
