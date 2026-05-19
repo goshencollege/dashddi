@@ -3,6 +3,7 @@
 namespace App\Entity;
 
 use App\Entity\Trait\AuditableTrait;
+use App\Entity\Trait\SoftDeletableTrait;
 use App\Repository\HostRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -13,9 +14,11 @@ use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: HostRepository::class)]
 #[ORM\Table(name: 'host')]
+#[ORM\Index(columns: ['deleted_at'], name: 'idx_host_deleted_at')]
 class Host
 {
     use AuditableTrait;
+    use SoftDeletableTrait;
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
@@ -106,6 +109,18 @@ class Host
     }
 
     public function getSnipeItAssetLink(): ?SnipeItAssetLink { return $this->snipeItAssetLink; }
+
+    /** Soft-deletes the host and cascades to all of its interfaces. */
+    public function softDeleteWithInterfaces(): static
+    {
+        $this->softDelete();
+        foreach ($this->interfaces as $iface) {
+            if (!$iface->isDeleted()) {
+                $iface->softDelete();
+            }
+        }
+        return $this;
+    }
 
     public function __toString(): string { return $this->name; }
 }

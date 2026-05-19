@@ -31,60 +31,66 @@ class HostController extends AbstractController
     #[Route('', name: 'host_index', methods: ['GET'])]
     public function index(Request $request, HostRepository $repo, SubnetRepository $subnetRepo, BuildingRepository $buildingRepo, TagRepository $tagRepo, UserPreferenceRepository $prefRepo, DhcpLeaseRepository $leaseRepo, EntityManagerInterface $em): Response
     {
-        $user  = $this->getUser();
-        $pref  = $user ? $prefRepo->findByIdentifier($user->getUserIdentifier()) : null;
-        $page  = max(1, $request->query->getInt('page', 1));
-        $reset = $request->query->getBoolean('reset');
+        $user        = $this->getUser();
+        $pref        = $user ? $prefRepo->findByIdentifier($user->getUserIdentifier()) : null;
+        $page        = max(1, $request->query->getInt('page', 1));
+        $reset       = $request->query->getBoolean('reset');
+        $showDeleted = $request->query->getBoolean('deleted');
 
         $advancedFields = ['name', 'building', 'room', 'subnet', 'ip', 'mac', 'dns', 'tag'];
 
-        $hasExplicitState = $request->query->has('q')
-            || $request->query->has('page')
-            || (bool) array_filter($advancedFields, fn($f) => $request->query->has($f));
-
         $query      = '';
         $criteria   = [];
+        $isAdvanced = false;
         $needsFlush = false;
 
-        if ($reset) {
-            if ($user && $pref) {
-                $pref->setHostSearch(null);
-                $needsFlush = true;
-            }
-        } elseif ($hasExplicitState) {
-            $query = trim($request->query->getString('q'));
-            foreach ($advancedFields as $field) {
-                $val = trim($request->query->getString($field));
-                if ($val !== '') {
-                    $criteria[$field] = $val;
-                }
-            }
-            if ($user) {
-                if (!$pref) {
-                    $pref = new UserPreference($user->getUserIdentifier());
-                    $em->persist($pref);
-                }
-                $saved = array_filter(['q' => $query] + $criteria, fn($v) => $v !== '');
-                $pref->setHostSearch($saved ?: null);
-                $needsFlush = true;
-            }
-        } else {
-            $saved = $pref?->getHostSearch() ?? [];
-            $query = $saved['q'] ?? '';
-            foreach ($advancedFields as $field) {
-                if (!empty($saved[$field])) {
-                    $criteria[$field] = $saved[$field];
-                }
-            }
-        }
+        if (!$showDeleted) {
+            $hasExplicitState = $request->query->has('q')
+                || $request->query->has('page')
+                || (bool) array_filter($advancedFields, fn($f) => $request->query->has($f));
 
-        $isAdvanced = !empty($criteria);
+            if ($reset) {
+                if ($user && $pref) {
+                    $pref->setHostSearch(null);
+                    $needsFlush = true;
+                }
+            } elseif ($hasExplicitState) {
+                $query = trim($request->query->getString('q'));
+                foreach ($advancedFields as $field) {
+                    $val = trim($request->query->getString($field));
+                    if ($val !== '') {
+                        $criteria[$field] = $val;
+                    }
+                }
+                if ($user) {
+                    if (!$pref) {
+                        $pref = new UserPreference($user->getUserIdentifier());
+                        $em->persist($pref);
+                    }
+                    $saved = array_filter(['q' => $query] + $criteria, fn($v) => $v !== '');
+                    $pref->setHostSearch($saved ?: null);
+                    $needsFlush = true;
+                }
+            } else {
+                $saved = $pref?->getHostSearch() ?? [];
+                $query = $saved['q'] ?? '';
+                foreach ($advancedFields as $field) {
+                    if (!empty($saved[$field])) {
+                        $criteria[$field] = $saved[$field];
+                    }
+                }
+            }
+
+            $isAdvanced = !empty($criteria);
+        }
 
         if ($needsFlush) {
             $em->flush();
         }
 
-        if ($isAdvanced) {
+        if ($showDeleted) {
+            ['hosts' => $hosts, 'total' => $total] = $repo->findDeletedPaginated($page, self::PER_PAGE);
+        } elseif ($isAdvanced) {
             ['hosts' => $hosts, 'total' => $total] = $repo->advancedSearchPaginated($criteria, $page, self::PER_PAGE);
         } elseif ($query !== '') {
             ['hosts' => $hosts, 'total' => $total] = $repo->searchPaginated($query, $page, self::PER_PAGE);
@@ -103,6 +109,7 @@ class HostController extends AbstractController
 
         // Params for pagination link generation (everything except 'page')
         $linkParams = array_filter([
+            'deleted'  => $showDeleted ?: null,
             'q'        => $query ?: null,
             'name'     => $criteria['name'] ?? null,
             'building' => $criteria['building'] ?? null,
@@ -121,6 +128,7 @@ class HostController extends AbstractController
             'query'        => $query,
             'criteria'     => $criteria,
             'isAdvanced'   => $isAdvanced,
+            'showDeleted'  => $showDeleted,
             'subnets'      => $subnetRepo->findBy([], ['name' => 'ASC']),
             'buildings'    => $buildingRepo->findBy([], ['name' => 'ASC']),
             'tags'         => $tagRepo->findBy([], ['name' => 'ASC']),
@@ -218,7 +226,7 @@ class HostController extends AbstractController
         if ($action === 'delete') {
             $count = count($hosts);
             foreach ($hosts as $host) {
-                $em->remove($host);
+                $host->softDeleteWithInterfaces();
             }
             $em->flush();
             return $this->json(['message' => $count . ' host(s) deleted.']);
@@ -274,11 +282,25 @@ class HostController extends AbstractController
         ]);
     }
 
+    #[Route('/{id}/restore', name: 'host_restore', methods: ['POST'])]
+    public function restore(Request $request, Host $host, EntityManagerInterface $em): Response
+    {
+        if ($this->isCsrfTokenValid('restore_host_' . $host->getId(), $request->request->get('_token'))) {
+            $host->restore();
+            foreach ($host->getInterfaces() as $iface) {
+                $iface->restore();
+            }
+            $em->flush();
+            $this->addFlash('success', 'Host "' . $host->getName() . '" and its interfaces have been restored.');
+        }
+        return $this->redirectToRoute('host_show', ['id' => $host->getId()]);
+    }
+
     #[Route('/{id}/delete', name: 'host_delete', methods: ['POST'])]
     public function delete(Request $request, Host $host, EntityManagerInterface $em): Response
     {
         if ($this->isCsrfTokenValid('delete_host_' . $host->getId(), $request->request->get('_token'))) {
-            $em->remove($host);
+            $host->softDeleteWithInterfaces();
             $em->flush();
             $this->addFlash('success', 'Host deleted.');
         }

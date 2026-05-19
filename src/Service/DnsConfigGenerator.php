@@ -82,7 +82,7 @@ class DnsConfigGenerator
                 continue;
             }
             $iface = $ifaceName->getNetworkInterface();
-            if (!$iface) {
+            if (!$iface || $iface->isDeleted()) {
                 continue;
             }
             $label = $ifaceName->getName();
@@ -154,6 +154,9 @@ class DnsConfigGenerator
 
         $ptrLines = [];
         foreach ($subnet->getInterfaces() as $iface) {
+            if ($iface->isDeleted()) {
+                continue;
+            }
             $ip = $isIpv6 ? $iface->getIpv6Address() : $iface->getIpAddress();
             if (!$ip) {
                 continue;

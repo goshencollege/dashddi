@@ -46,17 +46,38 @@ class HostRepository extends ServiceEntityRepository
     // -------------------------------------------------------------------------
 
     /** @return array{hosts: Host[], total: int} */
+    public function findDeletedPaginated(int $page, int $perPage): array
+    {
+        $offset = max(0, ($page - 1) * $perPage);
+
+        $total = (int) $this->createQueryBuilder('h')
+            ->select('COUNT(h.id)')
+            ->where('h.deletedAt IS NOT NULL')
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        $ids = $this->idsForPage(
+            $this->createQueryBuilder('h')->where('h.deletedAt IS NOT NULL'),
+            $offset,
+            $perPage
+        );
+
+        return ['hosts' => $this->fetchByIds($ids), 'total' => $total];
+    }
+
+    /** @return array{hosts: Host[], total: int} */
     public function findAllPaginated(int $page, int $perPage): array
     {
         $offset = max(0, ($page - 1) * $perPage);
 
         $total = (int) $this->createQueryBuilder('h')
             ->select('COUNT(h.id)')
+            ->where('h.deletedAt IS NULL')
             ->getQuery()
             ->getSingleScalarResult();
 
         $ids = $this->idsForPage(
-            $this->createQueryBuilder('h'),
+            $this->createQueryBuilder('h')->where('h.deletedAt IS NULL'),
             $offset,
             $perPage
         );
@@ -93,7 +114,8 @@ class HostRepository extends ServiceEntityRepository
             ->leftJoin('i.names', 'n')
             ->leftJoin('n.domain', 'nd')
             ->leftJoin('App\Entity\DhcpLease', 'dl', 'WITH', 'dl.macAddress = i.macAddress')
-            ->where('h.name LIKE :q')
+            ->where('h.deletedAt IS NULL')
+            ->andWhere('h.name LIKE :q')
             ->orWhere('b.name LIKE :q')
             ->orWhere('h.room LIKE :q')
             ->orWhere("CONCAT(COALESCE(b.name, ''), COALESCE(h.room, '')) LIKE :q")
@@ -127,7 +149,8 @@ class HostRepository extends ServiceEntityRepository
             ->leftJoin('i.ipv6Address', 'ip6')
             ->leftJoin('i.names', 'n')
             ->leftJoin('n.domain', 'nd')
-            ->leftJoin('App\Entity\DhcpLease', 'dl', 'WITH', 'dl.macAddress = i.macAddress');
+            ->leftJoin('App\Entity\DhcpLease', 'dl', 'WITH', 'dl.macAddress = i.macAddress')
+            ->where('h.deletedAt IS NULL');
 
         if (!empty($criteria['name'])) {
             $qb->andWhere('h.name LIKE :name')
@@ -243,6 +266,17 @@ class HostRepository extends ServiceEntityRepository
             ->orderBy('h.name', 'ASC')
             ->getQuery()
             ->getResult();
+    }
+
+    public function purgeDeletedBefore(\DateTimeImmutable $before): int
+    {
+        return (int) $this->createQueryBuilder('h')
+            ->delete()
+            ->where('h.deletedAt IS NOT NULL')
+            ->andWhere('h.deletedAt < :before')
+            ->setParameter('before', $before)
+            ->getQuery()
+            ->execute();
     }
 
     private function toLike(string $value): string
