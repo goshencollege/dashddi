@@ -7,6 +7,7 @@ framework:
                 dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
                 options:
                     queue_name: priority
+                failure_transport: failed_priority
 
             # Long-running jobs (Snipe-IT pull, scheduled tasks) — consumed by a
             # dedicated bulk worker so they cannot starve the priority queue.
@@ -14,13 +15,16 @@ framework:
                 dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
                 options:
                     queue_name: bulk
+                failure_transport: failed_bulk
 
-            failed: 'doctrine://default?queue_name=failed'
-        failure_transport: failed
+            # Each failure transport is consumed by its own worker so retries
+            # never cross queue boundaries.
+            failed_priority: 'doctrine://default?queue_name=failed_priority'
+            failed_bulk:     'doctrine://default?queue_name=failed_bulk'
 
         routing:
-            'App\Message\PushClearpassMessage': async_priority
-            'App\Message\PushDnsMessage':       async_priority
-            'App\Message\PushDhcpMessage':      async_priority
+            'App\Message\PushClearpassMessage':   async_priority
+            'App\Message\PushDnsMessage':         async_priority
+            'App\Message\PushDhcpMessage':        async_priority
             'App\Message\RunScheduledTaskMessage': async_bulk
             'App\Message\PullSnipeItMessage':     async_bulk
