@@ -43,11 +43,7 @@ class EntityPushListener
     public function postUpdate(PostUpdateEventArgs $args): void
     {
         $entity = $args->getObject();
-        $this->collect($entity);
 
-        // When an entity is soft-deleted (deletedAt: null → value), dispatch an additional
-        // push with a different dedup key so it cannot be silently dropped by a pending
-        // update message that shares the normal key.
         $em = $args->getObjectManager();
         if ($em instanceof EntityManagerInterface) {
             $changeset = $em->getUnitOfWork()->getEntityChangeSet($entity);
@@ -55,11 +51,17 @@ class EntityPushListener
                 && $changeset['deletedAt'][0] === null
                 && $changeset['deletedAt'][1] !== null
             ) {
+                // Soft-delete: route ClearPass through a separate dedup key so it cannot
+                // be blocked by a pending update message for the same MAC.
+                $this->collect($entity, includeClearpass: false);
                 foreach ($this->scope->clearpassMacsFor($entity) as $mac) {
                     $this->pendingClearpassDeleteMacs[$mac] = true;
                 }
+                return;
             }
         }
+
+        $this->collect($entity);
     }
 
     public function preRemove(PreRemoveEventArgs $args): void
@@ -108,19 +110,20 @@ class EntityPushListener
         }
     }
 
-    private function collect(object $entity): void
+    private function collect(object $entity, bool $includeClearpass = true): void
     {
         foreach ($this->scope->dnsServerIdsFor($entity) as $id) {
             $this->pendingDnsIds[$id] = true;
         }
 
-        foreach ($this->scope->clearpassMacsFor($entity) as $mac) {
-            $this->pendingClearpassMacs[$mac] = true;
+        if ($includeClearpass) {
+            foreach ($this->scope->clearpassMacsFor($entity) as $mac) {
+                $this->pendingClearpassMacs[$mac] = true;
+            }
         }
 
         if ($this->scope->affectsDhcp($entity)) {
             $this->pendingAllDhcp = true;
         }
-
     }
 }
