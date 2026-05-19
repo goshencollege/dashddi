@@ -35,7 +35,7 @@ class WorkerQueueController extends AbstractController
 
         foreach ($rows as $row) {
             $row['label'] = $this->parseLabel($row['body'], $taskNames);
-            if ($row['queue_name'] === 'failed') {
+            if (str_starts_with($row['queue_name'], 'failed')) {
                 $failed[] = $row;
             } elseif ($row['delivered_at'] !== null) {
                 $running[] = $row;
@@ -62,8 +62,12 @@ class WorkerQueueController extends AbstractController
 
         $affected = $conn->executeStatement(
             "UPDATE messenger_messages
-             SET queue_name = 'default', available_at = NOW(), delivered_at = NULL
-             WHERE id = ? AND queue_name = 'failed'",
+             SET queue_name = CASE queue_name
+                 WHEN 'failed_priority' THEN 'priority'
+                 WHEN 'failed_bulk'     THEN 'bulk'
+             END,
+             available_at = NOW(), delivered_at = NULL
+             WHERE id = ? AND queue_name IN ('failed_priority', 'failed_bulk')",
             [$id]
         );
 
@@ -82,7 +86,7 @@ class WorkerQueueController extends AbstractController
             return $this->redirectToRoute('worker_queue');
         }
 
-        $count = $conn->executeStatement("DELETE FROM messenger_messages WHERE queue_name = 'failed'");
+        $count = $conn->executeStatement("DELETE FROM messenger_messages WHERE queue_name IN ('failed_priority', 'failed_bulk')");
 
         $this->addFlash('success', $count . ' failed ' . ($count === 1 ? 'message' : 'messages') . ' deleted.');
         return $this->redirectToRoute('worker_queue');
@@ -118,7 +122,7 @@ class WorkerQueueController extends AbstractController
 
         $affected = $conn->executeStatement(
             "DELETE FROM messenger_messages
-             WHERE id = ? AND queue_name = 'default' AND delivered_at IS NULL",
+             WHERE id = ? AND queue_name IN ('priority', 'bulk') AND delivered_at IS NULL",
             [$id]
         );
 
