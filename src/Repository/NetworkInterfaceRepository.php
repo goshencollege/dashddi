@@ -103,6 +103,18 @@ class NetworkInterfaceRepository extends ServiceEntityRepository
             ->getOneOrNullResult();
     }
 
+    /** Finds a soft-deleted interface by MAC address. */
+    public function findDeletedByMac(string $mac): ?NetworkInterface
+    {
+        return $this->createQueryBuilder('ni')
+            ->where('ni.macAddress = :mac')
+            ->andWhere('ni.deletedAt IS NOT NULL')
+            ->setParameter('mac', $mac)
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
     public function purgeDeletedBefore(\DateTimeImmutable $before): int
     {
         return (int) $this->createQueryBuilder('ni')
