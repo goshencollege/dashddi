@@ -13,6 +13,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: NetworkInterfaceRepository::class)]
 #[ORM\Table(name: 'network_interface')]
+#[ORM\Index(columns: ['deleted_at'], name: 'idx_network_interface_deleted_at')]
 #[UniqueMacAddress]
 class NetworkInterface
 {
