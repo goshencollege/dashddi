@@ -23,8 +23,9 @@ framework:
             failed_bulk:     'doctrine://default?queue_name=failed_bulk'
 
         routing:
-            'App\Message\PushClearpassMessage':   async_priority
-            'App\Message\PushDnsMessage':         async_priority
-            'App\Message\PushDhcpMessage':        async_priority
+            'App\Message\PushClearpassMessage':    async_priority
+            'App\Message\PushDnsMessage':          async_priority
+            'App\Message\PushDhcpMessage':         async_priority
+            'App\Message\PushClearpassAllMessage': async_bulk
             'App\Message\RunScheduledTaskMessage': async_bulk
-            'App\Message\PullSnipeItMessage':     async_bulk
+            'App\Message\PullSnipeItMessage':      async_bulk

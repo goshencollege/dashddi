@@ -142,11 +142,12 @@ class WorkerQueueController extends AbstractController
         }
 
         return match ($m[1]) {
-            'RunScheduledTaskMessage' => $this->labelScheduledTask($body, $taskNames),
-            'PushClearpassMessage'    => $this->labelClearpass($body),
-            'PushDnsMessage'          => 'Push DNS',
-            'PushDhcpMessage'         => 'Push DHCP',
-            default                   => trim(preg_replace('/([A-Z])/', ' $1', $m[1])),
+            'RunScheduledTaskMessage'  => $this->labelScheduledTask($body, $taskNames),
+            'PushClearpassMessage'     => $this->labelClearpass($body),
+            'PushClearpassAllMessage'  => 'Push ClearPass (all endpoints)',
+            'PushDnsMessage'           => 'Push DNS',
+            'PushDhcpMessage'          => 'Push DHCP',
+            default                    => trim(preg_replace('/([A-Z])/', ' $1', $m[1])),
         };
     }
 

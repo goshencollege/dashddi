@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\ClearpassServer;
 use App\Form\ClearpassServerType;
+use App\Message\PushClearpassAllMessage;
 use App\Message\PushClearpassMessage;
 use App\Repository\ClearpassServerRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -97,7 +98,7 @@ class ClearpassServerController extends AbstractController
         }
 
         foreach ($servers as $server) {
-            $bus->dispatch(new PushClearpassMessage($server->getId()), [new DeduplicateStamp('push_clearpass_' . $server->getId() . '_all', ttl: 3600)]);
+            $bus->dispatch(new PushClearpassAllMessage($server->getId()), [new DeduplicateStamp('push_clearpass_' . $server->getId() . '_all', ttl: 3600)]);
         }
 
         return $this->json(['queued' => true, 'count' => count($servers)], 202);
