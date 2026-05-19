@@ -224,6 +224,55 @@ class SnipeItSyncService
     }
 
     /**
+     * Fetches all categories from the Snipe-IT API.
+     *
+     * @return array<int, array{id: int, name: string}>
+     * @throws \RuntimeException on API failure
+     */
+    public function fetchCategories(SnipeItServer $server): array
+    {
+        $categories = [];
+        $offset     = 0;
+        $total      = PHP_INT_MAX;
+
+        while ($offset < $total) {
+            $response = $this->request($server, 'GET', '/api/v1/categories', null, [
+                'limit'  => self::FETCH_LIMIT,
+                'offset' => $offset,
+                'sort'   => 'name',
+                'order'  => 'asc',
+            ]);
+
+            if (!$response['success']) {
+                throw new \RuntimeException('Snipe-IT API error: ' . $response['error']);
+            }
+
+            $data  = json_decode($response['body'], true, 512, JSON_THROW_ON_ERROR);
+            $rows  = $data['rows'] ?? [];
+            $total = (int) ($data['total'] ?? 0);
+
+            if (empty($rows)) {
+                break;
+            }
+
+            foreach ($rows as $row) {
+                $id = (int) ($row['id'] ?? 0);
+                if ($id === 0) {
+                    continue;
+                }
+                $categories[] = [
+                    'id'   => $id,
+                    'name' => trim((string) ($row['name'] ?? '')),
+                ];
+            }
+
+            $offset += self::FETCH_LIMIT;
+        }
+
+        return $categories;
+    }
+
+    /**
      * Moves all interfaces from each host in $others into $primary, then deletes the now-empty hosts.
      * Uses DBAL directly to avoid Doctrine's orphan-removal scheduling interfering with the UPDATE
      * before the DELETE. host_tag rows are cleaned up by the DB-level ON DELETE CASCADE on host.
