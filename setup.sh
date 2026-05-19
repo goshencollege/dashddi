@@ -283,11 +283,31 @@ ${APP_READONLY}
       start_period: 10s
 ${DEPENDS_ON_BLOCK}
 
-  worker:
+  worker_priority:
     build: .
 ${APP_READONLY}
     restart: unless-stopped
-    command: ["php", "bin/console", "messenger:consume", "async", "failed", "--time-limit=3600"]
+    command: ["php", "bin/console", "messenger:consume", "async_priority", "failed_priority", "--time-limit=3600"]
+    volumes:
+      - .:/var/www/html${VOL_RO}
+      - symfony_var:/var/www/html/var
+    tmpfs:
+      - /tmp
+      - /usr/local/var/run
+    environment:
+      APP_ENV: ${APP_ENV}
+      APP_SECRET: "${APP_SECRET}"
+      APP_ENCRYPTION_KEY: "${APP_ENCRYPTION_KEY}"
+      DATABASE_URL: "${DATABASE_URL}"
+      DEFAULT_URI: "${BASE_URL}"
+      MESSENGER_TRANSPORT_DSN: "doctrine://default?auto_setup=0"
+${DEPENDS_ON_BLOCK}
+
+  worker_bulk:
+    build: .
+${APP_READONLY}
+    restart: unless-stopped
+    command: ["php", "bin/console", "messenger:consume", "async_priority", "async_bulk", "failed_bulk", "--time-limit=3600"]
     volumes:
       - .:/var/www/html${VOL_RO}
       - symfony_var:/var/www/html/var
