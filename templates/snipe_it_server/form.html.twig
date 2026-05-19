@@ -1,0 +1,110 @@
+{% extends 'base.html.twig' %}
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ path('servers_index') }}">Servers</a></li>
+        <li class="breadcrumb-item active">{{ title }}</li>
+    </ol>
+</nav>
+
+<div class="row justify-content-center">
+    <div class="col-md-7">
+        <div class="card">
+            <div class="card-header"><h5 class="mb-0">{{ title }}</h5></div>
+            <div class="card-body">
+                {{ form_start(form) }}
+
+                {% for field in ['name', 'apiUrl', 'apiKey', 'macCustomFields', 'description'] %}
+                    <div class="mb-3">
+                        {{ form_label(form[field], null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                        {{ form_widget(form[field], {attr: {class: 'form-control' ~ (form[field].vars.errors|length ? ' is-invalid' : '')}}) }}
+                        {{ form_errors(form[field]) }}
+                        {% if field == 'apiKey' and server.id %}
+                            <div class="form-text">Leave blank to keep the existing API key.</div>
+                        {% elseif form[field].vars.help is defined and form[field].vars.help %}
+                            <div class="form-text">{{ form[field].vars.help }}</div>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+
+                <div class="mb-3 form-check">
+                    {{ form_widget(form.verifyTls, {attr: {class: 'form-check-input'}}) }}
+                    {{ form_label(form.verifyTls, null, {label_attr: {class: 'form-check-label'}}) }}
+                    {{ form_errors(form.verifyTls) }}
+                    <div class="form-text">Disable only for self-signed certificates in test environments.</div>
+                </div>
+
+                <div class="d-flex gap-2 mt-4">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg me-1"></i>Save
+                    </button>
+                    <a href="{{ path('servers_index') }}" class="btn btn-outline-secondary">Cancel</a>
+                </div>
+                {{ form_end(form) }}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if server.id %}
+<div class="row justify-content-center mt-4">
+    <div class="col-md-7">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Category → Subnet Mappings</h5>
+                <form method="post" action="{{ path('snipe_it_fetch_categories', {id: server.id}) }}">
+                    <input type="hidden" name="_token" value="{{ csrf_token('fetch_categories_' ~ server.id) }}">
+                    <button type="submit" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-cloud-download me-1"></i>Fetch Categories
+                    </button>
+                </form>
+            </div>
+            <form method="post" action="{{ path('snipe_it_category_maps_save', {id: server.id}) }}">
+                <input type="hidden" name="_token" value="{{ csrf_token('save_category_maps_' ~ server.id) }}">
+                <div class="card-body p-0">
+                    <table class="table table-sm mb-0">
+                        <thead>
+                            <tr>
+                                <th style="width: 8%">ID</th>
+                                <th>Category Name</th>
+                                <th>Default Subnet</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for mapping in server.categorySubnetMaps %}
+                            <tr>
+                                <td class="align-middle text-muted">{{ mapping.snipeCategoryId }}</td>
+                                <td class="align-middle">{{ mapping.snipeCategoryName }}</td>
+                                <td class="align-middle">
+                                    <select name="mappings[{{ mapping.id }}]" class="form-select form-select-sm">
+                                        <option value="">— none —</option>
+                                        {% for subnet in subnets %}
+                                        <option value="{{ subnet.id }}"{% if mapping.subnet and mapping.subnet.id == subnet.id %} selected{% endif %}>
+                                            {{ subnet.name }}{% if subnet.ipv4Cidr %} ({{ subnet.ipv4Cidr }}){% endif %}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="3" class="text-muted text-center py-3">No categories yet — click Fetch Categories to import them from Snipe-IT.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="card-footer d-flex justify-content-between align-items-center">
+                    <p class="small text-muted mb-0">When the sync creates or updates an interface with no subnet, it uses this mapping to assign one based on the asset's Snipe-IT model category.</p>
+                    <button type="submit" class="btn btn-sm btn-primary ms-3 text-nowrap">
+                        <i class="bi bi-check-lg me-1"></i>Save All
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

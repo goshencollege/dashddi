@@ -9,6 +9,8 @@ use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Validator\Constraints as Assert;
 
+
+
 #[ORM\Entity(repositoryClass: HostRepository::class)]
 #[ORM\Table(name: 'host')]
 class Host
@@ -39,6 +41,9 @@ class Host
     #[ORM\JoinTable(name: 'host_tag')]
     #[ORM\OrderBy(['name' => 'ASC'])]
     private Collection $tags;
+
+    #[ORM\OneToOne(mappedBy: 'host', targetEntity: SnipeItAssetLink::class)]
+    private ?SnipeItAssetLink $snipeItAssetLink = null;
 
     public function __construct()
     {
@@ -99,6 +104,8 @@ class Host
         }
         return $this;
     }
+
+    public function getSnipeItAssetLink(): ?SnipeItAssetLink { return $this->snipeItAssetLink; }
 
     public function __toString(): string { return $this->name; }
 }

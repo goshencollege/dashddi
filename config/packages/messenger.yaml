@@ -10,3 +10,4 @@ framework:
             'App\Message\PushDnsMessage': async
             'App\Message\PushDhcpMessage': async
             'App\Message\RunScheduledTaskMessage': async
+            'App\Message\PullSnipeItMessage': async

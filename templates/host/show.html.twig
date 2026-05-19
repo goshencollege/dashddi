@@ -120,6 +120,36 @@
     {% endif %}
 </div>
 
+{% set snipeLink = host.snipeItAssetLink %}
+{% if snipeLink %}
+<div class="card mb-3">
+    <div class="card-header"><i class="bi bi-box-seam me-1"></i>Snipe-IT Asset</div>
+    <div class="card-body py-2">
+        <dl class="row mb-0 small">
+            <dt class="col-sm-3">Asset Name</dt>
+            <dd class="col-sm-9">
+                {{ snipeLink.snipeAssetName }}
+                {% if snipeLink.snipeAssetName != host.name %}
+                    <span class="text-muted ms-2">(DashDDI name: <strong>{{ host.name }}</strong>)</span>
+                {% endif %}
+            </dd>
+            {% if snipeLink.snipeAssetTag %}
+            <dt class="col-sm-3">Asset Tag</dt>
+            <dd class="col-sm-9 font-monospace">
+              <a href="{{ snipeLink.server.webUrl }}/hardware/{{ snipeLink.snipeAssetId }}" target="_blank" rel="noopener noreferrer">
+                {{ snipeLink.snipeAssetTag }}
+              </a>
+            </dd>
+            {% endif %}
+            <dt class="col-sm-3">Server</dt>
+            <dd class="col-sm-9">{{ snipeLink.server.name }}</dd>
+            <dt class="col-sm-3">Last Synced</dt>
+            <dd class="col-sm-9">{{ snipeLink.syncedAt|date('Y-m-d H:i') }}</dd>
+        </dl>
+    </div>
+</div>
+{% endif %}
+
 <div class="text-muted small">
     Created {{ host.createdAt|date('Y-m-d H:i') }}{% if host.createdBy %} by {{ host.createdBy }}{% endif %}
     &middot; Updated {{ host.updatedAt|date('Y-m-d H:i') }}{% if host.updatedBy %} by {{ host.updatedBy }}{% endif %}
