@@ -4,10 +4,12 @@ namespace App\Controller;
 
 use App\Entity\SnipeItCategorySubnetMap;
 use App\Entity\SnipeItServer;
-use App\Form\SnipeItCategorySubnetMapType;
+use App\Form\SnipeItCategorySubnetAssignType;
 use App\Form\SnipeItServerType;
 use App\Message\PullSnipeItMessage;
+use App\Repository\SnipeItCategorySubnetMapRepository;
 use App\Repository\SnipeItServerRepository;
+use App\Service\SnipeItSyncService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -71,30 +73,84 @@ class SnipeItServerController extends AbstractController
             return $this->redirectToRoute('snipe_it_server_edit', ['id' => $server->getId()]);
         }
 
-        $mapForm = $this->createForm(SnipeItCategorySubnetMapType::class, new SnipeItCategorySubnetMap(), [
-            'action' => $this->generateUrl('snipe_it_category_map_create', ['id' => $server->getId()]),
-        ]);
+        $subnetForms = [];
+        foreach ($server->getCategorySubnetMaps() as $mapping) {
+            $subnetForms[$mapping->getId()] = $this->createForm(SnipeItCategorySubnetAssignType::class, $mapping, [
+                'action' => $this->generateUrl('snipe_it_category_map_update', [
+                    'server' => $server->getId(),
+                    'map'    => $mapping->getId(),
+                ]),
+            ])->createView();
+        }
 
         return $this->render('snipe_it_server/form.html.twig', [
-            'form'    => $form,
-            'server'  => $server,
-            'title'   => 'Edit: ' . $server->getName(),
-            'mapForm' => $mapForm,
+            'form'        => $form,
+            'server'      => $server,
+            'title'       => 'Edit: ' . $server->getName(),
+            'subnetForms' => $subnetForms,
         ]);
     }
 
-    #[Route('/{id}/category-maps', name: 'snipe_it_category_map_create', methods: ['POST'])]
-    public function createCategoryMap(Request $request, SnipeItServer $server, EntityManagerInterface $em): Response
+    #[Route('/{id}/fetch-categories', name: 'snipe_it_fetch_categories', methods: ['POST'])]
+    public function fetchCategories(
+        Request $request,
+        SnipeItServer $server,
+        SnipeItSyncService $syncService,
+        SnipeItCategorySubnetMapRepository $mapRepo,
+        EntityManagerInterface $em,
+    ): Response {
+        if (!$this->isCsrfTokenValid('fetch_categories_' . $server->getId(), $request->request->get('_token'))) {
+            $this->addFlash('error', 'Invalid CSRF token.');
+            return $this->redirectToRoute('snipe_it_server_edit', ['id' => $server->getId()]);
+        }
+
+        try {
+            $categories = $syncService->fetchCategories($server);
+        } catch (\RuntimeException $e) {
+            $this->addFlash('error', 'Could not fetch categories: ' . $e->getMessage());
+            return $this->redirectToRoute('snipe_it_server_edit', ['id' => $server->getId()]);
+        }
+
+        $existing = [];
+        foreach ($mapRepo->findBy(['server' => $server]) as $map) {
+            $existing[$map->getSnipeCategoryId()] = $map;
+        }
+
+        $added = $updated = 0;
+        foreach ($categories as $cat) {
+            if (isset($existing[$cat['id']])) {
+                if ($existing[$cat['id']]->getSnipeCategoryName() !== $cat['name']) {
+                    $existing[$cat['id']]->setSnipeCategoryName($cat['name']);
+                    $updated++;
+                }
+            } else {
+                $map = new SnipeItCategorySubnetMap();
+                $map->setServer($server);
+                $map->setSnipeCategoryId($cat['id']);
+                $map->setSnipeCategoryName($cat['name']);
+                $em->persist($map);
+                $added++;
+            }
+        }
+
+        $em->flush();
+
+        $parts = [];
+        if ($added)   { $parts[] = $added . ' added'; }
+        if ($updated) { $parts[] = $updated . ' updated'; }
+        $this->addFlash('success', 'Categories fetched' . ($parts ? ': ' . implode(', ', $parts) . '.' : ' — no changes.'));
+
+        return $this->redirectToRoute('snipe_it_server_edit', ['id' => $server->getId()]);
+    }
+
+    #[Route('/{server}/category-maps/{map}/update', name: 'snipe_it_category_map_update', methods: ['POST'])]
+    public function updateCategoryMap(Request $request, SnipeItServer $server, SnipeItCategorySubnetMap $map, EntityManagerInterface $em): Response
     {
-        $map = new SnipeItCategorySubnetMap();
-        $map->setServer($server);
-        $form = $this->createForm(SnipeItCategorySubnetMapType::class, $map);
+        $form = $this->createForm(SnipeItCategorySubnetAssignType::class, $map);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            $em->persist($map);
             $em->flush();
-            $this->addFlash('success', 'Category mapping added.');
         } else {
             foreach ($form->getErrors(true) as $error) {
                 $this->addFlash('error', $error->getMessage());
@@ -110,7 +166,6 @@ class SnipeItServerController extends AbstractController
         if ($this->isCsrfTokenValid('delete_category_map_' . $map->getId(), $request->request->get('_token'))) {
             $em->remove($map);
             $em->flush();
-            $this->addFlash('success', 'Category mapping removed.');
         }
 
         return $this->redirectToRoute('snipe_it_server_edit', ['id' => $server->getId()]);

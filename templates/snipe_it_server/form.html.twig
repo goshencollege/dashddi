@@ -52,12 +52,20 @@
 <div class="row justify-content-center mt-4">
     <div class="col-md-7">
         <div class="card">
-            <div class="card-header"><h5 class="mb-0">Category → Subnet Mappings</h5></div>
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Category → Subnet Mappings</h5>
+                <form method="post" action="{{ path('snipe_it_fetch_categories', {id: server.id}) }}">
+                    <input type="hidden" name="_token" value="{{ csrf_token('fetch_categories_' ~ server.id) }}">
+                    <button type="submit" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-cloud-download me-1"></i>Fetch Categories
+                    </button>
+                </form>
+            </div>
             <div class="card-body p-0">
                 <table class="table table-sm mb-0">
                     <thead>
                         <tr>
-                            <th>Category ID</th>
+                            <th style="width: 8%">ID</th>
                             <th>Category Name</th>
                             <th>Default Subnet</th>
                             <th></th>
@@ -66,19 +74,20 @@
                     <tbody>
                         {% for mapping in server.categorySubnetMaps %}
                         <tr>
-                            <td class="align-middle">{{ mapping.snipeCategoryId }}</td>
+                            <td class="align-middle text-muted">{{ mapping.snipeCategoryId }}</td>
                             <td class="align-middle">{{ mapping.snipeCategoryName }}</td>
                             <td class="align-middle">
-                                {% if mapping.subnet %}
-                                    {{ mapping.subnet.name }}{% if mapping.subnet.ipv4Cidr %} <span class="text-muted">({{ mapping.subnet.ipv4Cidr }})</span>{% endif %}
-                                {% else %}
-                                    <span class="text-muted fst-italic">subnet deleted</span>
-                                {% endif %}
+                                {{ form_start(subnetForms[mapping.id]) }}
+                                <div class="input-group input-group-sm">
+                                    {{ form_widget(subnetForms[mapping.id].subnet, {attr: {class: 'form-select form-select-sm'}}) }}
+                                    <button type="submit" class="btn btn-sm btn-outline-primary">Save</button>
+                                </div>
+                                {{ form_end(subnetForms[mapping.id]) }}
                             </td>
                             <td class="text-end align-middle">
-                                <form method="post" action="{{ path('snipe_it_category_map_delete', {server: server.id, map: mapping.id}) }}" class="d-inline">
+                                <form method="post" action="{{ path('snipe_it_category_map_delete', {server: server.id, map: mapping.id}) }}">
                                     <input type="hidden" name="_token" value="{{ csrf_token('delete_category_map_' ~ mapping.id) }}">
-                                    <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Remove this mapping?')">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Remove this category?')">
                                         <i class="bi bi-trash"></i>
                                     </button>
                                 </form>
@@ -86,35 +95,14 @@
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="4" class="text-muted text-center py-3">No mappings configured.</td>
+                            <td colspan="4" class="text-muted text-center py-3">No categories yet — click Fetch Categories to import them from Snipe-IT.</td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
             <div class="card-footer">
-                <p class="small text-muted mb-2">When the sync creates or updates an interface with no subnet assigned, it will use this mapping to assign one based on the asset's Snipe-IT model category.</p>
-                {{ form_start(mapForm) }}
-                <div class="row g-2 align-items-end">
-                    <div class="col-auto">
-                        {{ form_label(mapForm.snipeCategoryId, null, {label_attr: {class: 'form-label form-label-sm fw-semibold'}}) }}
-                        {{ form_widget(mapForm.snipeCategoryId, {attr: {class: 'form-control form-control-sm', style: 'width: 100px'}}) }}
-                    </div>
-                    <div class="col">
-                        {{ form_label(mapForm.snipeCategoryName, null, {label_attr: {class: 'form-label form-label-sm fw-semibold'}}) }}
-                        {{ form_widget(mapForm.snipeCategoryName, {attr: {class: 'form-control form-control-sm'}}) }}
-                    </div>
-                    <div class="col">
-                        {{ form_label(mapForm.subnet, null, {label_attr: {class: 'form-label form-label-sm fw-semibold'}}) }}
-                        {{ form_widget(mapForm.subnet, {attr: {class: 'form-select form-select-sm'}}) }}
-                    </div>
-                    <div class="col-auto">
-                        <button type="submit" class="btn btn-sm btn-primary">
-                            <i class="bi bi-plus-lg me-1"></i>Add
-                        </button>
-                    </div>
-                </div>
-                {{ form_end(mapForm) }}
+                <p class="small text-muted mb-0">When the sync creates or updates an interface with no subnet, it uses this mapping to assign one based on the asset's Snipe-IT model category.</p>
             </div>
         </div>
     </div>
