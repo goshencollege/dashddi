@@ -72,4 +72,10 @@ class SnipeItServer
 
     public function getLastSyncAt(): ?\DateTimeImmutable { return $this->lastSyncAt; }
     public function setLastSyncAt(?\DateTimeImmutable $dt): static { $this->lastSyncAt = $dt; return $this; }
+
+    /** Base web URL (strips /api/v1 suffix), used to build links to asset pages in the Snipe-IT UI. */
+    public function getWebUrl(): string
+    {
+        return preg_replace('#/api/v1$#', '', $this->apiUrl);
+    }
 }

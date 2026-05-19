@@ -137,6 +137,12 @@
             <dt class="col-sm-3">Asset Tag</dt>
             <dd class="col-sm-9 font-monospace">{{ snipeLink.snipeAssetTag }}</dd>
             {% endif %}
+            <dt class="col-sm-3">Asset ID</dt>
+            <dd class="col-sm-9">
+                <a href="{{ snipeLink.server.webUrl }}/hardware/{{ snipeLink.snipeAssetId }}" target="_blank" rel="noopener noreferrer">
+                    {{ snipeLink.snipeAssetId }}
+                </a>
+            </dd>
             <dt class="col-sm-3">Server</dt>
             <dd class="col-sm-9">{{ snipeLink.server.name }}</dd>
             <dt class="col-sm-3">Last Synced</dt>
