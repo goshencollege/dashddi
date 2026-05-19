@@ -46,6 +46,26 @@ class HostRepository extends ServiceEntityRepository
     // -------------------------------------------------------------------------
 
     /** @return array{hosts: Host[], total: int} */
+    public function findDeletedPaginated(int $page, int $perPage): array
+    {
+        $offset = max(0, ($page - 1) * $perPage);
+
+        $total = (int) $this->createQueryBuilder('h')
+            ->select('COUNT(h.id)')
+            ->where('h.deletedAt IS NOT NULL')
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        $ids = $this->idsForPage(
+            $this->createQueryBuilder('h')->where('h.deletedAt IS NOT NULL'),
+            $offset,
+            $perPage
+        );
+
+        return ['hosts' => $this->fetchByIds($ids), 'total' => $total];
+    }
+
+    /** @return array{hosts: Host[], total: int} */
     public function findAllPaginated(int $page, int $perPage): array
     {
         $offset = max(0, ($page - 1) * $perPage);

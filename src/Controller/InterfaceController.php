@@ -206,6 +206,21 @@ class InterfaceController extends AbstractController
         return $this->redirectToRoute('host_show', ['id' => $hostId]);
     }
 
+    #[Route('/interfaces/{id}/restore', name: 'interface_restore', methods: ['POST'])]
+    public function restore(Request $request, NetworkInterface $interface, EntityManagerInterface $em): Response
+    {
+        if ($this->isCsrfTokenValid('restore_interface_' . $interface->getId(), $request->request->get('_token'))) {
+            $interface->restore();
+            $host = $interface->getHost();
+            if ($host?->isDeleted()) {
+                $host->restore();
+            }
+            $em->flush();
+            $this->addFlash('success', 'Interface restored.');
+        }
+        return $this->redirectToRoute('interface_show', ['id' => $interface->getId()]);
+    }
+
     #[Route('/interfaces/{id}/names/new', name: 'interface_name_new', methods: ['GET', 'POST'])]
     public function nameNew(Request $request, NetworkInterface $interface, EntityManagerInterface $em): Response
     {

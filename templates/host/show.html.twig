@@ -9,6 +9,22 @@
     </ol>
 </nav>
 
+{% if host.deleted %}
+<div class="alert alert-warning d-flex align-items-center justify-content-between mb-3" role="alert">
+    <div>
+        <i class="bi bi-trash me-2"></i>
+        <strong>This host was deleted</strong> on {{ host.deletedAt|date('Y-m-d H:i') }}.
+        It is excluded from all DNS, DHCP, and ClearPass pushes.
+    </div>
+    <form method="post" action="{{ path('host_restore', {id: host.id}) }}" class="ms-3 flex-shrink-0">
+        <input type="hidden" name="_token" value="{{ csrf_token('restore_host_' ~ host.id) }}">
+        <button type="submit" class="btn btn-warning btn-sm text-nowrap">
+            <i class="bi bi-arrow-counterclockwise me-1"></i>Restore Host &amp; Interfaces
+        </button>
+    </form>
+</div>
+{% endif %}
+
 <div class="d-flex justify-content-between align-items-start mb-4">
     <div>
         <h1 class="h3 mb-1"><i class="bi bi-pc-display me-2"></i>{{ host.name }}</h1>
@@ -23,6 +39,7 @@
             </div>
         {% endif %}
     </div>
+    {% if not host.deleted %}
     <div>
         <a href="{{ path('host_edit', {id: host.id}) }}" class="btn btn-outline-secondary me-2">
             <i class="bi bi-pencil me-1"></i>Edit
@@ -35,14 +52,22 @@
             </button>
         </form>
     </div>
+    {% endif %}
 </div>
 
 <div class="card mb-3">
+    {% set activeInterfaces  = host.interfaces|filter(i => not i.deleted) %}
+    {% set deletedInterfaces = host.interfaces|filter(i => i.deleted) %}
     <div class="card-header d-flex justify-content-between align-items-center">
-        <span><i class="bi bi-hdd-network me-1"></i>Interfaces ({{ host.interfaces|length }})</span>
+        <span>
+            <i class="bi bi-hdd-network me-1"></i>Interfaces ({{ activeInterfaces|length }}
+            {%- if deletedInterfaces|length > 0 %}, <span class="text-warning-emphasis">{{ deletedInterfaces|length }} deleted</span>{% endif %})
+        </span>
+        {% if not host.deleted %}
         <a href="{{ path('interface_new', {id: host.id}) }}" class="btn btn-sm btn-primary">
             <i class="bi bi-plus-lg me-1"></i>Add Interface
         </a>
+        {% endif %}
     </div>
     {% if host.interfaces is empty %}
         <div class="card-body text-center text-muted py-4">
@@ -51,7 +76,7 @@
     {% else %}
         <div class="table-responsive">
             <table class="table table-hover mb-0">
-                <thead class="">
+                <thead>
                     <tr>
                         <th>Interface</th>
                         <th>DNS Names</th>
@@ -64,7 +89,7 @@
                 </thead>
                 <tbody>
                     {% for iface in host.interfaces %}
-                        <tr>
+                        <tr class="{{ iface.deleted ? 'table-warning opacity-75' : '' }}">
                             <td class="small">
                                 <a href="{{ path('interface_show', {id: iface.id}) }}" class="text-decoration-none">
                                     {% if iface.name %}
@@ -72,6 +97,9 @@
                                     {% endif %}
                                     <div class="font-monospace text-muted">{{ iface.macAddress }}</div>
                                 </a>
+                                {% if iface.deleted %}
+                                    <span class="badge text-bg-warning mt-1">Deleted {{ iface.deletedAt|date('Y-m-d') }}</span>
+                                {% endif %}
                             </td>
                             <td>
                                 {% for name in iface.names %}
@@ -101,16 +129,25 @@
                                 {% if iface.updatedBy %}<br>{{ iface.updatedBy }}{% endif %}
                             </td>
                             <td class="text-end">
-                                <a href="{{ path('interface_edit', {id: iface.id}) }}" class="btn btn-sm btn-outline-secondary me-1">
-                                    <i class="bi bi-pencil"></i>
-                                </a>
-                                <form method="post" action="{{ path('interface_delete', {id: iface.id}) }}" class="d-inline"
-                                      onsubmit="return confirm({% if host.interfaces|length == 1 %}'Delete this interface? It is the only interface on {{ host.name|e('js') }}, so the host will also be deleted.'{% else %}'Delete this interface from {{ host.name|e('js') }}?'{% endif %})">
-                                    <input type="hidden" name="_token" value="{{ csrf_token('delete_interface_' ~ iface.id) }}">
-                                    <button type="submit" class="btn btn-sm btn-outline-danger">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </form>
+                                {% if iface.deleted %}
+                                    <form method="post" action="{{ path('interface_restore', {id: iface.id}) }}" class="d-inline">
+                                        <input type="hidden" name="_token" value="{{ csrf_token('restore_interface_' ~ iface.id) }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-warning">
+                                            <i class="bi bi-arrow-counterclockwise"></i>
+                                        </button>
+                                    </form>
+                                {% else %}
+                                    <a href="{{ path('interface_edit', {id: iface.id}) }}" class="btn btn-sm btn-outline-secondary me-1">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <form method="post" action="{{ path('interface_delete', {id: iface.id}) }}" class="d-inline"
+                                          onsubmit="return confirm({% if activeInterfaces|length == 1 %}'Delete this interface? It is the only active interface on {{ host.name|e('js') }}, so the host will also be deleted.'{% else %}'Delete this interface from {{ host.name|e('js') }}?'{% endif %})">
+                                        <input type="hidden" name="_token" value="{{ csrf_token('delete_interface_' ~ iface.id) }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                {% endif %}
                             </td>
                         </tr>
                     {% endfor %}
