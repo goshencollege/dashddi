@@ -20,8 +20,9 @@ class InterfaceApiController extends AbstractController
     #[Route('', name: 'api_interfaces_index', methods: ['GET'])]
     public function index(Request $request, NetworkInterfaceRepository $repo): JsonResponse
     {
+        $deleted = $request->query->getBoolean('deleted');
         $qb = $repo->createQueryBuilder('i')
-            ->where('i.deletedAt IS NULL');
+            ->where($deleted ? 'i.deletedAt IS NOT NULL' : 'i.deletedAt IS NULL');
 
         if ($hostId = $request->query->getInt('host_id')) {
             $qb->andWhere('i.host = :hid')->setParameter('hid', $hostId);
@@ -178,6 +179,22 @@ class InterfaceApiController extends AbstractController
         return $this->json(null, Response::HTTP_NO_CONTENT);
     }
 
+    #[Route('/{id}/restore', name: 'api_interfaces_restore', methods: ['POST'])]
+    public function restore(NetworkInterface $interface, EntityManagerInterface $em): JsonResponse
+    {
+        if (!$interface->isDeleted()) {
+            return $this->json($this->serialize($interface));
+        }
+        $interface->restore();
+        // If the parent host was also soft-deleted, restore it too
+        if ($interface->getHost()?->isDeleted()) {
+            $interface->getHost()->restore();
+        }
+        $em->flush();
+
+        return $this->json($this->serialize($interface));
+    }
+
     /**
      * Handles ip_address field. Values:
      *   "auto"       – assign next available IPv4 from the interface's subnet
@@ -283,6 +300,7 @@ class InterfaceApiController extends AbstractController
             'subnet_id'    => $iface->getSubnet()?->getId(),
             'ip_address'   => $iface->getIpAddress()?->getAddress(),
             'ipv6_address' => $iface->getIpv6Address()?->getAddress(),
+            'deleted_at'   => $iface->getDeletedAt()?->format(\DateTimeInterface::ATOM),
             'created_at'   => $iface->getCreatedAt()->format(\DateTimeInterface::ATOM),
             'updated_at'   => $iface->getUpdatedAt()->format(\DateTimeInterface::ATOM),
             'created_by'   => $iface->getCreatedBy(),
