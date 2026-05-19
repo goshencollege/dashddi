@@ -58,6 +58,8 @@
                                     <span class="badge bg-success">DHCP</span>
                                 {% elseif log.type == 'clearpass' %}
                                     <span class="badge bg-info text-dark">ClearPass</span>
+                                {% elseif log.type == 'snipeit' %}
+                                    <span class="badge bg-warning text-dark">Snipe-IT</span>
                                 {% else %}
                                     <span class="badge bg-secondary">{{ log.type|upper }}</span>
                                 {% endif %}
@@ -87,6 +89,8 @@
                                     {{ _self.renderDnsResult(log.result) }}
                                 {% elseif log.type == 'clearpass' %}
                                     {{ _self.renderClearpassResult(log.result) }}
+                                {% elseif log.type == 'snipeit' %}
+                                    {{ _self.renderSnipeItResult(log.result) }}
                                 {% else %}
                                     {{ _self.renderDhcpResult(log.result) }}
                                 {% endif %}
@@ -181,6 +185,29 @@
             </li>
         {% endfor %}
     {% endif %}
+</ul>
+{% endmacro %}
+
+{# ── Snipe-IT result renderer ─────────────────────────────────────────────── #}
+{% macro renderSnipeItResult(result) %}
+<ul class="zone-list">
+    <li class="d-flex align-items-start gap-2">
+        <i class="bi bi-arrow-repeat text-muted mt-1 flex-shrink-0"></i>
+        <div>
+            <span class="badge bg-success me-1">+{{ result.created ?? 0 }}</span> created
+            <span class="badge bg-primary me-1 ms-2">~{{ result.updated ?? 0 }}</span> updated
+            <span class="badge bg-danger me-1 ms-2">-{{ result.deleted ?? 0 }}</span> deleted
+            {% if (result.skipped ?? 0) > 0 %}
+                <span class="badge bg-secondary me-1 ms-2">{{ result.skipped }}</span> skipped
+            {% endif %}
+        </div>
+    </li>
+    {% for err in result.errors ?? [] %}
+        <li class="d-flex align-items-start gap-2">
+            <i class="bi bi-x-circle-fill text-danger mt-1 flex-shrink-0"></i>
+            <div class="text-danger small font-monospace">{{ err }}</div>
+        </li>
+    {% endfor %}
 </ul>
 {% endmacro %}
 
