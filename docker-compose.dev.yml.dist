@@ -62,9 +62,11 @@ services:
     command: ["php", "bin/console", "messenger:consume", "async_priority", "failed_priority", "--time-limit=3600"]
 
   # Handles long-running jobs (Snipe-IT pull, scheduled tasks) and their failed-message retries.
+  # Also picks up priority messages when idle — async_priority is listed first so it is
+  # always checked before pulling a bulk job.
   worker_bulk:
     <<: *worker-base
-    command: ["php", "bin/console", "messenger:consume", "async_bulk", "failed_bulk", "--time-limit=3600"]
+    command: ["php", "bin/console", "messenger:consume", "async_priority", "async_bulk", "failed_bulk", "--time-limit=3600"]
 
   nginx:
     image: nginx:alpine

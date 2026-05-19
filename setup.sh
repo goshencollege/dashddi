@@ -307,7 +307,7 @@ ${DEPENDS_ON_BLOCK}
     build: .
 ${APP_READONLY}
     restart: unless-stopped
-    command: ["php", "bin/console", "messenger:consume", "async_bulk", "failed_bulk", "--time-limit=3600"]
+    command: ["php", "bin/console", "messenger:consume", "async_priority", "async_bulk", "failed_bulk", "--time-limit=3600"]
     volumes:
       - .:/var/www/html${VOL_RO}
       - symfony_var:/var/www/html/var
