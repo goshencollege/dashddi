@@ -56,17 +56,15 @@ services:
         max-size: "20m"
         max-file: "5"
 
-  # Handles quick push messages (ClearPass, DNS, DHCP) and failed-message retries.
-  # Kept free of long-running jobs so pushes are never queued behind a bulk task.
+  # Handles quick push messages (ClearPass, DNS, DHCP) and their failed-message retries.
   worker_priority:
     <<: *worker-base
-    command: ["php", "bin/console", "messenger:consume", "async_priority", "failed", "--time-limit=3600"]
+    command: ["php", "bin/console", "messenger:consume", "async_priority", "failed_priority", "--time-limit=3600"]
 
-  # Handles long-running jobs (Snipe-IT pull, scheduled tasks).
-  # Runs in a separate container so bulk jobs cannot starve the priority queue.
+  # Handles long-running jobs (Snipe-IT pull, scheduled tasks) and their failed-message retries.
   worker_bulk:
     <<: *worker-base
-    command: ["php", "bin/console", "messenger:consume", "async_bulk", "--time-limit=3600"]
+    command: ["php", "bin/console", "messenger:consume", "async_bulk", "failed_bulk", "--time-limit=3600"]
 
   nginx:
     image: nginx:alpine
