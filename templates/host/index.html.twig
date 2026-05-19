@@ -219,7 +219,7 @@
                     </thead>
                     <tbody>
                         {% for host in hosts %}
-                            <tr class="{{ host.deleted ? 'table-warning' : '' }}">
+                            <tr class="{{ host.deleted ? 'row-deleted' : '' }}">
                                 <td class="ps-3">
                                     <input type="checkbox" class="form-check-input bulk-host-cb" value="{{ host.id }}">
                                 </td>
@@ -358,7 +358,7 @@
                         {% for host in hosts %}
                             {% for iface in host.interfaces %}
                                 {% set row_deleted = iface.deleted or host.deleted %}
-                                <tr class="{{ row_deleted ? 'table-warning' : '' }}">
+                                <tr class="{{ row_deleted ? 'row-deleted' : '' }}">
                                     <td class="ps-3">
                                         <input type="checkbox" class="form-check-input bulk-iface-cb" value="{{ iface.id }}">
                                     </td>

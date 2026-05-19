@@ -89,7 +89,7 @@
                 </thead>
                 <tbody>
                     {% for iface in host.interfaces %}
-                        <tr class="{{ iface.deleted ? 'table-warning opacity-75' : '' }}">
+                        <tr class="{{ iface.deleted ? 'row-deleted' : '' }}">
                             <td class="small">
                                 <a href="{{ path('interface_show', {id: iface.id}) }}" class="text-decoration-none">
                                     {% if iface.name %}
