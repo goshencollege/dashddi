@@ -19,7 +19,11 @@ class HostApiController extends AbstractController
     #[Route('', name: 'api_hosts_index', methods: ['GET'])]
     public function index(Request $request, HostRepository $repo): JsonResponse
     {
+        $deletedParam = $request->query->get('deleted');
         $qb = $repo->createQueryBuilder('h');
+        if ($deletedParam !== 'all') {
+            $qb->where($request->query->getBoolean('deleted') ? 'h.deletedAt IS NOT NULL' : 'h.deletedAt IS NULL');
+        }
 
         if ($name = $request->query->get('name')) {
             $qb->andWhere('h.name LIKE :name')->setParameter('name', '%' . $name . '%');
@@ -36,6 +40,9 @@ class HostApiController extends AbstractController
     #[Route('/{id}', name: 'api_hosts_show', methods: ['GET'])]
     public function show(Host $host): JsonResponse
     {
+        if ($host->isDeleted()) {
+            return $this->json(['error' => 'Not found'], Response::HTTP_NOT_FOUND);
+        }
         return $this->json($this->serialize($host));
     }
 
@@ -85,6 +92,9 @@ class HostApiController extends AbstractController
         BuildingRepository $buildingRepo,
         TagRepository $tagRepo,
     ): JsonResponse {
+        if ($host->isDeleted()) {
+            return $this->json(['error' => 'Not found'], Response::HTTP_NOT_FOUND);
+        }
         $data = json_decode($request->getContent(), true) ?? [];
 
         if (array_key_exists('name', $data)) {
@@ -130,10 +140,28 @@ class HostApiController extends AbstractController
     #[Route('/{id}', name: 'api_hosts_delete', methods: ['DELETE'])]
     public function delete(Host $host, EntityManagerInterface $em): JsonResponse
     {
-        $em->remove($host);
+        if ($host->isDeleted()) {
+            return $this->json(null, Response::HTTP_NO_CONTENT);
+        }
+        $host->softDeleteWithInterfaces();
         $em->flush();
 
         return $this->json(null, Response::HTTP_NO_CONTENT);
+    }
+
+    #[Route('/{id}/restore', name: 'api_hosts_restore', methods: ['POST'])]
+    public function restore(Host $host, EntityManagerInterface $em): JsonResponse
+    {
+        if (!$host->isDeleted()) {
+            return $this->json($this->serialize($host));
+        }
+        $host->restore();
+        foreach ($host->getInterfaces() as $iface) {
+            $iface->restore();
+        }
+        $em->flush();
+
+        return $this->json($this->serialize($host));
     }
 
     private function serialize(Host $host): array
@@ -144,6 +172,7 @@ class HostApiController extends AbstractController
             'room'        => $host->getRoom(),
             'building_id' => $host->getBuilding()?->getId(),
             'tag_ids'     => $host->getTags()->map(fn($t) => $t->getId())->toArray(),
+            'deleted_at'  => $host->getDeletedAt()?->format(\DateTimeInterface::ATOM),
             'created_at'  => $host->getCreatedAt()->format(\DateTimeInterface::ATOM),
             'updated_at'  => $host->getUpdatedAt()->format(\DateTimeInterface::ATOM),
             'created_by'  => $host->getCreatedBy(),

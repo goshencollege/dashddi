@@ -20,7 +20,11 @@ class InterfaceApiController extends AbstractController
     #[Route('', name: 'api_interfaces_index', methods: ['GET'])]
     public function index(Request $request, NetworkInterfaceRepository $repo): JsonResponse
     {
+        $deletedParam = $request->query->get('deleted');
         $qb = $repo->createQueryBuilder('i');
+        if ($deletedParam !== 'all') {
+            $qb->where($request->query->getBoolean('deleted') ? 'i.deletedAt IS NOT NULL' : 'i.deletedAt IS NULL');
+        }
 
         if ($hostId = $request->query->getInt('host_id')) {
             $qb->andWhere('i.host = :hid')->setParameter('hid', $hostId);
@@ -40,6 +44,9 @@ class InterfaceApiController extends AbstractController
     #[Route('/{id}', name: 'api_interfaces_show', methods: ['GET'])]
     public function show(NetworkInterface $interface): JsonResponse
     {
+        if ($interface->isDeleted()) {
+            return $this->json(['error' => 'Not found'], Response::HTTP_NOT_FOUND);
+        }
         return $this->json($this->serialize($interface));
     }
 
@@ -101,6 +108,9 @@ class InterfaceApiController extends AbstractController
         SubnetRepository $subnetRepo,
         IpAddressManager $ipManager,
     ): JsonResponse {
+        if ($interface->isDeleted()) {
+            return $this->json(['error' => 'Not found'], Response::HTTP_NOT_FOUND);
+        }
         $data = json_decode($request->getContent(), true) ?? [];
 
         if (array_key_exists('mac_address', $data)) {
@@ -162,10 +172,29 @@ class InterfaceApiController extends AbstractController
     #[Route('/{id}', name: 'api_interfaces_delete', methods: ['DELETE'])]
     public function delete(NetworkInterface $interface, EntityManagerInterface $em): JsonResponse
     {
-        $em->remove($interface);
+        if ($interface->isDeleted()) {
+            return $this->json(null, Response::HTTP_NO_CONTENT);
+        }
+        $interface->softDelete();
         $em->flush();
 
         return $this->json(null, Response::HTTP_NO_CONTENT);
+    }
+
+    #[Route('/{id}/restore', name: 'api_interfaces_restore', methods: ['POST'])]
+    public function restore(NetworkInterface $interface, EntityManagerInterface $em): JsonResponse
+    {
+        if (!$interface->isDeleted()) {
+            return $this->json($this->serialize($interface));
+        }
+        $interface->restore();
+        // If the parent host was also soft-deleted, restore it too
+        if ($interface->getHost()?->isDeleted()) {
+            $interface->getHost()->restore();
+        }
+        $em->flush();
+
+        return $this->json($this->serialize($interface));
     }
 
     /**
@@ -273,6 +302,7 @@ class InterfaceApiController extends AbstractController
             'subnet_id'    => $iface->getSubnet()?->getId(),
             'ip_address'   => $iface->getIpAddress()?->getAddress(),
             'ipv6_address' => $iface->getIpv6Address()?->getAddress(),
+            'deleted_at'   => $iface->getDeletedAt()?->format(\DateTimeInterface::ATOM),
             'created_at'   => $iface->getCreatedAt()->format(\DateTimeInterface::ATOM),
             'updated_at'   => $iface->getUpdatedAt()->format(\DateTimeInterface::ATOM),
             'created_by'   => $iface->getCreatedBy(),

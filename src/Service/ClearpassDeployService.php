@@ -19,7 +19,7 @@ class ClearpassDeployService
     public function pushSingleInterface(ClearpassServer $server, string $mac): array
     {
         $mac   = $this->normaliseMac($mac);
-        $iface = $this->interfaceRepo->findOneBy(['macAddress' => $mac]);
+        $iface = $this->interfaceRepo->findActiveByMac($mac);
         $token = $this->getAccessToken($server);
 
         if ($iface === null) {

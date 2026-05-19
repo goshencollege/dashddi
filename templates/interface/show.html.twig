@@ -12,23 +12,41 @@
     </ol>
 </nav>
 
+{% if interface.deleted %}
+<div class="alert alert-warning d-flex align-items-center justify-content-between mb-3" role="alert">
+    <div>
+        <i class="bi bi-trash me-2"></i>
+        <strong>This interface was deleted</strong> on {{ interface.deletedAt|date('Y-m-d H:i') }}.
+        It is excluded from all DNS, DHCP, and ClearPass pushes.
+    </div>
+    <form method="post" action="{{ path('interface_restore', {id: interface.id}) }}" class="ms-3 flex-shrink-0">
+        <input type="hidden" name="_token" value="{{ csrf_token('restore_interface_' ~ interface.id) }}">
+        <button type="submit" class="btn btn-warning btn-sm text-nowrap">
+            <i class="bi bi-arrow-counterclockwise me-1"></i>Restore Interface
+        </button>
+    </form>
+</div>
+{% endif %}
+
 <div class="d-flex justify-content-between align-items-start mb-4">
     <div>
         <h1 class="h3 mb-1"><i class="bi bi-hdd-network me-2"></i>{{ interface.name ?: 'Interface' }}</h1>
         <code class="fs-5">{{ interface.macAddress }}</code>
     </div>
+    {% if not interface.deleted %}
     <div>
         <a href="{{ path('interface_edit', {id: interface.id}) }}" class="btn btn-outline-secondary me-2">
             <i class="bi bi-pencil me-1"></i>Edit
         </a>
         <form method="post" action="{{ path('interface_delete', {id: interface.id}) }}" class="d-inline"
-              onsubmit="return confirm({% if interface.host and interface.host.interfaces|length == 1 %}'Delete this interface? It is the only interface on {{ interface.host.name|e('js') }}, so the host will also be deleted.'{% else %}'Delete this interface?'{% endif %})">
+              onsubmit="return confirm({% if interface.host and interface.host.interfaces|filter(i => not i.deleted)|length == 1 %}'Delete this interface? It is the only active interface on {{ interface.host.name|e('js') }}, so the host will also be deleted.'{% else %}'Delete this interface?'{% endif %})">
             <input type="hidden" name="_token" value="{{ csrf_token('delete_interface_' ~ interface.id) }}">
             <button type="submit" class="btn btn-outline-danger">
                 <i class="bi bi-trash me-1"></i>Delete
             </button>
         </form>
     </div>
+    {% endif %}
 </div>
 
 <div class="row g-3 mb-4">
