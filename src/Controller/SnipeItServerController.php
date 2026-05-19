@@ -4,7 +4,7 @@ namespace App\Controller;
 
 use App\Entity\SnipeItCategorySubnetMap;
 use App\Entity\SnipeItServer;
-use App\Form\SnipeItCategorySubnetAssignType;
+use App\Entity\Subnet;
 use App\Form\SnipeItServerType;
 use App\Message\PullSnipeItMessage;
 use App\Repository\SnipeItCategorySubnetMapRepository;
@@ -73,21 +73,13 @@ class SnipeItServerController extends AbstractController
             return $this->redirectToRoute('snipe_it_server_edit', ['id' => $server->getId()]);
         }
 
-        $subnetForms = [];
-        foreach ($server->getCategorySubnetMaps() as $mapping) {
-            $subnetForms[$mapping->getId()] = $this->createForm(SnipeItCategorySubnetAssignType::class, $mapping, [
-                'action' => $this->generateUrl('snipe_it_category_map_update', [
-                    'server' => $server->getId(),
-                    'map'    => $mapping->getId(),
-                ]),
-            ])->createView();
-        }
+        $subnets = $em->getRepository(Subnet::class)->findBy([], ['name' => 'ASC']);
 
         return $this->render('snipe_it_server/form.html.twig', [
-            'form'        => $form,
-            'server'      => $server,
-            'title'       => 'Edit: ' . $server->getName(),
-            'subnetForms' => $subnetForms,
+            'form'    => $form,
+            'server'  => $server,
+            'title'   => 'Edit: ' . $server->getName(),
+            'subnets' => $subnets,
         ]);
     }
 
@@ -143,30 +135,42 @@ class SnipeItServerController extends AbstractController
         return $this->redirectToRoute('snipe_it_server_edit', ['id' => $server->getId()]);
     }
 
-    #[Route('/{server}/category-maps/{map}/update', name: 'snipe_it_category_map_update', methods: ['POST'])]
-    public function updateCategoryMap(Request $request, SnipeItServer $server, SnipeItCategorySubnetMap $map, EntityManagerInterface $em): Response
+    #[Route('/{id}/category-maps/save', name: 'snipe_it_category_maps_save', methods: ['POST'])]
+    public function saveCategoryMaps(Request $request, SnipeItServer $server, EntityManagerInterface $em): Response
     {
-        $form = $this->createForm(SnipeItCategorySubnetAssignType::class, $map);
-        $form->handleRequest($request);
+        if (!$this->isCsrfTokenValid('save_category_maps_' . $server->getId(), $request->request->get('_token'))) {
+            $this->addFlash('error', 'Invalid CSRF token.');
+            return $this->redirectToRoute('snipe_it_server_edit', ['id' => $server->getId()]);
+        }
 
-        if ($form->isSubmitted() && $form->isValid()) {
-            $em->flush();
-        } else {
-            foreach ($form->getErrors(true) as $error) {
-                $this->addFlash('error', $error->getMessage());
+        $submissions = $request->request->all()['mappings'] ?? [];
+
+        // Index maps by ID so we only touch rows that belong to this server
+        $maps = [];
+        foreach ($server->getCategorySubnetMaps() as $map) {
+            $maps[$map->getId()] = $map;
+        }
+
+        // Resolve submitted subnet IDs to entities in one query
+        $subnetIds = array_filter(array_map('intval', array_values($submissions)));
+        $subnetIndex = [];
+        if (!empty($subnetIds)) {
+            foreach ($em->getRepository(Subnet::class)->findBy(['id' => $subnetIds]) as $subnet) {
+                $subnetIndex[$subnet->getId()] = $subnet;
             }
         }
 
-        return $this->redirectToRoute('snipe_it_server_edit', ['id' => $server->getId()]);
-    }
-
-    #[Route('/{server}/category-maps/{map}/delete', name: 'snipe_it_category_map_delete', methods: ['POST'])]
-    public function deleteCategoryMap(Request $request, SnipeItServer $server, SnipeItCategorySubnetMap $map, EntityManagerInterface $em): Response
-    {
-        if ($this->isCsrfTokenValid('delete_category_map_' . $map->getId(), $request->request->get('_token'))) {
-            $em->remove($map);
-            $em->flush();
+        foreach ($submissions as $mapId => $subnetId) {
+            $mapId    = (int) $mapId;
+            $subnetId = (int) $subnetId;
+            if (!isset($maps[$mapId])) {
+                continue;
+            }
+            $maps[$mapId]->setSubnet($subnetId > 0 ? ($subnetIndex[$subnetId] ?? null) : null);
         }
+
+        $em->flush();
+        $this->addFlash('success', 'Category mappings saved.');
 
         return $this->redirectToRoute('snipe_it_server_edit', ['id' => $server->getId()]);
     }
