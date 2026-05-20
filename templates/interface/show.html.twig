@@ -82,7 +82,14 @@
                     {% if switchInfo and switchInfo.nasIp %}
                     <tr>
                         <th class="text-muted fw-normal ps-3">Switch IP</th>
-                        <td class="ip-address">{{ switchInfo.nasIp }}</td>
+                        <td class="ip-address">
+                            {% if switchIface and switchIface.host %}
+                                <a href="{{ path('host_show', {id: switchIface.host.id}) }}">{{ switchIface.host.name }}</a>
+                                <span class="text-muted small ms-1">({{ switchInfo.nasIp }})</span>
+                            {% else %}
+                                {{ switchInfo.nasIp }}
+                            {% endif %}
+                        </td>
                     </tr>
                     <tr>
                         <th class="text-muted fw-normal ps-3">Switch Port</th>
