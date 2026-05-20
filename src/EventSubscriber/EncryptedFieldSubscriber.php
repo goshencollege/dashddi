@@ -2,6 +2,7 @@
 
 namespace App\EventSubscriber;
 
+use App\Entity\ArubaSwitch;
 use App\Entity\BackupSetting;
 use App\Entity\ClearpassServer;
 use App\Entity\DhcpServer;
@@ -25,6 +26,7 @@ class EncryptedFieldSubscriber
 {
     // entity class => list of property names to encrypt
     private const FIELDS = [
+        ArubaSwitch::class      => ['password', 'sshPrivateKey'],
         BackupSetting::class    => ['backupPassword'],
         ClearpassServer::class  => ['clientSecret'],
         DhcpServer::class       => ['sshPrivateKey', 'controlPassword'],
