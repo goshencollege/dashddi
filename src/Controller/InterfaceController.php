@@ -93,7 +93,7 @@ class InterfaceController extends AbstractController
         $switchInfo = $authLogRepo->findLatestWithSwitchInfoByMac($interface->getMacAddress(), $cutoff);
 
         $switchIface  = $switchInfo?->getNasIp() ? $ifaceRepo->findByIpString($switchInfo->getNasIp()) : null;
-        $arubaSwitch  = $switchInfo?->getNasIp() ? $arubaSwitchRepo->findByManagementIp($switchInfo->getNasIp()) : null;
+        $arubaSwitch  = $switchInfo?->getNasPortId() ? $arubaSwitchRepo->getInstance() : null;
 
         return $this->render('interface/show.html.twig', [
             'interface'   => $interface,

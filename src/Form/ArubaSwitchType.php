@@ -16,16 +16,6 @@ class ArubaSwitchType extends AbstractType
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
         $builder
-            ->add('name', TextType::class, [
-                'label'    => 'Name',
-                'required' => true,
-            ])
-            ->add('managementIp', TextType::class, [
-                'label'    => 'Management IP',
-                'required' => true,
-                'attr'     => ['placeholder' => '192.168.1.1'],
-                'help'     => 'IP address used to reach the switch. Must match the NAS-IP-Address reported by ClearPass.',
-            ])
             ->add('username', TextType::class, [
                 'label'    => 'Username',
                 'required' => true,

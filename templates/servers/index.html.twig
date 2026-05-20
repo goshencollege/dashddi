@@ -74,74 +74,62 @@
 {% endif %}
 
 {# ── Aruba CX Switches ────────────────────────────────────────────────────── #}
+{% set arubaCreds = arubaSwitches|first %}
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h2 class="h5 mb-0"><i class="bi bi-diagram-3 me-2"></i>Aruba CX Switches</h2>
-    <a href="{{ path('aruba_switch_new') }}" class="btn btn-sm btn-primary">
-        <i class="bi bi-plus-lg me-1"></i>Add Switch
+    <a href="{{ path('aruba_switch_configure') }}" class="btn btn-sm btn-{{ arubaCreds ? 'outline-secondary' : 'primary' }}">
+        <i class="bi bi-{{ arubaCreds ? 'pencil' : 'plus-lg' }} me-1"></i>{{ arubaCreds ? 'Edit Credentials' : 'Configure' }}
     </a>
 </div>
 
-{% if arubaSwitches is empty %}
+{% if not arubaCreds %}
     <div class="card mb-5">
         <div class="card-body text-center text-muted py-4">
             <i class="bi bi-diagram-3 fs-1 d-block mb-3 opacity-25"></i>
-            No Aruba CX switches configured yet. <a href="{{ path('aruba_switch_new') }}">Add the first one →</a>
+            No Aruba CX credentials configured yet. <a href="{{ path('aruba_switch_configure') }}">Configure →</a>
         </div>
     </div>
 {% else %}
     <div class="card mb-5">
-        <div class="table-responsive">
-            <table class="table table-hover mb-0">
-                <thead>
-                    <tr>
-                        <th>Name</th>
-                        <th>Management IP</th>
-                        <th>Username</th>
-                        <th>REST API</th>
-                        <th>TLS</th>
-                        <th>SSH Key</th>
-                        <th class="text-end">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for switch in arubaSwitches %}
-                        <tr>
-                            <td class="fw-semibold">{{ switch.name }}</td>
-                            <td class="font-monospace">{{ switch.managementIp }}</td>
-                            <td class="font-monospace">{{ switch.username }}</td>
-                            <td class="font-monospace small text-muted">{{ switch.restApiVersion }}</td>
-                            <td>
-                                {% if switch.verifyTls %}
-                                    <span class="badge bg-success">Verified</span>
-                                {% else %}
-                                    <span class="badge bg-warning text-dark">Unverified</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if switch.sshPublicKey %}
-                                    <span class="badge bg-success"><i class="bi bi-key-fill me-1"></i>Ready</span>
-                                {% else %}
-                                    <span class="badge bg-secondary">No key</span>
-                                {% endif %}
-                            </td>
-                            <td class="text-end">
-                                <div class="d-flex gap-1 justify-content-end align-items-center">
-                                    <a href="{{ path('aruba_switch_edit', {id: switch.id}) }}" class="btn btn-sm btn-outline-secondary">
-                                        <i class="bi bi-pencil"></i>
-                                    </a>
-                                    <form method="post" action="{{ path('aruba_switch_delete', {id: switch.id}) }}"
-                                          onsubmit="return confirm('Remove {{ switch.name|e('js') }}?')">
-                                        <input type="hidden" name="_token" value="{{ csrf_token('delete_aruba_switch_' ~ switch.id) }}">
-                                        <button type="submit" class="btn btn-sm btn-outline-danger">
-                                            <i class="bi bi-trash"></i>
-                                        </button>
-                                    </form>
-                                </div>
-                            </td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-sm-4">
+                    <div class="text-muted small">Username</div>
+                    <code>{{ arubaCreds.username }}</code>
+                </div>
+                <div class="col-sm-2">
+                    <div class="text-muted small">REST API</div>
+                    <code>{{ arubaCreds.restApiVersion }}</code>
+                </div>
+                <div class="col-sm-3">
+                    <div class="text-muted small">TLS</div>
+                    {% if arubaCreds.verifyTls %}
+                        <span class="badge bg-success">Verified</span>
+                    {% else %}
+                        <span class="badge bg-warning text-dark">Unverified</span>
+                    {% endif %}
+                </div>
+                <div class="col-sm-3">
+                    <div class="text-muted small">SSH Key</div>
+                    {% if arubaCreds.sshPublicKey %}
+                        <span class="badge bg-success"><i class="bi bi-key-fill me-1"></i>Ready</span>
+                    {% else %}
+                        <span class="badge bg-secondary">No key</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% if arubaCreds.description %}
+                <p class="text-muted small mt-2 mb-0">{{ arubaCreds.description }}</p>
+            {% endif %}
+        </div>
+        <div class="card-footer d-flex justify-content-end">
+            <form method="post" action="{{ path('aruba_switch_delete') }}"
+                  onsubmit="return confirm('Remove Aruba CX credentials?')">
+                <input type="hidden" name="_token" value="{{ csrf_token('delete_aruba_creds') }}">
+                <button type="submit" class="btn btn-sm btn-outline-danger">
+                    <i class="bi bi-trash me-1"></i>Remove Credentials
+                </button>
+            </form>
         </div>
     </div>
 {% endif %}

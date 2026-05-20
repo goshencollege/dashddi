@@ -13,8 +13,8 @@ class ArubaSwitchRepository extends ServiceEntityRepository
         parent::__construct($registry, ArubaSwitch::class);
     }
 
-    public function findByManagementIp(string $ip): ?ArubaSwitch
+    public function getInstance(): ?ArubaSwitch
     {
-        return $this->findOneBy(['managementIp' => $ip]);
+        return $this->findOneBy([]);
     }
 }

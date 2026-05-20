@@ -18,14 +18,6 @@ class ArubaSwitch
     #[ORM\Column]
     private ?int $id = null;
 
-    #[ORM\Column(length: 255)]
-    #[Assert\NotBlank]
-    private string $name = '';
-
-    #[ORM\Column(length: 255)]
-    #[Assert\NotBlank]
-    private string $managementIp = '';
-
     #[ORM\Column(length: 128)]
     #[Assert\NotBlank]
     private string $username = '';
@@ -49,12 +41,6 @@ class ArubaSwitch
     private ?string $description = null;
 
     public function getId(): ?int { return $this->id; }
-
-    public function getName(): string { return $this->name; }
-    public function setName(string $name): static { $this->name = $name; return $this; }
-
-    public function getManagementIp(): string { return $this->managementIp; }
-    public function setManagementIp(string $ip): static { $this->managementIp = $ip; return $this; }
 
     public function getUsername(): string { return $this->username; }
     public function setUsername(string $username): static { $this->username = $username; return $this; }
