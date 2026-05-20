@@ -22,7 +22,7 @@ class ServersController extends AbstractController
             'dhcpServers'      => $dhcpRepo->findBy([], ['name' => 'ASC']),
             'dnsServers'       => $dnsRepo->findBy([], ['name' => 'ASC']),
             'snipeItServers'   => $snipeRepo->findBy([], ['name' => 'ASC']),
-            'arubaSwitches'    => $arubaRepo->findBy([], ['name' => 'ASC']),
+            'arubaSwitches'    => $arubaRepo->findBy([]),
         ]);
     }
 }
