@@ -10,7 +10,8 @@ use Doctrine\ORM\EntityManagerInterface;
 
 class ClearpassAuthLogService
 {
-    private const PAGE_SIZE = 1000;
+    private const PAGE_SIZE            = 1000;
+    private const ACTIVE_REFRESH_BATCH = 20;   // UUIDs in a GET URL; keep well under 414
 
     public function __construct(
         private readonly ClearpassAuthLogRepository $logRepo,
@@ -168,7 +169,7 @@ class ClearpassAuthLogService
 
         $updated = 0;
 
-        foreach (array_chunk($activeSessions, 200) as $batch) {
+        foreach (array_chunk($activeSessions, self::ACTIVE_REFRESH_BATCH) as $batch) {
             // Map sessionId => database row id (no entity objects).
             $bySessionId = array_column($batch, 'id', 'sessionId');
 
