@@ -69,12 +69,10 @@ class ClearpassAuthLogService
         $imported  = 0;
         $errors    = [];
         $offset    = 0;
-        $latestTs  = $this->logRepo->findLatestAuthTimestamp($server);
+        $latestTs  = $this->logRepo->findLatestAuthTimestamp($server) ?? new \DateTimeImmutable('-1 hour');
 
         $params = ['sort' => '+acctstarttime', 'limit' => self::PAGE_SIZE];
-        if ($latestTs !== null) {
-            $params['filter'] = json_encode(['acctstarttime' => ['$gt' => (string) $latestTs->getTimestamp()]]);
-        }
+        $params['filter'] = json_encode(['acctstarttime' => ['$gt' => (string) $latestTs->getTimestamp()]]);
 
         do {
             $query  = '?' . http_build_query(array_merge($params, ['offset' => $offset]));
