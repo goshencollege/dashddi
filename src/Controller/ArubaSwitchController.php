@@ -93,16 +93,17 @@ class ArubaSwitchController extends AbstractController
     {
         $creds  = $repo->getInstance();
         $portId = trim((string) $request->query->get('portId', ''));
+        $ip     = trim((string) $request->query->get('switchIp', ''));
 
         if ($creds === null) {
             return $this->json(['clients' => [], 'raw' => '', 'via' => 'none', 'error' => 'No Aruba CX credentials configured']);
         }
-        if ($portId === '') {
-            return $this->json(['clients' => [], 'raw' => '', 'via' => 'none', 'error' => 'No port ID provided']);
+        if ($portId === '' || $ip === '') {
+            return $this->json(['clients' => [], 'raw' => '', 'via' => 'none', 'error' => 'Missing portId or switchIp']);
         }
 
         try {
-            return $this->json($cx->getPortInfo($creds, $portId));
+            return $this->json($cx->getPortInfo($creds, $ip, $portId));
         } catch (\Throwable $e) {
             return $this->json(['clients' => [], 'raw' => '', 'via' => 'none', 'error' => $e->getMessage()]);
         }
@@ -117,16 +118,17 @@ class ArubaSwitchController extends AbstractController
 
         $creds  = $repo->getInstance();
         $portId = trim((string) $request->request->get('portId', ''));
+        $ip     = trim((string) $request->request->get('switchIp', ''));
 
         if ($creds === null) {
             return $this->json(['success' => false, 'error' => 'No Aruba CX credentials configured']);
         }
-        if ($portId === '') {
-            return $this->json(['success' => false, 'error' => 'No port ID provided']);
+        if ($portId === '' || $ip === '') {
+            return $this->json(['success' => false, 'error' => 'Missing portId or switchIp']);
         }
 
         try {
-            return $this->json($cx->bouncePort($creds, $portId));
+            return $this->json($cx->bouncePort($creds, $ip, $portId));
         } catch (\Throwable $e) {
             return $this->json(['success' => false, 'error' => $e->getMessage()]);
         }

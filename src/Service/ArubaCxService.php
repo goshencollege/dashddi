@@ -10,21 +10,22 @@ class ArubaCxService
 {
     // ── REST helpers ──────────────────────────────────────────────────────────
 
-    private function baseUrl(ArubaSwitch $switch): string
+    private function baseUrl(ArubaSwitch $creds, string $ip): string
     {
-        return 'https://' . $switch->getManagementIp() . '/rest/' . $switch->getRestApiVersion();
+        return 'https://' . $ip . '/rest/' . $creds->getRestApiVersion();
     }
 
     /** @return array{success:bool, error:string, body:string, status:int, headers:string[]} */
     private function request(
-        ArubaSwitch $switch,
+        ArubaSwitch $creds,
+        string      $ip,
         string      $method,
         string      $path,
         array       $headers = [],
         string      $body    = '',
         string      $cookie  = '',
     ): array {
-        $url       = $this->baseUrl($switch) . $path;
+        $url       = $this->baseUrl($creds, $ip) . $path;
         $headerStr = implode("\r\n", $headers) . "\r\n";
         if ($cookie !== '') {
             $headerStr .= 'Cookie: ' . $cookie . "\r\n";
@@ -38,7 +39,7 @@ class ArubaCxService
             'ignore_errors' => true,
         ];
 
-        $ssl = $switch->isVerifyTls()
+        $ssl = $creds->isVerifyTls()
             ? []
             : ['verify_peer' => false, 'verify_peer_name' => false];
 
@@ -46,7 +47,7 @@ class ArubaCxService
         $response = @file_get_contents($url, false, $context);
 
         if ($response === false) {
-            return ['success' => false, 'error' => 'Connection failed to ' . $switch->getManagementIp(), 'body' => '', 'status' => 0, 'headers' => []];
+            return ['success' => false, 'error' => 'Connection failed to ' . $ip, 'body' => '', 'status' => 0, 'headers' => []];
         }
 
         $status      = 0;
@@ -67,18 +68,14 @@ class ArubaCxService
         ];
     }
 
-    private function loginRest(ArubaSwitch $switch): string
+    private function loginRest(ArubaSwitch $creds, string $ip): string
     {
-        if ($switch->getPassword() === null) {
+        if ($creds->getPassword() === null) {
             throw new \RuntimeException('No password configured for REST API');
         }
 
-        $body   = http_build_query(['username' => $switch->getUsername(), 'password' => $switch->getPassword()]);
-        $result = $this->request($switch, 'POST', '/login', ['Content-Type: application/x-www-form-urlencoded'], $body);
-
-        if (!$result['success'] && $result['status'] !== 0) {
-            // 200 or even 302 may come back — accept anything that gave us a cookie
-        }
+        $body   = http_build_query(['username' => $creds->getUsername(), 'password' => $creds->getPassword()]);
+        $result = $this->request($creds, $ip, 'POST', '/login', ['Content-Type: application/x-www-form-urlencoded'], $body);
 
         foreach ($result['headers'] as $h) {
             if (preg_match('/^Set-Cookie:\s*([^;]+)/i', $h, $m)) {
@@ -93,17 +90,15 @@ class ArubaCxService
         throw new \RuntimeException('No session cookie returned by login endpoint (HTTP ' . $result['status'] . ')');
     }
 
-    private function logoutRest(ArubaSwitch $switch, string $cookie): void
+    private function logoutRest(ArubaSwitch $creds, string $ip, string $cookie): void
     {
-        $this->request($switch, 'POST', '/logout', [], '', $cookie);
+        $this->request($creds, $ip, 'POST', '/logout', [], '', $cookie);
     }
 
     /** Normalise a NAS-Port-ID string to just the interface name ("1/1/5 - ..." → "1/1/5"). */
     public static function normalisePortId(string $portId): string
     {
-        // ClearPass sometimes appends description after a dash or comma
-        $portId = preg_replace('/[\s,]+.*$/', '', trim($portId)) ?? trim($portId);
-        return $portId;
+        return preg_replace('/[\s,]+.*$/', '', trim($portId)) ?? trim($portId);
     }
 
     private function encodePort(string $portId): string
@@ -113,20 +108,20 @@ class ArubaCxService
 
     // ── SSH helpers ───────────────────────────────────────────────────────────
 
-    private function sshConnect(ArubaSwitch $switch): SSH2
+    private function sshConnect(ArubaSwitch $creds, string $ip): SSH2
     {
-        $ssh      = new SSH2($switch->getManagementIp());
+        $ssh = new SSH2($ip);
         $ssh->setTimeout(10);
 
         $loggedIn = false;
-        if ($switch->getSshPrivateKey() !== null) {
-            $loggedIn = $ssh->login($switch->getUsername(), PublicKeyLoader::load($switch->getSshPrivateKey()));
+        if ($creds->getSshPrivateKey() !== null) {
+            $loggedIn = $ssh->login($creds->getUsername(), PublicKeyLoader::load($creds->getSshPrivateKey()));
         }
-        if (!$loggedIn && $switch->getPassword() !== null) {
-            $loggedIn = $ssh->login($switch->getUsername(), $switch->getPassword());
+        if (!$loggedIn && $creds->getPassword() !== null) {
+            $loggedIn = $ssh->login($creds->getUsername(), $creds->getPassword());
         }
         if (!$loggedIn) {
-            throw new \RuntimeException('SSH login failed for ' . $switch->getManagementIp());
+            throw new \RuntimeException('SSH login failed for ' . $ip);
         }
 
         return $ssh;
@@ -136,25 +131,26 @@ class ArubaCxService
 
     /**
      * Returns port-access client info for a switch port.
-     * Tries REST first; falls back to SSH if no password or if REST fails.
+     * $ip is the switch management IP (taken from the ClearPass auth log nasIp).
+     * Tries REST first; falls back to SSH.
      *
      * @return array{clients: list<array{mac:string,ip:?string,role:?string,status:?string,auth_method:?string}>, raw: string, via: string, error: ?string}
      */
-    public function getPortInfo(ArubaSwitch $switch, string $portId): array
+    public function getPortInfo(ArubaSwitch $creds, string $ip, string $portId): array
     {
         $portId = self::normalisePortId($portId);
 
-        if ($switch->getPassword() !== null) {
+        if ($creds->getPassword() !== null) {
             try {
-                return $this->getPortInfoRest($switch, $portId);
+                return $this->getPortInfoRest($creds, $ip, $portId);
             } catch (\Throwable $e) {
                 // Fall through to SSH
             }
         }
 
-        if ($switch->getSshPrivateKey() !== null || $switch->getPassword() !== null) {
+        if ($creds->getSshPrivateKey() !== null || $creds->getPassword() !== null) {
             try {
-                return $this->getPortInfoSsh($switch, $portId);
+                return $this->getPortInfoSsh($creds, $ip, $portId);
             } catch (\Throwable $e) {
                 return ['clients' => [], 'raw' => '', 'via' => 'ssh', 'error' => $e->getMessage()];
             }
@@ -163,12 +159,12 @@ class ArubaCxService
         return ['clients' => [], 'raw' => '', 'via' => 'none', 'error' => 'No credentials configured'];
     }
 
-    private function getPortInfoRest(ArubaSwitch $switch, string $portId): array
+    private function getPortInfoRest(ArubaSwitch $creds, string $ip, string $portId): array
     {
-        $cookie = $this->loginRest($switch);
+        $cookie = $this->loginRest($creds, $ip);
         try {
             $path   = '/system/interfaces/' . $this->encodePort($portId) . '/port_access_clients?depth=2';
-            $result = $this->request($switch, 'GET', $path, ['Accept: application/json'], '', $cookie);
+            $result = $this->request($creds, $ip, 'GET', $path, ['Accept: application/json'], '', $cookie);
 
             if (!$result['success']) {
                 throw new \RuntimeException($result['error']);
@@ -189,13 +185,13 @@ class ArubaCxService
 
             return ['clients' => $clients, 'raw' => $result['body'], 'via' => 'rest', 'error' => null];
         } finally {
-            $this->logoutRest($switch, $cookie);
+            $this->logoutRest($creds, $ip, $cookie);
         }
     }
 
-    private function getPortInfoSsh(ArubaSwitch $switch, string $portId): array
+    private function getPortInfoSsh(ArubaSwitch $creds, string $ip, string $portId): array
     {
-        $ssh = $this->sshConnect($switch);
+        $ssh = $this->sshConnect($creds, $ip);
         $raw = (string) $ssh->exec('show port-access clients interface ' . $portId);
 
         return ['clients' => $this->parsePortAccessOutput($raw), 'raw' => $raw, 'via' => 'ssh', 'error' => null];
@@ -216,16 +212,15 @@ class ArubaCxService
         }
 
         if ($headerLine !== null) {
-            // Table format — skip separator lines, parse data rows
-            $cols = preg_split('/\s{2,}/', trim($lines[$headerLine]));
+            $cols   = preg_split('/\s{2,}/', trim($lines[$headerLine]));
             $colMap = [];
             foreach ($cols as $ci => $col) {
                 $col = strtolower(trim($col));
-                if (str_contains($col, 'mac'))    $colMap['mac']         = $ci;
-                if (str_contains($col, 'ip'))     $colMap['ip']          = $ci;
-                if (str_contains($col, 'role'))   $colMap['role']        = $ci;
+                if (str_contains($col, 'mac'))                                $colMap['mac']         = $ci;
+                if (str_contains($col, 'ip'))                                 $colMap['ip']          = $ci;
+                if (str_contains($col, 'role'))                               $colMap['role']        = $ci;
                 if (str_contains($col, 'status') || str_contains($col, 'auth s')) $colMap['status'] = $ci;
-                if (str_contains($col, 'method')) $colMap['auth_method'] = $ci;
+                if (str_contains($col, 'method'))                             $colMap['auth_method'] = $ci;
             }
 
             for ($i = $headerLine + 1; $i < count($lines); $i++) {
@@ -252,10 +247,10 @@ class ArubaCxService
                 if ($current !== null) $clients[] = $current;
                 $current = ['mac' => strtolower($m[1]), 'ip' => null, 'role' => null, 'status' => null, 'auth_method' => null];
             } elseif ($current !== null) {
-                if (preg_match('/^Client\s+IP\s*:\s*(\S+)/i', $line, $m))     $current['ip'] = $m[1];
-                if (preg_match('/^Client\s+Role\s*:\s*(.+)/i', $line, $m))    $current['role'] = trim($m[1]);
-                if (preg_match('/^Auth\s+Status\s*:\s*(.+)/i', $line, $m))    $current['status'] = trim($m[1]);
-                if (preg_match('/^Auth\s+Method\s*:\s*(.+)/i', $line, $m))    $current['auth_method'] = trim($m[1]);
+                if (preg_match('/^Client\s+IP\s*:\s*(\S+)/i', $line, $m))  $current['ip']          = $m[1];
+                if (preg_match('/^Client\s+Role\s*:\s*(.+)/i', $line, $m)) $current['role']        = trim($m[1]);
+                if (preg_match('/^Auth\s+Status\s*:\s*(.+)/i', $line, $m)) $current['status']      = trim($m[1]);
+                if (preg_match('/^Auth\s+Method\s*:\s*(.+)/i', $line, $m)) $current['auth_method'] = trim($m[1]);
             }
         }
         if ($current !== null) $clients[] = $current;
@@ -267,27 +262,27 @@ class ArubaCxService
 
     /**
      * Bounces a port (admin-down then admin-up).
-     * Tries REST first, falls back to SSH.
+     * $ip is the switch management IP (taken from the ClearPass auth log nasIp).
      *
      * @return array{success: bool, error: ?string}
      */
-    public function bouncePort(ArubaSwitch $switch, string $portId): array
+    public function bouncePort(ArubaSwitch $creds, string $ip, string $portId): array
     {
         $portId = self::normalisePortId($portId);
 
-        if ($switch->getPassword() !== null) {
+        if ($creds->getPassword() !== null) {
             try {
-                return $this->bouncePortRest($switch, $portId);
+                return $this->bouncePortRest($creds, $ip, $portId);
             } catch (\Throwable $e) {
-                if ($switch->getSshPrivateKey() === null) {
+                if ($creds->getSshPrivateKey() === null) {
                     return ['success' => false, 'error' => $e->getMessage()];
                 }
             }
         }
 
-        if ($switch->getSshPrivateKey() !== null || $switch->getPassword() !== null) {
+        if ($creds->getSshPrivateKey() !== null || $creds->getPassword() !== null) {
             try {
-                return $this->bouncePortSsh($switch, $portId);
+                return $this->bouncePortSsh($creds, $ip, $portId);
             } catch (\Throwable $e) {
                 return ['success' => false, 'error' => $e->getMessage()];
             }
@@ -296,38 +291,36 @@ class ArubaCxService
         return ['success' => false, 'error' => 'No credentials configured'];
     }
 
-    private function bouncePortRest(ArubaSwitch $switch, string $portId): array
+    private function bouncePortRest(ArubaSwitch $creds, string $ip, string $portId): array
     {
-        $cookie  = $this->loginRest($switch);
+        $cookie  = $this->loginRest($creds, $ip);
         $path    = '/system/interfaces/' . $this->encodePort($portId);
         $headers = ['Content-Type: application/json', 'Accept: application/json'];
 
         try {
-            $down = $this->request($switch, 'PUT', $path, $headers, json_encode(['user_config' => ['admin' => 'down']]), $cookie);
+            $down = $this->request($creds, $ip, 'PUT', $path, $headers, json_encode(['user_config' => ['admin' => 'down']]), $cookie);
             if (!$down['success']) {
                 throw new \RuntimeException('Admin-down failed: ' . $down['error']);
             }
 
-            $up = $this->request($switch, 'PUT', $path, $headers, json_encode(['user_config' => ['admin' => 'up']]), $cookie);
+            $up = $this->request($creds, $ip, 'PUT', $path, $headers, json_encode(['user_config' => ['admin' => 'up']]), $cookie);
             if (!$up['success']) {
                 throw new \RuntimeException('Admin-up failed: ' . $up['error']);
             }
 
             return ['success' => true, 'error' => null];
         } finally {
-            $this->logoutRest($switch, $cookie);
+            $this->logoutRest($creds, $ip, $cookie);
         }
     }
 
-    private function bouncePortSsh(ArubaSwitch $switch, string $portId): array
+    private function bouncePortSsh(ArubaSwitch $creds, string $ip, string $portId): array
     {
-        $ssh = $this->sshConnect($switch);
+        $ssh = $this->sshConnect($creds, $ip);
         $ssh->enablePTY();
         $ssh->setTimeout(10);
 
-        // Open interactive CLI session
         $ssh->exec('', false);
-
         $ssh->read('/[#>]\s*$/');
         $ssh->write("configure terminal\n");
         $ssh->read('/\(config\)[#>]\s*$/');
