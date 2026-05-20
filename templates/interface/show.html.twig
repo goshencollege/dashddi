@@ -239,9 +239,10 @@
 (function () {
     const statusBtn  = document.getElementById('port-status-btn');
     const statusBody = document.getElementById('port-status-body');
-    const statusUrl  = {{ (path('aruba_switch_port_status') ~ '?portId=' ~ switchInfo.nasPortId|url_encode)|json_encode|raw }};
+    const statusUrl  = {{ (path('aruba_switch_port_status') ~ '?portId=' ~ switchInfo.nasPortId|url_encode ~ '&switchIp=' ~ switchInfo.nasIp|url_encode)|json_encode|raw }};
     const bounceUrl  = {{ path('aruba_switch_port_bounce')|json_encode|raw }};
     const portId     = {{ switchInfo.nasPortId|json_encode|raw }};
+    const switchIp   = {{ switchInfo.nasIp|json_encode|raw }};
     const csrfToken  = {{ csrf_token('bounce_port')|json_encode|raw }};
 
     function renderClients(data) {
@@ -295,6 +296,7 @@
         const fd = new FormData();
         fd.append('_token', csrfToken);
         fd.append('portId', portId);
+        fd.append('switchIp', switchIp);
 
         fetch(bounceUrl, { method: 'POST', body: fd })
             .then(r => r.json())
