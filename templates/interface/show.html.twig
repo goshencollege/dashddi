@@ -233,8 +233,8 @@
 {% endif %}
 {% endblock %}
 
-{% if arubaSwitch and switchInfo and switchInfo.nasPortId %}
 {% block scripts %}
+{% if arubaSwitch and switchInfo and switchInfo.nasPortId %}
 <script>
 (function () {
     const statusBtn  = document.getElementById('port-status-btn');
@@ -313,5 +313,5 @@
     };
 })();
 </script>
-{% endblock %}
 {% endif %}
+{% endblock %}
