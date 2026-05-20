@@ -74,7 +74,7 @@ class InterfaceController extends AbstractController
     }
 
     #[Route('/interfaces/{id}', name: 'interface_show', methods: ['GET'])]
-    public function show(NetworkInterface $interface, DhcpLeaseRepository $leaseRepo, ClearpassAuthLogRepository $authLogRepo, AppSettingRepository $settingRepo): Response
+    public function show(NetworkInterface $interface, DhcpLeaseRepository $leaseRepo, ClearpassAuthLogRepository $authLogRepo, AppSettingRepository $settingRepo, NetworkInterfaceRepository $ifaceRepo): Response
     {
         $events = [];
 
@@ -91,10 +91,13 @@ class InterfaceController extends AbstractController
         $cutoff     = $maxAge !== null ? new \DateTimeImmutable("-{$maxAge} days") : null;
         $switchInfo = $authLogRepo->findLatestWithSwitchInfoByMac($interface->getMacAddress(), $cutoff);
 
+        $switchIface = $switchInfo?->getNasIp() ? $ifaceRepo->findByIpString($switchInfo->getNasIp()) : null;
+
         return $this->render('interface/show.html.twig', [
-            'interface'  => $interface,
-            'events'     => $events,
-            'switchInfo' => $switchInfo,
+            'interface'   => $interface,
+            'events'      => $events,
+            'switchInfo'  => $switchInfo,
+            'switchIface' => $switchIface,
         ]);
     }
 

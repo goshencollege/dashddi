@@ -115,6 +115,21 @@ class NetworkInterfaceRepository extends ServiceEntityRepository
             ->getOneOrNullResult();
     }
 
+    /** Finds an active interface by its IPv4 address string, with host eager-loaded. */
+    public function findByIpString(string $ip): ?NetworkInterface
+    {
+        return $this->createQueryBuilder('ni')
+            ->addSelect('h')
+            ->join('ni.ipAddress', 'a')
+            ->leftJoin('ni.host', 'h')
+            ->where('a.address = :ip')
+            ->andWhere('ni.deletedAt IS NULL')
+            ->setParameter('ip', $ip)
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
     public function purgeDeletedBefore(\DateTimeImmutable $before): int
     {
         return (int) $this->createQueryBuilder('ni')
