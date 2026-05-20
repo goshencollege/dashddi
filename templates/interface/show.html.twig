@@ -79,6 +79,16 @@
                         <th class="text-muted fw-normal ps-3">IPv6 Address</th>
                         <td class="ip-address small">{{ interface.ipv6Address ? interface.ipv6Address.address : '—' }}</td>
                     </tr>
+                    {% if switchInfo and switchInfo.nasIp %}
+                    <tr>
+                        <th class="text-muted fw-normal ps-3">Switch IP</th>
+                        <td class="ip-address">{{ switchInfo.nasIp }}</td>
+                    </tr>
+                    <tr>
+                        <th class="text-muted fw-normal ps-3">Switch Port</th>
+                        <td>{{ switchInfo.nasPortId ?: '—' }}</td>
+                    </tr>
+                    {% endif %}
                 </tbody>
             </table>
         </div>
