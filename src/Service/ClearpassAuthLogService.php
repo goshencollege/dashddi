@@ -63,6 +63,7 @@ class ClearpassAuthLogService
      */
     public function pullFromServer(ClearpassServer $server): array
     {
+        $serverId  = $server->getId();
         $token     = $this->getAccessToken($server);
         $imported  = 0;
         $errors    = [];
@@ -86,50 +87,62 @@ class ClearpassAuthLogService
             $data  = json_decode($result['body'], true);
             $items = $data['_embedded']['items'] ?? [];
 
-            foreach ($items as $item) {
-                $sessionId = (string) ($item['id'] ?? '');
-                $macRaw    = (string) ($item['mac_address'] ?? $item['callingstationid'] ?? '');
-                $mac       = $this->normaliseMac($macRaw);
+            if (!empty($items)) {
+                // Bulk-check which session IDs already exist (one query per page, no entity loading).
+                $pageSessionIds = array_values(array_filter(array_map(
+                    fn($i) => (string) ($i['id'] ?? ''), $items
+                )));
+                $existingIds = array_flip($this->logRepo->findExistingSessionIds($server, $pageSessionIds));
 
-                if ($sessionId === '' || $mac === '') {
-                    continue;
+                // Bulk-fetch interfaces for all MACs on this page (one query, keyed by MAC).
+                $pageMacs = array_unique(array_filter(array_map(
+                    fn($i) => $this->normaliseMac((string) ($i['mac_address'] ?? $i['callingstationid'] ?? '')),
+                    $items
+                )));
+                $ifaceMap = $this->ifaceRepo->findByMacs($pageMacs);
+
+                foreach ($items as $item) {
+                    $sessionId = (string) ($item['id'] ?? '');
+                    $macRaw    = (string) ($item['mac_address'] ?? $item['callingstationid'] ?? '');
+                    $mac       = $this->normaliseMac($macRaw);
+
+                    if ($sessionId === '' || $mac === '' || isset($existingIds[$sessionId])) {
+                        continue;
+                    }
+
+                    $acctStart = $item['acctstarttime'] ?? null;
+                    try {
+                        $authTs = $acctStart !== null
+                            ? (new \DateTimeImmutable())->setTimestamp((int) $acctStart)
+                            : new \DateTimeImmutable();
+                    } catch (\Throwable) {
+                        $authTs = new \DateTimeImmutable();
+                    }
+
+                    $log = new ClearpassAuthLog($sessionId, $mac, $authTs);
+                    $log->setClearpassServer($server);
+                    $log->setIpAddress($item['framedipaddress'] ?? $item['ip_address'] ?? null ?: null);
+                    $log->setUsername($item['username'] ?? null ?: null);
+                    $log->setService($item['servicetype'] ?? $item['service_name'] ?? null ?: null);
+                    $log->setAuthStatus($item['state'] ?? null ?: null);
+                    $log->setAuthProtocol($item['nasporttype'] ?? null ?: null);
+                    $log->setNasIp($item['nasipaddress'] ?? $item['nas_ip_address'] ?? null ?: null);
+                    $log->setNasPortId($item['nasportid'] ?? null ?: null);
+                    $log->setRole($item['arubauserrole'] ?? null ?: null);
+                    $log->setVlan($item['arubauservlan'] ?? null ?: null);
+                    $log->setNetworkInterface($ifaceMap[$mac] ?? null);
+
+                    $this->em->persist($log);
+                    $imported++;
                 }
 
-                if ($this->logRepo->findOneBy(['clearpassServer' => $server, 'sessionId' => $sessionId]) !== null) {
-                    continue;
-                }
+                // Flush and clear the identity map between pages so memory stays flat.
+                $this->em->flush();
+                $this->em->clear();
 
-                $acctStart = $item['acctstarttime'] ?? null;
-                try {
-                    $authTs = $acctStart !== null
-                        ? (new \DateTimeImmutable())->setTimestamp((int) $acctStart)
-                        : new \DateTimeImmutable();
-                } catch (\Throwable) {
-                    $authTs = new \DateTimeImmutable();
-                }
-
-                $log = new ClearpassAuthLog($sessionId, $mac, $authTs);
-                $log->setClearpassServer($server);
-                $log->setIpAddress($item['framedipaddress'] ?? $item['ip_address'] ?? null ?: null);
-                $log->setUsername($item['username'] ?? null ?: null);
-                $log->setService($item['servicetype'] ?? $item['service_name'] ?? null ?: null);
-                $log->setAuthStatus($item['state'] ?? null ?: null);
-                $log->setAuthProtocol($item['nasporttype'] ?? null ?: null);
-                $log->setNasIp($item['nasipaddress'] ?? $item['nas_ip_address'] ?? null ?: null);
-                $log->setNasPortId($item['nasportid'] ?? null ?: null);
-                $log->setRole($item['arubauserrole'] ?? null ?: null);
-                $log->setVlan($item['arubauservlan'] ?? null ?: null);
-                $log->setNetworkInterface($this->ifaceRepo->findOneBy(['macAddress' => $mac]));
-
-                $this->em->persist($log);
-                $imported++;
-
-                if ($imported % 200 === 0) {
-                    $this->em->flush();
-                }
+                // Re-fetch the server entity after clear so it is managed again.
+                $server = $this->em->find(ClearpassServer::class, $serverId);
             }
-
-            $this->em->flush();
 
             $total  = $data['count'] ?? count($items);
             $offset += count($items);
@@ -142,23 +155,22 @@ class ClearpassAuthLogService
 
     /**
      * Fetches the current state from ClearPass for every session we still have marked
-     * Active, and updates authStatus for any that have since ended.
-     * Batches requests to avoid excessively long filter URLs.
+     * Active, and bulk-updates authStatus for any that have since ended.
+     * Uses scalar queries and DQL UPDATE — no entities are loaded into memory.
      */
     private function updateActiveSessions(ClearpassServer $server, string $token, array &$errors): int
     {
-        $activeLogs = $this->logRepo->findActiveByServer($server);
-        if (empty($activeLogs)) {
+        // Returns plain arrays: [['id' => 123, 'sessionId' => 'abc'], ...]
+        $activeSessions = $this->logRepo->findActiveSessionData($server);
+        if (empty($activeSessions)) {
             return 0;
         }
 
         $updated = 0;
 
-        foreach (array_chunk($activeLogs, 200) as $batch) {
-            $bySessionId = [];
-            foreach ($batch as $log) {
-                $bySessionId[$log->getSessionId()] = $log;
-            }
+        foreach (array_chunk($activeSessions, 200) as $batch) {
+            // Map sessionId => database row id (no entity objects).
+            $bySessionId = array_column($batch, 'id', 'sessionId');
 
             $filter = json_encode(['id' => ['$in' => array_keys($bySessionId)]]);
             $query  = '?' . http_build_query(['filter' => $filter, 'limit' => count($bySessionId)]);
@@ -172,24 +184,37 @@ class ClearpassAuthLogService
             $data  = json_decode($result['body'], true);
             $items = $data['_embedded']['items'] ?? [];
 
+            // Group row IDs by the new status they should receive.
+            $toUpdate = [];
             foreach ($items as $item) {
                 $sessionId = (string) ($item['id'] ?? '');
                 $newStatus = $item['state'] ?? null ?: null;
 
-                if ($sessionId === '' || $newStatus === null) {
+                if ($sessionId === '' || $newStatus === null || strtolower($newStatus) === 'active') {
                     continue;
                 }
 
-                $log = $bySessionId[$sessionId] ?? null;
-                if ($log === null || strtolower($newStatus) === 'active') {
+                $rowId = $bySessionId[$sessionId] ?? null;
+                if ($rowId === null) {
                     continue;
                 }
 
-                $log->setAuthStatus($newStatus);
-                $updated++;
+                $toUpdate[$newStatus][] = $rowId;
             }
 
-            $this->em->flush();
+            // One DQL UPDATE per distinct new status value — no entities loaded.
+            foreach ($toUpdate as $status => $ids) {
+                $this->em->createQueryBuilder()
+                    ->update(ClearpassAuthLog::class, 'l')
+                    ->set('l.authStatus', ':status')
+                    ->where('l.id IN (:ids)')
+                    ->setParameter('status', $status)
+                    ->setParameter('ids', $ids)
+                    ->getQuery()
+                    ->execute();
+
+                $updated += count($ids);
+            }
         }
 
         return $updated;
