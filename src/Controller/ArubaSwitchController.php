@@ -14,7 +14,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
-#[Route('/aruba-switches')]
+#[Route('/aruba-switch')]
 class ArubaSwitchController extends AbstractController
 {
     public function __construct(private readonly SshKeyService $sshKeys) {}
@@ -25,100 +25,108 @@ class ArubaSwitchController extends AbstractController
         return $this->redirectToRoute('servers_index');
     }
 
-    #[Route('/new', name: 'aruba_switch_new', methods: ['GET', 'POST'])]
-    public function new(Request $request, EntityManagerInterface $em): Response
+    #[Route('/configure', name: 'aruba_switch_configure', methods: ['GET', 'POST'])]
+    public function configure(Request $request, ArubaSwitchRepository $repo, EntityManagerInterface $em): Response
     {
-        $switch = new ArubaSwitch();
-        $form   = $this->createForm(ArubaSwitchType::class, $switch);
+        $creds  = $repo->getInstance();
+        $isNew  = $creds === null;
+        $creds ??= new ArubaSwitch();
+
+        $existingPassword = $creds->getPassword();
+
+        $form = $this->createForm(ArubaSwitchType::class, $creds);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            $keys = $this->sshKeys->generateKeyPair();
-            $switch->setSshPrivateKey($keys['private'])->setSshPublicKey($keys['public']);
-            $em->persist($switch);
-            $em->flush();
-            $this->addFlash('success', 'Switch "' . $switch->getName() . '" added.');
-            $this->addFlash('ssh_pubkey', $switch->getSshPublicKey());
-            return $this->redirectToRoute('servers_index');
-        }
-
-        return $this->render('aruba_switch/form.html.twig', [
-            'form'   => $form,
-            'switch' => $switch,
-            'title'  => 'Add Aruba CX Switch',
-        ]);
-    }
-
-    #[Route('/{id}/edit', name: 'aruba_switch_edit', methods: ['GET', 'POST'])]
-    public function edit(Request $request, ArubaSwitch $switch, EntityManagerInterface $em): Response
-    {
-        $existingPassword = $switch->getPassword();
-        $form = $this->createForm(ArubaSwitchType::class, $switch);
-        $form->handleRequest($request);
-
-        if ($form->isSubmitted() && $form->isValid()) {
-            if ($switch->getPassword() === null) {
-                $switch->setPassword($existingPassword);
+            if ($creds->getPassword() === null) {
+                $creds->setPassword($existingPassword);
+            }
+            if ($isNew) {
+                $keys = $this->sshKeys->generateKeyPair();
+                $creds->setSshPrivateKey($keys['private'])->setSshPublicKey($keys['public']);
+                $em->persist($creds);
+                $this->addFlash('ssh_pubkey', $creds->getSshPublicKey());
             }
             $em->flush();
-            $this->addFlash('success', 'Switch updated.');
-            return $this->redirectToRoute('aruba_switch_edit', ['id' => $switch->getId()]);
+            $this->addFlash('success', 'Aruba CX credentials saved.');
+            return $this->redirectToRoute('aruba_switch_configure');
         }
 
         return $this->render('aruba_switch/form.html.twig', [
-            'form'   => $form,
-            'switch' => $switch,
-            'title'  => 'Edit: ' . $switch->getName(),
+            'form'  => $form,
+            'creds' => $creds,
+            'title' => 'Aruba CX Switch Credentials',
         ]);
     }
 
-    #[Route('/{id}/regenerate-key', name: 'aruba_switch_regenerate_key', methods: ['POST'])]
-    public function regenerateKey(Request $request, ArubaSwitch $switch, EntityManagerInterface $em): Response
+    #[Route('/regenerate-key', name: 'aruba_switch_regenerate_key', methods: ['POST'])]
+    public function regenerateKey(Request $request, ArubaSwitchRepository $repo, EntityManagerInterface $em): Response
     {
-        if ($this->isCsrfTokenValid('regen_key_aruba_' . $switch->getId(), $request->request->get('_token'))) {
+        $creds = $repo->getInstance();
+        if ($creds && $this->isCsrfTokenValid('regen_key_aruba', $request->request->get('_token'))) {
             $keys = $this->sshKeys->generateKeyPair();
-            $switch->setSshPrivateKey($keys['private'])->setSshPublicKey($keys['public']);
+            $creds->setSshPrivateKey($keys['private'])->setSshPublicKey($keys['public']);
             $em->flush();
-            $this->addFlash('warning', 'SSH key regenerated. Add the new public key to authorized_keys on "' . $switch->getName() . '".');
+            $this->addFlash('warning', 'SSH key regenerated. Add the new public key to authorized_keys on all switches.');
         }
 
-        return $this->redirectToRoute('aruba_switch_edit', ['id' => $switch->getId()]);
+        return $this->redirectToRoute('aruba_switch_configure');
     }
 
-    #[Route('/{id}/delete', name: 'aruba_switch_delete', methods: ['POST'])]
-    public function delete(Request $request, ArubaSwitch $switch, EntityManagerInterface $em): Response
+    #[Route('/delete', name: 'aruba_switch_delete', methods: ['POST'])]
+    public function delete(Request $request, ArubaSwitchRepository $repo, EntityManagerInterface $em): Response
     {
-        if ($this->isCsrfTokenValid('delete_aruba_switch_' . $switch->getId(), $request->request->get('_token'))) {
-            $em->remove($switch);
+        $creds = $repo->getInstance();
+        if ($creds && $this->isCsrfTokenValid('delete_aruba_creds', $request->request->get('_token'))) {
+            $em->remove($creds);
             $em->flush();
-            $this->addFlash('success', 'Switch deleted.');
+            $this->addFlash('success', 'Aruba CX credentials removed.');
         }
         return $this->redirectToRoute('aruba_switch_index');
     }
 
     // ── Interface-page AJAX endpoints ─────────────────────────────────────────
+    // portId passed as query/body param to avoid routing issues with "1/1/5" slashes.
 
-    #[Route('/{id}/port/{portId}/status', name: 'aruba_switch_port_status', methods: ['GET'])]
-    public function portStatus(ArubaSwitch $switch, string $portId, ArubaCxService $cx): JsonResponse
+    #[Route('/port-status', name: 'aruba_switch_port_status', methods: ['GET'])]
+    public function portStatus(Request $request, ArubaSwitchRepository $repo, ArubaCxService $cx): JsonResponse
     {
+        $creds  = $repo->getInstance();
+        $portId = trim((string) $request->query->get('portId', ''));
+
+        if ($creds === null) {
+            return $this->json(['clients' => [], 'raw' => '', 'via' => 'none', 'error' => 'No Aruba CX credentials configured']);
+        }
+        if ($portId === '') {
+            return $this->json(['clients' => [], 'raw' => '', 'via' => 'none', 'error' => 'No port ID provided']);
+        }
+
         try {
-            $info = $cx->getPortInfo($switch, $portId);
-            return $this->json($info);
+            return $this->json($cx->getPortInfo($creds, $portId));
         } catch (\Throwable $e) {
             return $this->json(['clients' => [], 'raw' => '', 'via' => 'none', 'error' => $e->getMessage()]);
         }
     }
 
-    #[Route('/{id}/port/{portId}/bounce', name: 'aruba_switch_port_bounce', methods: ['POST'])]
-    public function portBounce(Request $request, ArubaSwitch $switch, string $portId, ArubaCxService $cx): JsonResponse
+    #[Route('/port-bounce', name: 'aruba_switch_port_bounce', methods: ['POST'])]
+    public function portBounce(Request $request, ArubaSwitchRepository $repo, ArubaCxService $cx): JsonResponse
     {
-        if (!$this->isCsrfTokenValid('bounce_port_' . $switch->getId(), $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid('bounce_port', $request->request->get('_token'))) {
             return $this->json(['success' => false, 'error' => 'Invalid CSRF token'], 403);
         }
 
+        $creds  = $repo->getInstance();
+        $portId = trim((string) $request->request->get('portId', ''));
+
+        if ($creds === null) {
+            return $this->json(['success' => false, 'error' => 'No Aruba CX credentials configured']);
+        }
+        if ($portId === '') {
+            return $this->json(['success' => false, 'error' => 'No port ID provided']);
+        }
+
         try {
-            $result = $cx->bouncePort($switch, $portId);
-            return $this->json($result);
+            return $this->json($cx->bouncePort($creds, $portId));
         } catch (\Throwable $e) {
             return $this->json(['success' => false, 'error' => $e->getMessage()]);
         }
