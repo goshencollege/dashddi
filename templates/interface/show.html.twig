@@ -145,6 +145,27 @@
     </div>
 </div>
 
+{% if arubaSwitch and switchInfo and switchInfo.nasPortId %}
+{% set portId = switchInfo.nasPortId %}
+<div class="card mt-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="fw-semibold"><i class="bi bi-plug me-1"></i>Switch Port — {{ portId }}</span>
+        <div class="d-flex gap-2">
+            <button id="port-status-btn" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-arrow-clockwise me-1"></i>Check Status
+            </button>
+            <button id="port-bounce-btn" class="btn btn-sm btn-outline-warning"
+                    onclick="if(!confirm('Bounce port {{ portId|e('js') }} on {{ arubaSwitch.name|e('js') }}? This will briefly disconnect any client on the port.')) return; doBounce()">
+                <i class="bi bi-power me-1"></i>Bounce Port
+            </button>
+        </div>
+    </div>
+    <div id="port-status-body" class="card-body text-muted small">
+        Click <strong>Check Status</strong> to load live port-access client data from the switch.
+    </div>
+</div>
+{% endif %}
+
 {% if events is defined and events|length > 0 %}
 <div class="card mt-3">
     <div class="card-header d-flex justify-content-between align-items-center">
@@ -211,3 +232,84 @@
 </div>
 {% endif %}
 {% endblock %}
+
+{% if arubaSwitch and switchInfo and switchInfo.nasPortId %}
+{% block scripts %}
+<script>
+(function () {
+    const statusBtn  = document.getElementById('port-status-btn');
+    const statusBody = document.getElementById('port-status-body');
+    const statusUrl  = {{ path('aruba_switch_port_status', {id: arubaSwitch.id, portId: switchInfo.nasPortId})|json_encode|raw }};
+    const bounceUrl  = {{ path('aruba_switch_port_bounce',  {id: arubaSwitch.id, portId: switchInfo.nasPortId})|json_encode|raw }};
+    const csrfToken  = {{ csrf_token('bounce_port_' ~ arubaSwitch.id)|json_encode|raw }};
+
+    function renderClients(data) {
+        if (data.error) {
+            return `<div class="alert alert-danger mb-0 py-2">${data.error}</div>`;
+        }
+        if (!data.clients || data.clients.length === 0) {
+            return `<span class="text-muted">No port-access clients found on this port.</span>
+                    <span class="text-muted ms-2 small">(via ${data.via})</span>`;
+        }
+        const rows = data.clients.map(c => `
+            <tr>
+                <td class="font-monospace">${c.mac ?? '—'}</td>
+                <td class="font-monospace">${c.ip ?? '—'}</td>
+                <td>${c.role ?? '—'}</td>
+                <td>${c.status ?? '—'}</td>
+                <td>${c.auth_method ?? '—'}</td>
+            </tr>`).join('');
+        return `<div class="table-responsive mb-0">
+            <table class="table table-sm mb-0">
+                <thead><tr>
+                    <th>MAC</th><th>IP</th><th>Role</th><th>Status</th><th>Auth Method</th>
+                </tr></thead>
+                <tbody>${rows}</tbody>
+            </table>
+            <div class="px-3 pb-2 text-muted small">Source: ${data.via}</div>
+        </div>`;
+    }
+
+    statusBtn.addEventListener('click', function () {
+        statusBtn.disabled = true;
+        statusBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Checking…';
+        statusBody.innerHTML = '<span class="text-muted">Loading…</span>';
+
+        fetch(statusUrl)
+            .then(r => r.json())
+            .then(data => { statusBody.innerHTML = renderClients(data); })
+            .catch(err => { statusBody.innerHTML = `<div class="alert alert-danger mb-0 py-2">Request failed: ${err}</div>`; })
+            .finally(() => {
+                statusBtn.disabled = false;
+                statusBtn.innerHTML = '<i class="bi bi-arrow-clockwise me-1"></i>Refresh';
+            });
+    });
+
+    window.doBounce = function () {
+        const bounceBtn = document.getElementById('port-bounce-btn');
+        bounceBtn.disabled = true;
+        bounceBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Bouncing…';
+        statusBody.innerHTML = '<span class="text-muted">Bouncing port…</span>';
+
+        const fd = new FormData();
+        fd.append('_token', csrfToken);
+
+        fetch(bounceUrl, { method: 'POST', body: fd })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    statusBody.innerHTML = '<div class="alert alert-success mb-0 py-2"><i class="bi bi-check-lg me-1"></i>Port bounced successfully.</div>';
+                } else {
+                    statusBody.innerHTML = `<div class="alert alert-danger mb-0 py-2">Bounce failed: ${data.error}</div>`;
+                }
+            })
+            .catch(err => { statusBody.innerHTML = `<div class="alert alert-danger mb-0 py-2">Request failed: ${err}</div>`; })
+            .finally(() => {
+                bounceBtn.disabled = false;
+                bounceBtn.innerHTML = '<i class="bi bi-power me-1"></i>Bounce Port';
+            });
+    };
+})();
+</script>
+{% endblock %}
+{% endif %}
