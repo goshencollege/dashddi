@@ -113,6 +113,27 @@ class ClearpassAuthLogRepository extends ServiceEntityRepository
         return $map;
     }
 
+    /**
+     * Returns the most recent auth log for the given MAC that has switch info (nasIp),
+     * optionally restricted to entries newer than $cutoff.
+     */
+    public function findLatestWithSwitchInfoByMac(string $mac, ?\DateTimeImmutable $cutoff): ?ClearpassAuthLog
+    {
+        $qb = $this->createQueryBuilder('l')
+            ->where('l.macAddress = :mac')
+            ->andWhere('l.nasIp IS NOT NULL')
+            ->setParameter('mac', strtolower($mac))
+            ->orderBy('l.authTimestamp', 'DESC')
+            ->setMaxResults(1);
+
+        if ($cutoff !== null) {
+            $qb->andWhere('l.authTimestamp >= :cutoff')
+               ->setParameter('cutoff', $cutoff);
+        }
+
+        return $qb->getQuery()->getOneOrNullResult();
+    }
+
     /** Returns all auth logs for the server whose authStatus indicates an active session. */
     public function findActiveByServer(ClearpassServer $server): array
     {

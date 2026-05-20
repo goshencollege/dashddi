@@ -49,6 +49,9 @@ class AppSetting
     #[ORM\Column(nullable: true, options: ['default' => 90])]
     private ?int $deletedHostRetentionDays = 90;
 
+    #[ORM\Column(nullable: true, options: ['default' => 7])]
+    private ?int $switchInfoMaxAgeDays = 7;
+
     #[ORM\Column(length: 50, nullable: true)]
     private ?string $timezone = null;
 
@@ -92,4 +95,7 @@ class AppSetting
 
     public function getTimezone(): ?string { return $this->timezone; }
     public function setTimezone(?string $timezone): static { $this->timezone = $timezone; return $this; }
+
+    public function getSwitchInfoMaxAgeDays(): ?int { return $this->switchInfoMaxAgeDays; }
+    public function setSwitchInfoMaxAgeDays(?int $days): static { $this->switchInfoMaxAgeDays = $days; return $this; }
 }
