@@ -113,6 +113,18 @@ class ClearpassAuthLogRepository extends ServiceEntityRepository
         return $map;
     }
 
+    /** Returns all auth logs for the server whose authStatus indicates an active session. */
+    public function findActiveByServer(ClearpassServer $server): array
+    {
+        return $this->createQueryBuilder('l')
+            ->where('l.clearpassServer = :server')
+            ->andWhere('LOWER(l.authStatus) = :active')
+            ->setParameter('server', $server)
+            ->setParameter('active', 'active')
+            ->getQuery()
+            ->getResult();
+    }
+
     /** Returns the most recent authTimestamp stored for the given server, or null if none. */
     public function findLatestAuthTimestamp(ClearpassServer $server): ?\DateTimeImmutable
     {

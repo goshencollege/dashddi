@@ -57,8 +57,9 @@ class ClearpassAuthLogService
     /**
      * Pulls authentication sessions from ClearPass with acctstarttime greater than
      * the latest record already stored. On first run, fetches all sessions.
+     * Also refreshes the status of any sessions still marked Active in the database.
      *
-     * @return array{imported: int, errors: string[]}
+     * @return array{imported: int, updated: int, errors: string[]}
      */
     public function pullFromServer(ClearpassServer $server): array
     {
@@ -134,7 +135,64 @@ class ClearpassAuthLogService
             $offset += count($items);
         } while (count($items) === self::PAGE_SIZE && $offset < $total);
 
-        return ['imported' => $imported, 'errors' => $errors];
+        $updated = $this->updateActiveSessions($server, $token, $errors);
+
+        return ['imported' => $imported, 'updated' => $updated, 'errors' => $errors];
+    }
+
+    /**
+     * Fetches the current state from ClearPass for every session we still have marked
+     * Active, and updates authStatus for any that have since ended.
+     * Batches requests to avoid excessively long filter URLs.
+     */
+    private function updateActiveSessions(ClearpassServer $server, string $token, array &$errors): int
+    {
+        $activeLogs = $this->logRepo->findActiveByServer($server);
+        if (empty($activeLogs)) {
+            return 0;
+        }
+
+        $updated = 0;
+
+        foreach (array_chunk($activeLogs, 200) as $batch) {
+            $bySessionId = [];
+            foreach ($batch as $log) {
+                $bySessionId[$log->getSessionId()] = $log;
+            }
+
+            $filter = json_encode(['id' => ['$in' => array_keys($bySessionId)]]);
+            $query  = '?' . http_build_query(['filter' => $filter, 'limit' => count($bySessionId)]);
+            $result = $this->request($server, $token, 'GET', '/api/v1/session' . $query, null);
+
+            if (!$result['success']) {
+                $errors[] = 'Active-session refresh failed: ' . $result['error'];
+                continue;
+            }
+
+            $data  = json_decode($result['body'], true);
+            $items = $data['_embedded']['items'] ?? [];
+
+            foreach ($items as $item) {
+                $sessionId = (string) ($item['id'] ?? '');
+                $newStatus = $item['state'] ?? null ?: null;
+
+                if ($sessionId === '' || $newStatus === null) {
+                    continue;
+                }
+
+                $log = $bySessionId[$sessionId] ?? null;
+                if ($log === null || strtolower($newStatus) === 'active') {
+                    continue;
+                }
+
+                $log->setAuthStatus($newStatus);
+                $updated++;
+            }
+
+            $this->em->flush();
+        }
+
+        return $updated;
     }
 
     private function getAccessToken(ClearpassServer $server): string
