@@ -213,14 +213,7 @@
                         </td>
                         <td>
                             {% if event.type == 'auth' %}
-                                {% if event.entity.authStatus == 'Access-Accept' %}
-                                    <span class="badge bg-success">{{ event.entity.authStatus }}</span>
-                                {% elseif event.entity.authStatus == 'Access-Reject' %}
-                                    <span class="badge bg-danger">{{ event.entity.authStatus }}</span>
-                                {% elseif event.entity.authStatus %}
-                                    <span class="badge bg-secondary">{{ event.entity.authStatus }}</span>
-                                {% endif %}
-                                {% if event.entity.username %} · {{ event.entity.username }}{% endif %}
+                                {% if event.entity.username %}{{ event.entity.username }}{% endif %}
                                 {% if event.entity.authProtocol %} · {{ event.entity.authProtocol }}{% endif %}
                                 {% if event.entity.vlan %} · VLAN {{ event.entity.vlan }}{% endif %}
                                 {% if event.entity.nasIp %} · {{ event.entity.nasIp }}{% if event.entity.nasPortId %} / {{ event.entity.nasPortId }}{% endif %}{% endif %}

@@ -121,7 +121,6 @@ class ClearpassAuthLogService
                     $log->setIpAddress($item['framedipaddress'] ?? $item['ip_address'] ?? null ?: null);
                     $log->setUsername($item['username'] ?? null ?: null);
                     $log->setService($item['servicetype'] ?? $item['service_name'] ?? null ?: null);
-                    $log->setAuthStatus($item['state'] ?? null ?: null);
                     $log->setAuthProtocol($item['nasporttype'] ?? null ?: null);
                     $log->setNasIp($item['nasipaddress'] ?? $item['nas_ip_address'] ?? null ?: null);
                     $log->setNasPortId($item['nasportid'] ?? null ?: null);

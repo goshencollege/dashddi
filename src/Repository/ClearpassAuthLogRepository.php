@@ -18,7 +18,6 @@ class ClearpassAuthLogRepository extends ServiceEntityRepository
     public function search(
         string $mac,
         string $username,
-        string $status,
         string $role,
         string $vlan,
         string $protocol,
@@ -40,10 +39,6 @@ class ClearpassAuthLogRepository extends ServiceEntityRepository
         if ($username !== '') {
             $qb->andWhere('l.username LIKE :username')
                ->setParameter('username', '%' . $username . '%');
-        }
-        if ($status !== '') {
-            $qb->andWhere('l.authStatus = :status')
-               ->setParameter('status', $status);
         }
         if ($role !== '') {
             $qb->andWhere('l.role = :role')
@@ -181,19 +176,6 @@ class ClearpassAuthLogRepository extends ServiceEntityRepository
             ->setParameter('cutoff', $cutoff)
             ->getQuery()
             ->execute();
-    }
-
-    /** Returns distinct auth status values present in the table. */
-    public function findDistinctStatuses(): array
-    {
-        $rows = $this->createQueryBuilder('l')
-            ->select('DISTINCT l.authStatus')
-            ->where('l.authStatus IS NOT NULL')
-            ->orderBy('l.authStatus', 'ASC')
-            ->getQuery()
-            ->getScalarResult();
-
-        return array_column($rows, 'authStatus');
     }
 
     public function findDistinctRoles(): array

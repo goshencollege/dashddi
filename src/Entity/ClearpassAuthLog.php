@@ -11,7 +11,6 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Index(columns: ['mac_address'], name: 'idx_clearpass_auth_mac')]
 #[ORM\Index(columns: ['auth_timestamp'],      name: 'idx_clearpass_auth_timestamp')]
 #[ORM\Index(columns: ['clearpass_server_id'], name: 'idx_clearpass_auth_server_id')]
-#[ORM\Index(columns: ['auth_status'],         name: 'idx_clearpass_auth_status')]
 #[ORM\Index(columns: ['role'],                name: 'idx_clearpass_auth_role')]
 #[ORM\Index(columns: ['vlan'],                name: 'idx_clearpass_auth_vlan')]
 #[ORM\Index(columns: ['auth_protocol'],       name: 'idx_clearpass_auth_protocol')]
@@ -42,9 +41,6 @@ class ClearpassAuthLog
 
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $service = null;
-
-    #[ORM\Column(length: 50, nullable: true)]
-    private ?string $authStatus = null;
 
     #[ORM\Column(length: 100, nullable: true)]
     private ?string $authProtocol = null;
@@ -99,9 +95,6 @@ class ClearpassAuthLog
 
     public function getService(): ?string { return $this->service; }
     public function setService(?string $service): static { $this->service = $service; return $this; }
-
-    public function getAuthStatus(): ?string { return $this->authStatus; }
-    public function setAuthStatus(?string $status): static { $this->authStatus = $status; return $this; }
 
     public function getAuthProtocol(): ?string { return $this->authProtocol; }
     public function setAuthProtocol(?string $protocol): static { $this->authProtocol = $protocol; return $this; }
