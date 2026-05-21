@@ -88,77 +88,96 @@ class DatabaseBackupCommand extends Command
             return Command::FAILURE;
         }
 
-        // -- Dump database via DBAL (no external mysqldump needed) ---------------
         $io->writeln('Dumping database…');
 
         $excludeTables = $excludeDhcpLeases ? ['dhcp_lease'] : [];
 
+        $tmpFile = null;
         try {
-            $sql = $this->dumpDatabase($excludeTables);
-        } catch (\Throwable $e) {
-            $io->error('Database dump failed: ' . $e->getMessage());
-            return Command::FAILURE;
-        }
-
-        // -- Decrypt fields ------------------------------------------------------
-        if ($decryptFields) {
-            $io->writeln('Decrypting encrypted fields…');
-            $sql = $this->decryptFieldsInSql($sql);
-        }
-
-        // -- Build header --------------------------------------------------------
-        $now    = new \DateTimeImmutable();
-        $header = "-- DashDDI Backup\n-- Generated: " . $now->format('Y-m-d H:i:s') . "\n";
-
-        if ($includeKey && !$decryptFields) {
-            $header .= "-- APP_ENCRYPTION_KEY: {$this->encryptionKey}\n";
-        }
-
-        $sql = $header . "\n" . $sql;
-
-        // -- Filename & content --------------------------------------------------
-        $timestamp = $now->format('Y-m-d_H-i-s');
-        $extension = $encryptBackup ? 'sql.enc' : 'sql';
-        $filename  = "dashddi_backup_{$timestamp}.{$extension}";
-
-        $content = $encryptBackup ? $this->encryptContent($sql, $backupPassword) : $sql;
-
-        // -- Save ----------------------------------------------------------------
-        if ($destinationType === 'cifs') {
-            $tmpFile = tempnam('/tmp', 'dashddi_bak_');
-            file_put_contents($tmpFile, $content);
-
-            $remotePath = $cifsSubdir !== '' ? rtrim($cifsSubdir, '/') . '/' . $filename : $filename;
-            $ok = $this->uploadToCifs($tmpFile, $cifsServer, $cifsUser, $cifsPassword, $remotePath, $cifsSubdir, $io);
-            unlink($tmpFile);
-
-            if (!$ok) {
+            try {
+                $tmpFile = $this->dumpDatabase($excludeTables);
+            } catch (\Throwable $e) {
+                $io->error('Database dump failed: ' . $e->getMessage());
                 return Command::FAILURE;
             }
 
-            if ($retention > 0) {
-                $this->applyRetentionCifs($cifsServer, $cifsUser, $cifsPassword, $cifsSubdir, $retention, $io);
+            // Prepend header (small string, safe to build in memory)
+            $now    = new \DateTimeImmutable();
+            $header = "-- DashDDI Backup\n-- Generated: " . $now->format('Y-m-d H:i:s') . "\n";
+            if ($includeKey && !$decryptFields) {
+                $header .= "-- APP_ENCRYPTION_KEY: {$this->encryptionKey}\n";
             }
-        } else {
-            if (!is_dir($localPath) && !mkdir($localPath, 0755, true) && !is_dir($localPath)) {
-                $io->error("Cannot create backup directory: {$localPath}");
-                return Command::FAILURE;
+            $header .= "\n";
+            $this->prependToFile($tmpFile, $header);
+
+            if ($decryptFields) {
+                $io->writeln('Decrypting encrypted fields…');
+                $this->decryptFieldsInFile($tmpFile);
             }
 
-            $filePath = rtrim($localPath, '/') . '/' . $filename;
-            if (file_put_contents($filePath, $content) === false) {
-                $io->error("Cannot write backup file: {$filePath}");
-                return Command::FAILURE;
+            $timestamp = $now->format('Y-m-d_H-i-s');
+            $extension = $encryptBackup ? 'sql.enc' : 'sql';
+            $filename  = "dashddi_backup_{$timestamp}.{$extension}";
+
+            if ($encryptBackup) {
+                $encFile = $tmpFile . '.enc';
+                $this->encryptFile($tmpFile, $encFile, $backupPassword);
+                unlink($tmpFile);
+                $tmpFile = $encFile;
             }
 
-            $io->success("Backup saved: {$filePath}");
+            if ($destinationType === 'cifs') {
+                $remotePath = $cifsSubdir !== '' ? rtrim($cifsSubdir, '/') . '/' . $filename : $filename;
+                $ok = $this->uploadToCifs($tmpFile, $cifsServer, $cifsUser, $cifsPassword, $remotePath, $cifsSubdir, $io);
 
-            if ($retention > 0) {
-                $this->applyRetentionLocal($localPath, $retention, $io);
+                if (!$ok) {
+                    return Command::FAILURE;
+                }
+
+                if ($retention > 0) {
+                    $this->applyRetentionCifs($cifsServer, $cifsUser, $cifsPassword, $cifsSubdir, $retention, $io);
+                }
+            } else {
+                if (!is_dir($localPath) && !mkdir($localPath, 0755, true) && !is_dir($localPath)) {
+                    $io->error("Cannot create backup directory: {$localPath}");
+                    return Command::FAILURE;
+                }
+
+                $filePath = rtrim($localPath, '/') . '/' . $filename;
+                $fIn      = fopen($tmpFile, 'rb');
+                $fOut     = fopen($filePath, 'wb');
+
+                if ($fIn === false || $fOut === false) {
+                    $fIn  !== false && fclose($fIn);
+                    $fOut !== false && fclose($fOut);
+                    @unlink($filePath);
+                    $io->error("Cannot write backup file: {$filePath}");
+                    return Command::FAILURE;
+                }
+
+                $written = stream_copy_to_stream($fIn, $fOut);
+                fclose($fIn);
+                fclose($fOut);
+
+                if ($written === false) {
+                    @unlink($filePath);
+                    $io->error("Cannot write backup file: {$filePath}");
+                    return Command::FAILURE;
+                }
+
+                $io->success("Backup saved: {$filePath}");
+
+                if ($retention > 0) {
+                    $this->applyRetentionLocal($localPath, $retention, $io);
+                }
+            }
+
+            return Command::SUCCESS;
+        } finally {
+            if ($tmpFile !== null && file_exists($tmpFile)) {
+                unlink($tmpFile);
             }
         }
-
-        return Command::SUCCESS;
     }
 
     // ---------------------------------------------------------------------------
@@ -166,15 +185,16 @@ class DatabaseBackupCommand extends Command
     /** @param string[] $excludeTables */
     private function dumpDatabase(array $excludeTables = []): string
     {
-        $lines = [];
+        $tmpFile = tempnam(sys_get_temp_dir(), 'dashddi_dump_');
+        $fh      = fopen($tmpFile, 'w');
 
-        $lines[] = 'SET FOREIGN_KEY_CHECKS=0;';
-        $lines[] = 'SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";';
-        $lines[] = 'SET NAMES utf8mb4;';
+        fwrite($fh, "SET FOREIGN_KEY_CHECKS=0;\n");
+        fwrite($fh, "SET SQL_MODE = \"NO_AUTO_VALUE_ON_ZERO\";\n");
+        fwrite($fh, "SET NAMES utf8mb4;\n");
         if ($excludeTables !== []) {
-            $lines[] = '-- Excluded tables: ' . implode(', ', $excludeTables);
+            fwrite($fh, '-- Excluded tables: ' . implode(', ', $excludeTables) . "\n");
         }
-        $lines[] = '';
+        fwrite($fh, "\n");
 
         $tables = $this->connection->fetchFirstColumn(
             "SELECT TABLE_NAME FROM information_schema.TABLES
@@ -186,15 +206,13 @@ class DatabaseBackupCommand extends Command
             if (in_array($table, $excludeTables, true)) {
                 continue;
             }
-            $lines[] = '';
-            $lines[] = '-- --------------------------------------------------------';
-            $lines[] = "-- Table: `{$table}`";
-            $lines[] = '';
 
-            $lines[] = "DROP TABLE IF EXISTS `{$table}`;";
-            $create   = $this->connection->fetchAllAssociative("SHOW CREATE TABLE `{$table}`");
-            $lines[]  = $create[0]['Create Table'] . ';';
-            $lines[]  = '';
+            fwrite($fh, "\n-- --------------------------------------------------------\n");
+            fwrite($fh, "-- Table: `{$table}`\n\n");
+            fwrite($fh, "DROP TABLE IF EXISTS `{$table}`;\n");
+
+            $create = $this->connection->fetchAllAssociative("SHOW CREATE TABLE `{$table}`");
+            fwrite($fh, $create[0]['Create Table'] . ";\n\n");
 
             $total = (int) $this->connection->fetchOne("SELECT COUNT(*) FROM `{$table}`");
             if ($total === 0) {
@@ -204,8 +222,7 @@ class DatabaseBackupCommand extends Command
             $cols    = $this->connection->fetchAllAssociative("SHOW COLUMNS FROM `{$table}`");
             $colList = implode(', ', array_map(fn($c) => '`' . $c['Field'] . '`', $cols));
 
-            $lines[] = "-- Data for `{$table}`";
-            $lines[] = '';
+            fwrite($fh, "-- Data for `{$table}`\n\n");
 
             $batchSize = 500;
             $offset    = 0;
@@ -233,34 +250,89 @@ class DatabaseBackupCommand extends Command
                     $valueRows[] = '(' . implode(', ', $vals) . ')';
                 }
 
-                $lines[] = "INSERT INTO `{$table}` ({$colList}) VALUES";
-                $lines[] = implode(",\n", $valueRows) . ';';
-                $lines[] = '';
+                fwrite($fh, "INSERT INTO `{$table}` ({$colList}) VALUES\n");
+                fwrite($fh, implode(",\n", $valueRows) . ";\n\n");
 
                 $offset += count($rows);
             }
         }
 
-        $lines[] = '';
-        $lines[] = 'SET FOREIGN_KEY_CHECKS=1;';
+        fwrite($fh, "\nSET FOREIGN_KEY_CHECKS=1;\n");
+        fclose($fh);
 
-        return implode("\n", $lines);
+        return $tmpFile;
     }
 
-    private function decryptFieldsInSql(string $sql): string
+    private function prependToFile(string $path, string $prefix): void
     {
-        return preg_replace_callback(
-            "/'(enc:[A-Za-z0-9+\\/=]+)'/",
-            function (array $matches): string {
-                try {
-                    $plain = $this->encryption->decrypt($matches[1]);
-                    return "'" . $this->mysqlEscape($plain) . "'";
-                } catch (\Throwable) {
-                    return $matches[0];
-                }
-            },
-            $sql
-        ) ?? $sql;
+        $tmp = $path . '.hdr';
+        $dst = fopen($tmp, 'wb');
+        fwrite($dst, $prefix);
+        $src = fopen($path, 'rb');
+        stream_copy_to_stream($src, $dst);
+        fclose($src);
+        fclose($dst);
+        rename($tmp, $path);
+    }
+
+    private function decryptFieldsInFile(string $path): void
+    {
+        $tmp = $path . '.dec';
+        $in  = fopen($path, 'r');
+        $out = fopen($tmp, 'w');
+        while (($line = fgets($in)) !== false) {
+            fwrite($out, preg_replace_callback(
+                "/'(enc:[A-Za-z0-9+\\/=]+)'/",
+                function (array $matches): string {
+                    try {
+                        $plain = $this->encryption->decrypt($matches[1]);
+                        return "'" . $this->mysqlEscape($plain) . "'";
+                    } catch (\Throwable) {
+                        return $matches[0];
+                    }
+                },
+                $line
+            ) ?? $line);
+        }
+        fclose($in);
+        fclose($out);
+        rename($tmp, $path);
+    }
+
+    private function encryptFile(string $inputPath, string $outputPath, string $password): void
+    {
+        $salt = random_bytes(16);
+        $key  = openssl_pbkdf2($password, $salt, 32, 100000, 'sha256');
+        $iv   = random_bytes(16);
+
+        $in  = fopen($inputPath, 'rb');
+        $out = fopen($outputPath, 'wb');
+
+        fwrite($out, 'DASHDDI1' . $salt . $iv);
+
+        // Stream in 64 KB chunks (must be a multiple of the AES block size, 16 bytes).
+        // CBC chaining is preserved by using the last ciphertext block as the IV for
+        // the next chunk, producing identical output to encrypting the whole file at once.
+        $chunkSize = 65536;
+        $currentIv = $iv;
+        $pending   = '';
+
+        while (($data = fread($in, $chunkSize)) !== false && $data !== '') {
+            if ($pending !== '') {
+                $encrypted = openssl_encrypt($pending, 'aes-256-cbc', $key, OPENSSL_RAW_DATA | OPENSSL_ZERO_PADDING, $currentIv);
+                fwrite($out, $encrypted);
+                $currentIv = substr($encrypted, -16);
+            }
+            $pending = $data;
+        }
+
+        // Final chunk: apply PKCS7 padding manually before encrypting
+        $padLen   = 16 - (strlen($pending) % 16);
+        $pending .= str_repeat(chr($padLen), $padLen);
+        fwrite($out, openssl_encrypt($pending, 'aes-256-cbc', $key, OPENSSL_RAW_DATA | OPENSSL_ZERO_PADDING, $currentIv));
+
+        fclose($in);
+        fclose($out);
     }
 
     private function mysqlEscape(string $value): string
@@ -274,15 +346,6 @@ class DatabaseBackupCommand extends Command
             '"'    => '\\"',
             "\x1a" => '\\Z',
         ]);
-    }
-
-    private function encryptContent(string $plaintext, string $password): string
-    {
-        $salt      = random_bytes(16);
-        $key       = openssl_pbkdf2($password, $salt, 32, 100000, 'sha256');
-        $iv        = random_bytes(16);
-        $encrypted = openssl_encrypt($plaintext, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
-        return 'DASHDDI1' . $salt . $iv . $encrypted;
     }
 
     private function uploadToCifs(
