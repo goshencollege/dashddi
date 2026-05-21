@@ -154,9 +154,17 @@
             <button id="port-status-btn" class="btn btn-sm btn-outline-secondary">
                 <i class="bi bi-arrow-clockwise me-1"></i>Check Status
             </button>
+            <button id="port-reauth-btn" class="btn btn-sm btn-outline-info"
+                    onclick="if(!confirm('Reauthenticate port {{ portId|e('js') }}?')) return; doReauth()">
+                <i class="bi bi-shield-check me-1"></i>Reauthenticate
+            </button>
             <button id="port-bounce-btn" class="btn btn-sm btn-outline-warning"
                     onclick="if(!confirm('Bounce port {{ portId|e('js') }}? This will briefly disconnect any client on the port.')) return; doBounce()">
                 <i class="bi bi-power me-1"></i>Bounce Port
+            </button>
+            <button id="port-poe-bounce-btn" class="btn btn-sm btn-outline-warning"
+                    onclick="if(!confirm('PoE bounce port {{ portId|e('js') }}? This will cut power and disconnect the client.')) return; doPoeBounce()">
+                <i class="bi bi-lightning me-1"></i>PoE Bounce
             </button>
         </div>
     </div>
@@ -239,8 +247,10 @@
 (function () {
     const statusBtn  = document.getElementById('port-status-btn');
     const statusBody = document.getElementById('port-status-body');
-    const statusUrl  = {{ (path('aruba_switch_port_status') ~ '?portId=' ~ switchInfo.nasPortId|url_encode ~ '&switchIp=' ~ switchInfo.nasIp|url_encode)|json_encode|raw }};
-    const bounceUrl  = {{ path('aruba_switch_port_bounce')|json_encode|raw }};
+    const statusUrl    = {{ (path('aruba_switch_port_status') ~ '?portId=' ~ switchInfo.nasPortId|url_encode ~ '&switchIp=' ~ switchInfo.nasIp|url_encode)|json_encode|raw }};
+    const reauthUrl    = {{ path('aruba_switch_port_reauthenticate')|json_encode|raw }};
+    const bounceUrl    = {{ path('aruba_switch_port_bounce')|json_encode|raw }};
+    const poeBounceUrl = {{ path('aruba_switch_port_poe_bounce')|json_encode|raw }};
     const portId     = {{ switchInfo.nasPortId|json_encode|raw }};
     const switchIp   = {{ switchInfo.nasIp|json_encode|raw }};
     const csrfToken  = {{ csrf_token('bounce_port')|json_encode|raw }};
@@ -292,32 +302,33 @@
             });
     });
 
-    window.doBounce = function () {
-        const bounceBtn = document.getElementById('port-bounce-btn');
-        bounceBtn.disabled = true;
-        bounceBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Bouncing…';
-        statusBody.innerHTML = '<span class="text-muted">Bouncing port…</span>';
+    function portAction(url, btnId, busyLabel, successMsg, idleLabel) {
+        const btn = document.getElementById(btnId);
+        btn.disabled = true;
+        btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span>${busyLabel}`;
+        statusBody.innerHTML = `<span class="text-muted">${busyLabel}…</span>`;
 
         const fd = new FormData();
         fd.append('_token', csrfToken);
         fd.append('portId', portId);
         fd.append('switchIp', switchIp);
 
-        fetch(bounceUrl, { method: 'POST', body: fd })
+        fetch(url, { method: 'POST', body: fd })
             .then(r => r.json())
             .then(data => {
                 if (data.success) {
-                    statusBody.innerHTML = '<div class="alert alert-success mb-0 py-2"><i class="bi bi-check-lg me-1"></i>Port bounced successfully.</div>';
+                    statusBody.innerHTML = `<div class="alert alert-success mb-0 py-2"><i class="bi bi-check-lg me-1"></i>${successMsg}</div>`;
                 } else {
-                    statusBody.innerHTML = `<div class="alert alert-danger mb-0 py-2">Bounce failed: ${data.error}</div>`;
+                    statusBody.innerHTML = `<div class="alert alert-danger mb-0 py-2">Failed: ${data.error}</div>`;
                 }
             })
             .catch(err => { statusBody.innerHTML = `<div class="alert alert-danger mb-0 py-2">Request failed: ${err}</div>`; })
-            .finally(() => {
-                bounceBtn.disabled = false;
-                bounceBtn.innerHTML = '<i class="bi bi-power me-1"></i>Bounce Port';
-            });
-    };
+            .finally(() => { btn.disabled = false; btn.innerHTML = idleLabel; });
+    }
+
+    window.doReauth    = () => portAction(reauthUrl,    'port-reauth-btn',      'Reauthenticating', 'Reauthentication triggered.',  '<i class="bi bi-shield-check me-1"></i>Reauthenticate');
+    window.doBounce    = () => portAction(bounceUrl,    'port-bounce-btn',      'Bouncing',         'Port bounced successfully.',   '<i class="bi bi-power me-1"></i>Bounce Port');
+    window.doPoeBounce = () => portAction(poeBounceUrl, 'port-poe-bounce-btn',  'PoE bouncing',     'PoE bounce complete.',         '<i class="bi bi-lightning me-1"></i>PoE Bounce');
 })();
 </script>
 {% endif %}
