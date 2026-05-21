@@ -9,6 +9,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Table(name: 'dhcp_lease')]
 #[ORM\Index(columns: ['mac_address'], name: 'idx_dhcp_lease_mac')]
 #[ORM\Index(columns: ['ip_address'], name: 'idx_dhcp_lease_ip')]
+#[ORM\Index(columns: ['subnet_id'],  name: 'idx_dhcp_lease_subnet_id')]
 class DhcpLease
 {
     #[ORM\Id]

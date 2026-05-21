@@ -9,7 +9,14 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Table(name: 'clearpass_auth_log')]
 #[ORM\UniqueConstraint(name: 'uniq_clearpass_auth_session', columns: ['clearpass_server_id', 'session_id'])]
 #[ORM\Index(columns: ['mac_address'], name: 'idx_clearpass_auth_mac')]
-#[ORM\Index(columns: ['auth_timestamp'], name: 'idx_clearpass_auth_timestamp')]
+#[ORM\Index(columns: ['auth_timestamp'],      name: 'idx_clearpass_auth_timestamp')]
+#[ORM\Index(columns: ['clearpass_server_id'], name: 'idx_clearpass_auth_server_id')]
+#[ORM\Index(columns: ['auth_status'],         name: 'idx_clearpass_auth_status')]
+#[ORM\Index(columns: ['role'],                name: 'idx_clearpass_auth_role')]
+#[ORM\Index(columns: ['vlan'],                name: 'idx_clearpass_auth_vlan')]
+#[ORM\Index(columns: ['auth_protocol'],       name: 'idx_clearpass_auth_protocol')]
+#[ORM\Index(columns: ['service'],             name: 'idx_clearpass_auth_service')]
+#[ORM\Index(columns: ['nas_ip'],              name: 'idx_clearpass_auth_nas_ip')]
 class ClearpassAuthLog
 {
     #[ORM\Id]
