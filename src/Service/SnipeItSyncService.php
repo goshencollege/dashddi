@@ -104,6 +104,7 @@ class SnipeItSyncService
                         $kept = $this->updateHost($link, $assetName, $assetTagStr, $macs, $result['errors'], $categorySubnetIdMap, $categoryId);
                         if (!$kept) {
                             // soft-delete done inside updateHost; delete only the link row
+                            $link->getHost()->setSnipeItAssetLink(null);
                             $this->em->getConnection()->executeStatement(
                                 'DELETE FROM snipe_it_asset_link WHERE id = ?',
                                 [$link->getId()]
@@ -231,14 +232,18 @@ class SnipeItSyncService
             if (!in_array($link->getSnipeAssetId(), $activeAssetIds, true)) {
                 if ($link->isAdopted()) {
                     // Preserve the pre-existing host; just remove the link and the snipeit tag
-                    $link->getHost()->removeTag($snipeTag);
+                    $host = $link->getHost();
+                    $host->removeTag($snipeTag);
+                    $host->setSnipeItAssetLink(null);
                     $this->em->createQuery('DELETE FROM App\Entity\SnipeItAssetLink l WHERE l.id = :id')
                         ->setParameter('id', $link->getId())
                         ->execute();
                     $this->em->detach($link);
                 } else {
                     // Soft-delete the sync-created host and its interfaces; delete only the link row
-                    $link->getHost()->softDeleteWithInterfaces();
+                    $host = $link->getHost();
+                    $host->softDeleteWithInterfaces();
+                    $host->setSnipeItAssetLink(null);
                     $this->em->getConnection()->executeStatement(
                         'DELETE FROM snipe_it_asset_link WHERE id = ?',
                         [$link->getId()]
