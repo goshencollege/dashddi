@@ -258,11 +258,41 @@ class ArubaCxService
         return $clients;
     }
 
-    // ── Port bounce ───────────────────────────────────────────────────────────
+    // ── Port actions ──────────────────────────────────────────────────────────
+
+    /** @return array{success: bool, error: ?string} */
+    public function reauthenticatePort(ArubaSwitch $creds, string $ip, string $portId): array
+    {
+        $portId = self::normalisePortId($portId);
+
+        if ($creds->getSshPrivateKey() !== null || $creds->getPassword() !== null) {
+            try {
+                return $this->reauthenticatePortSsh($creds, $ip, $portId);
+            } catch (\Throwable $e) {
+                return ['success' => false, 'error' => $e->getMessage()];
+            }
+        }
+
+        return ['success' => false, 'error' => 'No credentials configured'];
+    }
+
+    private function reauthenticatePortSsh(ArubaSwitch $creds, string $ip, string $portId): array
+    {
+        $ssh = $this->sshConnect($creds, $ip);
+        $ssh->enablePTY();
+        $ssh->setTimeout(15);
+
+        $ssh->exec('', false);
+        $ssh->read('/[#>]\s*$/');
+        $ssh->write("port-access reauthenticate interface {$portId}\n");
+        $ssh->read('/[#>]\s*$/');
+
+        return ['success' => true, 'error' => null];
+    }
 
     /**
-     * Bounces a port (admin-down then admin-up).
-     * $ip is the switch management IP (taken from the ClearPass auth log nasIp).
+     * Bounces a port (admin-down, 10 s pause, admin-up).
+     * Tries REST first; falls back to SSH.
      *
      * @return array{success: bool, error: ?string}
      */
@@ -303,6 +333,8 @@ class ArubaCxService
                 throw new \RuntimeException('Admin-down failed: ' . $down['error']);
             }
 
+            sleep(10);
+
             $up = $this->request($creds, $ip, 'PUT', $path, $headers, json_encode(['user_config' => ['admin' => 'up']]), $cookie);
             if (!$up['success']) {
                 throw new \RuntimeException('Admin-up failed: ' . $up['error']);
@@ -318,7 +350,7 @@ class ArubaCxService
     {
         $ssh = $this->sshConnect($creds, $ip);
         $ssh->enablePTY();
-        $ssh->setTimeout(10);
+        $ssh->setTimeout(30);
 
         $ssh->exec('', false);
         $ssh->read('/[#>]\s*$/');
@@ -328,7 +360,51 @@ class ArubaCxService
         $ssh->read('/\(config-if\)[#>]\s*$/');
         $ssh->write("shutdown\n");
         $ssh->read('/\(config-if\)[#>]\s*$/');
+        sleep(10);
         $ssh->write("no shutdown\n");
+        $ssh->read('/\(config-if\)[#>]\s*$/');
+        $ssh->write("end\n");
+        $ssh->read('/[#>]\s*$/');
+
+        return ['success' => true, 'error' => null];
+    }
+
+    /** @return array{success: bool, error: ?string} */
+    public function poeBouncePort(ArubaSwitch $creds, string $ip, string $portId): array
+    {
+        $portId = self::normalisePortId($portId);
+
+        if ($creds->getSshPrivateKey() !== null || $creds->getPassword() !== null) {
+            try {
+                return $this->poeBouncePortSsh($creds, $ip, $portId);
+            } catch (\Throwable $e) {
+                return ['success' => false, 'error' => $e->getMessage()];
+            }
+        }
+
+        return ['success' => false, 'error' => 'No credentials configured'];
+    }
+
+    private function poeBouncePortSsh(ArubaSwitch $creds, string $ip, string $portId): array
+    {
+        $ssh = $this->sshConnect($creds, $ip);
+        $ssh->enablePTY();
+        $ssh->setTimeout(30);
+
+        $ssh->exec('', false);
+        $ssh->read('/[#>]\s*$/');
+        $ssh->write("configure terminal\n");
+        $ssh->read('/\(config\)[#>]\s*$/');
+        $ssh->write("interface {$portId}\n");
+        $ssh->read('/\(config-if\)[#>]\s*$/');
+        $ssh->write("no power-over-ethernet\n");
+        $ssh->read('/\(config-if\)[#>]\s*$/');
+        $ssh->write("shutdown\n");
+        $ssh->read('/\(config-if\)[#>]\s*$/');
+        sleep(10);
+        $ssh->write("no shutdown\n");
+        $ssh->read('/\(config-if\)[#>]\s*$/');
+        $ssh->write("power-over-ethernet\n");
         $ssh->read('/\(config-if\)[#>]\s*$/');
         $ssh->write("end\n");
         $ssh->read('/[#>]\s*$/');
