@@ -267,7 +267,7 @@
                 <span class="text-muted small">Source: ${data.via}</span>
                 <button class="btn btn-link btn-sm p-0 text-muted small" onclick="document.getElementById('${rawId}').classList.toggle('d-none')">raw</button>
             </div>
-            <pre id="${rawId}" class="d-none mx-3 mb-2 p-2 border border-success rounded small" style="max-height:200px;overflow:auto">${rawContent}</pre>` : `<div class="px-3 pb-2"><span class="text-muted small">Source: ${data.via}</span></div>`;
+            <div id="${rawId}" class="d-none mx-3 mb-2 alert alert-success p-0"><pre class="mb-0 p-2 small" style="max-height:200px;overflow:auto">${rawContent}</pre></div>` : `<div class="px-3 pb-2"><span class="text-muted small">Source: ${data.via}</span></div>`;
         if (!data.clients || data.clients.length === 0) {
             return `<div class="px-3 pt-2"><span class="text-muted">No port-access clients found on this port.</span></div>${rawPanel}`;
         }
