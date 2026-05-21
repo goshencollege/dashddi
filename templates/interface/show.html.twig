@@ -79,6 +79,23 @@
                         <th class="text-muted fw-normal ps-3">IPv6 Address</th>
                         <td class="ip-address small">{{ interface.ipv6Address ? interface.ipv6Address.address : '—' }}</td>
                     </tr>
+                    {% if switchInfo and switchInfo.nasIp %}
+                    <tr>
+                        <th class="text-muted fw-normal ps-3">Switch IP</th>
+                        <td class="ip-address">
+                            {% if switchIface and switchIface.host %}
+                                <a href="{{ path('host_show', {id: switchIface.host.id}) }}">{{ switchIface.host.name }}</a>
+                                <span class="text-muted small ms-1">({{ switchInfo.nasIp }})</span>
+                            {% else %}
+                                {{ switchInfo.nasIp }}
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <th class="text-muted fw-normal ps-3">Switch Port</th>
+                        <td>{{ switchInfo.nasPortId ?: '—' }}</td>
+                    </tr>
+                    {% endif %}
                 </tbody>
             </table>
         </div>
@@ -127,6 +144,35 @@
         </div>
     </div>
 </div>
+
+{% if arubaSwitch and switchInfo and switchInfo.nasPortId %}
+{% set portId = switchInfo.nasPortId %}
+<div class="card mt-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="fw-semibold"><i class="bi bi-plug me-1"></i>Switch Port — {{ portId }}</span>
+        <div class="d-flex gap-2">
+            <button id="port-status-btn" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-arrow-clockwise me-1"></i>Check Status
+            </button>
+            <button id="port-reauth-btn" class="btn btn-sm btn-outline-info"
+                    onclick="if(!confirm('Reauthenticate port {{ portId|e('js') }}?')) return; doReauth()">
+                <i class="bi bi-shield-check me-1"></i>Reauthenticate
+            </button>
+            <button id="port-bounce-btn" class="btn btn-sm btn-outline-warning"
+                    onclick="if(!confirm('Bounce port {{ portId|e('js') }}? This will briefly disconnect any client on the port.')) return; doBounce()">
+                <i class="bi bi-power me-1"></i>Bounce Port
+            </button>
+            <button id="port-poe-bounce-btn" class="btn btn-sm btn-outline-warning"
+                    onclick="if(!confirm('PoE bounce port {{ portId|e('js') }}? This will cut power and disconnect the client.')) return; doPoeBounce()">
+                <i class="bi bi-lightning me-1"></i>PoE Bounce
+            </button>
+        </div>
+    </div>
+    <div id="port-status-body" class="card-body text-muted small">
+        Click <strong>Check Status</strong> to load live port-access client data from the switch.
+    </div>
+</div>
+{% endif %}
 
 {% if events is defined and events|length > 0 %}
 <div class="card mt-3">
@@ -192,5 +238,102 @@
         </table>
     </div>
 </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if arubaSwitch and switchInfo and switchInfo.nasPortId %}
+<script>
+(function () {
+    const statusBtn  = document.getElementById('port-status-btn');
+    const statusBody = document.getElementById('port-status-body');
+    const statusUrl    = {{ (path('aruba_switch_port_status') ~ '?portId=' ~ switchInfo.nasPortId|url_encode ~ '&switchIp=' ~ switchInfo.nasIp|url_encode)|json_encode|raw }};
+    const reauthUrl    = {{ path('aruba_switch_port_reauthenticate')|json_encode|raw }};
+    const bounceUrl    = {{ path('aruba_switch_port_bounce')|json_encode|raw }};
+    const poeBounceUrl = {{ path('aruba_switch_port_poe_bounce')|json_encode|raw }};
+    const portId     = {{ switchInfo.nasPortId|json_encode|raw }};
+    const switchIp   = {{ switchInfo.nasIp|json_encode|raw }};
+    const csrfToken  = {{ csrf_token('bounce_port')|json_encode|raw }};
+
+    function renderClients(data) {
+        if (data.error) {
+            return `<div class="alert alert-danger mb-0 py-2">${data.error}</div>`;
+        }
+        const rawId = 'raw-' + Math.random().toString(36).slice(2);
+        let rawContent = data.raw || '';
+        try { rawContent = JSON.stringify(JSON.parse(rawContent), null, 2); } catch (e) { /* plain text */ }
+        const rawPanel = rawContent ? `
+            <div class="px-3 pb-2 d-flex justify-content-between align-items-center">
+                <span class="text-muted small">Source: ${data.via}</span>
+                <button class="btn btn-link btn-sm p-0 text-muted small" onclick="document.getElementById('${rawId}').classList.toggle('d-none')">raw</button>
+            </div>
+            <div id="${rawId}" class="d-none mx-3 mb-2 alert alert-success p-0"><pre class="mb-0 p-2 small" style="max-height:200px;overflow:auto">${rawContent}</pre></div>` : `<div class="px-3 pb-2"><span class="text-muted small">Source: ${data.via}</span></div>`;
+        if (!data.clients || data.clients.length === 0) {
+            return `<div class="px-3 pt-2"><span class="text-muted">No port-access clients found on this port.</span></div>${rawPanel}`;
+        }
+        const rows = data.clients.map(c => `
+            <tr>
+                <td class="font-monospace">${c.mac ?? '—'}</td>
+                <td>${c.vlan || '—'}</td>
+                <td>${c.role ?? '—'}</td>
+                <td>${c.status ?? '—'}</td>
+                <td>${c.auth_method ?? '—'}</td>
+            </tr>`).join('');
+        return `<div class="table-responsive mb-0">
+            <table class="table table-sm mb-0">
+                <thead><tr>
+                    <th>MAC</th><th>VLAN</th><th>Role</th><th>Status</th><th>Auth Method</th>
+                </tr></thead>
+                <tbody>${rows}</tbody>
+            </table>
+            ${rawPanel}
+        </div>`;
+    }
+
+    statusBtn.addEventListener('click', function () {
+        statusBtn.disabled = true;
+        statusBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Checking…';
+        statusBody.innerHTML = '<span class="text-muted">Loading…</span>';
+
+        fetch(statusUrl)
+            .then(r => r.json())
+            .then(data => { statusBody.innerHTML = renderClients(data); })
+            .catch(err => { statusBody.innerHTML = `<div class="alert alert-danger mb-0 py-2">Request failed: ${err}</div>`; })
+            .finally(() => {
+                statusBtn.disabled = false;
+                statusBtn.innerHTML = '<i class="bi bi-arrow-clockwise me-1"></i>Refresh';
+            });
+    });
+
+    function portAction(url, btnId, busyLabel, successMsg, idleLabel) {
+        const btn = document.getElementById(btnId);
+        btn.disabled = true;
+        btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span>${busyLabel}`;
+        statusBody.innerHTML = `<span class="text-muted">${busyLabel}…</span>`;
+
+        const fd = new FormData();
+        fd.append('_token', csrfToken);
+        fd.append('portId', portId);
+        fd.append('switchIp', switchIp);
+
+        fetch(url, { method: 'POST', body: fd })
+            .then(r => r.json())
+            .then(data => {
+                const out = data.output ? `<pre class="mt-2 mb-0 p-2 border rounded small" style="max-height:120px;overflow:auto">${data.output}</pre>` : '';
+                if (data.success) {
+                    statusBody.innerHTML = `<div class="alert alert-success mb-0 py-2"><i class="bi bi-check-lg me-1"></i>${successMsg}${out}</div>`;
+                } else {
+                    statusBody.innerHTML = `<div class="alert alert-danger mb-0 py-2">Failed: ${data.error}${out}</div>`;
+                }
+            })
+            .catch(err => { statusBody.innerHTML = `<div class="alert alert-danger mb-0 py-2">Request failed: ${err}</div>`; })
+            .finally(() => { btn.disabled = false; btn.innerHTML = idleLabel; });
+    }
+
+    window.doReauth    = () => portAction(reauthUrl,    'port-reauth-btn',      'Reauthenticating', 'Reauthentication triggered.',  '<i class="bi bi-shield-check me-1"></i>Reauthenticate');
+    window.doBounce    = () => portAction(bounceUrl,    'port-bounce-btn',      'Bouncing',         'Port bounced successfully.',   '<i class="bi bi-power me-1"></i>Bounce Port');
+    window.doPoeBounce = () => portAction(poeBounceUrl, 'port-poe-bounce-btn',  'PoE bouncing',     'PoE bounce complete.',         '<i class="bi bi-lightning me-1"></i>PoE Bounce');
+})();
+</script>
 {% endif %}
 {% endblock %}

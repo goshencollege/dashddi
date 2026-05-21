@@ -49,6 +49,12 @@ class AppSettingType extends AbstractType
                 'attr'     => ['placeholder' => '30'],
                 'help'     => 'How long to keep ClearPass authentication log entries. Leave blank to keep forever.',
             ])
+            ->add('switchInfoMaxAgeDays', IntegerType::class, [
+                'label'    => 'Switch Info Max Age (days)',
+                'required' => false,
+                'attr'     => ['placeholder' => '7'],
+                'help'     => 'Switch IP and port from ClearPass auth logs are shown on the interface page only if the most recent log entry is within this many days. Leave blank to always show regardless of age.',
+            ])
             ->add('defaultNewSubnetLeaseRetentionDays', IntegerType::class, [
                 'label'    => 'Default Retention for New Subnets (days)',
                 'required' => false,

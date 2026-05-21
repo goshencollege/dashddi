@@ -56,22 +56,21 @@ class ClearpassAuthLogService
 
     /**
      * Pulls authentication sessions from ClearPass with acctstarttime greater than
-     * the latest record already stored. On first run, fetches all sessions.
+     * the latest record already stored. On first run, fetches the last hour.
      *
      * @return array{imported: int, errors: string[]}
      */
     public function pullFromServer(ClearpassServer $server): array
     {
+        $serverId  = $server->getId();
         $token     = $this->getAccessToken($server);
         $imported  = 0;
         $errors    = [];
         $offset    = 0;
-        $latestTs  = $this->logRepo->findLatestAuthTimestamp($server);
+        $latestTs  = $this->logRepo->findLatestAuthTimestamp($server) ?? new \DateTimeImmutable('-1 hour');
 
         $params = ['sort' => '+acctstarttime', 'limit' => self::PAGE_SIZE];
-        if ($latestTs !== null) {
-            $params['filter'] = json_encode(['acctstarttime' => ['$gt' => (string) $latestTs->getTimestamp()]]);
-        }
+        $params['filter'] = json_encode(['acctstarttime' => ['$gt' => (string) $latestTs->getTimestamp()]]);
 
         do {
             $query  = '?' . http_build_query(array_merge($params, ['offset' => $offset]));
@@ -85,50 +84,62 @@ class ClearpassAuthLogService
             $data  = json_decode($result['body'], true);
             $items = $data['_embedded']['items'] ?? [];
 
-            foreach ($items as $item) {
-                $sessionId = (string) ($item['id'] ?? '');
-                $macRaw    = (string) ($item['mac_address'] ?? $item['callingstationid'] ?? '');
-                $mac       = $this->normaliseMac($macRaw);
+            if (!empty($items)) {
+                // Bulk-check which session IDs already exist (one query per page, no entity loading).
+                $pageSessionIds = array_values(array_filter(array_map(
+                    fn($i) => (string) ($i['id'] ?? ''), $items
+                )));
+                $existingIds = array_flip($this->logRepo->findExistingSessionIds($server, $pageSessionIds));
 
-                if ($sessionId === '' || $mac === '') {
-                    continue;
+                // Bulk-fetch interfaces for all MACs on this page (one query, keyed by MAC).
+                $pageMacs = array_unique(array_filter(array_map(
+                    fn($i) => $this->normaliseMac((string) ($i['mac_address'] ?? $i['callingstationid'] ?? '')),
+                    $items
+                )));
+                $ifaceMap = $this->ifaceRepo->findByMacs($pageMacs);
+
+                foreach ($items as $item) {
+                    $sessionId = (string) ($item['id'] ?? '');
+                    $macRaw    = (string) ($item['mac_address'] ?? $item['callingstationid'] ?? '');
+                    $mac       = $this->normaliseMac($macRaw);
+
+                    if ($sessionId === '' || $mac === '' || isset($existingIds[$sessionId])) {
+                        continue;
+                    }
+
+                    $acctStart = $item['acctstarttime'] ?? null;
+                    try {
+                        $authTs = $acctStart !== null
+                            ? (new \DateTimeImmutable())->setTimestamp((int) $acctStart)
+                            : new \DateTimeImmutable();
+                    } catch (\Throwable) {
+                        $authTs = new \DateTimeImmutable();
+                    }
+
+                    $log = new ClearpassAuthLog($sessionId, $mac, $authTs);
+                    $log->setClearpassServer($server);
+                    $log->setIpAddress($item['framedipaddress'] ?? $item['ip_address'] ?? null ?: null);
+                    $log->setUsername($item['username'] ?? null ?: null);
+                    $log->setService($item['servicetype'] ?? $item['service_name'] ?? null ?: null);
+                    $log->setAuthStatus($item['state'] ?? null ?: null);
+                    $log->setAuthProtocol($item['nasporttype'] ?? null ?: null);
+                    $log->setNasIp($item['nasipaddress'] ?? $item['nas_ip_address'] ?? null ?: null);
+                    $log->setNasPortId($item['nasportid'] ?? null ?: null);
+                    $log->setRole($item['arubauserrole'] ?? null ?: null);
+                    $log->setVlan($item['arubauservlan'] ?? null ?: null);
+                    $log->setNetworkInterface($ifaceMap[$mac] ?? null);
+
+                    $this->em->persist($log);
+                    $imported++;
                 }
 
-                if ($this->logRepo->findOneBy(['clearpassServer' => $server, 'sessionId' => $sessionId]) !== null) {
-                    continue;
-                }
+                // Flush and clear the identity map between pages so memory stays flat.
+                $this->em->flush();
+                $this->em->clear();
 
-                $acctStart = $item['acctstarttime'] ?? null;
-                try {
-                    $authTs = $acctStart !== null
-                        ? (new \DateTimeImmutable())->setTimestamp((int) $acctStart)
-                        : new \DateTimeImmutable();
-                } catch (\Throwable) {
-                    $authTs = new \DateTimeImmutable();
-                }
-
-                $log = new ClearpassAuthLog($sessionId, $mac, $authTs);
-                $log->setClearpassServer($server);
-                $log->setIpAddress($item['framedipaddress'] ?? $item['ip_address'] ?? null ?: null);
-                $log->setUsername($item['username'] ?? null ?: null);
-                $log->setService($item['servicetype'] ?? $item['service_name'] ?? null ?: null);
-                $log->setAuthStatus($item['state'] ?? null ?: null);
-                $log->setAuthProtocol($item['nasporttype'] ?? null ?: null);
-                $log->setNasIp($item['nasipaddress'] ?? $item['nas_ip_address'] ?? null ?: null);
-                $log->setNasPortId($item['nasportid'] ?? null ?: null);
-                $log->setRole($item['arubauserrole'] ?? null ?: null);
-                $log->setVlan($item['arubauservlan'] ?? null ?: null);
-                $log->setNetworkInterface($this->ifaceRepo->findOneBy(['macAddress' => $mac]));
-
-                $this->em->persist($log);
-                $imported++;
-
-                if ($imported % 200 === 0) {
-                    $this->em->flush();
-                }
+                // Re-fetch the server entity after clear so it is managed again.
+                $server = $this->em->find(ClearpassServer::class, $serverId);
             }
-
-            $this->em->flush();
 
             $total  = $data['count'] ?? count($items);
             $offset += count($items);

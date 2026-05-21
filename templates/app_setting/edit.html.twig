@@ -63,11 +63,17 @@
         <div class="card mt-4">
             <div class="card-header"><strong>ClearPass Auth Logs</strong></div>
             <div class="card-body">
-                <div class="mb-0">
+                <div class="mb-3">
                     {{ form_label(form.clearpassAuthLogRetentionDays, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
                     {{ form_widget(form.clearpassAuthLogRetentionDays) }}
                     {{ form_errors(form.clearpassAuthLogRetentionDays) }}
                     {{ form_help(form.clearpassAuthLogRetentionDays) }}
+                </div>
+                <div class="mb-0">
+                    {{ form_label(form.switchInfoMaxAgeDays, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                    {{ form_widget(form.switchInfoMaxAgeDays) }}
+                    {{ form_errors(form.switchInfoMaxAgeDays) }}
+                    {{ form_help(form.switchInfoMaxAgeDays) }}
                 </div>
             </div>
         </div>
