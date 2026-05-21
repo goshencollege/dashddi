@@ -192,7 +192,14 @@ class ArubaCxService
     private function getPortInfoSsh(ArubaSwitch $creds, string $ip, string $portId): array
     {
         $ssh = $this->sshConnect($creds, $ip);
-        $raw = (string) $ssh->exec('show port-access clients interface ' . $portId);
+        $ssh->enablePTY();
+        $ssh->setTimeout(10);
+
+        $ssh->exec('', false);
+        $ssh->read('/[#>]\s*$/');
+        $ssh->setTimeout(1);
+        $ssh->write("show port-access clients interface {$portId}\n");
+        $raw = (string) $ssh->read('/[#>]\s*$/');
 
         return ['clients' => $this->parsePortAccessOutput($raw), 'raw' => $raw, 'via' => 'ssh', 'error' => null];
     }
