@@ -18,6 +18,9 @@ class SnipeItSyncService
     private const TAG_NAME = 'snipeit';
     private const FETCH_LIMIT = 100;
 
+    /** @var array<string, Tag> */
+    private array $tagCache = [];
+
     public function __construct(
         private readonly EntityManagerInterface      $em,
         private readonly SnipeItAssetLinkRepository  $linkRepo,
@@ -217,6 +220,7 @@ class SnipeItSyncService
             // accumulating thousands of hydrated entities and exhausting PHP memory.
             $this->em->flush();
             $this->em->clear();
+            $this->tagCache = [];
 
             // Re-acquire entities detached by clear()
             $server              = $this->em->find(SnipeItServer::class, $serverId);
@@ -540,13 +544,16 @@ class SnipeItSyncService
 
     private function ensureTag(string $tagName): Tag
     {
+        if (isset($this->tagCache[$tagName])) {
+            return $this->tagCache[$tagName];
+        }
         $tag = $this->tagRepo->findOneBy(['name' => $tagName]);
         if ($tag === null) {
             $tag = new Tag();
             $tag->setName($tagName);
             $this->em->persist($tag);
         }
-        return $tag;
+        return $this->tagCache[$tagName] = $tag;
     }
 
     private function isArchived(array $asset): bool
