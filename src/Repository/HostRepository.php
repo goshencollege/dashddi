@@ -6,14 +6,18 @@ use App\Entity\Host;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
+use Symfony\Contracts\Cache\CacheInterface;
+use Symfony\Contracts\Cache\ItemInterface;
 
 /**
  * @extends ServiceEntityRepository<Host>
  */
 class HostRepository extends ServiceEntityRepository
 {
-    public function __construct(ManagerRegistry $registry)
-    {
+    public function __construct(
+        ManagerRegistry $registry,
+        private readonly CacheInterface $cache,
+    ) {
         parent::__construct($registry, Host::class);
     }
 
@@ -88,13 +92,31 @@ class HostRepository extends ServiceEntityRepository
     /** @return array{hosts: Host[], total: int} */
     public function searchPaginated(string $query, int $page, int $perPage): array
     {
-        return $this->paginateFilterQuery($this->buildSearchQb($query), $page, $perPage);
+        $key  = 'host_search_' . md5($query . '|' . $page . '|' . $perPage);
+        $data = $this->cache->get($key, function (ItemInterface $item) use ($query, $page, $perPage) {
+            $item->expiresAfter(60);
+            $result = $this->paginateFilterQuery($this->buildSearchQb($query), $page, $perPage);
+            return [
+                'ids'   => array_map(fn(Host $h) => $h->getId(), $result['hosts']),
+                'total' => $result['total'],
+            ];
+        });
+        return ['hosts' => $this->fetchByIds($data['ids']), 'total' => $data['total']];
     }
 
     /** @return array{hosts: Host[], total: int} */
     public function advancedSearchPaginated(array $criteria, int $page, int $perPage): array
     {
-        return $this->paginateFilterQuery($this->buildAdvancedQb($criteria), $page, $perPage);
+        $key  = 'host_advsearch_' . md5(serialize($criteria) . '|' . $page . '|' . $perPage);
+        $data = $this->cache->get($key, function (ItemInterface $item) use ($criteria, $page, $perPage) {
+            $item->expiresAfter(60);
+            $result = $this->paginateFilterQuery($this->buildAdvancedQb($criteria), $page, $perPage);
+            return [
+                'ids'   => array_map(fn(Host $h) => $h->getId(), $result['hosts']),
+                'total' => $result['total'],
+            ];
+        });
+        return ['hosts' => $this->fetchByIds($data['ids']), 'total' => $data['total']];
     }
 
     // -------------------------------------------------------------------------
@@ -108,49 +130,106 @@ class HostRepository extends ServiceEntityRepository
             ->leftJoin('h.building', 'b')
             ->where('h.deletedAt IS NULL');
 
-        // Use EXISTS subqueries instead of JOINs to avoid row-multiplication + DISTINCT overhead.
-        // Also fixes a scoping bug: the old orWhere chain let deleted hosts match on building/room.
-        $or = $qb->expr()->orX(
-            'h.name LIKE :q',
-            'b.name LIKE :q',
-            'h.room LIKE :q',
-            "CONCAT(COALESCE(b.name, ''), COALESCE(h.room, '')) LIKE :q",
-            <<<'DQL'
-                EXISTS (
-                    SELECT 1 FROM App\Entity\NetworkInterface i2
-                    LEFT JOIN i2.subnet s2
-                    LEFT JOIN i2.ipAddress ip4
-                    LEFT JOIN i2.ipv6Address ip6
-                    LEFT JOIN i2.names n2
-                    LEFT JOIN n2.domain nd2
-                    WHERE i2.host = h AND (
-                        i2.macAddress LIKE :q
-                        OR s2.name LIKE :q
-                        OR ip4.address LIKE :q
-                        OR ip6.address LIKE :q
-                        OR n2.name LIKE :q
-                        OR nd2.name LIKE :q
-                        OR CONCAT(n2.name, '.', nd2.name) LIKE :q
+        // Classify the query so we can skip subqueries that cannot possibly match,
+        // making the basic search behave like the targeted advanced search.
+        $isIpLike  = (bool) preg_match('/^\d[\d.]*\./', $query);  // "192.168", "10.0.0.1"
+        $hasNonHex = (bool) preg_match('/[g-zG-Z]/', $query);     // letters outside hex range
+
+        if ($isIpLike) {
+            // Query looks like an IP address — only search address fields, skip all text.
+            $or = $qb->expr()->orX(
+                <<<'DQL'
+                    EXISTS (
+                        SELECT 1 FROM App\Entity\NetworkInterface i2
+                        LEFT JOIN i2.ipAddress ip4
+                        LEFT JOIN i2.ipv6Address ip6
+                        WHERE i2.host = h AND (ip4.address LIKE :q OR ip6.address LIKE :q)
                     )
-                )
-            DQL,
-            <<<'DQL'
-                EXISTS (
-                    SELECT 1 FROM App\Entity\NetworkInterface i3
-                    WHERE i3.host = h AND EXISTS (
-                        SELECT 1 FROM App\Entity\DhcpLease dl2
-                        WHERE dl2.macAddress = i3.macAddress AND dl2.ipAddress LIKE :q
+                DQL,
+                <<<'DQL'
+                    EXISTS (
+                        SELECT 1 FROM App\Entity\NetworkInterface i3
+                        WHERE i3.host = h AND EXISTS (
+                            SELECT 1 FROM App\Entity\DhcpLease dl2
+                            WHERE dl2.macAddress = i3.macAddress AND dl2.ipAddress LIKE :q
+                        )
                     )
-                )
-            DQL,
-            <<<'DQL'
-                EXISTS (
-                    SELECT 1 FROM App\Entity\Host h2
-                    JOIN h2.tags tg2
-                    WHERE h2 = h AND tg2.name LIKE :q
-                )
-            DQL
-        );
+                DQL
+            );
+        } elseif ($hasNonHex) {
+            // Query contains letters outside the hex range — cannot match an IP address or
+            // a MAC address, so skip those fields entirely.
+            $or = $qb->expr()->orX(
+                'h.name LIKE :q',
+                'b.name LIKE :q',
+                'h.room LIKE :q',
+                "CONCAT(COALESCE(b.name, ''), COALESCE(h.room, '')) LIKE :q",
+                <<<'DQL'
+                    EXISTS (
+                        SELECT 1 FROM App\Entity\NetworkInterface i2
+                        LEFT JOIN i2.subnet s2
+                        LEFT JOIN i2.names n2
+                        LEFT JOIN n2.domain nd2
+                        WHERE i2.host = h AND (
+                            s2.name LIKE :q
+                            OR n2.name LIKE :q
+                            OR nd2.name LIKE :q
+                            OR CONCAT(n2.name, '.', nd2.name) LIKE :q
+                        )
+                    )
+                DQL,
+                <<<'DQL'
+                    EXISTS (
+                        SELECT 1 FROM App\Entity\Host h2
+                        JOIN h2.tags tg2
+                        WHERE h2 = h AND tg2.name LIKE :q
+                    )
+                DQL
+            );
+        } else {
+            // Ambiguous (pure digits, hex chars, partial MAC) — run everything to be safe.
+            $or = $qb->expr()->orX(
+                'h.name LIKE :q',
+                'b.name LIKE :q',
+                'h.room LIKE :q',
+                "CONCAT(COALESCE(b.name, ''), COALESCE(h.room, '')) LIKE :q",
+                <<<'DQL'
+                    EXISTS (
+                        SELECT 1 FROM App\Entity\NetworkInterface i2
+                        LEFT JOIN i2.subnet s2
+                        LEFT JOIN i2.ipAddress ip4
+                        LEFT JOIN i2.ipv6Address ip6
+                        LEFT JOIN i2.names n2
+                        LEFT JOIN n2.domain nd2
+                        WHERE i2.host = h AND (
+                            i2.macAddress LIKE :q
+                            OR s2.name LIKE :q
+                            OR ip4.address LIKE :q
+                            OR ip6.address LIKE :q
+                            OR n2.name LIKE :q
+                            OR nd2.name LIKE :q
+                            OR CONCAT(n2.name, '.', nd2.name) LIKE :q
+                        )
+                    )
+                DQL,
+                <<<'DQL'
+                    EXISTS (
+                        SELECT 1 FROM App\Entity\NetworkInterface i3
+                        WHERE i3.host = h AND EXISTS (
+                            SELECT 1 FROM App\Entity\DhcpLease dl2
+                            WHERE dl2.macAddress = i3.macAddress AND dl2.ipAddress LIKE :q
+                        )
+                    )
+                DQL,
+                <<<'DQL'
+                    EXISTS (
+                        SELECT 1 FROM App\Entity\Host h2
+                        JOIN h2.tags tg2
+                        WHERE h2 = h AND tg2.name LIKE :q
+                    )
+                DQL
+            );
+        }
 
         $qb->andWhere($or)->setParameter('q', $q);
 
