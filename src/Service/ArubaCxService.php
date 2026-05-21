@@ -337,12 +337,12 @@ class ArubaCxService
         $ssh->setTimeout(10);   // long enough for login banner
 
         $ssh->exec('', false);
-        $ssh->read('/[#>]\s*$/');
+        $out  = (string) $ssh->read('/[#>]\s*$/');
         $ssh->setTimeout(1);    // fast for subsequent reads
         $ssh->write("port-access reauthenticate interface {$portId}\n");
-        $output = $ssh->read('/[#>]\s*$/');
+        $out .= (string) $ssh->read('/[#>]\s*$/');
 
-        return ['success' => true, 'error' => null, 'output' => trim((string) $output)];
+        return ['success' => true, 'error' => null, 'output' => trim($out)];
     }
 
     /**
