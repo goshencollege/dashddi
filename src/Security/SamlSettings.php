@@ -12,6 +12,12 @@ class SamlSettings
         private readonly EncryptionService $encryption,
     ) {}
 
+    public function getSessionLifetimeSeconds(): int
+    {
+        $provider = $this->repository->findActive();
+        return ($provider?->getSessionLifetimeMinutes() ?? 30) * 60;
+    }
+
     public function toArray(): array
     {
         $provider = $this->repository->findActive();

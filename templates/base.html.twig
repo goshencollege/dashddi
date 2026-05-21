@@ -600,6 +600,21 @@
     });
 })();
 </script>
+{% if app.user %}
+<script>
+(function () {
+    var expiresAt = {{ app.session.get('_session_expires_at') ?? 'null' }};
+    if (expiresAt) {
+        var remaining = expiresAt * 1000 - Date.now();
+        if (remaining > 0) {
+            setTimeout(function () { window.location.href = '{{ path('saml_login') }}'; }, remaining);
+        } else {
+            window.location.href = '{{ path('saml_login') }}';
+        }
+    }
+})();
+</script>
+{% endif %}
 {% block scripts %}{% endblock %}
 </body>
 </html>

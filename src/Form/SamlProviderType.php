@@ -4,6 +4,7 @@ namespace App\Form;
 
 use App\Entity\SamlProvider;
 use Symfony\Component\Form\AbstractType;
+use Symfony\Component\Form\Extension\Core\Type\IntegerType;
 use Symfony\Component\Form\Extension\Core\Type\PasswordType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
@@ -64,6 +65,11 @@ class SamlProviderType extends AbstractType
                 'label' => 'IdP Certificate',
                 'attr'  => ['rows' => 4, 'class' => 'font-monospace', 'placeholder' => 'Base64-encoded certificate — no headers'],
                 'help'  => 'Paste the base64 body from the IdP signing certificate (no -----BEGIN CERTIFICATE----- headers).',
+            ])
+            ->add('sessionLifetimeMinutes', IntegerType::class, [
+                'label' => 'Session Timeout (minutes)',
+                'attr'  => ['min' => 1, 'max' => 1440],
+                'help'  => 'How long users can be inactive before they must log in again. Default is 30 minutes.',
             ])
         ;
     }
