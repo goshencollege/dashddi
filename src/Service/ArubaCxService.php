@@ -279,11 +279,16 @@ class ArubaCxService
 
     private function reauthenticatePortSsh(ArubaSwitch $creds, string $ip, string $portId): array
     {
-        $cmd    = "port-access reauthenticate interface {$portId}";
-        $ssh    = $this->sshConnect($creds, $ip);
-        $output = trim((string) $ssh->exec($cmd));
+        $ssh = $this->sshConnect($creds, $ip);
+        $ssh->enablePTY();
+        $ssh->setTimeout(1);
 
-        return ['success' => true, 'error' => null, 'output' => $this->formatSshLog([[$cmd, $output]])];
+        $ssh->exec('', false);
+        $ssh->read('/[#>]\s*$/');
+        $ssh->write("port-access reauthenticate interface {$portId}\n");
+        $output = $ssh->read('/[#>]\s*$/');
+
+        return ['success' => true, 'error' => null, 'output' => trim((string) $output)];
     }
 
     /**
@@ -345,14 +350,25 @@ class ArubaCxService
 
     private function bouncePortSsh(ArubaSwitch $creds, string $ip, string $portId): array
     {
-        $cmd1 = "configure terminal\ninterface {$portId}\nshutdown\nend";
-        $cmd2 = "configure terminal\ninterface {$portId}\nno shutdown\nend";
-        $ssh  = $this->sshConnect($creds, $ip);
-        $out1 = trim((string) $ssh->exec($cmd1));
-        sleep(10);
-        $out2 = trim((string) $ssh->exec($cmd2));
+        $ssh = $this->sshConnect($creds, $ip);
+        $ssh->enablePTY();
+        $ssh->setTimeout(1);
 
-        return ['success' => true, 'error' => null, 'output' => $this->formatSshLog([[$cmd1, $out1], ['(10 s pause)', ''], [$cmd2, $out2]])];
+        $ssh->exec('', false);
+        $out  = $ssh->read('/[#>]\s*$/');
+        $ssh->write("configure terminal\n");
+        $out .= $ssh->read('/\(config\)[#>]\s*$/');
+        $ssh->write("interface {$portId}\n");
+        $out .= $ssh->read('/\(config-if\)[#>]\s*$/');
+        $ssh->write("shutdown\n");
+        $out .= $ssh->read('/\(config-if\)[#>]\s*$/');
+        sleep(10);
+        $ssh->write("no shutdown\n");
+        $out .= $ssh->read('/\(config-if\)[#>]\s*$/');
+        $ssh->write("end\n");
+        $out .= $ssh->read('/[#>]\s*$/');
+
+        return ['success' => true, 'error' => null, 'output' => trim((string) $out)];
     }
 
     /** @return array{success: bool, error: ?string} */
@@ -374,28 +390,28 @@ class ArubaCxService
 
     private function poeBouncePortSsh(ArubaSwitch $creds, string $ip, string $portId): array
     {
-        $cmd1 = "configure terminal\ninterface {$portId}\nno power-over-ethernet\nshutdown\nend";
-        $cmd2 = "configure terminal\ninterface {$portId}\nno shutdown\npower-over-ethernet\nend";
-        $ssh  = $this->sshConnect($creds, $ip);
-        $out1 = trim((string) $ssh->exec($cmd1));
+        $ssh = $this->sshConnect($creds, $ip);
+        $ssh->enablePTY();
+        $ssh->setTimeout(1);
+
+        $ssh->exec('', false);
+        $out  = $ssh->read('/[#>]\s*$/');
+        $ssh->write("configure terminal\n");
+        $out .= $ssh->read('/\(config\)[#>]\s*$/');
+        $ssh->write("interface {$portId}\n");
+        $out .= $ssh->read('/\(config-if\)[#>]\s*$/');
+        $ssh->write("no power-over-ethernet\n");
+        $out .= $ssh->read('/\(config-if\)[#>]\s*$/');
+        $ssh->write("shutdown\n");
+        $out .= $ssh->read('/\(config-if\)[#>]\s*$/');
         sleep(10);
-        $out2 = trim((string) $ssh->exec($cmd2));
+        $ssh->write("no shutdown\n");
+        $out .= $ssh->read('/\(config-if\)[#>]\s*$/');
+        $ssh->write("power-over-ethernet\n");
+        $out .= $ssh->read('/\(config-if\)[#>]\s*$/');
+        $ssh->write("end\n");
+        $out .= $ssh->read('/[#>]\s*$/');
 
-        return ['success' => true, 'error' => null, 'output' => $this->formatSshLog([[$cmd1, $out1], ['(10 s pause)', ''], [$cmd2, $out2]])];
-    }
-
-    /** Formats an array of [sent, received] pairs into a readable SSH log. */
-    private function formatSshLog(array $steps): string
-    {
-        $lines = [];
-        foreach ($steps as [$sent, $received]) {
-            foreach (explode("\n", $sent) as $line) {
-                $lines[] = '> ' . $line;
-            }
-            if ($received !== '') {
-                $lines[] = $received;
-            }
-        }
-        return implode("\n", $lines);
+        return ['success' => true, 'error' => null, 'output' => trim((string) $out)];
     }
 }
