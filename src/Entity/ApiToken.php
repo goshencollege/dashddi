@@ -31,6 +31,7 @@ class ApiToken
     private array $allowedRoutes = [];
 
     #[ORM\Column(type: 'json')]
+    #[Assert\Count(min: 1, minMessage: 'At least one IP address or CIDR range is required.')]
     #[Assert\All([
         new Assert\Regex(
             pattern: '/^(\d{1,3}\.){3}\d{1,3}(\/\d{1,2})?$|^[0-9a-fA-F:]+:+[0-9a-fA-F]*(\/\d{1,3})?$/',
@@ -40,6 +41,7 @@ class ApiToken
     private array $allowedCidrs = [];
 
     #[ORM\Column(nullable: true)]
+    #[Assert\NotNull(message: 'An expiry date is required.')]
     private ?\DateTimeImmutable $expiresAt = null;
 
     #[ORM\Column(nullable: true)]
@@ -51,6 +53,7 @@ class ApiToken
     public function __construct()
     {
         $this->createdAt = new \DateTimeImmutable();
+        $this->expiresAt = new \DateTimeImmutable('+5 years');
     }
 
     public function getId(): ?int { return $this->id; }
@@ -80,7 +83,7 @@ class ApiToken
 
     public function isExpired(): bool
     {
-        return $this->expiresAt !== null && $this->expiresAt < new \DateTimeImmutable();
+        return $this->expiresAt === null || $this->expiresAt < new \DateTimeImmutable();
     }
 
     public function isAllowedOnRoute(string $route): bool
@@ -91,7 +94,7 @@ class ApiToken
     public function isAllowedFromIp(string $ip): bool
     {
         if (empty($this->allowedCidrs)) {
-            return true;
+            return false;
         }
 
         foreach ($this->allowedCidrs as $cidr) {

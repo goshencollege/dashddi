@@ -33,17 +33,14 @@ class ApiTokenType extends AbstractType
                 'expanded' => true,
             ])
             ->add('allowedCidrs', TextareaType::class, [
-                'label'    => 'Allowed IP / CIDR Ranges',
-                'required' => false,
-                'attr'     => ['rows' => 4, 'placeholder' => "192.168.1.0/24\n10.0.0.5"],
-                'help'     => 'One IP address or CIDR range per line. Leave blank to allow requests from any IP.',
+                'label' => 'Allowed IP / CIDR Ranges',
+                'attr'  => ['rows' => 4, 'placeholder' => "192.168.1.0/24\n10.0.0.5"],
+                'help'  => 'One IP address or CIDR range per line.',
             ])
             ->add('expiresAt', DateType::class, [
-                'label'    => 'Expiry Date',
-                'required' => false,
-                'widget'   => 'single_text',
-                'input'    => 'datetime_immutable',
-                'help'     => 'Leave blank for no expiry.',
+                'label'  => 'Expiry Date',
+                'widget' => 'single_text',
+                'input'  => 'datetime_immutable',
             ]);
 
         $builder->get('allowedCidrs')->addModelTransformer(new CallbackTransformer(
