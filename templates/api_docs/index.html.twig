@@ -60,7 +60,10 @@ curl -H "Authorization: Bearer &lt;your-token&gt;" https://example.com/api/...</
 curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
 
             <h3 class="h6 mt-3 mb-1">IP / CIDR restrictions</h3>
-            <p class="small mb-0">Tokens can optionally be restricted to one or more source IP addresses or CIDR ranges (IPv4 and IPv6 both supported). Requests from addresses outside the allowlist are rejected with <code>403</code>. Tokens with no IP restriction accept requests from any address. Restrictions are configured when creating or editing a token.</p>
+            <p class="small mb-0">Every token must be restricted to one or more source IP addresses or CIDR ranges (IPv4 and IPv6 both supported). Requests from addresses outside the allowlist are rejected with <code>403</code>. Restrictions are configured when creating or editing a token.</p>
+
+            <h3 class="h6 mt-3 mb-1">Expiry</h3>
+            <p class="small mb-0">Every token must have an expiry date. Requests made with an expired token are rejected with <code>401</code>. The default expiry when creating a token is five years from the creation date. Tokens can be extended by editing them.</p>
 
             <p class="mt-3 mb-0 text-muted small">Always use <strong>HTTPS</strong>. HTTP requests will be redirected and the Authorization header will be stripped by the redirect.</p>
         </section>
