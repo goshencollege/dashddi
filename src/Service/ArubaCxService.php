@@ -196,12 +196,12 @@ class ArubaCxService
         $ssh->setTimeout(10);
 
         $ssh->exec('', false);
-        $ssh->read('/[#>]\s*$/');
-        $ssh->setTimeout(1);
+        $out  = (string) $ssh->read('/[#>]\s*$/');
+        $ssh->setTimeout(5);    // show commands can be slower than config commands
         $ssh->write("show port-access clients interface {$portId}\n");
-        $raw = (string) $ssh->read('/[#>]\s*$/');
+        $out .= (string) $ssh->read('/[#>]\s*$/');
 
-        return ['clients' => $this->parsePortAccessOutput($raw), 'raw' => $raw, 'via' => 'ssh', 'error' => null];
+        return ['clients' => $this->parsePortAccessOutput($out), 'raw' => trim($out), 'via' => 'ssh', 'error' => null];
     }
 
     private function parsePortAccessOutput(string $output): array
