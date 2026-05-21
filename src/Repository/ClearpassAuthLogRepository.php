@@ -135,24 +135,6 @@ class ClearpassAuthLogRepository extends ServiceEntityRepository
     }
 
     /**
-     * Returns the id and sessionId of every log for this server whose status is still Active.
-     * Returns plain arrays (no entities) to avoid loading thousands of objects into memory.
-     *
-     * @return list<array{id: int, sessionId: string}>
-     */
-    public function findActiveSessionData(ClearpassServer $server): array
-    {
-        return $this->createQueryBuilder('l')
-            ->select('l.id', 'l.sessionId')
-            ->where('l.clearpassServer = :server')
-            ->andWhere('LOWER(l.authStatus) = :active')
-            ->setParameter('server', $server)
-            ->setParameter('active', 'active')
-            ->getQuery()
-            ->getArrayResult();
-    }
-
-    /**
      * Returns which of the given session IDs already exist for this server.
      * Used to skip duplicates without a per-row findOneBy.
      *
