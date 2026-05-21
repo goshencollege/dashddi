@@ -279,10 +279,11 @@ class ArubaCxService
 
     private function reauthenticatePortSsh(ArubaSwitch $creds, string $ip, string $portId): array
     {
+        $cmd    = "port-access reauthenticate interface {$portId}";
         $ssh    = $this->sshConnect($creds, $ip);
-        $output = $ssh->exec("port-access reauthenticate interface {$portId}");
+        $output = trim((string) $ssh->exec($cmd));
 
-        return ['success' => true, 'error' => null, 'output' => trim((string) $output)];
+        return ['success' => true, 'error' => null, 'output' => $this->formatSshLog([[$cmd, $output]])];
     }
 
     /**
@@ -344,12 +345,14 @@ class ArubaCxService
 
     private function bouncePortSsh(ArubaSwitch $creds, string $ip, string $portId): array
     {
+        $cmd1 = "configure terminal\ninterface {$portId}\nshutdown\nend";
+        $cmd2 = "configure terminal\ninterface {$portId}\nno shutdown\nend";
         $ssh  = $this->sshConnect($creds, $ip);
-        $out  = (string) $ssh->exec("configure terminal\ninterface {$portId}\nshutdown\nend");
+        $out1 = trim((string) $ssh->exec($cmd1));
         sleep(10);
-        $out .= (string) $ssh->exec("configure terminal\ninterface {$portId}\nno shutdown\nend");
+        $out2 = trim((string) $ssh->exec($cmd2));
 
-        return ['success' => true, 'error' => null, 'output' => trim($out)];
+        return ['success' => true, 'error' => null, 'output' => $this->formatSshLog([[$cmd1, $out1], ['(10 s pause)', ''], [$cmd2, $out2]])];
     }
 
     /** @return array{success: bool, error: ?string} */
@@ -371,11 +374,28 @@ class ArubaCxService
 
     private function poeBouncePortSsh(ArubaSwitch $creds, string $ip, string $portId): array
     {
+        $cmd1 = "configure terminal\ninterface {$portId}\nno power-over-ethernet\nshutdown\nend";
+        $cmd2 = "configure terminal\ninterface {$portId}\nno shutdown\npower-over-ethernet\nend";
         $ssh  = $this->sshConnect($creds, $ip);
-        $out  = (string) $ssh->exec("configure terminal\ninterface {$portId}\nno power-over-ethernet\nshutdown\nend");
+        $out1 = trim((string) $ssh->exec($cmd1));
         sleep(10);
-        $out .= (string) $ssh->exec("configure terminal\ninterface {$portId}\nno shutdown\npower-over-ethernet\nend");
+        $out2 = trim((string) $ssh->exec($cmd2));
 
-        return ['success' => true, 'error' => null, 'output' => trim((string) $out)];
+        return ['success' => true, 'error' => null, 'output' => $this->formatSshLog([[$cmd1, $out1], ['(10 s pause)', ''], [$cmd2, $out2]])];
+    }
+
+    /** Formats an array of [sent, received] pairs into a readable SSH log. */
+    private function formatSshLog(array $steps): string
+    {
+        $lines = [];
+        foreach ($steps as [$sent, $received]) {
+            foreach (explode("\n", $sent) as $line) {
+                $lines[] = '> ' . $line;
+            }
+            if ($received !== '') {
+                $lines[] = $received;
+            }
+        }
+        return implode("\n", $lines);
     }
 }
