@@ -68,10 +68,9 @@ class PullClearpassLogsCommand extends Command
                 $result = $this->logService->pullFromServer($server);
 
                 $io->writeln(sprintf(
-                    '  <info>✓</info> %s  imported=%d  updated=%d',
+                    '  <info>✓</info> %s  imported=%d',
                     $server->getName(),
                     $result['imported'],
-                    $result['updated'],
                 ));
 
                 foreach ($result['errors'] as $err) {

@@ -10,8 +10,7 @@ use Doctrine\ORM\EntityManagerInterface;
 
 class ClearpassAuthLogService
 {
-    private const PAGE_SIZE            = 1000;
-    private const ACTIVE_REFRESH_BATCH = 20;   // UUIDs in a GET URL; keep well under 414
+    private const PAGE_SIZE = 1000;
 
     public function __construct(
         private readonly ClearpassAuthLogRepository $logRepo,
@@ -57,10 +56,9 @@ class ClearpassAuthLogService
 
     /**
      * Pulls authentication sessions from ClearPass with acctstarttime greater than
-     * the latest record already stored. On first run, fetches all sessions.
-     * Also refreshes the status of any sessions still marked Active in the database.
+     * the latest record already stored. On first run, fetches the last hour.
      *
-     * @return array{imported: int, updated: int, errors: string[]}
+     * @return array{imported: int, errors: string[]}
      */
     public function pullFromServer(ClearpassServer $server): array
     {
@@ -147,76 +145,7 @@ class ClearpassAuthLogService
             $offset += count($items);
         } while (count($items) === self::PAGE_SIZE && $offset < $total);
 
-        $updated = $this->updateActiveSessions($server, $token, $errors);
-
-        return ['imported' => $imported, 'updated' => $updated, 'errors' => $errors];
-    }
-
-    /**
-     * Fetches the current state from ClearPass for every session we still have marked
-     * Active, and bulk-updates authStatus for any that have since ended.
-     * Uses scalar queries and DQL UPDATE — no entities are loaded into memory.
-     */
-    private function updateActiveSessions(ClearpassServer $server, string $token, array &$errors): int
-    {
-        // Returns plain arrays: [['id' => 123, 'sessionId' => 'abc'], ...]
-        $activeSessions = $this->logRepo->findActiveSessionData($server);
-        if (empty($activeSessions)) {
-            return 0;
-        }
-
-        $updated = 0;
-
-        foreach (array_chunk($activeSessions, self::ACTIVE_REFRESH_BATCH) as $batch) {
-            // Map sessionId => database row id (no entity objects).
-            $bySessionId = array_column($batch, 'id', 'sessionId');
-
-            $filter = json_encode(['id' => ['$in' => array_keys($bySessionId)]]);
-            $query  = '?' . http_build_query(['filter' => $filter, 'limit' => count($bySessionId)]);
-            $result = $this->request($server, $token, 'GET', '/api/v1/session' . $query, null);
-
-            if (!$result['success']) {
-                $errors[] = 'Active-session refresh failed: ' . $result['error'];
-                continue;
-            }
-
-            $data  = json_decode($result['body'], true);
-            $items = $data['_embedded']['items'] ?? [];
-
-            // Group row IDs by the new status they should receive.
-            $toUpdate = [];
-            foreach ($items as $item) {
-                $sessionId = (string) ($item['id'] ?? '');
-                $newStatus = $item['state'] ?? null ?: null;
-
-                if ($sessionId === '' || $newStatus === null || strtolower($newStatus) === 'active') {
-                    continue;
-                }
-
-                $rowId = $bySessionId[$sessionId] ?? null;
-                if ($rowId === null) {
-                    continue;
-                }
-
-                $toUpdate[$newStatus][] = $rowId;
-            }
-
-            // One DQL UPDATE per distinct new status value — no entities loaded.
-            foreach ($toUpdate as $status => $ids) {
-                $this->em->createQueryBuilder()
-                    ->update(ClearpassAuthLog::class, 'l')
-                    ->set('l.authStatus', ':status')
-                    ->where('l.id IN (:ids)')
-                    ->setParameter('status', $status)
-                    ->setParameter('ids', $ids)
-                    ->getQuery()
-                    ->execute();
-
-                $updated += count($ids);
-            }
-        }
-
-        return $updated;
+        return ['imported' => $imported, 'errors' => $errors];
     }
 
     private function getAccessToken(ClearpassServer $server): string
