@@ -281,10 +281,11 @@ class ArubaCxService
     {
         $ssh = $this->sshConnect($creds, $ip);
         $ssh->enablePTY();
-        $ssh->setTimeout(1);
+        $ssh->setTimeout(10);   // long enough for login banner
 
         $ssh->exec('', false);
         $ssh->read('/[#>]\s*$/');
+        $ssh->setTimeout(1);    // fast for subsequent reads
         $ssh->write("port-access reauthenticate interface {$portId}\n");
         $output = $ssh->read('/[#>]\s*$/');
 
@@ -352,10 +353,11 @@ class ArubaCxService
     {
         $ssh = $this->sshConnect($creds, $ip);
         $ssh->enablePTY();
-        $ssh->setTimeout(1);
+        $ssh->setTimeout(10);   // long enough for login banner
 
         $ssh->exec('', false);
         $out  = $ssh->read('/[#>]\s*$/');
+        $ssh->setTimeout(1);    // fast for subsequent reads
         $ssh->write("configure terminal\n");
         $out .= $ssh->read('/\(config\)[#>]\s*$/');
         $ssh->write("interface {$portId}\n");
@@ -392,10 +394,11 @@ class ArubaCxService
     {
         $ssh = $this->sshConnect($creds, $ip);
         $ssh->enablePTY();
-        $ssh->setTimeout(1);
+        $ssh->setTimeout(10);   // long enough for login banner
 
         $ssh->exec('', false);
         $out  = $ssh->read('/[#>]\s*$/');
+        $ssh->setTimeout(1);    // fast for subsequent reads
         $ssh->write("configure terminal\n");
         $out .= $ssh->read('/\(config\)[#>]\s*$/');
         $ssh->write("interface {$portId}\n");
