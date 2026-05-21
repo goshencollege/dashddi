@@ -281,6 +281,11 @@ ${APP_READONLY}
       timeout: 3s
       retries: 10
       start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
 ${DEPENDS_ON_BLOCK}
 
   worker_priority:
@@ -301,6 +306,11 @@ ${APP_READONLY}
       DATABASE_URL: "${DATABASE_URL}"
       DEFAULT_URI: "${BASE_URL}"
       MESSENGER_TRANSPORT_DSN: "doctrine://default?auto_setup=0"
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
 ${DEPENDS_ON_BLOCK}
 
   worker_bulk:
@@ -321,6 +331,11 @@ ${APP_READONLY}
       DATABASE_URL: "${DATABASE_URL}"
       DEFAULT_URI: "${BASE_URL}"
       MESSENGER_TRANSPORT_DSN: "doctrine://default?auto_setup=0"
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
 ${DEPENDS_ON_BLOCK}
 
   nginx:
@@ -341,6 +356,11 @@ ${DEPENDS_ON_BLOCK}
     depends_on:
       app:
         condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
 ${DB_SERVICE_BLOCK}
 ${VOLUMES_BLOCK}
 EOF
@@ -364,21 +384,32 @@ for i in $(seq 1 30); do
 done
 ok "App container ready"
 
-# ── 8. Database migrations ────────────────────────────────────────────────────
+# ── 8. PHP dependencies ───────────────────────────────────────────────────────
+header "Installing PHP dependencies"
+
+COMPOSER_FLAGS="--no-interaction --no-progress"
+if [[ "$APP_ENV" == "prod" ]]; then
+    COMPOSER_FLAGS="$COMPOSER_FLAGS --no-dev --optimize-autoloader"
+fi
+docker compose -f "$COMPOSE_FILE" exec -T app \
+    composer install $COMPOSER_FLAGS
+ok "Dependencies installed"
+
+# ── 9. Database migrations ────────────────────────────────────────────────────
 header "Running database migrations"
 
 docker compose -f "$COMPOSE_FILE" exec -T app \
     php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
 ok "Migrations complete"
 
-# ── 9. Cache warmup ──────────────────────────────────────────────────────────
+# ── 10. Cache warmup ─────────────────────────────────────────────────────────
 header "Warming up cache"
 
 docker compose -f "$COMPOSE_FILE" exec -T app \
     php bin/console cache:warmup
 ok "Cache warm"
 
-# ── 10. SAML identity provider setup ─────────────────────────────────────────
+# ── 11. SAML identity provider setup ─────────────────────────────────────────
 header "SAML Identity Provider"
 echo
 echo -e "  ${BOLD}SP metadata URL (give this to your IdP administrator):${NC}"
@@ -416,7 +447,7 @@ else
     warn "  docker compose -f docker-compose.prod.yml exec app php bin/console app:saml:import-metadata <file-or-url> --activate"
 fi
 
-# ── 11. Summary ──────────────────────────────────────────────────────────────
+# ── 12. Summary ──────────────────────────────────────────────────────────────
 header "Setup complete"
 echo
 echo -e "  ${BOLD}DashDDI is running at:  ${CYAN}${BASE_URL}${NC}"
