@@ -29,6 +29,6 @@ security:
                 invalidate_session: true
 
     access_control:
-        - { path: ^/saml, roles: PUBLIC_ACCESS }
+        - { path: ^/saml/, roles: PUBLIC_ACCESS }
         - { path: ^/api/, roles: ROLE_USER }
         - { path: ^/, roles: ROLE_USER }
