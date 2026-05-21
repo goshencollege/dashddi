@@ -2,27 +2,35 @@
 <div class="d-none" id="allowedRoutes-container">{{ form_widget(form.allowedRoutes) }}</div>
 {{ form_errors(form.allowedRoutes) }}
 
-{# Grid and "Other Endpoints" are built by the script below #}
+{# Grid is built by the script below #}
 <div id="endpoint-grid-container" class="table-responsive mb-3"></div>
-<div id="other-endpoints-container" class="mb-1"></div>
 
 <script>
 (function () {
     const groups = [
         { label: 'Buildings',      path: '/api/buildings',       routes: ['api_buildings_index',      'api_buildings_show',      'api_buildings_create',      'api_buildings_update',      'api_buildings_delete'     ] },
-        { label: 'DNS Servers',    path: '/api/dns-servers',     routes: ['api_dns_servers_index',    'api_dns_servers_show',    'api_dns_servers_create',    'api_dns_servers_update',    'api_dns_servers_delete'   ] },
-        { label: 'DHCP Servers',   path: '/api/dhcp-servers',    routes: ['api_dhcp_servers_index',   'api_dhcp_servers_show',   'api_dhcp_servers_create',   'api_dhcp_servers_update',   'api_dhcp_servers_delete'  ] },
-        { label: 'Hosts',          path: '/api/hosts',           routes: ['api_hosts_index',          'api_hosts_show',          'api_hosts_create',          'api_hosts_update',          'api_hosts_delete'         ] },
-        { label: 'Interfaces',     path: '/api/interfaces',      routes: ['api_interfaces_index',      'api_interfaces_show',      'api_interfaces_create',      'api_interfaces_update',      'api_interfaces_delete'     ] },
-        { label: 'Interface Names',path: '/api/interface-names', routes: ['api_interface_names_index', 'api_interface_names_show', 'api_interface_names_create', 'api_interface_names_update', 'api_interface_names_delete'] },
-        { label: 'Subnets',        path: '/api/subnets',         routes: ['api_subnets_index',         'api_subnets_show',         'api_subnets_create',         'api_subnets_update',         'api_subnets_delete'        ] },
-        { label: 'Address Blocks', path: '/api/address-blocks',  routes: ['api_address_blocks_index',  'api_address_blocks_show',  'api_address_blocks_create',  'api_address_blocks_update',  'api_address_blocks_delete' ] },
-        { label: 'Domains',        path: '/api/domains',         routes: ['api_domains_index',         'api_domains_show',         'api_domains_create',         'api_domains_update',         'api_domains_delete'        ] },
-        { label: 'Domain Records', path: '/api/domain-records',  routes: ['api_domain_records_index',  'api_domain_records_show',  'api_domain_records_create',  'api_domain_records_update',  'api_domain_records_delete' ] },
-        { label: 'Tags',           path: '/api/tags',            routes: ['api_tags_search',           null,                       'api_tags_create',            null,                         null                       ] },
+        { label: 'DNS Servers',    path: '/api/dns-servers',     routes: ['api_dns_servers_index',    'api_dns_servers_show',    'api_dns_servers_create',    'api_dns_servers_update',    'api_dns_servers_delete'   ], actions: [{ label: 'Push Config',       route: 'api_dns_servers_push'          }] },
+        { label: 'DHCP Servers',   path: '/api/dhcp-servers',    routes: ['api_dhcp_servers_index',   'api_dhcp_servers_show',   'api_dhcp_servers_create',   'api_dhcp_servers_update',   'api_dhcp_servers_delete'  ], actions: [{ label: 'Push Config',       route: 'api_dhcp_servers_push'         }] },
+        { label: 'Hosts',          path: '/api/hosts',           routes: ['api_hosts_index',          'api_hosts_show',          'api_hosts_create',          'api_hosts_update',          'api_hosts_delete'         ], actions: [{ label: 'Restore Deleted',   route: 'api_hosts_restore'             }] },
+        { label: 'Interfaces',     path: '/api/interfaces',      routes: ['api_interfaces_index',     'api_interfaces_show',     'api_interfaces_create',     'api_interfaces_update',     'api_interfaces_delete'    ], actions: [{ label: 'Restore Deleted',   route: 'api_interfaces_restore'        }] },
+        { label: 'Interface Names',path: '/api/interface-names', routes: ['api_interface_names_index','api_interface_names_show','api_interface_names_create','api_interface_names_update','api_interface_names_delete'] },
+        { label: 'Subnets',        path: '/api/subnets',         routes: ['api_subnets_index',        'api_subnets_show',        'api_subnets_create',        'api_subnets_update',        'api_subnets_delete'       ] },
+        { label: 'Address Blocks', path: '/api/address-blocks',  routes: ['api_address_blocks_index', 'api_address_blocks_show', 'api_address_blocks_create', 'api_address_blocks_update', 'api_address_blocks_delete'] },
+        { label: 'Domains',        path: '/api/domains',         routes: ['api_domains_index',        'api_domains_show',        'api_domains_create',        'api_domains_update',        'api_domains_delete'       ] },
+        { label: 'Domain Records', path: '/api/domain-records',  routes: ['api_domain_records_index', 'api_domain_records_show', 'api_domain_records_create', 'api_domain_records_update', 'api_domain_records_delete'] },
+        { label: 'Tags',           path: '/api/tags',            routes: ['api_tags_search',          null,                      'api_tags_create',           null,                        null                       ] },
+        { label: 'Switches',       path: '/api/switch',          routes: [null,                       null,                      null,                        null,                        null                       ], actions: [
+            { label: 'Port Status',        route: 'api_switch_port_status'        },
+            { label: 'Bounce Port',        route: 'api_switch_port_bounce'        },
+            { label: 'PoE Bounce',         route: 'api_switch_port_poe_bounce'    },
+            { label: 'Reauthenticate Port',route: 'api_switch_port_reauthenticate'},
+        ]},
     ];
     const colLabels = ['List', 'Detail', 'Create', 'Update', 'Delete'];
-    const knownRoutes = new Set(groups.flatMap(g => g.routes.filter(Boolean)));
+    const knownRoutes = new Set(groups.flatMap(g => [
+        ...g.routes.filter(Boolean),
+        ...(g.actions || []).map(a => a.route),
+    ]));
 
     // Map route name → hidden checkbox
     const hiddenMap = {};
@@ -48,13 +56,13 @@
 
     const thead = table.createTHead();
     const hRow = thead.insertRow();
-    ['Resource', ...colLabels, 'All'].forEach((text, i) => {
+    ['Resource', ...colLabels, 'Actions', 'All'].forEach((text, i) => {
         const th = document.createElement('th');
         th.textContent = text;
         if (i > 0) th.className = 'text-center';
+        if (text === 'All') th.title = 'Toggle all for this row';
         hRow.appendChild(th);
     });
-    hRow.lastElementChild.title = 'Toggle all for this row';
 
     const tbody = table.createTBody();
     groups.forEach(group => {
@@ -71,6 +79,30 @@
             if (check) { cell.appendChild(check); rowChecks.push(check); }
             else        { cell.innerHTML = '<span class="text-body-tertiary">—</span>'; }
         });
+
+        // Actions column
+        const actionsCell = row.insertCell();
+        actionsCell.className = 'text-center';
+        const actions = group.actions || [];
+        if (actions.length) {
+            const wrap = document.createElement('div');
+            wrap.className = 'd-flex flex-column gap-1 align-items-start px-1';
+            actions.forEach(({ label, route }) => {
+                const check = makeCheck(route, 'endpoint-check');
+                if (!check) return;
+                rowChecks.push(check);
+                const lbl = document.createElement('label');
+                lbl.className = 'form-check-label small d-flex align-items-center gap-1 text-nowrap';
+                lbl.appendChild(check);
+                const span = document.createElement('span');
+                span.textContent = label;
+                lbl.appendChild(span);
+                wrap.appendChild(lbl);
+            });
+            actionsCell.appendChild(wrap);
+        } else {
+            actionsCell.innerHTML = '<span class="text-body-tertiary">—</span>';
+        }
 
         // "All" toggle
         const allCell = row.insertCell();
@@ -101,37 +133,5 @@
     tableWrap.className = 'table-responsive mb-3';
     tableWrap.appendChild(table);
     document.getElementById('endpoint-grid-container').appendChild(tableWrap);
-
-    // ── Other endpoints ───────────────────────────────────────────────────────
-    const others = Object.keys(hiddenMap).filter(r => !knownRoutes.has(r));
-    if (others.length) {
-        const container = document.getElementById('other-endpoints-container');
-        const lbl = document.createElement('label');
-        lbl.className = 'form-label fw-semibold small text-muted text-uppercase';
-        lbl.textContent = 'Other Endpoints';
-        container.appendChild(lbl);
-
-        const flex = document.createElement('div');
-        flex.className = 'border rounded p-3 d-flex flex-wrap gap-3';
-        others.forEach(routeName => {
-            const hidden = hiddenMap[routeName];
-            const wrap = document.createElement('div');
-            wrap.className = 'form-check mb-0';
-            const visual = document.createElement('input');
-            visual.type = 'checkbox';
-            visual.className = 'form-check-input';
-            visual.id = 'vis_' + hidden.id;
-            visual.checked = hidden.checked;
-            visual.addEventListener('change', () => { hidden.checked = visual.checked; });
-            const label = document.createElement('label');
-            label.className = 'form-check-label font-monospace small';
-            label.htmlFor = 'vis_' + hidden.id;
-            label.textContent = routeName;
-            wrap.appendChild(visual);
-            wrap.appendChild(label);
-            flex.appendChild(wrap);
-        });
-        container.appendChild(flex);
-    }
 })();
 </script>
