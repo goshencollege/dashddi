@@ -8,6 +8,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: IpAddressRepository::class)]
 #[ORM\Table(name: 'ip_address')]
+#[ORM\Index(columns: ['subnet_id'], name: 'idx_ip_address_subnet_id')]
 class IpAddress
 {
     #[ORM\Id]

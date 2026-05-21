@@ -12,6 +12,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: DomainRecordRepository::class)]
 #[ORM\Table(name: 'domain_record')]
+#[ORM\Index(columns: ['domain_id'], name: 'idx_domain_record_domain_id')]
 class DomainRecord
 {
     use AuditableTrait;

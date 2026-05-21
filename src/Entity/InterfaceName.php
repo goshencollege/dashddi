@@ -11,6 +11,8 @@ use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: InterfaceNameRepository::class)]
 #[ORM\Table(name: 'interface_name')]
+#[ORM\Index(columns: ['network_interface_id'], name: 'idx_interface_name_network_interface_id')]
+#[ORM\Index(columns: ['domain_id'],    name: 'idx_interface_name_domain_id')]
 #[ViewsAllowedForInterfaceName]
 class InterfaceName
 {

@@ -10,6 +10,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: AddressBlockRepository::class)]
 #[ORM\Table(name: 'address_block')]
+#[ORM\Index(columns: ['subnet_id'], name: 'idx_address_block_subnet_id')]
 class AddressBlock
 {
     use AuditableTrait;
