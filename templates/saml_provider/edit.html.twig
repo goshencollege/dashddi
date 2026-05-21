@@ -20,11 +20,19 @@
         <div class="card">
             <div class="card-header"><strong>Provider</strong></div>
             <div class="card-body">
-                <div class="col-lg-4">
-                    {{ form_label(form.name, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
-                    {{ form_widget(form.name, {attr: {class: 'form-control'}}) }}
-                    {{ form_errors(form.name) }}
-                    {{ form_help(form.name) }}
+                <div class="row g-3">
+                    <div class="col-lg-4">
+                        {{ form_label(form.name, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                        {{ form_widget(form.name, {attr: {class: 'form-control'}}) }}
+                        {{ form_errors(form.name) }}
+                        {{ form_help(form.name) }}
+                    </div>
+                    <div class="col-lg-2">
+                        {{ form_label(form.sessionLifetimeMinutes, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                        {{ form_widget(form.sessionLifetimeMinutes, {attr: {class: 'form-control'}}) }}
+                        {{ form_errors(form.sessionLifetimeMinutes) }}
+                        {{ form_help(form.sessionLifetimeMinutes) }}
+                    </div>
                 </div>
             </div>
         </div>
