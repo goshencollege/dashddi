@@ -338,7 +338,7 @@ class ArubaCxService
 
         $ssh->exec('', false);
         $out  = (string) $ssh->read('/[#>]\s*$/');
-        $ssh->setTimeout(1);    // fast for subsequent reads
+        $ssh->setTimeout(5);    // allow time for banner + command response
         $ssh->write("port-access reauthenticate interface {$portId}\n");
         $out .= (string) $ssh->read('/[#>]\s*$/');
 
