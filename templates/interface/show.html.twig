@@ -256,19 +256,24 @@
         const rows = data.clients.map(c => `
             <tr>
                 <td class="font-monospace">${c.mac ?? '—'}</td>
-                <td class="font-monospace">${c.ip ?? '—'}</td>
+                <td>${c.vlan || '—'}</td>
                 <td>${c.role ?? '—'}</td>
                 <td>${c.status ?? '—'}</td>
                 <td>${c.auth_method ?? '—'}</td>
             </tr>`).join('');
+        const rawId = 'raw-' + Math.random().toString(36).slice(2);
         return `<div class="table-responsive mb-0">
             <table class="table table-sm mb-0">
                 <thead><tr>
-                    <th>MAC</th><th>IP</th><th>Role</th><th>Status</th><th>Auth Method</th>
+                    <th>MAC</th><th>VLAN</th><th>Role</th><th>Status</th><th>Auth Method</th>
                 </tr></thead>
                 <tbody>${rows}</tbody>
             </table>
-            <div class="px-3 pb-2 text-muted small">Source: ${data.via}</div>
+            <div class="px-3 pb-2 d-flex justify-content-between align-items-center">
+                <span class="text-muted small">Source: ${data.via}</span>
+                <button class="btn btn-link btn-sm p-0 text-muted small" onclick="document.getElementById('${rawId}').classList.toggle('d-none')">raw</button>
+            </div>
+            <pre id="${rawId}" class="d-none mx-3 mb-2 p-2 border rounded small" style="max-height:200px;overflow:auto">${JSON.stringify(JSON.parse(data.raw || '{}'), null, 2)}</pre>
         </div>`;
     }
 
