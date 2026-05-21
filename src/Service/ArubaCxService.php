@@ -342,7 +342,7 @@ class ArubaCxService
                 throw new \RuntimeException('Admin-up failed: ' . $up['error']);
             }
 
-            return ['success' => true, 'error' => null];
+            return ['success' => true, 'error' => null, 'output' => null];
         } finally {
             $this->logoutRest($creds, $ip, $cookie);
         }
@@ -355,20 +355,20 @@ class ArubaCxService
         $ssh->setTimeout(30);
 
         $ssh->exec('', false);
-        $ssh->read('/[#>]\s*$/');
+        $out  = $ssh->read('/[#>]\s*$/');
         $ssh->write("configure terminal\n");
-        $ssh->read('/\(config\)[#>]\s*$/');
+        $out .= $ssh->read('/\(config\)[#>]\s*$/');
         $ssh->write("interface {$portId}\n");
-        $ssh->read('/\(config-if\)[#>]\s*$/');
+        $out .= $ssh->read('/\(config-if\)[#>]\s*$/');
         $ssh->write("shutdown\n");
-        $ssh->read('/\(config-if\)[#>]\s*$/');
+        $out .= $ssh->read('/\(config-if\)[#>]\s*$/');
         sleep(10);
         $ssh->write("no shutdown\n");
-        $ssh->read('/\(config-if\)[#>]\s*$/');
+        $out .= $ssh->read('/\(config-if\)[#>]\s*$/');
         $ssh->write("end\n");
-        $ssh->read('/[#>]\s*$/');
+        $out .= $ssh->read('/[#>]\s*$/');
 
-        return ['success' => true, 'error' => null];
+        return ['success' => true, 'error' => null, 'output' => trim((string) $out)];
     }
 
     /** @return array{success: bool, error: ?string} */
@@ -395,23 +395,23 @@ class ArubaCxService
         $ssh->setTimeout(30);
 
         $ssh->exec('', false);
-        $ssh->read('/[#>]\s*$/');
+        $out  = $ssh->read('/[#>]\s*$/');
         $ssh->write("configure terminal\n");
-        $ssh->read('/\(config\)[#>]\s*$/');
+        $out .= $ssh->read('/\(config\)[#>]\s*$/');
         $ssh->write("interface {$portId}\n");
-        $ssh->read('/\(config-if\)[#>]\s*$/');
+        $out .= $ssh->read('/\(config-if\)[#>]\s*$/');
         $ssh->write("no power-over-ethernet\n");
-        $ssh->read('/\(config-if\)[#>]\s*$/');
+        $out .= $ssh->read('/\(config-if\)[#>]\s*$/');
         $ssh->write("shutdown\n");
-        $ssh->read('/\(config-if\)[#>]\s*$/');
+        $out .= $ssh->read('/\(config-if\)[#>]\s*$/');
         sleep(10);
         $ssh->write("no shutdown\n");
-        $ssh->read('/\(config-if\)[#>]\s*$/');
+        $out .= $ssh->read('/\(config-if\)[#>]\s*$/');
         $ssh->write("power-over-ethernet\n");
-        $ssh->read('/\(config-if\)[#>]\s*$/');
+        $out .= $ssh->read('/\(config-if\)[#>]\s*$/');
         $ssh->write("end\n");
-        $ssh->read('/[#>]\s*$/');
+        $out .= $ssh->read('/[#>]\s*$/');
 
-        return ['success' => true, 'error' => null];
+        return ['success' => true, 'error' => null, 'output' => trim((string) $out)];
     }
 }

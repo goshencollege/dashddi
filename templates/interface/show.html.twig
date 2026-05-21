@@ -316,40 +316,18 @@
         fetch(url, { method: 'POST', body: fd })
             .then(r => r.json())
             .then(data => {
+                const out = data.output ? `<pre class="mt-2 mb-0 p-2 border rounded small" style="max-height:120px;overflow:auto">${data.output}</pre>` : '';
                 if (data.success) {
-                    statusBody.innerHTML = `<div class="alert alert-success mb-0 py-2"><i class="bi bi-check-lg me-1"></i>${successMsg}</div>`;
+                    statusBody.innerHTML = `<div class="alert alert-success mb-0 py-2"><i class="bi bi-check-lg me-1"></i>${successMsg}${out}</div>`;
                 } else {
-                    statusBody.innerHTML = `<div class="alert alert-danger mb-0 py-2">Failed: ${data.error}</div>`;
+                    statusBody.innerHTML = `<div class="alert alert-danger mb-0 py-2">Failed: ${data.error}${out}</div>`;
                 }
             })
             .catch(err => { statusBody.innerHTML = `<div class="alert alert-danger mb-0 py-2">Request failed: ${err}</div>`; })
             .finally(() => { btn.disabled = false; btn.innerHTML = idleLabel; });
     }
 
-    window.doReauth = function () {
-        const btn = document.getElementById('port-reauth-btn');
-        btn.disabled = true;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Reauthenticating';
-        statusBody.innerHTML = '<span class="text-muted">Reauthenticating…</span>';
-
-        const fd = new FormData();
-        fd.append('_token', csrfToken);
-        fd.append('portId', portId);
-        fd.append('switchIp', switchIp);
-
-        fetch(reauthUrl, { method: 'POST', body: fd })
-            .then(r => r.json())
-            .then(data => {
-                const out = data.output ? `<pre class="mt-2 mb-0 p-2 border rounded small" style="max-height:120px;overflow:auto">${data.output}</pre>` : '';
-                if (data.success) {
-                    statusBody.innerHTML = `<div class="alert alert-success mb-0 py-2"><i class="bi bi-check-lg me-1"></i>Reauthentication triggered.${out}</div>`;
-                } else {
-                    statusBody.innerHTML = `<div class="alert alert-danger mb-0 py-2">Failed: ${data.error}${out}</div>`;
-                }
-            })
-            .catch(err => { statusBody.innerHTML = `<div class="alert alert-danger mb-0 py-2">Request failed: ${err}</div>`; })
-            .finally(() => { btn.disabled = false; btn.innerHTML = '<i class="bi bi-shield-check me-1"></i>Reauthenticate'; });
-    };
+    window.doReauth    = () => portAction(reauthUrl,    'port-reauth-btn',      'Reauthenticating', 'Reauthentication triggered.',  '<i class="bi bi-shield-check me-1"></i>Reauthenticate');
     window.doBounce    = () => portAction(bounceUrl,    'port-bounce-btn',      'Bouncing',         'Port bounced successfully.',   '<i class="bi bi-power me-1"></i>Bounce Port');
     window.doPoeBounce = () => portAction(poeBounceUrl, 'port-poe-bounce-btn',  'PoE bouncing',     'PoE bounce complete.',         '<i class="bi bi-lightning me-1"></i>PoE Bounce');
 })();
