@@ -367,10 +367,39 @@ EOF
 
 ok "docker-compose.${APP_ENV}.yml written"
 
-# ── 7. Start containers ──────────────────────────────────────────────────────
-header "Building and starting services"
+# ── 7. Build image ───────────────────────────────────────────────────────────
+header "Building image"
 
-docker compose -f "$COMPOSE_FILE" up -d --build
+docker compose -f "$COMPOSE_FILE" build app
+ok "Image built"
+
+# ── 8. PHP dependencies ───────────────────────────────────────────────────────
+header "Installing PHP dependencies"
+
+# Run composer in a throwaway container with a writable mount. We cannot use
+# `docker compose exec` because prod containers mount the code volume read-only.
+COMPOSER_FLAGS="--no-interaction --no-progress"
+if [[ "$APP_ENV" == "prod" ]]; then
+    COMPOSER_FLAGS="$COMPOSER_FLAGS --no-dev --optimize-autoloader"
+fi
+
+# docker compose tags the built image as {project_name}-app; project name
+# defaults to the directory name (lowercased).
+COMPOSE_PROJECT=$(docker compose -f "$COMPOSE_FILE" config 2>/dev/null | awk '/^name:/ {print $2; exit}')
+COMPOSE_PROJECT=${COMPOSE_PROJECT:-$(basename "$SCRIPT_DIR" | tr '[:upper:]' '[:lower:]')}
+
+docker run --rm \
+    --volume "$SCRIPT_DIR:/var/www/html" \
+    --workdir /var/www/html \
+    --env COMPOSER_HOME=/tmp/composer \
+    "${COMPOSE_PROJECT}-app" \
+    composer install $COMPOSER_FLAGS
+ok "Dependencies installed"
+
+# ── 9. Start services ────────────────────────────────────────────────────────
+header "Starting services"
+
+docker compose -f "$COMPOSE_FILE" up -d
 ok "Containers started"
 
 # Wait for the app container to be healthy enough to run console commands
@@ -380,36 +409,25 @@ for i in $(seq 1 30); do
         break
     fi
     sleep 2
-    [[ $i -eq 30 ]] && die "App container did not become ready in time. Check: docker compose -f docker-compose.prod.yml logs app"
+    [[ $i -eq 30 ]] && die "App container did not become ready in time. Check: docker compose -f docker-compose.${APP_ENV}.yml logs app"
 done
 ok "App container ready"
 
-# ── 8. PHP dependencies ───────────────────────────────────────────────────────
-header "Installing PHP dependencies"
-
-COMPOSER_FLAGS="--no-interaction --no-progress"
-if [[ "$APP_ENV" == "prod" ]]; then
-    COMPOSER_FLAGS="$COMPOSER_FLAGS --no-dev --optimize-autoloader"
-fi
-docker compose -f "$COMPOSE_FILE" exec -T app \
-    composer install $COMPOSER_FLAGS
-ok "Dependencies installed"
-
-# ── 9. Database migrations ────────────────────────────────────────────────────
+# ── 10. Database migrations ──────────────────────────────────────────────────
 header "Running database migrations"
 
 docker compose -f "$COMPOSE_FILE" exec -T app \
     php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
 ok "Migrations complete"
 
-# ── 10. Cache warmup ─────────────────────────────────────────────────────────
+# ── 11. Cache warmup ─────────────────────────────────────────────────────────
 header "Warming up cache"
 
 docker compose -f "$COMPOSE_FILE" exec -T app \
     php bin/console cache:warmup
 ok "Cache warm"
 
-# ── 11. SAML identity provider setup ─────────────────────────────────────────
+# ── 12. SAML identity provider setup ─────────────────────────────────────────
 header "SAML Identity Provider"
 echo
 echo -e "  ${BOLD}SP metadata URL (give this to your IdP administrator):${NC}"
@@ -447,7 +465,7 @@ else
     warn "  docker compose -f docker-compose.prod.yml exec app php bin/console app:saml:import-metadata <file-or-url> --activate"
 fi
 
-# ── 12. Summary ──────────────────────────────────────────────────────────────
+# ── 13. Summary ──────────────────────────────────────────────────────────────
 header "Setup complete"
 echo
 echo -e "  ${BOLD}DashDDI is running at:  ${CYAN}${BASE_URL}${NC}"
