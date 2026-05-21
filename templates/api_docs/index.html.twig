@@ -26,6 +26,7 @@
                 <li class="nav-item"><a class="nav-link py-1 px-2 text-start" href="#domain-records">Domain Records</a></li>
                 <li class="nav-item"><a class="nav-link py-1 px-2 text-start" href="#tags">Tags</a></li>
                 <li class="nav-item"><a class="nav-link py-1 px-2 text-start" href="#dhcp-lease">DHCP Lease</a></li>
+                <li class="nav-item"><a class="nav-link py-1 px-2 text-start" href="#switch-ports">Switch Ports</a></li>
             </ul>
         </nav>
     </div>
@@ -672,6 +673,75 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
                 ],
                 response_example: '{"id": 42}',
                 response_status: '201',
+            } %}
+        </section>
+
+        {# ═══════════════════════════════════════════════════════════════════
+           SWITCH PORTS
+           ═══════════════════════════════════════════════════════════════════ #}
+        <section id="switch-ports" class="mb-5">
+            <h2 class="h5 border-bottom pb-2 mb-3">Switch Ports <code class="small fw-normal text-muted">/api/switch</code></h2>
+            <p class="text-muted small">Query live port-access client data and trigger port actions on Aruba CX switches. All endpoints require Aruba CX credentials to be configured in the application.</p>
+
+            <h3 class="h6 mt-3 mb-2">Port resolution</h3>
+            <p class="small">All four endpoints accept the same three ways to identify the target port:</p>
+            <table class="table table-sm table-bordered mb-3 small">
+                <thead class="table-light"><tr><th>Field(s)</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>mac</code></td><td>MAC address of the client (any format — <code>aa:bb:cc:dd:ee:ff</code>, <code>aa-bb-cc-dd-ee-ff</code>, or bare <code>aabbccddeeff</code>). Looks up the switch IP and port from the most recent ClearPass auth log for this MAC.</td></tr>
+                    <tr><td><code>ip</code></td><td>IPv4 address of the client. Resolves to the interface's MAC address, then performs the same ClearPass lookup as above.</td></tr>
+                    <tr><td><code>switch_ip</code> + <code>port_id</code></td><td>Explicit switch management IP and port ID (e.g. <code>10.254.19.2</code> and <code>1/1/18</code>). Skips the database lookup entirely.</td></tr>
+                </tbody>
+            </table>
+            <p class="small text-muted">The MAC/IP lookup is subject to the switch info max-age setting — if the most recent auth log for that address is older than the configured limit, a <code>404</code> is returned.</p>
+            <p class="small text-muted mb-4">Port actions (reauthenticate, bounce, PoE bounce) connect to the switch over SSH and may take up to 15–20 seconds to complete due to the built-in pause between down and up states.</p>
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'GET', path: '/api/switch/port-status', name: 'Get port-access clients',
+                notes: 'Returns live port-access client data for the specified port. Tries the REST API first; falls back to SSH if REST is unavailable.',
+                query: [
+                    {name: 'mac', type: 'string', desc: 'Client MAC address (any common format). Mutually exclusive with <code>switch_ip</code>/<code>port_id</code>.'},
+                    {name: 'ip', type: 'string', desc: 'Client IPv4 address. Mutually exclusive with <code>switch_ip</code>/<code>port_id</code>.'},
+                    {name: 'switch_ip', type: 'string', desc: 'Switch management IP. Must be used together with <code>port_id</code>.'},
+                    {name: 'port_id', type: 'string', desc: 'Switch port ID (e.g. <code>1/1/18</code>). Must be used together with <code>switch_ip</code>.'},
+                ],
+                response_example: '{\n  "clients": [\n    {\n      "mac": "20:4c:03:d7:c0:bf",\n      "vlan": "44",\n      "role": "CX_DUR_Local_VLAN44-3050-9",\n      "status": "Success",\n      "auth_method": "MAC-Auth"\n    }\n  ],\n  "raw": "...",\n  "via": "rest",\n  "error": null\n}',
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'POST', path: '/api/switch/port-reauthenticate', name: 'Reauthenticate port',
+                notes: 'Sends a <code>port-access reauthenticate interface</code> command to the switch via SSH, forcing the connected client to re-run 802.1X or MAC-auth.',
+                body: [
+                    {name: 'mac', type: 'string', required: false, desc: 'Client MAC address. One of <code>mac</code>, <code>ip</code>, or <code>switch_ip</code>+<code>port_id</code> is required.'},
+                    {name: 'ip', type: 'string', required: false, desc: 'Client IPv4 address.'},
+                    {name: 'switch_ip', type: 'string', required: false, desc: 'Switch management IP (use with <code>port_id</code>).'},
+                    {name: 'port_id', type: 'string', required: false, desc: 'Switch port ID (use with <code>switch_ip</code>).'},
+                ],
+                response_example: '{\n  "success": true,\n  "error": null,\n  "output": "Last login: 2026-05-21 17:00:57 from 192.168.60.134\ncx-sas# port-access reauthenticate interface 1\/1\/18\ncx-sas#"\n}',
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'POST', path: '/api/switch/port-bounce', name: 'Bounce port',
+                notes: 'Administratively shuts the port down, waits 10 seconds, then brings it back up. Tries the REST API first; falls back to SSH. Disconnects and reconnects any client on the port.',
+                body: [
+                    {name: 'mac', type: 'string', required: false, desc: 'Client MAC address. One of <code>mac</code>, <code>ip</code>, or <code>switch_ip</code>+<code>port_id</code> is required.'},
+                    {name: 'ip', type: 'string', required: false, desc: 'Client IPv4 address.'},
+                    {name: 'switch_ip', type: 'string', required: false, desc: 'Switch management IP (use with <code>port_id</code>).'},
+                    {name: 'port_id', type: 'string', required: false, desc: 'Switch port ID (use with <code>switch_ip</code>).'},
+                ],
+                response_example: '{\n  "success": true,\n  "error": null,\n  "output": "Last login: 2026-05-21 17:00:57 from 192.168.60.134\ncx-sas# configure terminal\ncx-sas(config)# interface 1\/1\/18\ncx-sas(config-if)# shutdown\ncx-sas(config-if)# no shutdown\ncx-sas(config-if)# end\ncx-sas#"\n}',
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'POST', path: '/api/switch/port-poe-bounce', name: 'PoE bounce port',
+                notes: 'Cuts PoE power to the port (<code>no power-over-ethernet</code>), shuts it down, waits 10 seconds, then restores both. Forces a full power cycle of any PoE-powered device (e.g. an AP or IP phone).',
+                body: [
+                    {name: 'mac', type: 'string', required: false, desc: 'Client MAC address. One of <code>mac</code>, <code>ip</code>, or <code>switch_ip</code>+<code>port_id</code> is required.'},
+                    {name: 'ip', type: 'string', required: false, desc: 'Client IPv4 address.'},
+                    {name: 'switch_ip', type: 'string', required: false, desc: 'Switch management IP (use with <code>port_id</code>).'},
+                    {name: 'port_id', type: 'string', required: false, desc: 'Switch port ID (use with <code>switch_ip</code>).'},
+                ],
+                response_example: '{\n  "success": true,\n  "error": null,\n  "output": "Last login: 2026-05-21 17:00:57 from 192.168.60.134\ncx-sas# configure terminal\ncx-sas(config)# interface 1\/1\/18\ncx-sas(config-if)# no power-over-ethernet\ncx-sas(config-if)# shutdown\ncx-sas(config-if)# no shutdown\ncx-sas(config-if)# power-over-ethernet\ncx-sas(config-if)# end\ncx-sas#"\n}',
             } %}
         </section>
 
