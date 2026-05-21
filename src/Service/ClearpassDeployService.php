@@ -179,7 +179,7 @@ class ClearpassDeployService
             $tagNames = array_map(fn($t) => $t->getName(), $host->getTags()->toArray());
             if (!empty($tagNames)) {
                 sort($tagNames);
-                $attrs['Tags'] = implode('|', $tagNames);
+                $attrs['Tags'] = '|' . implode('|', $tagNames) . '|';
             }
         }
 
