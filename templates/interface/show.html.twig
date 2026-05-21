@@ -259,9 +259,17 @@
         if (data.error) {
             return `<div class="alert alert-danger mb-0 py-2">${data.error}</div>`;
         }
+        const rawId = 'raw-' + Math.random().toString(36).slice(2);
+        let rawContent = data.raw || '';
+        try { rawContent = JSON.stringify(JSON.parse(rawContent), null, 2); } catch (e) { /* plain text */ }
+        const rawPanel = rawContent ? `
+            <div class="px-3 pb-2 d-flex justify-content-between align-items-center">
+                <span class="text-muted small">Source: ${data.via}</span>
+                <button class="btn btn-link btn-sm p-0 text-muted small" onclick="document.getElementById('${rawId}').classList.toggle('d-none')">raw</button>
+            </div>
+            <pre id="${rawId}" class="d-none mx-3 mb-2 p-2 border rounded small" style="max-height:200px;overflow:auto">${rawContent}</pre>` : `<div class="px-3 pb-2"><span class="text-muted small">Source: ${data.via}</span></div>`;
         if (!data.clients || data.clients.length === 0) {
-            return `<span class="text-muted">No port-access clients found on this port.</span>
-                    <span class="text-muted ms-2 small">(via ${data.via})</span>`;
+            return `<div class="px-3 pt-2"><span class="text-muted">No port-access clients found on this port.</span></div>${rawPanel}`;
         }
         const rows = data.clients.map(c => `
             <tr>
@@ -271,7 +279,6 @@
                 <td>${c.status ?? '—'}</td>
                 <td>${c.auth_method ?? '—'}</td>
             </tr>`).join('');
-        const rawId = 'raw-' + Math.random().toString(36).slice(2);
         return `<div class="table-responsive mb-0">
             <table class="table table-sm mb-0">
                 <thead><tr>
@@ -279,11 +286,7 @@
                 </tr></thead>
                 <tbody>${rows}</tbody>
             </table>
-            <div class="px-3 pb-2 d-flex justify-content-between align-items-center">
-                <span class="text-muted small">Source: ${data.via}</span>
-                <button class="btn btn-link btn-sm p-0 text-muted small" onclick="document.getElementById('${rawId}').classList.toggle('d-none')">raw</button>
-            </div>
-            <pre id="${rawId}" class="d-none mx-3 mb-2 p-2 border rounded small" style="max-height:200px;overflow:auto">${JSON.stringify(JSON.parse(data.raw || '{}'), null, 2)}</pre>
+            ${rawPanel}
         </div>`;
     }
 
