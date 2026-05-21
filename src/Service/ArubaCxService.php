@@ -175,11 +175,11 @@ class ArubaCxService
             foreach ($data as $key => $entry) {
                 if (!is_array($entry)) continue;
                 $clients[] = [
-                    'mac'         => $entry['mac_address'] ?? $key,
-                    'ip'          => $entry['ip_address']  ?? null,
-                    'role'        => $entry['role']         ?? null,
-                    'status'      => $entry['session_state'] ?? $entry['auth_state'] ?? null,
-                    'auth_method' => $entry['auth_method']  ?? null,
+                    'mac'         => $entry['mac'] ?? $key,
+                    'vlan'        => (string) (array_key_first($entry['access_vlan'] ?? []) ?? ''),
+                    'role'        => array_key_first($entry['applied_role'] ?? []) ?? null,
+                    'status'      => $entry['client_state'] ?? null,
+                    'auth_method' => $entry['onboarded_method'] ?? null,
                 ];
             }
 
