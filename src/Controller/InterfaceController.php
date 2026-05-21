@@ -10,6 +10,8 @@ use App\Entity\NetworkInterface;
 use App\Entity\Subnet;
 use App\Form\InterfaceNameType;
 use App\Form\NetworkInterfaceType;
+use App\Repository\AppSettingRepository;
+use App\Repository\ArubaSwitchRepository;
 use App\Repository\ClearpassAuthLogRepository;
 use App\Repository\DhcpLeaseRepository;
 use App\Repository\DomainRepository;
@@ -73,7 +75,7 @@ class InterfaceController extends AbstractController
     }
 
     #[Route('/interfaces/{id}', name: 'interface_show', methods: ['GET'])]
-    public function show(NetworkInterface $interface, DhcpLeaseRepository $leaseRepo, ClearpassAuthLogRepository $authLogRepo): Response
+    public function show(NetworkInterface $interface, DhcpLeaseRepository $leaseRepo, ClearpassAuthLogRepository $authLogRepo, AppSettingRepository $settingRepo, NetworkInterfaceRepository $ifaceRepo, ArubaSwitchRepository $arubaSwitchRepo): Response
     {
         $events = [];
 
@@ -86,9 +88,19 @@ class InterfaceController extends AbstractController
 
         usort($events, fn(NetworkEvent $a, NetworkEvent $b) => $b->timestamp <=> $a->timestamp);
 
+        $maxAge     = $settingRepo->getInstance()->getSwitchInfoMaxAgeDays();
+        $cutoff     = $maxAge !== null ? new \DateTimeImmutable("-{$maxAge} days") : null;
+        $switchInfo = $authLogRepo->findLatestWithSwitchInfoByMac($interface->getMacAddress(), $cutoff);
+
+        $switchIface  = $switchInfo?->getNasIp() ? $ifaceRepo->findByIpString($switchInfo->getNasIp()) : null;
+        $arubaSwitch  = $switchInfo?->getNasPortId() ? $arubaSwitchRepo->getInstance() : null;
+
         return $this->render('interface/show.html.twig', [
-            'interface' => $interface,
-            'events'    => $events,
+            'interface'   => $interface,
+            'events'      => $events,
+            'switchInfo'  => $switchInfo,
+            'switchIface' => $switchIface,
+            'arubaSwitch' => $arubaSwitch,
         ]);
     }
 

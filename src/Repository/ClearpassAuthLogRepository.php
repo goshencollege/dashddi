@@ -113,6 +113,53 @@ class ClearpassAuthLogRepository extends ServiceEntityRepository
         return $map;
     }
 
+    /**
+     * Returns the most recent auth log for the given MAC that has switch info (nasIp),
+     * optionally restricted to entries newer than $cutoff.
+     */
+    public function findLatestWithSwitchInfoByMac(string $mac, ?\DateTimeImmutable $cutoff): ?ClearpassAuthLog
+    {
+        $qb = $this->createQueryBuilder('l')
+            ->where('l.macAddress = :mac')
+            ->andWhere('l.nasIp IS NOT NULL')
+            ->setParameter('mac', strtolower($mac))
+            ->orderBy('l.authTimestamp', 'DESC')
+            ->setMaxResults(1);
+
+        if ($cutoff !== null) {
+            $qb->andWhere('l.authTimestamp >= :cutoff')
+               ->setParameter('cutoff', $cutoff);
+        }
+
+        return $qb->getQuery()->getOneOrNullResult();
+    }
+
+    /**
+     * Returns which of the given session IDs already exist for this server.
+     * Used to skip duplicates without a per-row findOneBy.
+     *
+     * @param  string[] $sessionIds
+     * @return string[]
+     */
+    public function findExistingSessionIds(ClearpassServer $server, array $sessionIds): array
+    {
+        if (empty($sessionIds)) {
+            return [];
+        }
+
+        return array_column(
+            $this->createQueryBuilder('l')
+                ->select('l.sessionId')
+                ->where('l.clearpassServer = :server')
+                ->andWhere('l.sessionId IN (:ids)')
+                ->setParameter('server', $server)
+                ->setParameter('ids', $sessionIds)
+                ->getQuery()
+                ->getArrayResult(),
+            'sessionId'
+        );
+    }
+
     /** Returns the most recent authTimestamp stored for the given server, or null if none. */
     public function findLatestAuthTimestamp(ClearpassServer $server): ?\DateTimeImmutable
     {
