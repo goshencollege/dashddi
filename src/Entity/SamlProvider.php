@@ -61,6 +61,10 @@ class SamlProvider
     #[Assert\NotBlank]
     private string $idpCert = '';
 
+    #[ORM\Column]
+    #[Assert\Range(min: 1, max: 1440)]
+    private int $sessionLifetimeMinutes = 30;
+
     public function __construct()
     {
         $this->createdAt = new \DateTimeImmutable();
@@ -98,5 +102,8 @@ class SamlProvider
 
     public function getIdpCert(): string { return $this->idpCert; }
     public function setIdpCert(string $idpCert): static { $this->idpCert = trim($idpCert); return $this; }
+
+    public function getSessionLifetimeMinutes(): int { return $this->sessionLifetimeMinutes; }
+    public function setSessionLifetimeMinutes(int $sessionLifetimeMinutes): static { $this->sessionLifetimeMinutes = $sessionLifetimeMinutes; return $this; }
 
 }
