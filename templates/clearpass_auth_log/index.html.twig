@@ -22,15 +22,6 @@
                        placeholder="e.g. user@domain" value="{{ filter_username }}">
             </div>
             <div class="col-md-2">
-                <label class="form-label small text-muted mb-1">Status</label>
-                <select name="status" class="form-select form-select-sm">
-                    <option value="">— All —</option>
-                    {% for s in statuses %}
-                        <option value="{{ s }}" {{ filter_status == s ? 'selected' : '' }}>{{ s }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-md-2">
                 <label class="form-label small text-muted mb-1">Role</label>
                 <select name="role" class="form-select form-select-sm">
                     <option value="">— All —</option>
@@ -100,7 +91,6 @@
                     <tr>
                         <th>MAC Address</th>
                         <th>Username</th>
-                        <th>Status</th>
                         <th>Protocol</th>
                         <th>Service</th>
                         <th>Switch IP</th>
@@ -122,17 +112,6 @@
                                 {% endif %}
                             </td>
                             <td>{{ log.username ?: '—' }}</td>
-                            <td>
-                                {% if log.authStatus == 'Access-Accept' %}
-                                    <span class="badge bg-success">{{ log.authStatus }}</span>
-                                {% elseif log.authStatus == 'Access-Reject' %}
-                                    <span class="badge bg-danger">{{ log.authStatus }}</span>
-                                {% elseif log.authStatus %}
-                                    <span class="badge bg-secondary">{{ log.authStatus }}</span>
-                                {% else %}
-                                    <span class="text-muted">—</span>
-                                {% endif %}
-                            </td>
                             <td>{{ log.authProtocol ?: '—' }}</td>
                             <td>{{ log.service ?: '—' }}</td>
                             <td>{{ log.nasIp ?: '—' }}</td>
@@ -150,7 +129,7 @@
             <div class="card-footer d-flex justify-content-between align-items-center">
                 <span class="text-muted small">Page {{ page }} of {{ (total / per_page)|round(0, 'ceil') }}</span>
                 <div>
-                    {% set pagerParams = {mac: filter_mac, username: filter_username, status: filter_status, role: filter_role, vlan: filter_vlan, protocol: filter_protocol, service: filter_service, nas_ip: filter_nas_ip, nas_port_id: filter_nas_port_id} %}
+                    {% set pagerParams = {mac: filter_mac, username: filter_username, role: filter_role, vlan: filter_vlan, protocol: filter_protocol, service: filter_service, nas_ip: filter_nas_ip, nas_port_id: filter_nas_port_id} %}
                     {% if page > 1 %}
                         <a href="{{ path('clearpass_auth_log_index', pagerParams|merge({page: page - 1})) }}"
                            class="btn btn-sm btn-outline-secondary me-1">
