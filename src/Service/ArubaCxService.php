@@ -260,20 +260,21 @@ class ArubaCxService
 
     // ── Port actions ──────────────────────────────────────────────────────────
 
-    /** @return array{success: bool, error: ?string} */
+    /** @return array{success: bool, error: ?string, output: ?string} */
     public function reauthenticatePort(ArubaSwitch $creds, string $ip, string $portId): array
     {
+        set_time_limit(60);
         $portId = self::normalisePortId($portId);
 
         if ($creds->getSshPrivateKey() !== null || $creds->getPassword() !== null) {
             try {
                 return $this->reauthenticatePortSsh($creds, $ip, $portId);
             } catch (\Throwable $e) {
-                return ['success' => false, 'error' => $e->getMessage()];
+                return ['success' => false, 'error' => $e->getMessage(), 'output' => null];
             }
         }
 
-        return ['success' => false, 'error' => 'No credentials configured'];
+        return ['success' => false, 'error' => 'No credentials configured', 'output' => null];
     }
 
     private function reauthenticatePortSsh(ArubaSwitch $creds, string $ip, string $portId): array
@@ -285,9 +286,9 @@ class ArubaCxService
         $ssh->exec('', false);
         $ssh->read('/[#>]\s*$/');
         $ssh->write("port-access reauthenticate interface {$portId}\n");
-        $ssh->read('/[#>]\s*$/');
+        $output = $ssh->read('/[#>]\s*$/');
 
-        return ['success' => true, 'error' => null];
+        return ['success' => true, 'error' => null, 'output' => trim((string) $output)];
     }
 
     /**
@@ -298,6 +299,7 @@ class ArubaCxService
      */
     public function bouncePort(ArubaSwitch $creds, string $ip, string $portId): array
     {
+        set_time_limit(60);
         $portId = self::normalisePortId($portId);
 
         if ($creds->getPassword() !== null) {
@@ -372,6 +374,7 @@ class ArubaCxService
     /** @return array{success: bool, error: ?string} */
     public function poeBouncePort(ArubaSwitch $creds, string $ip, string $portId): array
     {
+        set_time_limit(60);
         $portId = self::normalisePortId($portId);
 
         if ($creds->getSshPrivateKey() !== null || $creds->getPassword() !== null) {
