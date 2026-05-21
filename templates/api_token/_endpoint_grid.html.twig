@@ -19,6 +19,7 @@
         { label: 'Domains',        path: '/api/domains',         routes: ['api_domains_index',        'api_domains_show',        'api_domains_create',        'api_domains_update',        'api_domains_delete'       ] },
         { label: 'Domain Records', path: '/api/domain-records',  routes: ['api_domain_records_index', 'api_domain_records_show', 'api_domain_records_create', 'api_domain_records_update', 'api_domain_records_delete'] },
         { label: 'Tags',           path: '/api/tags',            routes: ['api_tags_search',          null,                      'api_tags_create',           null,                        null                       ] },
+        { label: 'DHCP Leases',    path: '/api/dhcp/lease',      routes: [null,                       null,                      null,                        null,                        null                       ], actions: [{ label: 'Receive Lease',     route: 'api_dhcp_lease'                }] },
         { label: 'Switches',       path: '/api/switch',          routes: [null,                       null,                      null,                        null,                        null                       ], actions: [
             { label: 'Port Status',        route: 'api_switch_port_status'        },
             { label: 'Bounce Port',        route: 'api_switch_port_bounce'        },
