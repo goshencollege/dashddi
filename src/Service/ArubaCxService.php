@@ -279,14 +279,8 @@ class ArubaCxService
 
     private function reauthenticatePortSsh(ArubaSwitch $creds, string $ip, string $portId): array
     {
-        $ssh = $this->sshConnect($creds, $ip);
-        $ssh->enablePTY();
-        $ssh->setTimeout(15);
-
-        $ssh->exec('', false);
-        $ssh->read('/[#>]\s*$/');
-        $ssh->write("port-access reauthenticate interface {$portId}\n");
-        $output = $ssh->read('/[#>]\s*$/');
+        $ssh    = $this->sshConnect($creds, $ip);
+        $output = $ssh->exec("port-access reauthenticate interface {$portId}");
 
         return ['success' => true, 'error' => null, 'output' => trim((string) $output)];
     }
@@ -350,25 +344,12 @@ class ArubaCxService
 
     private function bouncePortSsh(ArubaSwitch $creds, string $ip, string $portId): array
     {
-        $ssh = $this->sshConnect($creds, $ip);
-        $ssh->enablePTY();
-        $ssh->setTimeout(30);
-
-        $ssh->exec('', false);
-        $out  = $ssh->read('/[#>]\s*$/');
-        $ssh->write("configure terminal\n");
-        $out .= $ssh->read('/\(config\)[#>]\s*$/');
-        $ssh->write("interface {$portId}\n");
-        $out .= $ssh->read('/\(config-if\)[#>]\s*$/');
-        $ssh->write("shutdown\n");
-        $out .= $ssh->read('/\(config-if\)[#>]\s*$/');
+        $ssh  = $this->sshConnect($creds, $ip);
+        $out  = (string) $ssh->exec("configure terminal\ninterface {$portId}\nshutdown\nend");
         sleep(10);
-        $ssh->write("no shutdown\n");
-        $out .= $ssh->read('/\(config-if\)[#>]\s*$/');
-        $ssh->write("end\n");
-        $out .= $ssh->read('/[#>]\s*$/');
+        $out .= (string) $ssh->exec("configure terminal\ninterface {$portId}\nno shutdown\nend");
 
-        return ['success' => true, 'error' => null, 'output' => trim((string) $out)];
+        return ['success' => true, 'error' => null, 'output' => trim($out)];
     }
 
     /** @return array{success: bool, error: ?string} */
@@ -390,27 +371,10 @@ class ArubaCxService
 
     private function poeBouncePortSsh(ArubaSwitch $creds, string $ip, string $portId): array
     {
-        $ssh = $this->sshConnect($creds, $ip);
-        $ssh->enablePTY();
-        $ssh->setTimeout(30);
-
-        $ssh->exec('', false);
-        $out  = $ssh->read('/[#>]\s*$/');
-        $ssh->write("configure terminal\n");
-        $out .= $ssh->read('/\(config\)[#>]\s*$/');
-        $ssh->write("interface {$portId}\n");
-        $out .= $ssh->read('/\(config-if\)[#>]\s*$/');
-        $ssh->write("no power-over-ethernet\n");
-        $out .= $ssh->read('/\(config-if\)[#>]\s*$/');
-        $ssh->write("shutdown\n");
-        $out .= $ssh->read('/\(config-if\)[#>]\s*$/');
+        $ssh  = $this->sshConnect($creds, $ip);
+        $out  = (string) $ssh->exec("configure terminal\ninterface {$portId}\nno power-over-ethernet\nshutdown\nend");
         sleep(10);
-        $ssh->write("no shutdown\n");
-        $out .= $ssh->read('/\(config-if\)[#>]\s*$/');
-        $ssh->write("power-over-ethernet\n");
-        $out .= $ssh->read('/\(config-if\)[#>]\s*$/');
-        $ssh->write("end\n");
-        $out .= $ssh->read('/[#>]\s*$/');
+        $out .= (string) $ssh->exec("configure terminal\ninterface {$portId}\nno shutdown\npower-over-ethernet\nend");
 
         return ['success' => true, 'error' => null, 'output' => trim((string) $out)];
     }
