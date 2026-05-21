@@ -254,20 +254,22 @@ class HostRepository extends ServiceEntityRepository
     {
         $offset = max(0, ($page - 1) * $perPage);
 
-        $total = (int) (clone $filterQb)
-            ->select('COUNT(DISTINCT h.id)')
+        // Fetch all matching IDs in one pass so the WHERE clause runs once, not twice.
+        // With EXISTS subqueries there is no row multiplication, so getScalarResult()
+        // returns one row per host — cheap to count and slice in PHP.
+        $rows = (clone $filterQb)
+            ->select('h.id AS hid')
+            ->orderBy('h.name', 'ASC')
             ->getQuery()
-            ->getSingleScalarResult();
+            ->getScalarResult();
+
+        $total = count($rows);
 
         if ($total === 0) {
             return ['hosts' => [], 'total' => 0];
         }
 
-        $ids = $this->idsForPage(
-            (clone $filterQb)->distinct(),
-            $offset,
-            $perPage
-        );
+        $ids = array_column(array_slice($rows, $offset, $perPage), 'hid');
 
         return ['hosts' => $this->fetchByIds($ids), 'total' => $total];
     }
