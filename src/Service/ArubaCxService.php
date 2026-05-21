@@ -209,11 +209,19 @@ class ArubaCxService
         $clients = [];
         $lines   = explode("\n", $output);
 
-        // Detect table format: look for a line containing "MAC Address" as a header
+        // Detect table format by header line
         $headerLine = null;
+        $headerType = null;
         foreach ($lines as $i => $line) {
             if (preg_match('/MAC\s+Address/i', $line)) {
                 $headerLine = $i;
+                $headerType = 'mac';
+                break;
+            }
+            // Aruba CX "show port-access clients" format: Port  Client-Name  IPv4-Address  User-Role  VLAN  Flags
+            if (preg_match('/\bPort\b.+\bClient-Name\b/i', $line)) {
+                $headerLine = $i;
+                $headerType = 'port';
                 break;
             }
         }
@@ -223,11 +231,18 @@ class ArubaCxService
             $colMap = [];
             foreach ($cols as $ci => $col) {
                 $col = strtolower(trim($col));
-                if (str_contains($col, 'mac'))                                $colMap['mac']         = $ci;
-                if (str_contains($col, 'ip'))                                 $colMap['ip']          = $ci;
-                if (str_contains($col, 'role'))                               $colMap['role']        = $ci;
-                if (str_contains($col, 'status') || str_contains($col, 'auth s')) $colMap['status'] = $ci;
-                if (str_contains($col, 'method'))                             $colMap['auth_method'] = $ci;
+                if ($headerType === 'mac') {
+                    if (str_contains($col, 'mac'))                                    $colMap['mac']         = $ci;
+                    if (str_contains($col, 'ip'))                                     $colMap['ip']          = $ci;
+                    if (str_contains($col, 'role'))                                   $colMap['role']        = $ci;
+                    if (str_contains($col, 'status') || str_contains($col, 'auth s')) $colMap['status']     = $ci;
+                    if (str_contains($col, 'method'))                                 $colMap['auth_method'] = $ci;
+                } else {
+                    if (str_contains($col, 'ipv4'))   $colMap['ip']    = $ci;
+                    if (str_contains($col, 'role'))   $colMap['role']  = $ci;
+                    if ($col === 'vlan')               $colMap['vlan']  = $ci;
+                    if ($col === 'flags')              $colMap['flags'] = $ci;
+                }
             }
 
             for ($i = $headerLine + 1; $i < count($lines); $i++) {
@@ -235,13 +250,45 @@ class ArubaCxService
                 if ($line === '' || preg_match('/^-+/', $line)) continue;
                 $parts = preg_split('/\s{2,}/', $line);
                 if (count($parts) < 2) continue;
-                $clients[] = [
-                    'mac'         => strtolower($parts[$colMap['mac'] ?? 0] ?? ''),
-                    'ip'          => $parts[$colMap['ip'] ?? 1] ?? null,
-                    'role'        => $parts[$colMap['role'] ?? 2] ?? null,
-                    'status'      => $parts[$colMap['status'] ?? 3] ?? null,
-                    'auth_method' => $parts[$colMap['auth_method'] ?? 4] ?? null,
-                ];
+
+                if ($headerType === 'mac') {
+                    $clients[] = [
+                        'mac'         => strtolower($parts[$colMap['mac'] ?? 0] ?? ''),
+                        'vlan'        => null,
+                        'role'        => $parts[$colMap['role'] ?? 2] ?? null,
+                        'status'      => $parts[$colMap['status'] ?? 3] ?? null,
+                        'auth_method' => $parts[$colMap['auth_method'] ?? 4] ?? null,
+                    ];
+                } else {
+                    // Port/Client-Name format — decode VLAN prefix and Flags field
+                    $vlanRaw  = isset($colMap['vlan'])  ? ($parts[$colMap['vlan']]  ?? null) : null;
+                    $flagsRaw = isset($colMap['flags']) ? ($parts[$colMap['flags']] ?? null) : null;
+                    $vlan     = $vlanRaw ? (string) preg_replace('/^\([a-z]+\)/', '', $vlanRaw) : null;
+
+                    $authMethod = null;
+                    $status     = null;
+                    if ($flagsRaw !== null) {
+                        $fp         = explode('|', $flagsRaw);
+                        $authMethod = match ($fp[0] ?? '') {
+                            '1x' => '802.1X', 'ma' => 'MAC-Auth',
+                            'ps' => 'Port-Security', 'dp' => 'Device-Profile',
+                            default => $fp[0] ?: null,
+                        };
+                        $status = match ($fp[3] ?? '') {
+                            's' => 'Success', 'f' => 'Failed',
+                            'p' => 'In-Progress', 'd' => 'Role-Download-Failed',
+                            default => $fp[3] ?: null,
+                        };
+                    }
+
+                    $clients[] = [
+                        'mac'         => null,
+                        'vlan'        => $vlan,
+                        'role'        => isset($colMap['role'])  ? ($parts[$colMap['role']]  ?? null) : null,
+                        'status'      => $status,
+                        'auth_method' => $authMethod,
+                    ];
+                }
             }
             return $clients;
         }
@@ -252,9 +299,8 @@ class ArubaCxService
             $line = trim($line);
             if (preg_match('/^Client\s+MAC\s*:\s*([0-9a-f:]+)/i', $line, $m)) {
                 if ($current !== null) $clients[] = $current;
-                $current = ['mac' => strtolower($m[1]), 'ip' => null, 'role' => null, 'status' => null, 'auth_method' => null];
+                $current = ['mac' => strtolower($m[1]), 'vlan' => null, 'role' => null, 'status' => null, 'auth_method' => null];
             } elseif ($current !== null) {
-                if (preg_match('/^Client\s+IP\s*:\s*(\S+)/i', $line, $m))  $current['ip']          = $m[1];
                 if (preg_match('/^Client\s+Role\s*:\s*(.+)/i', $line, $m)) $current['role']        = trim($m[1]);
                 if (preg_match('/^Auth\s+Status\s*:\s*(.+)/i', $line, $m)) $current['status']      = trim($m[1]);
                 if (preg_match('/^Auth\s+Method\s*:\s*(.+)/i', $line, $m)) $current['auth_method'] = trim($m[1]);
