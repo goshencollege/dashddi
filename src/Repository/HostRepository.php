@@ -106,34 +106,64 @@ class HostRepository extends ServiceEntityRepository
         $q  = '%' . $query . '%';
         $qb = $this->createQueryBuilder('h')
             ->leftJoin('h.building', 'b')
-            ->leftJoin('h.tags', 'tg')
-            ->leftJoin('h.interfaces', 'i')
-            ->leftJoin('i.subnet', 's')
-            ->leftJoin('i.ipAddress', 'ip4')
-            ->leftJoin('i.ipv6Address', 'ip6')
-            ->leftJoin('i.names', 'n')
-            ->leftJoin('n.domain', 'nd')
-            ->leftJoin('App\Entity\DhcpLease', 'dl', 'WITH', 'dl.macAddress = i.macAddress')
-            ->where('h.deletedAt IS NULL')
-            ->andWhere('h.name LIKE :q')
-            ->orWhere('b.name LIKE :q')
-            ->orWhere('h.room LIKE :q')
-            ->orWhere("CONCAT(COALESCE(b.name, ''), COALESCE(h.room, '')) LIKE :q")
-            ->orWhere('s.name LIKE :q')
-            ->orWhere('ip4.address LIKE :q')
-            ->orWhere('ip6.address LIKE :q')
-            ->orWhere('dl.ipAddress LIKE :q')
-            ->orWhere('i.macAddress LIKE :q')
-            ->orWhere('n.name LIKE :q')
-            ->orWhere('nd.name LIKE :q')
-            ->orWhere("CONCAT(n.name, '.', nd.name) LIKE :q")
-            ->orWhere('tg.name LIKE :q')
-            ->setParameter('q', $q);
+            ->where('h.deletedAt IS NULL');
+
+        // Use EXISTS subqueries instead of JOINs to avoid row-multiplication + DISTINCT overhead.
+        // Also fixes a scoping bug: the old orWhere chain let deleted hosts match on building/room.
+        $or = $qb->expr()->orX(
+            'h.name LIKE :q',
+            'b.name LIKE :q',
+            'h.room LIKE :q',
+            "CONCAT(COALESCE(b.name, ''), COALESCE(h.room, '')) LIKE :q",
+            <<<'DQL'
+                EXISTS (
+                    SELECT 1 FROM App\Entity\NetworkInterface i2
+                    LEFT JOIN i2.subnet s2
+                    LEFT JOIN i2.ipAddress ip4
+                    LEFT JOIN i2.ipv6Address ip6
+                    LEFT JOIN i2.names n2
+                    LEFT JOIN n2.domain nd2
+                    WHERE i2.host = h AND (
+                        i2.macAddress LIKE :q
+                        OR s2.name LIKE :q
+                        OR ip4.address LIKE :q
+                        OR ip6.address LIKE :q
+                        OR n2.name LIKE :q
+                        OR nd2.name LIKE :q
+                        OR CONCAT(n2.name, '.', nd2.name) LIKE :q
+                    )
+                )
+            DQL,
+            <<<'DQL'
+                EXISTS (
+                    SELECT 1 FROM App\Entity\NetworkInterface i3
+                    WHERE i3.host = h AND EXISTS (
+                        SELECT 1 FROM App\Entity\DhcpLease dl2
+                        WHERE dl2.macAddress = i3.macAddress AND dl2.ipAddress LIKE :q
+                    )
+                )
+            DQL,
+            <<<'DQL'
+                EXISTS (
+                    SELECT 1 FROM App\Entity\Host h2
+                    JOIN h2.tags tg2
+                    WHERE h2 = h AND tg2.name LIKE :q
+                )
+            DQL
+        );
+
+        $qb->andWhere($or)->setParameter('q', $q);
 
         $hex = preg_replace('/[^0-9a-fA-F]/', '', $query);
         if (strlen($hex) === 12) {
             $normalized = implode(':', str_split(strtolower($hex), 2));
-            $qb->orWhere('i.macAddress = :mac')->setParameter('mac', $normalized);
+            $qb->orWhere(<<<'DQL'
+                    EXISTS (
+                        SELECT 1 FROM App\Entity\NetworkInterface i4
+                        WHERE i4.host = h AND i4.macAddress = :mac
+                    )
+                DQL)
+               ->setParameter('mac', $normalized);
         }
 
         return $qb;
@@ -142,14 +172,6 @@ class HostRepository extends ServiceEntityRepository
     private function buildAdvancedQb(array $criteria): QueryBuilder
     {
         $qb = $this->createQueryBuilder('h')
-            ->leftJoin('h.building', 'b')
-            ->leftJoin('h.tags', 'tg')
-            ->leftJoin('h.interfaces', 'i')
-            ->leftJoin('i.ipAddress', 'ip4')
-            ->leftJoin('i.ipv6Address', 'ip6')
-            ->leftJoin('i.names', 'n')
-            ->leftJoin('n.domain', 'nd')
-            ->leftJoin('App\Entity\DhcpLease', 'dl', 'WITH', 'dl.macAddress = i.macAddress')
             ->where('h.deletedAt IS NULL');
 
         if (!empty($criteria['name'])) {
@@ -166,30 +188,52 @@ class HostRepository extends ServiceEntityRepository
         }
         if (!empty($criteria['subnet'])) {
             if ($criteria['subnet'] === 'none') {
-                $qb->andWhere('i.subnet IS NULL');
+                $qb->andWhere('EXISTS (SELECT 1 FROM App\Entity\NetworkInterface i2 WHERE i2.host = h AND i2.subnet IS NULL)');
             } else {
-                $qb->andWhere('i.subnet = :subnet')
+                $qb->andWhere('EXISTS (SELECT 1 FROM App\Entity\NetworkInterface i2 WHERE i2.host = h AND i2.subnet = :subnet)')
                    ->setParameter('subnet', (int) $criteria['subnet']);
             }
         }
         if (!empty($criteria['ip'])) {
-            $qb->andWhere($qb->expr()->orX('ip4.address LIKE :ip', 'ip6.address LIKE :ip', 'dl.ipAddress LIKE :ip'))
+            $qb->andWhere(<<<'DQL'
+                    EXISTS (
+                        SELECT 1 FROM App\Entity\NetworkInterface i3
+                        LEFT JOIN i3.ipAddress ip4
+                        LEFT JOIN i3.ipv6Address ip6
+                        WHERE i3.host = h AND (
+                            ip4.address LIKE :ip
+                            OR ip6.address LIKE :ip
+                            OR EXISTS (
+                                SELECT 1 FROM App\Entity\DhcpLease dl2
+                                WHERE dl2.macAddress = i3.macAddress AND dl2.ipAddress LIKE :ip
+                            )
+                        )
+                    )
+                DQL)
                ->setParameter('ip', $this->toLike($criteria['ip']));
         }
         if (!empty($criteria['mac'])) {
-            $qb->andWhere('i.macAddress LIKE :mac')
+            $qb->andWhere('EXISTS (SELECT 1 FROM App\Entity\NetworkInterface i4 WHERE i4.host = h AND i4.macAddress LIKE :mac)')
                ->setParameter('mac', $this->toLike($criteria['mac']));
         }
         if (!empty($criteria['tag'])) {
-            $qb->andWhere('tg.id = :tag')
+            $qb->andWhere('EXISTS (SELECT 1 FROM App\Entity\Host h2 JOIN h2.tags tg2 WHERE h2 = h AND tg2.id = :tag)')
                ->setParameter('tag', (int) $criteria['tag']);
         }
         if (!empty($criteria['dns'])) {
-            $qb->andWhere($qb->expr()->orX(
-                'n.name LIKE :dns',
-                'nd.name LIKE :dns',
-                "CONCAT(n.name, '.', nd.name) LIKE :dns"
-            ))->setParameter('dns', $this->toLike($criteria['dns']));
+            $qb->andWhere(<<<'DQL'
+                    EXISTS (
+                        SELECT 1 FROM App\Entity\NetworkInterface i5
+                        LEFT JOIN i5.names n2
+                        LEFT JOIN n2.domain nd2
+                        WHERE i5.host = h AND (
+                            n2.name LIKE :dns
+                            OR nd2.name LIKE :dns
+                            OR CONCAT(n2.name, '.', nd2.name) LIKE :dns
+                        )
+                    )
+                DQL)
+               ->setParameter('dns', $this->toLike($criteria['dns']));
         }
 
         return $qb;
