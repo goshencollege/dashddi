@@ -47,6 +47,7 @@
                     {{ form_label(form.tags, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
                     {{ form_widget(form.tags, {attr: {class: 'form-select', id: 'host_tags'}}) }}
                     {{ form_errors(form.tags) }}
+                    <div id="host_tags_error" class="text-danger small mt-1" style="display:none"></div>
                 </div>
 
                 {% if embed_interface %}
@@ -206,6 +207,7 @@
 <script>
 (function () {
     const select = document.getElementById('host_tags');
+    const errorEl = document.getElementById('host_tags_error');
     if (!select) return;
 
     // Remove unselected options so the dropdown is empty until the user types;
@@ -230,8 +232,17 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name: input }),
             })
-                .then(r => r.json())
-                .then(callback)
+                .then(r => r.json().then(data => ({ ok: r.ok, data })))
+                .then(({ ok, data }) => {
+                    if (!ok) {
+                        errorEl.textContent = data.error || 'Could not create tag.';
+                        errorEl.style.display = '';
+                        callback();
+                    } else {
+                        errorEl.style.display = 'none';
+                        callback(data);
+                    }
+                })
                 .catch(() => callback());
         },
         render: {

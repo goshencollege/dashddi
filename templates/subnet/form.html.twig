@@ -73,6 +73,7 @@
                         {{ form_label(form.tags, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
                         {{ form_widget(form.tags, {attr: {class: 'form-select', id: 'subnet_tags'}}) }}
                         {{ form_errors(form.tags) }}
+                        <div id="subnet_tags_error" class="text-danger small mt-1" style="display:none"></div>
                     </div>
                     <hr class="my-3">
                     <h6 class="text-muted mb-3">Reverse Zone SOA</h6>
@@ -207,6 +208,7 @@
 
 (function () {
     const select = document.getElementById('subnet_tags');
+    const errorEl = document.getElementById('subnet_tags_error');
     if (!select) return;
 
     Array.from(select.options).forEach(opt => { if (!opt.selected) opt.remove(); });
@@ -229,8 +231,17 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name: input }),
             })
-                .then(r => r.json())
-                .then(callback)
+                .then(r => r.json().then(data => ({ ok: r.ok, data })))
+                .then(({ ok, data }) => {
+                    if (!ok) {
+                        errorEl.textContent = data.error || 'Could not create tag.';
+                        errorEl.style.display = '';
+                        callback();
+                    } else {
+                        errorEl.style.display = 'none';
+                        callback(data);
+                    }
+                })
                 .catch(() => callback());
         },
         render: {
