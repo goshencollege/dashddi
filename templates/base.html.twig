@@ -624,11 +624,14 @@
 {% if app.user %}
 <script>
 (function () {
-    var expiresAt = {{ app.session.get('_session_expires_at') ?? 'null' }};
+    var expiresAt    = {{ app.session.get('_session_expires_at') ?? 'null' }};
+    var lifetime     = {{ app.session.get('_session_lifetime') ?? 1800 }};
     if (expiresAt) {
-        var remaining = expiresAt * 1000 - Date.now();
-        if (remaining > 0) {
-            setTimeout(function () { window.location.href = '{{ path('saml_login') }}'; }, remaining);
+        // Fire 10% of the session lifetime AFTER the server-side expiry so the
+        // subscriber has already invalidated the session when the redirect lands.
+        var delay = (expiresAt * 1000 + lifetime * 100) - Date.now();
+        if (delay > 0) {
+            setTimeout(function () { window.location.href = '{{ path('saml_login') }}'; }, delay);
         } else {
             window.location.href = '{{ path('saml_login') }}';
         }
