@@ -21,6 +21,7 @@ class Tag
     #[Assert\NotBlank]
     #[Assert\Length(max: 50)]
     #[Assert\Regex(pattern: '/\|/', match: false, message: 'Tag names may not contain a pipe character (|).')]
+    #[Assert\Regex(pattern: '/^snipeit:/i', match: false, message: 'Tag names starting with "snipeit:" are reserved for the Snipe-IT integration.')]
     private string $name = '';
 
     #[ORM\ManyToMany(targetEntity: Host::class, mappedBy: 'tags')]
