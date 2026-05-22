@@ -18,6 +18,9 @@ class SnipeItSyncService
     private const TAG_NAME = 'snipeit';
     private const FETCH_LIMIT = 100;
 
+    /** @var array<string, Tag> */
+    private array $tagCache = [];
+
     public function __construct(
         private readonly EntityManagerInterface      $em,
         private readonly SnipeItAssetLinkRepository  $linkRepo,
@@ -94,16 +97,18 @@ class SnipeItSyncService
                 if ($assetName === '') {
                     $assetName = 'Asset ' . $assetId;
                 }
-                $assetTagStr = trim((string) ($asset['asset_tag'] ?? ''));
-                $categoryId  = (int) ($asset['category']['id'] ?? 0);
+                $assetTagStr  = trim((string) ($asset['asset_tag'] ?? ''));
+                $categoryId   = (int) ($asset['category']['id'] ?? 0);
+                $categoryName = str_replace('|', '_', trim((string) ($asset['category']['name'] ?? '')));
 
                 $link = $this->linkRepo->findByServerAndAssetId($server, $assetId);
 
                 try {
                     if ($link !== null) {
-                        $kept = $this->updateHost($link, $assetName, $assetTagStr, $macs, $result['errors'], $categorySubnetIdMap, $categoryId);
+                        $kept = $this->updateHost($link, $assetName, $assetTagStr, $macs, $result['errors'], $categorySubnetIdMap, $categoryId, $categoryName);
                         if (!$kept) {
                             // soft-delete done inside updateHost; delete only the link row
+                            $link->getHost()->setSnipeItAssetLink(null);
                             $this->em->getConnection()->executeStatement(
                                 'DELETE FROM snipe_it_asset_link WHERE id = ?',
                                 [$link->getId()]
@@ -172,7 +177,7 @@ class SnipeItSyncService
                             usort($hosts, fn($a, $b) => $b->getInterfaces()->count() <=> $a->getInterfaces()->count());
                             $host = $hosts[0];
                             $this->mergeHosts($host, array_slice($hosts, 1));
-                            $this->adoptHost($host, $normalizedMacs, $snipeTag, $categorySubnetIdMap, $categoryId);
+                            $this->adoptHost($host, $normalizedMacs, $snipeTag, $categorySubnetIdMap, $categoryId, $categoryName);
                             $adoptedHostIds[$host->getId()] = true;
                             $adopted = true;
                         } elseif (count($conflictHosts) === 1) {
@@ -187,9 +192,9 @@ class SnipeItSyncService
                             $adoptedHostIds[$hostId] = true;
                             // Adopt the pre-existing DashDDI host instead of creating a new one
                             $adopted = true;
-                            $this->adoptHost($host, $normalizedMacs, $snipeTag, $categorySubnetIdMap, $categoryId);
+                            $this->adoptHost($host, $normalizedMacs, $snipeTag, $categorySubnetIdMap, $categoryId, $categoryName);
                         } else {
-                            $host = $this->createHost($assetName, $macs, $snipeTag, $result['errors'], $categorySubnetIdMap, $categoryId);
+                            $host = $this->createHost($assetName, $macs, $snipeTag, $result['errors'], $categorySubnetIdMap, $categoryId, $categoryName);
                             if ($host === null) {
                                 $result['skipped']++;
                                 continue;
@@ -215,6 +220,7 @@ class SnipeItSyncService
             // accumulating thousands of hydrated entities and exhausting PHP memory.
             $this->em->flush();
             $this->em->clear();
+            $this->tagCache = [];
 
             // Re-acquire entities detached by clear()
             $server              = $this->em->find(SnipeItServer::class, $serverId);
@@ -230,15 +236,21 @@ class SnipeItSyncService
         foreach ($existingLinks as $link) {
             if (!in_array($link->getSnipeAssetId(), $activeAssetIds, true)) {
                 if ($link->isAdopted()) {
-                    // Preserve the pre-existing host; just remove the link and the snipeit tag
-                    $link->getHost()->removeTag($snipeTag);
+                    // Preserve the pre-existing host; just remove the link and all snipeit tags
+                    $host = $link->getHost();
+                    foreach ($host->getTags()->filter(fn(Tag $t) => str_starts_with($t->getName(), 'snipeit'))->toArray() as $t) {
+                        $host->removeTag($t);
+                    }
+                    $host->setSnipeItAssetLink(null);
                     $this->em->createQuery('DELETE FROM App\Entity\SnipeItAssetLink l WHERE l.id = :id')
                         ->setParameter('id', $link->getId())
                         ->execute();
                     $this->em->detach($link);
                 } else {
                     // Soft-delete the sync-created host and its interfaces; delete only the link row
-                    $link->getHost()->softDeleteWithInterfaces();
+                    $host = $link->getHost();
+                    $host->softDeleteWithInterfaces();
+                    $host->setSnipeItAssetLink(null);
                     $this->em->getConnection()->executeStatement(
                         'DELETE FROM snipe_it_asset_link WHERE id = ?',
                         [$link->getId()]
@@ -329,9 +341,12 @@ class SnipeItSyncService
      * Does not change the host's name. Assigns a default subnet to interfaces that
      * have none, based on the category→subnet mapping.
      */
-    private function adoptHost(Host $host, array $normalizedMacs, Tag $snipeTag, array $categorySubnetIdMap, int $categoryId): void
+    private function adoptHost(Host $host, array $normalizedMacs, Tag $snipeTag, array $categorySubnetIdMap, int $categoryId, string $categoryName): void
     {
         $host->addTag($snipeTag);
+        if ($categoryName !== '') {
+            $host->addTag($this->ensureTag('snipeit:' . $categoryName));
+        }
         $existingMacs = array_map(
             fn(NetworkInterface $i) => $i->getMacAddress(),
             $host->getInterfaces()->filter(fn(NetworkInterface $i) => !$i->isDeleted())->toArray()
@@ -363,11 +378,14 @@ class SnipeItSyncService
     }
 
     /** Returns null if no interfaces could be created (all MACs already assigned elsewhere). */
-    private function createHost(string $name, array $macs, Tag $snipeTag, array &$errors, array $categorySubnetIdMap, int $categoryId): ?Host
+    private function createHost(string $name, array $macs, Tag $snipeTag, array &$errors, array $categorySubnetIdMap, int $categoryId, string $categoryName): ?Host
     {
         $host = new Host();
         $host->setName($name);
         $host->addTag($snipeTag);
+        if ($categoryName !== '') {
+            $host->addTag($this->ensureTag('snipeit:' . $categoryName));
+        }
 
         $added = 0;
         foreach ($macs as $mac) {
@@ -397,7 +415,7 @@ class SnipeItSyncService
      * Preserves the DashDDI host name when it has been customised or adopted (differs from the
      * previously stored Snipe name); otherwise updates it to track renames in Snipe-IT.
      */
-    private function updateHost(SnipeItAssetLink $link, string $name, string $assetTagStr, array $macs, array &$errors, array $categorySubnetIdMap, int $categoryId): bool
+    private function updateHost(SnipeItAssetLink $link, string $name, string $assetTagStr, array $macs, array &$errors, array $categorySubnetIdMap, int $categoryId, string $categoryName): bool
     {
         $host = $link->getHost();
 
@@ -416,6 +434,14 @@ class SnipeItSyncService
         }
         $link->setSnipeAssetName($name);
         $link->setSnipeAssetTag($assetTagStr);
+
+        // Refresh category tag: replace any existing snipeit: tag with the current one
+        foreach ($host->getTags()->filter(fn(Tag $t) => str_starts_with($t->getName(), 'snipeit:'))->toArray() as $t) {
+            $host->removeTag($t);
+        }
+        if ($categoryName !== '') {
+            $host->addTag($this->ensureTag('snipeit:' . $categoryName));
+        }
 
         $normalizedMacs = array_map([$this, 'normalizeMac'], $macs);
 
@@ -518,13 +544,16 @@ class SnipeItSyncService
 
     private function ensureTag(string $tagName): Tag
     {
+        if (isset($this->tagCache[$tagName])) {
+            return $this->tagCache[$tagName];
+        }
         $tag = $this->tagRepo->findOneBy(['name' => $tagName]);
         if ($tag === null) {
             $tag = new Tag();
             $tag->setName($tagName);
             $this->em->persist($tag);
         }
-        return $tag;
+        return $this->tagCache[$tagName] = $tag;
     }
 
     private function isArchived(array $asset): bool

@@ -20,6 +20,7 @@ class Tag
     #[ORM\Column(length: 50, unique: true)]
     #[Assert\NotBlank]
     #[Assert\Length(max: 50)]
+    #[Assert\Regex(pattern: '/\|/', match: false, message: 'Tag names may not contain a pipe character (|).')]
     private string $name = '';
 
     #[ORM\ManyToMany(targetEntity: Host::class, mappedBy: 'tags')]

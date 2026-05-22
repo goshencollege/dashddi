@@ -109,6 +109,7 @@ class Host
     }
 
     public function getSnipeItAssetLink(): ?SnipeItAssetLink { return $this->snipeItAssetLink; }
+    public function setSnipeItAssetLink(?SnipeItAssetLink $link): static { $this->snipeItAssetLink = $link; return $this; }
 
     /** Soft-deletes the host and cascades to all of its interfaces. */
     public function softDeleteWithInterfaces(): static

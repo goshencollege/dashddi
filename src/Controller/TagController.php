@@ -5,8 +5,10 @@ namespace App\Controller;
 use App\Entity\Tag;
 use App\Form\TagType;
 use App\Repository\TagRepository;
+use App\Service\ReservedTagPrefixService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\Form\FormError;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -14,6 +16,8 @@ use Symfony\Component\Routing\Attribute\Route;
 
 class TagController extends AbstractController
 {
+    public function __construct(private readonly ReservedTagPrefixService $reservedPrefixes) {}
+
     #[Route('/tags', name: 'tag_index', methods: ['GET'])]
     public function index(TagRepository $repo): Response
     {
@@ -29,11 +33,16 @@ class TagController extends AbstractController
         $form = $this->createForm(TagType::class, $tag);
         $form->handleRequest($request);
 
-        if ($form->isSubmitted() && $form->isValid()) {
-            $em->persist($tag);
-            $em->flush();
-            $this->addFlash('success', 'Tag "' . $tag->getName() . '" added.');
-            return $this->redirectToRoute('tag_index');
+        if ($form->isSubmitted()) {
+            if ($prefix = $this->reservedPrefixes->matchingPrefix($tag->getName())) {
+                $form->get('name')->addError(new FormError("Tag names starting with \"$prefix\" are reserved."));
+            }
+            if ($form->isValid()) {
+                $em->persist($tag);
+                $em->flush();
+                $this->addFlash('success', 'Tag "' . $tag->getName() . '" added.');
+                return $this->redirectToRoute('tag_index');
+            }
         }
 
         return $this->render('tag/form.html.twig', [
@@ -49,10 +58,15 @@ class TagController extends AbstractController
         $form = $this->createForm(TagType::class, $tag);
         $form->handleRequest($request);
 
-        if ($form->isSubmitted() && $form->isValid()) {
-            $em->flush();
-            $this->addFlash('success', 'Tag updated.');
-            return $this->redirectToRoute('tag_index');
+        if ($form->isSubmitted()) {
+            if ($prefix = $this->reservedPrefixes->matchingPrefix($tag->getName())) {
+                $form->get('name')->addError(new FormError("Tag names starting with \"$prefix\" are reserved."));
+            }
+            if ($form->isValid()) {
+                $em->flush();
+                $this->addFlash('success', 'Tag updated.');
+                return $this->redirectToRoute('tag_index');
+            }
         }
 
         return $this->render('tag/form.html.twig', [
@@ -76,19 +90,18 @@ class TagController extends AbstractController
     #[Route('/api/tags', name: 'api_tags_search', methods: ['GET'])]
     public function apiSearch(Request $request, TagRepository $repo): JsonResponse
     {
-        $q    = trim($request->query->getString('q'));
-        $tags = $q === ''
-            ? $repo->findBy([], ['name' => 'ASC'], 20)
-            : $repo->createQueryBuilder('t')
-                ->where('t.name LIKE :q')
-                ->setParameter('q', '%' . $q . '%')
-                ->orderBy('t.name', 'ASC')
-                ->setMaxResults(20)
-                ->getQuery()
-                ->getResult();
+        $q  = trim($request->query->getString('q'));
+        $qb = $this->reservedPrefixes->excludeFromQuery(
+            $repo->createQueryBuilder('t')->orderBy('t.name', 'ASC')->setMaxResults(20),
+            't'
+        );
+
+        if ($q !== '') {
+            $qb->andWhere('t.name LIKE :q')->setParameter('q', '%' . $q . '%');
+        }
 
         return $this->json(
-            array_map(fn(Tag $t) => ['value' => (string) $t->getId(), 'text' => $t->getName()], $tags)
+            array_map(fn(Tag $t) => ['value' => (string) $t->getId(), 'text' => $t->getName()], $qb->getQuery()->getResult())
         );
     }
 
@@ -99,7 +112,13 @@ class TagController extends AbstractController
         $name = trim($data['name'] ?? '');
 
         if ($name === '') {
-            return $this->json(['error' => 'Name is required'], 400);
+            return $this->json(['error' => 'Name is required.'], 400);
+        }
+        if ($prefix = $this->reservedPrefixes->matchingPrefix($name)) {
+            return $this->json(['error' => "Tag names starting with \"$prefix\" are reserved."], 400);
+        }
+        if (str_contains($name, '|')) {
+            return $this->json(['error' => 'Tag names may not contain a pipe character (|).'], 400);
         }
 
         $tag = $repo->findOneBy(['name' => $name]);

@@ -1,6 +1,8 @@
 # yaml-language-server: $schema=../vendor/symfony/dependency-injection/Loader/schema/services.schema.json
 
 parameters:
+    app.reserved_tag_prefixes:
+        - 'snipeit'
 
 services:
     _defaults:
@@ -36,6 +38,10 @@ services:
     App\Command\DatabaseRestoreCommand:
         arguments:
             $projectDir: '%kernel.project_dir%'
+
+    App\Service\ReservedTagPrefixService:
+        arguments:
+            $prefixes: '%app.reserved_tag_prefixes%'
 
     # SamlSettings now loads configuration from the saml_provider database table.
 

@@ -10,6 +10,8 @@ use App\Entity\Tag;
 use App\Entity\Vrf;
 use App\Enum\BlockType;
 use App\Repository\DnsViewRepository;
+use App\Repository\TagRepository;
+use App\Service\ReservedTagPrefixService;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
@@ -21,7 +23,10 @@ use Symfony\Component\OptionsResolver\OptionsResolver;
 
 class SubnetType extends AbstractType
 {
-    public function __construct(private readonly DnsViewRepository $viewRepo) {}
+    public function __construct(
+        private readonly DnsViewRepository $viewRepo,
+        private readonly ReservedTagPrefixService $reservedPrefixes,
+    ) {}
 
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
@@ -57,13 +62,16 @@ class SubnetType extends AbstractType
                 'attr' => ['rows' => 3],
             ])
             ->add('tags', EntityType::class, [
-                'class'        => Tag::class,
-                'choice_label' => 'name',
-                'multiple'     => true,
-                'expanded'     => false,
-                'required'     => false,
-                'label'        => 'Tags',
-                'by_reference' => false,
+                'class'         => Tag::class,
+                'choice_label'  => 'name',
+                'multiple'      => true,
+                'expanded'      => false,
+                'required'      => false,
+                'label'         => 'Tags',
+                'by_reference'  => false,
+                'query_builder' => fn(TagRepository $r) => $this->reservedPrefixes->excludeFromQuery(
+                    $r->createQueryBuilder('t')->orderBy('t.name', 'ASC'), 't'
+                ),
             ])
             ->add('vrf', EntityType::class, [
                 'class'        => Vrf::class,
