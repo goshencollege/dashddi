@@ -76,16 +76,18 @@ class TagController extends AbstractController
     #[Route('/api/tags', name: 'api_tags_search', methods: ['GET'])]
     public function apiSearch(Request $request, TagRepository $repo): JsonResponse
     {
-        $q    = trim($request->query->getString('q'));
-        $tags = $q === ''
-            ? $repo->findBy([], ['name' => 'ASC'], 20)
-            : $repo->createQueryBuilder('t')
-                ->where('t.name LIKE :q')
-                ->setParameter('q', '%' . $q . '%')
-                ->orderBy('t.name', 'ASC')
-                ->setMaxResults(20)
-                ->getQuery()
-                ->getResult();
+        $q  = trim($request->query->getString('q'));
+        $qb = $repo->createQueryBuilder('t')
+            ->where('t.name NOT LIKE :prefix')
+            ->setParameter('prefix', 'snipeit:%')
+            ->orderBy('t.name', 'ASC')
+            ->setMaxResults(20);
+
+        if ($q !== '') {
+            $qb->andWhere('t.name LIKE :q')->setParameter('q', '%' . $q . '%');
+        }
+
+        $tags = $qb->getQuery()->getResult();
 
         return $this->json(
             array_map(fn(Tag $t) => ['value' => (string) $t->getId(), 'text' => $t->getName()], $tags)
@@ -99,7 +101,13 @@ class TagController extends AbstractController
         $name = trim($data['name'] ?? '');
 
         if ($name === '') {
-            return $this->json(['error' => 'Name is required'], 400);
+            return $this->json(['error' => 'Name is required.'], 400);
+        }
+        if (stripos($name, 'snipeit:') === 0) {
+            return $this->json(['error' => 'Tag names starting with "snipeit:" are reserved for the Snipe-IT integration.'], 400);
+        }
+        if (str_contains($name, '|')) {
+            return $this->json(['error' => 'Tag names may not contain a pipe character (|).'], 400);
         }
 
         $tag = $repo->findOneBy(['name' => $name]);
