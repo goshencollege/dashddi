@@ -2,7 +2,7 @@
 
 parameters:
     app.reserved_tag_prefixes:
-        - 'snipeit:'
+        - 'snipeit'
 
 services:
     _defaults:
