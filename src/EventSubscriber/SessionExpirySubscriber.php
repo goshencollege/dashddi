@@ -2,16 +2,22 @@
 
 namespace App\EventSubscriber;
 
+use App\Security\SamlSettings;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpKernel\Event\RequestEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
+use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
 
 class SessionExpirySubscriber implements EventSubscriberInterface
 {
-    public function __construct(private readonly UrlGeneratorInterface $urlGenerator) {}
+    public function __construct(
+        private readonly UrlGeneratorInterface $urlGenerator,
+        private readonly TokenStorageInterface $tokenStorage,
+        private readonly SamlSettings $samlSettings,
+    ) {}
 
     public static function getSubscribedEvents(): array
     {
@@ -34,6 +40,14 @@ class SessionExpirySubscriber implements EventSubscriberInterface
         $expiresAt = $session->get('_session_expires_at');
 
         if ($expiresAt === null) {
+            // Session predates the expiry feature — initialize it for authenticated users
+            // so the timeout starts from their next page load rather than never firing.
+            $token = $this->tokenStorage->getToken();
+            if ($token?->getUser() !== null) {
+                $lifetime = $this->samlSettings->getSessionLifetimeSeconds();
+                $session->set('_session_lifetime', $lifetime);
+                $session->set('_session_expires_at', time() + $lifetime);
+            }
             return;
         }
 
