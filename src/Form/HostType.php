@@ -7,6 +7,7 @@ use App\Entity\Host;
 use App\Entity\NetworkInterface;
 use App\Entity\Tag;
 use App\Repository\TagRepository;
+use App\Service\ReservedTagPrefixService;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
@@ -15,7 +16,7 @@ use Symfony\Component\OptionsResolver\OptionsResolver;
 
 class HostType extends AbstractType
 {
-    public function __construct(private readonly TagRepository $tagRepo) {}
+    public function __construct(private readonly ReservedTagPrefixService $reservedPrefixes) {}
 
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
@@ -43,10 +44,9 @@ class HostType extends AbstractType
                 'required'      => false,
                 'label'         => 'Tags',
                 'by_reference'  => false,
-                'query_builder' => fn(TagRepository $r) => $r->createQueryBuilder('t')
-                    ->where('t.name NOT LIKE :prefix')
-                    ->setParameter('prefix', 'snipeit:%')
-                    ->orderBy('t.name', 'ASC'),
+                'query_builder' => fn(TagRepository $r) => $this->reservedPrefixes->excludeFromQuery(
+                    $r->createQueryBuilder('t')->orderBy('t.name', 'ASC'), 't'
+                ),
             ]);
 
         if ($options['embed_interface']) {
