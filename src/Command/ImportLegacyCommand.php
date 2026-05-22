@@ -531,38 +531,41 @@ class ImportLegacyCommand extends Command
                 }
             }
 
+            $hasIp = $iface->getIpAddress() !== null || $iface->getIpv6Address() !== null;
             $sharedViews = $this->intersectViews($domain, $subnet);
 
-            // Canonical name from host.name
-            if ($this->isValidDnsLabel($row['name'])) {
-                $canonical = new InterfaceName();
-                $canonical->setName($row['name']);
-                $canonical->setDomain($domain);
-                $canonical->setIsCanonical(true);
-                foreach ($sharedViews as $view) {
-                    $canonical->addView($view);
+            if ($hasIp) {
+                // Canonical name from host.name
+                if ($this->isValidDnsLabel($row['name'])) {
+                    $canonical = new InterfaceName();
+                    $canonical->setName($row['name']);
+                    $canonical->setDomain($domain);
+                    $canonical->setIsCanonical(true);
+                    foreach ($sharedViews as $view) {
+                        $canonical->addView($view);
+                    }
+                    $iface->addName($canonical);
+                    if (!$dryRun) {
+                        $this->em->persist($canonical);
+                    }
                 }
-                $iface->addName($canonical);
-                if (!$dryRun) {
-                    $this->em->persist($canonical);
-                }
-            }
 
-            // Non-canonical names from alias table
-            foreach ($aliasMap[$hid] ?? [] as $aliasName) {
-                if (!$this->isValidDnsLabel($aliasName)) {
-                    continue;
-                }
-                $alias = new InterfaceName();
-                $alias->setName($aliasName);
-                $alias->setDomain($domain);
-                $alias->setIsCanonical(false);
-                foreach ($sharedViews as $view) {
-                    $alias->addView($view);
-                }
-                $iface->addName($alias);
-                if (!$dryRun) {
-                    $this->em->persist($alias);
+                // Non-canonical names from alias table
+                foreach ($aliasMap[$hid] ?? [] as $aliasName) {
+                    if (!$this->isValidDnsLabel($aliasName)) {
+                        continue;
+                    }
+                    $alias = new InterfaceName();
+                    $alias->setName($aliasName);
+                    $alias->setDomain($domain);
+                    $alias->setIsCanonical(false);
+                    foreach ($sharedViews as $view) {
+                        $alias->addView($view);
+                    }
+                    $iface->addName($alias);
+                    if (!$dryRun) {
+                        $this->em->persist($alias);
+                    }
                 }
             }
 
