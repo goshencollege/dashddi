@@ -295,61 +295,6 @@ if ($AppEnv -eq 'dev') {
     [IO.File]::WriteAllText($ComposeFile, $content)
 
     Ok 'docker-compose.dev.yml written'
-
-    # ── 6b. Dev Container files ───────────────────────────────────────────────
-    Header 'Writing devcontainer files'
-
-    $DevcontainerDir  = Join-Path $ScriptDir '.devcontainer'
-    $WorkspaceVolume  = "${ComposeProject}_devworkspace"
-
-    if (-not (Test-Path $DevcontainerDir)) { New-Item -ItemType Directory -Path $DevcontainerDir | Out-Null }
-
-    [IO.File]::WriteAllText("$DevcontainerDir\devcontainer.json", @"
-{
-    "name": "DashDDI Dev",
-    "dockerComposeFile": [
-        "../docker-compose.dev.yml",
-        "docker-compose.devcontainer.yml"
-    ],
-    "service": "app",
-    "workspaceFolder": "/var/www/html",
-    "shutdownAction": "stopCompose",
-    "customizations": {
-        "vscode": {
-            "extensions": [
-                "bmewburn.vscode-intelephense-client",
-                "xdebug.php-debug"
-            ]
-        }
-    },
-    "forwardPorts": [$HttpPort, $HttpsPort]
-}
-"@)
-
-    [IO.File]::WriteAllText("$DevcontainerDir\docker-compose.devcontainer.yml", @"
-# Overlays the Windows bind-mount with a pre-populated Docker volume so
-# that PHP reads files from the Linux filesystem at native speed.
-# Populated by setup.ps1 — re-run setup to refresh after a git pull.
-services:
-  app:
-    volumes:
-      - workspace:/var/www/html
-  worker_priority:
-    volumes:
-      - workspace:/var/www/html
-  worker_bulk:
-    volumes:
-      - workspace:/var/www/html
-  nginx:
-    volumes:
-      - workspace:/var/www/html:ro
-volumes:
-  workspace:
-    external: true
-    name: $WorkspaceVolume
-"@)
-
-    Ok 'devcontainer files written to .devcontainer/'
 } else {
     Header 'Writing docker-compose.prod.yml'
 
@@ -635,21 +580,7 @@ if (-not [string]::IsNullOrWhiteSpace($SamlSource)) {
     Warn "SP metadata URL (accessible after import):  $BaseUrl/saml/metadata"
 }
 
-# ── 14. Devcontainer workspace volume (dev only) ─────────────────────────────
-if ($AppEnv -eq 'dev') {
-    Header 'Populating devcontainer workspace volume'
-
-    docker volume create $WorkspaceVolume 2>&1 | Out-Null
-    $dockerScriptDir = $ScriptDir -replace '\\', '/'
-    docker run --rm `
-        -v "${dockerScriptDir}:/src" `
-        -v "${WorkspaceVolume}:/dst" `
-        alpine sh -c 'cp -a /src/. /dst/'
-    if ($LASTEXITCODE -ne 0) { Warn "Volume copy failed — devcontainer workspace may be incomplete." }
-    else { Ok "Workspace copied into volume: $WorkspaceVolume" }
-}
-
-# ── 15. Summary ───────────────────────────────────────────────────────────────
+# ── 14. Summary ───────────────────────────────────────────────────────────────
 Header 'Setup complete'
 Write-Host
 
@@ -689,12 +620,3 @@ Write-Host "    Migrate:  docker compose -f docker-compose.$AppEnv.yml exec app 
 Write-Host
 Write-Host "  SP metadata URL:  $BaseUrl/saml/metadata" -ForegroundColor Cyan
 Write-Host
-
-if ($AppEnv -eq 'dev') {
-    Write-Host '  VS Code devcontainer (faster page loads):' -ForegroundColor White
-    Write-Host '    Open VS Code in this folder, then run:'
-    Write-Host '      Dev Containers: Reopen in Container'
-    Write-Host "    The workspace lives in Docker volume $WorkspaceVolume."
-    Write-Host '    After a git pull on Windows, re-run setup.ps1 to refresh the volume.'
-    Write-Host
-}
