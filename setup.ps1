@@ -503,6 +503,17 @@ for ($i = 1; $i -le 30; $i++) {
 if (-not $ready) { Die "App container did not become ready in time. Check: docker compose -f docker-compose.$AppEnv.yml logs app" }
 Ok 'App container ready'
 
+Write-Host '  Waiting for database to accept connections...'
+$dbReady = $false
+$pdoCheck = "try { new PDO('mysql:host=$DbHost;port=$DbPort;dbname=$DbName', '$DbUser', '$DbPassword'); exit(0); } catch(Exception `$e) { exit(1); }"
+for ($i = 1; $i -le 30; $i++) {
+    $null = docker compose -f $ComposeFile exec -T app php -r $pdoCheck 2>$null
+    if ($LASTEXITCODE -eq 0) { $dbReady = $true; break }
+    Start-Sleep -Seconds 2
+}
+if (-not $dbReady) { Die "Database did not become ready. Check: docker compose -f docker-compose.$AppEnv.yml logs db" }
+Ok 'Database ready'
+
 # ── 11. Database migrations ───────────────────────────────────────────────────
 Header 'Running database migrations'
 

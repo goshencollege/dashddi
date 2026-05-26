@@ -500,6 +500,18 @@ for i in $(seq 1 30); do
 done
 ok "App container ready"
 
+echo "  Waiting for database to accept connections…"
+for i in $(seq 1 30); do
+    if docker compose -f "$COMPOSE_FILE" exec -T app \
+        php -r "try { new PDO('mysql:host=${DB_HOST};port=${DB_PORT};dbname=${DB_NAME}', '${DB_USER}', '${DB_PASSWORD}'); exit(0); } catch(Exception \$e) { exit(1); }" \
+        2>/dev/null; then
+        break
+    fi
+    sleep 2
+    [[ $i -eq 30 ]] && die "Database did not become ready. Check: docker compose -f docker-compose.${APP_ENV}.yml logs db"
+done
+ok "Database ready"
+
 # ── 11. Database migrations ───────────────────────────────────────────────────
 header "Running database migrations"
 
