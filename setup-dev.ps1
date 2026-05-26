@@ -77,7 +77,7 @@ if (Test-Path $ComposeFile) {
 Header 'Hostname'
 
 $Fqdn    = Ask 'Hostname or IP (e.g. localhost, 192.168.1.50, mydev.local)' 'localhost'
-$BaseUrl = "https://$Fqdn:8443"
+$BaseUrl = "https://${Fqdn}:8443"
 Ok "Base URL: $BaseUrl"
 
 # ── 3. Secrets ────────────────────────────────────────────────────────────────
