@@ -30,5 +30,5 @@ CMD ["php-fpm"]
 
 FROM base AS prod
 COPY . /var/www/html
-ENV APP_ENV=prod
+ARG APP_ENV=prod
 RUN composer install --no-dev --optimize-autoloader --no-interaction --no-progress
