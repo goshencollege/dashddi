@@ -185,10 +185,8 @@ docker compose -f "$COMPOSE_FILE" exec -T app \
 ok "Cache warm"
 
 # ── 11. SAML identity provider (optional) ────────────────────────────────────
+# Note: /saml/metadata is only accessible after an IdP provider is imported.
 header "SAML Identity Provider"
-echo
-echo -e "  ${BOLD}SP metadata URL (give this to your IdP administrator):${NC}"
-echo -e "  ${CYAN}${BASE_URL}/saml/metadata${NC}"
 echo
 read -rp "$(echo -e "  ${BOLD}Path to IdP metadata XML file, or URL (leave blank to skip): ${NC}")" SAML_SOURCE
 
@@ -211,9 +209,14 @@ if [[ -n "${SAML_SOURCE:-}" ]]; then
 
     [[ -n "${SAML_TMP:-}" ]] && rm -f "$SAML_TMP"
     ok "SAML provider '$SAML_NAME' imported and set as active"
+    echo
+    echo -e "  ${BOLD}Give this SP metadata URL to your IdP administrator:${NC}"
+    echo -e "  ${CYAN}${BASE_URL}/saml/metadata${NC}"
 else
-    warn "Skipped — configure SAML later with:"
+    warn "Skipped — no one will be able to log in until a SAML provider is configured."
+    warn "Run this when ready:"
     warn "  docker compose -f docker-compose.dev.yml exec app php bin/console app:saml:import-metadata <file-or-url> --activate"
+    warn "SP metadata URL (accessible after import):  ${BASE_URL}/saml/metadata"
 fi
 
 # ── 12. Summary ───────────────────────────────────────────────────────────────
