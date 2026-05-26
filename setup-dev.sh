@@ -157,6 +157,9 @@ ok "Dependencies installed"
 # ── 8. Start services ─────────────────────────────────────────────────────────
 header "Starting services"
 
+# Wipe any leftover volumes so MySQL always re-initialises with the current credentials
+docker compose -f "$COMPOSE_FILE" down -v 2>/dev/null || true
+
 docker compose -f "$COMPOSE_FILE" up -d
 ok "Containers started"
 
