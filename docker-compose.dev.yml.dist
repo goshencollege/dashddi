@@ -1,5 +1,7 @@
 x-worker-base: &worker-base
-  build: .
+  build:
+    context: .
+    target: base
   volumes:
     - .:/var/www/html
     - symfony_var:/var/www/html/var
@@ -26,7 +28,9 @@ x-worker-base: &worker-base
 
 services:
   app:
-    build: .
+    build:
+      context: .
+      target: base
     volumes:
       - .:/var/www/html
       - symfony_var:/var/www/html/var

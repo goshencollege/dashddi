@@ -186,6 +186,14 @@ Header 'Starting services'
 # Wipe any leftover volumes so MySQL always re-initialises with the current credentials
 docker compose -f $ComposeFile down -v 2>&1 | Out-Null
 
+$dockerSslDir = $SslDir -replace '\\', '/'
+docker run --rm `
+    -v "${composeProject}_ssl_certs:/ssl" `
+    -v "${dockerSslDir}:/src:ro" `
+    alpine sh -c "cp /src/cert.pem /src/key.pem /ssl/"
+if ($LASTEXITCODE -ne 0) { Die 'Failed to copy SSL certificates into volume.' }
+Ok 'SSL certificates copied to named volume'
+
 docker compose -f $ComposeFile up -d
 if ($LASTEXITCODE -ne 0) { Die 'Failed to start containers.' }
 Ok 'Containers started'
