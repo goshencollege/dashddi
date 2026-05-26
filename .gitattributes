@@ -1,0 +1,4 @@
+# Shell scripts and container entrypoints must use LF — CRLF breaks exec on Linux
+*.sh        text eol=lf
+*.sh.dist   text eol=lf
+docker/php/entrypoint.sh text eol=lf
