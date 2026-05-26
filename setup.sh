@@ -285,60 +285,6 @@ if [[ "$APP_ENV" == "dev" ]]; then
         "$DIST_FILE" > "$COMPOSE_FILE"
 
     ok "docker-compose.dev.yml written"
-
-    # ── 6b. Dev Container files ───────────────────────────────────────────────
-    header "Writing devcontainer files"
-
-    DEVCONTAINER_DIR="$SCRIPT_DIR/.devcontainer"
-    mkdir -p "$DEVCONTAINER_DIR"
-
-    cat > "$DEVCONTAINER_DIR/devcontainer.json" << EOF
-{
-    "name": "DashDDI Dev",
-    "dockerComposeFile": [
-        "../docker-compose.dev.yml",
-        "docker-compose.devcontainer.yml"
-    ],
-    "service": "app",
-    "workspaceFolder": "/var/www/html",
-    "shutdownAction": "stopCompose",
-    "postCreateCommand": "composer install --no-interaction --no-progress",
-    "customizations": {
-        "vscode": {
-            "extensions": [
-                "bmewburn.vscode-intelephense-client",
-                "xdebug.php-debug"
-            ]
-        }
-    },
-    "forwardPorts": [${HTTP_PORT}, ${HTTPS_PORT}]
-}
-EOF
-
-    cat > "$DEVCONTAINER_DIR/docker-compose.devcontainer.yml" << 'YAML'
-# Replaces the Windows bind-mount workspace with a Docker volume so that
-# file I/O runs on the Linux filesystem at native speed.
-# How to use: in VS Code run
-#   Dev Containers: Clone Repository in Named Container Volume
-services:
-  app:
-    volumes:
-      - workspace:/var/www/html
-  worker_priority:
-    volumes:
-      - workspace:/var/www/html
-  worker_bulk:
-    volumes:
-      - workspace:/var/www/html
-  nginx:
-    volumes:
-      - workspace:/var/www/html:ro
-volumes:
-  workspace:
-YAML
-
-    ok "devcontainer files written to .devcontainer/"
-    warn "To use: open VS Code → Dev Containers: Clone Repository in Named Container Volume"
 else
     header "Writing docker-compose.prod.yml"
 
