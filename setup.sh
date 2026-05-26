@@ -526,7 +526,15 @@ docker compose -f "$COMPOSE_FILE" exec -T app \
     php bin/console cache:warmup
 ok "Cache warm"
 
-# ── 13. SAML identity provider ────────────────────────────────────────────────
+# ── 13. Fixtures (dev only) ───────────────────────────────────────────────────
+if [[ "$APP_ENV" == "dev" ]]; then
+    header "Loading fixtures"
+    docker compose -f "$COMPOSE_FILE" exec -T app \
+        php bin/console doctrine:fixtures:load --no-interaction --append
+    ok "Fixtures loaded"
+fi
+
+# ── 14. SAML identity provider ───────────────────────────────────────────────
 header "SAML Identity Provider"
 echo
 if [[ "$APP_ENV" == "prod" ]]; then
@@ -575,7 +583,7 @@ else
     warn "SP metadata URL (accessible after import):  ${BASE_URL}/saml/metadata"
 fi
 
-# ── 14. Summary ───────────────────────────────────────────────────────────────
+# ── 15. Summary ───────────────────────────────────────────────────────────────
 header "Setup complete"
 echo
 if [[ "$APP_ENV" == "dev" ]]; then

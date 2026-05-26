@@ -529,7 +529,16 @@ docker compose -f $ComposeFile exec -T app php bin/console cache:warmup
 if ($LASTEXITCODE -ne 0) { Die 'Cache warmup failed.' }
 Ok 'Cache warm'
 
-# ── 13. SAML identity provider ────────────────────────────────────────────────
+# ── 13. Fixtures (dev only) ───────────────────────────────────────────────────
+if ($AppEnv -eq 'dev') {
+    Header 'Loading fixtures'
+    docker compose -f $ComposeFile exec -T app `
+        php bin/console doctrine:fixtures:load --no-interaction --append
+    if ($LASTEXITCODE -ne 0) { Die 'Fixture loading failed.' }
+    Ok 'Fixtures loaded'
+}
+
+# ── 14. SAML identity provider ───────────────────────────────────────────────
 Header 'SAML Identity Provider'
 Write-Host
 
@@ -580,7 +589,7 @@ if (-not [string]::IsNullOrWhiteSpace($SamlSource)) {
     Warn "SP metadata URL (accessible after import):  $BaseUrl/saml/metadata"
 }
 
-# ── 14. Summary ───────────────────────────────────────────────────────────────
+# ── 15. Summary ───────────────────────────────────────────────────────────────
 Header 'Setup complete'
 Write-Host
 
