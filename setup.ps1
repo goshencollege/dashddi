@@ -352,6 +352,8 @@ services:
     build:
       context: .
       target: prod
+      args:
+        APP_ENV: prod
     image: $AppImage
     read_only: true
     restart: unless-stopped
