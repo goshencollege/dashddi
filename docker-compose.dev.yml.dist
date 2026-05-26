@@ -77,7 +77,7 @@ services:
     volumes:
       - .:/var/www/html:ro
       - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
-      - ./docker/ssl:/etc/nginx/ssl:ro
+      - ssl_certs:/etc/nginx/ssl:ro
     tmpfs:
       - /var/cache/nginx
       - /var/run
@@ -119,5 +119,6 @@ services:
         max-file: "5"
 
 volumes:
+  ssl_certs:
   mysql_data:
   symfony_var:

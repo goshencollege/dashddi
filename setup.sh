@@ -16,6 +16,8 @@ done
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 COMPOSE_FILE="$SCRIPT_DIR/docker-compose.${APP_ENV}.yml"
 SSL_DIR="$SCRIPT_DIR/docker/ssl"
+COMPOSE_PROJECT=$(basename "$SCRIPT_DIR" | tr '[:upper:]' '[:lower:]')
+APP_IMAGE="${COMPOSE_PROJECT}-app"
 
 # ── Terminal colours (disabled when not a TTY) ────────────────────────────────
 if [[ -t 1 ]]; then
@@ -140,11 +142,15 @@ case "$SSL_CHOICE" in
         --non-interactive --agree-tos \
         --register-unsafely-without-email \
         || die "certbot failed — check the output above."
-    ln -sf "/etc/letsencrypt/live/${FQDN}/fullchain.pem" "$SSL_DIR/cert.pem"
-    ln -sf "/etc/letsencrypt/live/${FQDN}/privkey.pem"   "$SSL_DIR/key.pem"
-    ok "Let's Encrypt certificate obtained and linked into docker/ssl/"
-    warn "Set up auto-renewal: 'certbot renew --pre-hook \"docker compose -f docker-compose.${APP_ENV}.yml stop nginx\"'"
-    warn "                               --post-hook \"docker compose -f docker-compose.${APP_ENV}.yml start nginx\"'"
+    cp "/etc/letsencrypt/live/${FQDN}/fullchain.pem" "$SSL_DIR/cert.pem"
+    cp "/etc/letsencrypt/live/${FQDN}/privkey.pem"   "$SSL_DIR/key.pem"
+    ok "Let's Encrypt certificate copied to docker/ssl/"
+    warn "For certificate renewal, run:"
+    warn "  certbot renew"
+    warn "  cp /etc/letsencrypt/live/${FQDN}/fullchain.pem $SSL_DIR/cert.pem"
+    warn "  cp /etc/letsencrypt/live/${FQDN}/privkey.pem $SSL_DIR/key.pem"
+    warn "  docker run --rm -v ${COMPOSE_PROJECT}_ssl_certs:/ssl -v $SSL_DIR:/src:ro alpine sh -c 'cp /src/cert.pem /src/key.pem /ssl/'"
+    warn "  docker compose -f docker-compose.${APP_ENV}.yml restart nginx"
     ;;
 3)
     if [[ -f "$SSL_DIR/cert.pem" && -f "$SSL_DIR/key.pem" ]]; then
@@ -204,10 +210,8 @@ header "Writing docker-compose.${APP_ENV}.yml"
 # Prod: read-only containers and volume mounts. Dev: writable for easier development.
 if [[ "$APP_ENV" == "prod" ]]; then
     APP_READONLY="    read_only: true"
-    VOL_RO=":ro"
 else
     APP_READONLY=""
-    VOL_RO=""
 fi
 
 # Build the db service block and app depends_on conditionally
@@ -243,6 +247,7 @@ YAML
 
     read -r -d '' VOLUMES_BLOCK << YAML || true
 volumes:
+  ssl_certs:
   mysql_data:
   symfony_var:
 YAML
@@ -252,6 +257,7 @@ else
     DEPENDS_ON_BLOCK=""
     read -r -d '' VOLUMES_BLOCK << YAML || true
 volumes:
+  ssl_certs:
   symfony_var:
 YAML
 fi
@@ -259,11 +265,13 @@ fi
 cat > "$COMPOSE_FILE" << EOF
 services:
   app:
-    build: .
+    build:
+      context: .
+      target: prod
+    image: ${APP_IMAGE}
 ${APP_READONLY}
     restart: unless-stopped
     volumes:
-      - .:/var/www/html${VOL_RO}
       - symfony_var:/var/www/html/var
     tmpfs:
       - /tmp
@@ -289,12 +297,11 @@ ${APP_READONLY}
 ${DEPENDS_ON_BLOCK}
 
   worker_priority:
-    build: .
+    image: ${APP_IMAGE}
 ${APP_READONLY}
     restart: unless-stopped
     command: ["php", "bin/console", "messenger:consume", "async_priority", "failed_priority", "--time-limit=3600"]
     volumes:
-      - .:/var/www/html${VOL_RO}
       - symfony_var:/var/www/html/var
     tmpfs:
       - /tmp
@@ -314,12 +321,11 @@ ${APP_READONLY}
 ${DEPENDS_ON_BLOCK}
 
   worker_bulk:
-    build: .
+    image: ${APP_IMAGE}
 ${APP_READONLY}
     restart: unless-stopped
     command: ["php", "bin/console", "messenger:consume", "async_priority", "async_bulk", "failed_bulk", "--time-limit=3600"]
     volumes:
-      - .:/var/www/html${VOL_RO}
       - symfony_var:/var/www/html/var
     tmpfs:
       - /tmp
@@ -338,17 +344,19 @@ ${APP_READONLY}
         max-file: "5"
 ${DEPENDS_ON_BLOCK}
 
+  # Rebuild order: docker compose build app && docker compose build nginx
   nginx:
-    image: nginx:alpine
+    build:
+      context: docker/nginx
+      args:
+        APP_IMAGE: ${APP_IMAGE}
     read_only: true
     restart: unless-stopped
     ports:
       - "80:80"
       - "443:443"
     volumes:
-      - .:/var/www/html:ro
-      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
-      - ./docker/ssl:/etc/nginx/ssl:ro
+      - ssl_certs:/etc/nginx/ssl:ro
     tmpfs:
       - /var/cache/nginx
       - /var/run
@@ -367,34 +375,25 @@ EOF
 
 ok "docker-compose.${APP_ENV}.yml written"
 
-# ── 7. Build image ───────────────────────────────────────────────────────────
-header "Building image"
+# ── 7. Build images ──────────────────────────────────────────────────────────
+header "Building images"
 
+# app: code + composer install are baked into the prod target
 docker compose -f "$COMPOSE_FILE" build app
-ok "Image built"
+ok "Application image built (${APP_IMAGE})"
 
-# ── 8. PHP dependencies ───────────────────────────────────────────────────────
-header "Installing PHP dependencies"
+# nginx: copies public/ from the app image and bakes in the nginx config
+docker compose -f "$COMPOSE_FILE" build nginx
+ok "Nginx image built"
 
-# Run composer in a throwaway container with a writable mount. We cannot use
-# `docker compose exec` because prod containers mount the code volume read-only.
-COMPOSER_FLAGS="--no-interaction --no-progress"
-if [[ "$APP_ENV" == "prod" ]]; then
-    COMPOSER_FLAGS="$COMPOSER_FLAGS --no-dev --optimize-autoloader"
-fi
-
-# docker compose tags the built image as {project_name}-app; project name
-# defaults to the directory name (lowercased).
-COMPOSE_PROJECT=$(docker compose -f "$COMPOSE_FILE" config 2>/dev/null | awk '/^name:/ {print $2; exit}')
-COMPOSE_PROJECT=${COMPOSE_PROJECT:-$(basename "$SCRIPT_DIR" | tr '[:upper:]' '[:lower:]')}
+# ── 8. SSL certificate volume ────────────────────────────────────────────────
+header "Copying SSL certificates into volume"
 
 docker run --rm \
-    --volume "$SCRIPT_DIR:/var/www/html" \
-    --workdir /var/www/html \
-    --env COMPOSER_HOME=/tmp/composer \
-    "${COMPOSE_PROJECT}-app" \
-    composer install $COMPOSER_FLAGS
-ok "Dependencies installed"
+    -v "${COMPOSE_PROJECT}_ssl_certs:/ssl" \
+    -v "$SSL_DIR:/src:ro" \
+    alpine sh -c "cp /src/cert.pem /src/key.pem /ssl/ && chmod 644 /ssl/*.pem"
+ok "SSL certificates ready in named volume"
 
 # ── 9. Start services ────────────────────────────────────────────────────────
 header "Starting services"
@@ -450,7 +449,9 @@ if [[ -n "$SAML_SOURCE" ]]; then
         [[ -f "$SAML_SOURCE" ]] || die "File not found: $SAML_SOURCE"
         SAML_TMP="$SCRIPT_DIR/.saml-setup-metadata.xml"
         cp "$SAML_SOURCE" "$SAML_TMP"
-        SAML_ARG="/var/www/html/.saml-setup-metadata.xml"
+        APP_CONTAINER=$(docker compose -f "$COMPOSE_FILE" ps -q app | head -1)
+        docker cp "$SAML_TMP" "${APP_CONTAINER}:/tmp/saml-metadata.xml"
+        SAML_ARG="/tmp/saml-metadata.xml"
     fi
 
     docker compose -f "$COMPOSE_FILE" exec -T app \
@@ -480,7 +481,9 @@ fi
 
 if [[ "$SSL_CHOICE" == "1" ]]; then
     warn "Self-signed cert in use — browsers will show a warning."
-    warn "Replace docker/ssl/cert.pem and key.pem with a trusted cert when ready."
+    warn "To switch to a trusted cert, replace docker/ssl/cert.pem and key.pem, then run:"
+    warn "  docker run --rm -v ${COMPOSE_PROJECT}_ssl_certs:/ssl -v $SSL_DIR:/src:ro alpine sh -c 'cp /src/cert.pem /src/key.pem /ssl/'"
+    warn "  docker compose -f docker-compose.${APP_ENV}.yml restart nginx"
     echo
 fi
 
