@@ -106,8 +106,23 @@ if ((Test-Path "$SslDir\cert.pem") -and (Test-Path "$SslDir\key.pem")) {
 if ($RegenCert) {
     $San = if ($Fqdn -match '^\d+\.\d+\.\d+\.\d+$') { "IP:$Fqdn" } else { "DNS:$Fqdn,IP:127.0.0.1" }
 
-    if (Get-Command openssl -ErrorAction SilentlyContinue) {
-        openssl req -x509 -newkey rsa:2048 -nodes `
+    # Locate openssl: PATH first, then Git for Windows bundled copy
+    $opensslExe = $null
+    $opensslCmd = Get-Command openssl -ErrorAction SilentlyContinue
+    if ($opensslCmd) {
+        $opensslExe = $opensslCmd.Source
+    } else {
+        $gitPaths = @(
+            'C:\Program Files\Git\usr\bin\openssl.exe',
+            'C:\Program Files\Git\mingw64\bin\openssl.exe'
+        )
+        foreach ($p in $gitPaths) {
+            if (Test-Path $p) { $opensslExe = $p; break }
+        }
+    }
+
+    if ($opensslExe) {
+        & $opensslExe req -x509 -newkey rsa:2048 -nodes `
             -keyout "$SslDir\key.pem" `
             -out    "$SslDir\cert.pem" `
             -days 825 `
@@ -115,28 +130,12 @@ if ($RegenCert) {
             -addext "subjectAltName=$San" 2>&1 | Out-Null
         if ($LASTEXITCODE -ne 0) { Die 'openssl certificate generation failed.' }
     } else {
-        Warn 'openssl not found — using PowerShell certificate generation (requires PS 7+ / .NET 5+).'
-        $cert = New-SelfSignedCertificate `
-            -DnsName $Fqdn `
-            -CertStoreLocation 'Cert:\CurrentUser\My' `
-            -NotAfter (Get-Date).AddDays(825) `
-            -KeyAlgorithm RSA -KeyLength 2048
-
-        $certB64 = [Convert]::ToBase64String(
-            $cert.Export([Security.Cryptography.X509Certificates.X509ContentType]::Cert),
-            'InsertLineBreaks'
-        )
-        "-----BEGIN CERTIFICATE-----`n$certB64`n-----END CERTIFICATE-----" |
-            Set-Content "$SslDir\cert.pem" -Encoding ASCII
-
-        try {
-            $cert.GetRSAPrivateKey().ExportRSAPrivateKeyPem() |
-                Set-Content "$SslDir\key.pem" -Encoding ASCII
-        } catch {
-            Remove-Item "Cert:\CurrentUser\My\$($cert.Thumbprint)" -Force
-            Die 'Private key export requires .NET 5+. Install openssl (Git for Windows or: winget install ShiningLight.OpenSSL) and re-run.'
-        }
-        Remove-Item "Cert:\CurrentUser\My\$($cert.Thumbprint)" -Force
+        # Docker is already a prerequisite — use it to run openssl in a container
+        Warn 'openssl not found in PATH or Git for Windows — generating certificate via Docker.'
+        $dockerSslDir = $SslDir -replace '\\', '/'
+        docker run --rm -v "${dockerSslDir}:/ssl" alpine sh -c `
+            "apk add --no-cache openssl -q 2>/dev/null && openssl req -x509 -newkey rsa:2048 -nodes -keyout /ssl/key.pem -out /ssl/cert.pem -days 825 -subj /CN=$Fqdn -addext subjectAltName=$San 2>/dev/null"
+        if ($LASTEXITCODE -ne 0) { Die 'Docker-based certificate generation failed.' }
     }
 
     Ok 'Self-signed certificate written to docker/ssl/'
