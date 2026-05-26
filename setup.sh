@@ -529,9 +529,13 @@ ok "Cache warm"
 # ── 13. Fixtures (dev only) ───────────────────────────────────────────────────
 if [[ "$APP_ENV" == "dev" ]]; then
     header "Loading fixtures"
-    docker compose -f "$COMPOSE_FILE" exec -T app \
-        php bin/console doctrine:fixtures:load --no-interaction --append
-    ok "Fixtures loaded"
+    if compgen -G "$SCRIPT_DIR/src/DataFixtures/*.php" > /dev/null 2>&1; then
+        docker compose -f "$COMPOSE_FILE" exec -T app \
+            php bin/console doctrine:fixtures:load --no-interaction --append
+        ok "Fixtures loaded"
+    else
+        ok "No fixture files found — skipped"
+    fi
 fi
 
 # ── 14. SAML identity provider ───────────────────────────────────────────────
