@@ -1,4 +1,4 @@
-FROM php:8.3-fpm-alpine
+FROM php:8.3-fpm-alpine AS base
 
 RUN apk add --no-cache \
     bash \
@@ -27,3 +27,7 @@ WORKDIR /var/www/html
 EXPOSE 9000
 ENTRYPOINT ["entrypoint.sh"]
 CMD ["php-fpm"]
+
+FROM base AS prod
+COPY . /var/www/html
+RUN composer install --no-dev --optimize-autoloader --no-interaction --no-progress
