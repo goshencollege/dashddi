@@ -64,13 +64,15 @@ if [[ -f "$COMPOSE_FILE" ]]; then
     warn "docker-compose.dev.yml already exists."
     ask_yn "Overwrite and re-run full setup?" "n" \
         || { echo "  Aborted."; exit 0; }
+    # Wipe the old stack and volumes so regenerated credentials take effect
+    docker compose -f "$COMPOSE_FILE" down -v 2>/dev/null || true
 fi
 
 # ── 2. Hostname ───────────────────────────────────────────────────────────────
 header "Hostname"
 
 ask FQDN "Hostname or IP (e.g. localhost, 192.168.1.50, mydev.local)" "localhost"
-BASE_URL="https://${FQDN}"
+BASE_URL="https://${FQDN}:8443"
 ok "Base URL: $BASE_URL"
 
 # ── 3. Secrets ────────────────────────────────────────────────────────────────

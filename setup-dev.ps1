@@ -69,13 +69,15 @@ if (Test-Path $ComposeFile) {
     if (-not (AskYn 'Overwrite and re-run full setup?')) {
         Write-Host '  Aborted.'; exit 0
     }
+    # Wipe the old stack and volumes so regenerated credentials take effect
+    docker compose -f $ComposeFile down -v 2>&1 | Out-Null
 }
 
 # ── 2. Hostname ───────────────────────────────────────────────────────────────
 Header 'Hostname'
 
 $Fqdn    = Ask 'Hostname or IP (e.g. localhost, 192.168.1.50, mydev.local)' 'localhost'
-$BaseUrl = "https://$Fqdn"
+$BaseUrl = "https://$Fqdn:8443"
 Ok "Base URL: $BaseUrl"
 
 # ── 3. Secrets ────────────────────────────────────────────────────────────────
