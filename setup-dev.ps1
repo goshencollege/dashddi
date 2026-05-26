@@ -213,10 +213,8 @@ if ($LASTEXITCODE -ne 0) { Die 'Cache warmup failed.' }
 Ok 'Cache warm'
 
 # ── 11. SAML identity provider (optional) ────────────────────────────────────
+# Note: /saml/metadata is only accessible after an IdP provider is imported.
 Header 'SAML Identity Provider'
-Write-Host
-Write-Host '  SP metadata URL (give this to your IdP administrator):'
-Write-Host "  $BaseUrl/saml/metadata" -ForegroundColor Cyan
 Write-Host
 $SamlSource = Read-Host '  Path to IdP metadata XML file, or URL (leave blank to skip)'
 
@@ -239,9 +237,14 @@ if (-not [string]::IsNullOrWhiteSpace($SamlSource)) {
 
     if ($SamlTmp) { Remove-Item $SamlTmp -Force }
     Ok "SAML provider '$SamlName' imported and set as active"
+    Write-Host
+    Write-Host '  Give this SP metadata URL to your IdP administrator:' -ForegroundColor White
+    Write-Host "  $BaseUrl/saml/metadata" -ForegroundColor Cyan
 } else {
-    Warn 'Skipped — configure SAML later with:'
+    Warn 'Skipped — no one will be able to log in until a SAML provider is configured.'
+    Warn 'Run this when ready:'
     Warn '  docker compose -f docker-compose.dev.yml exec app php bin/console app:saml:import-metadata <file-or-url> --activate'
+    Warn "SP metadata URL (accessible after import):  $BaseUrl/saml/metadata"
 }
 
 # ── 12. Summary ───────────────────────────────────────────────────────────────
