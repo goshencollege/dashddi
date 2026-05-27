@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Git workflow
+
+Always use **merge commits** when merging pull requests — never squash. Use `gh pr merge <number> --merge --delete-branch`.
+
 ## What this is
 
 DashDDI is a Symfony 7.4 / PHP 8.3 web application for DNS, DHCP, and IP address management. It manages subnets, hosts, DNS zones/records, DHCP servers, VLANs, and VRFs, with SAML authentication, API token access, encrypted sensitive fields, and async push notifications to external systems (BIND, Kea DHCP, ClearPass NAC, Snipe-IT).
