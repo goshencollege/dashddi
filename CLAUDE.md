@@ -89,6 +89,51 @@ docker compose -f docker-compose.dev.yml exec app php bin/console make:migration
 make migrate
 ```
 
-## No test suite
+## Test suite
 
-There is currently no `tests/` directory or `phpunit.xml`. Do not reference tests when describing changes.
+PHPUnit 12 unit tests live in `tests/Unit/`. Run them inside the container:
+
+```bash
+docker compose -f docker-compose.dev.yml exec app php vendor/bin/phpunit
+```
+
+### Test structure
+
+```
+tests/Unit/
+  Service/         # one test class per service
+  Entity/Trait/    # tests for AuditableTrait and SoftDeletableTrait
+  Validator/       # tests for custom Symfony validators
+```
+
+### What is covered
+
+| File | What it tests |
+|---|---|
+| `Service/EncryptionServiceTest` | encrypt/decrypt round-trip, prefix detection, wrong key, corrupt data |
+| `Service/ReservedTagPrefixServiceTest` | prefix matching (case-insensitive), no-match, getPrefixes |
+| `Service/DnsViewResolverTest` | view intersection, null domain/subnet, isDomainUsable, reason strings |
+| `Service/SshKeyServiceTest` | Ed25519 key-pair generation, public-key extraction |
+| `Service/IpAddressManagerTest` | available IPv4/IPv6 ranges, limit, allocation exclusion, EUI-64, IPv6-from-IPv4 |
+| `Service/BindZoneFileParserTest` | A/AAAA/CNAME/MX/NS/TXT records, $ORIGIN/$TTL directives, comments, multi-line parens, inherited names |
+| `Service/PushScopeServiceTest` | affectsDhcp entity types, clearpassMacsFor (iface/IP/IPv6/unrelated) |
+| `Entity/Trait/SoftDeletableTraitTest` | softDelete, restore, isDeleted |
+| `Entity/Trait/AuditableTraitTest` | all getters/setters, null acceptance |
+| `Validator/UniqueMacAddressValidatorTest` | zero-MAC pass-through, unique/duplicate MAC, self-edit, non-interface value |
+
+### Rules for new features
+
+Every new **Service**, **Validator**, or **Entity trait** must ship with a corresponding unit test file in `tests/Unit/`. The test file goes in the matching subdirectory and is named `<ClassName>Test.php`.
+
+**Unit test conventions:**
+- Extend `PHPUnit\Framework\TestCase` directly (no Symfony kernel needed for unit tests).
+- Use `createStub()` for dependencies you only need to control return values on; use `createMock()` only when you need to assert a method was called a specific number of times.
+- Set entity IDs via `ReflectionProperty` when testing code that calls `getId()` on unpersisted objects.
+- Each test method name must read as a sentence describing the expected behaviour (e.g., `testDecryptPlaintextPassthrough`).
+
+**What not to test in unit tests:**
+- Deploy services that open SSH connections (`DnsDeployService`, `DhcpDeployService`) — these require real infrastructure.
+- SAML authentication — requires an external IdP.
+- Message handlers that depend on the full Symfony Messenger stack.
+
+These categories are candidates for future integration tests once a test database is wired up.
