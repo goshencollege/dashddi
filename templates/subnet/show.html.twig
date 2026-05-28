@@ -102,12 +102,12 @@
 
 <div class="card mb-4">
     <div class="card-header d-flex justify-content-between align-items-center">
-        <span><i class="bi bi-grid me-1"></i>Address Blocks ({{ subnet.addressBlocks|length }})</span>
+        <span><i class="bi bi-grid me-1"></i>Address Blocks ({{ blocks|length }})</span>
         <a href="{{ path('block_new', {subnetId: subnet.id}) }}" class="btn btn-sm btn-primary">
             <i class="bi bi-plus-lg me-1"></i>Add Block
         </a>
     </div>
-    {% if subnet.addressBlocks is empty %}
+    {% if blocks is empty %}
         <div class="card-body text-center text-muted py-3">
             No blocks defined — all addresses in the subnet are available for assignment.
         </div>
@@ -125,7 +125,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for ab in subnet.addressBlocks %}
+                    {% for ab in blocks %}
                         <tr>
                             <td>
                                 <span class="badge bg-{{ ab.type.badgeClass() }}">{{ ab.type.label() }}</span>
