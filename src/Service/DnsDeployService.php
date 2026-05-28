@@ -16,12 +16,12 @@ class DnsDeployService
      * For each view on the server:
      *   - Creates a remote subdirectory ({remoteZonePath}/{viewName}/)
      *   - Uploads a zone file per domain in that view via SFTP
-     * Then uploads views.conf and runs rndc reload.
+     * Then uploads dashddi.conf and runs rndc reload.
      *
      * Result shape:
      * [
      *   'views'  => [ 'viewName' => [ 'mkdir' => [...], 'zones' => [ 'domain' => [...] ] ] ],
-     *   'conf'   => [ 'success' => bool, 'file' => 'views.conf', 'output' => string ],
+     *   'conf'   => [ 'success' => bool, 'file' => 'dashddi.conf', 'output' => string ],
      *   'reload' => [ 'success' => bool, 'output' => string ] | null,
      * ]
      */
@@ -76,8 +76,8 @@ class DnsDeployService
             $results['views'][$viewName] = $viewResult;
         }
 
-        $confOk = $sftp->put($zonePath . '/views.conf', $this->generator->generateViewsConf($server));
-        $results['conf'] = ['success' => $confOk, 'file' => 'views.conf', 'output' => $confOk ? '' : 'SFTP upload failed'];
+        $confOk = $sftp->put($zonePath . '/dashddi.conf', $this->generator->generateViewsConf($server));
+        $results['conf'] = ['success' => $confOk, 'file' => 'dashddi.conf', 'output' => $confOk ? '' : 'SFTP upload failed'];
 
         if ($hasDomains || $confOk) {
             $rndcOut = $sftp->exec('rndc reload');

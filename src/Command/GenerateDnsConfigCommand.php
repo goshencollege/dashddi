@@ -14,7 +14,7 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
-#[AsCommand(name: 'app:generate-dns-config', description: 'Generate and optionally deploy BIND zone files and views.conf')]
+#[AsCommand(name: 'app:generate-dns-config', description: 'Generate and optionally deploy BIND zone files and dashddi.conf')]
 class GenerateDnsConfigCommand extends Command
 {
     public function __construct(
@@ -80,8 +80,8 @@ class GenerateDnsConfigCommand extends Command
                 }
             }
 
-            // Write views.conf
-            $confFile = $serverDir . '/views.conf';
+            // Write dashddi.conf
+            $confFile = $serverDir . '/dashddi.conf';
             file_put_contents($confFile, $this->generator->generateViewsConf($server));
             $io->writeln(' <info>Wrote</info> ' . $confFile);
 
@@ -119,9 +119,9 @@ class GenerateDnsConfigCommand extends Command
 
                 if (($results['conf'] ?? null) !== null) {
                     if ($results['conf']['success']) {
-                        $io->writeln(' <info>Deployed</info> views.conf');
+                        $io->writeln(' <info>Deployed</info> dashddi.conf');
                     } else {
-                        $io->writeln(' <error>Failed</error>  views.conf: ' . $results['conf']['output']);
+                        $io->writeln(' <error>Failed</error>  dashddi.conf: ' . $results['conf']['output']);
                         $failed = true;
                     }
                 }

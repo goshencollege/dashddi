@@ -5,7 +5,7 @@ DashDDI generates BIND zone files from your domain and subnet data and deploys t
 ## How It Works
 
 1. DashDDI reads all domains, subnets, DNS views, and network interfaces from the database.
-2. It generates BIND-compatible zone files (forward zones per domain, reverse zones per subnet) and a `views.conf` file that defines ACLs and DNSSEC policies.
+2. It generates BIND-compatible zone files (forward zones per domain, reverse zones per subnet) and a `dashddi.conf` file that defines ACLs and DNSSEC policies.
 3. The generated files are deployed to each DNS server via SFTP.
 4. After uploading, DashDDI runs `rndc reload` on the remote server to apply the changes without restarting BIND.
 
@@ -47,7 +47,7 @@ Files are written to `{remoteZonePath}/{viewName}/`:
 
 - **Forward zones:** one file per domain (e.g., `example.com.zone`)
 - **Reverse zones:** one file per subnet (e.g., `10.0.1.0.zone` for IPv4, `ip6.arpa` zone for IPv6)
-- **`views.conf`:** ACL definitions and all `view {}` blocks with `zone {}` stanzas
+- **`dashddi.conf`:** ACL definitions and all `view {}` blocks with `zone {}` stanzas
 
 Includes:
 - SOA record (serial, refresh, retry, expire, TTL from domain/subnet settings)
