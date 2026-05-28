@@ -79,12 +79,13 @@ docker compose -f docker-compose.prod.yml logs -f
 
 ### Containers
 
-| Service  | Description                              |
-|----------|------------------------------------------|
-| `app`    | PHP 8.3-FPM application                  |
-| `worker` | Symfony Messenger async queue consumer   |
-| `nginx`  | Nginx reverse proxy (HTTP/HTTPS)         |
-| `db`     | MySQL 8.0 database                       |
+| Service          | Description                                                      |
+|------------------|------------------------------------------------------------------|
+| `app`            | PHP 8.3-FPM application                                          |
+| `worker_priority`| Messenger consumer for fast push messages (`async_priority`)     |
+| `worker_bulk`    | Messenger consumer for long-running jobs (`async_bulk`); also monitors `async_priority` when idle |
+| `nginx`          | Nginx reverse proxy (HTTP/HTTPS)                                 |
+| `db`             | MySQL 8.0 database                                               |
 
 ### Running Console Commands
 
