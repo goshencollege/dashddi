@@ -125,7 +125,7 @@ class SubnetApiController extends AbstractController
         if ($has('is_container'))                         { $subnet->setIsContainer((bool) ($data['is_container'] ?? false)); }
 
         if ($has('vrf_id')) {
-            $subnet->setVrf($data['vrf_id'] ? $vrfRepo->find($data['vrf_id']) : null);
+            $subnet->setVrf(($data['vrf_id'] ?? null) ? $vrfRepo->find($data['vrf_id']) : null);
         }
 
         if ($has('tag_ids')) {
