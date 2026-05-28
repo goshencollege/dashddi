@@ -1,4 +1,4 @@
-.PHONY: up down restart bash migrate cc logs db-shell cert reset
+.PHONY: up down restart bash migrate cc logs db-shell cert reset test-setup test
 
 up:
 	docker compose -f docker-compose.dev.yml up -d
@@ -31,6 +31,14 @@ reset:
 	@until docker compose -f docker-compose.dev.yml exec -T app php -r 'echo "ok";' 2>/dev/null | grep -q ok; do sleep 2; done
 	docker compose -f docker-compose.dev.yml exec -T app php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
 	docker compose -f docker-compose.dev.yml exec -T app php bin/console doctrine:fixtures:load --no-interaction --purge-exclusions=scheduled_task
+
+test-setup:
+	docker compose -f docker-compose.dev.yml exec -T app php bin/console doctrine:database:create --env=test --if-not-exists --no-interaction
+	docker compose -f docker-compose.dev.yml exec -T app php bin/console doctrine:migrations:migrate --env=test --no-interaction --allow-no-migration
+	docker compose -f docker-compose.dev.yml exec -T app php bin/console doctrine:fixtures:load --env=test --group=test --no-interaction
+
+test:
+	docker compose -f docker-compose.dev.yml exec -T app php vendor/bin/phpunit
 
 cert:
 	mkdir -p docker/ssl

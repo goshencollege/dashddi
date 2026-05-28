@@ -52,3 +52,11 @@ when@dev:
             autoconfigure: true
         App\DataFixtures\:
             resource: '../src/DataFixtures/'
+
+when@test:
+    services:
+        _defaults:
+            autowire: true
+            autoconfigure: true
+        App\DataFixtures\:
+            resource: '../src/DataFixtures/'
