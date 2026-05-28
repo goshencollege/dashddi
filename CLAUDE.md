@@ -104,6 +104,8 @@ make test-setup  # first-time only: creates ipam_test DB, runs migrations, loads
 make test        # run all 182 tests
 ```
 
+Both targets auto-generate `.env.test.local` (gitignored) from `.env.test.local.dist` on first run, pulling `APP_ENCRYPTION_KEY` and `DATABASE_URL` out of `docker-compose.dev.yml`. Delete `.env.test.local` and re-run to regenerate after running `setup.sh` again.
+
 ### Test structure
 
 ```
