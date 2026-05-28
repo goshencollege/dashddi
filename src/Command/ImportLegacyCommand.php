@@ -314,6 +314,22 @@ class ImportLegacyCommand extends Command
                     $this->em->persist($fixed);
                 }
             }
+
+            // Dynamic block: max_ip+1 – last usable address (broadcast−1)
+            $prefixLen      = (int) explode('/', $cidr)[1];
+            $lastUsableLong = ip2long($network) + (1 << (32 - $prefixLen)) - 2;
+            $dynamicStart   = long2ip(ip2long($fixedEnd) + 1);
+
+            if ($lastUsableLong >= ip2long($dynamicStart)) {
+                $dynamic = new AddressBlock();
+                $dynamic->setSubnet($subnet);
+                $dynamic->setType(BlockType::Dynamic);
+                $dynamic->setStartIp($dynamicStart);
+                $dynamic->setEndIp(long2ip($lastUsableLong));
+                if (!$dryRun) {
+                    $this->em->persist($dynamic);
+                }
+            }
         }
 
         if (!$dryRun) {
