@@ -6,7 +6,6 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SSL_DIR="$SCRIPT_DIR/docker/ssl"
 COMPOSE_PROJECT=$(basename "$SCRIPT_DIR" | tr '[:upper:]' '[:lower:]')
-APP_IMAGE="${COMPOSE_PROJECT}-app"
 
 # ── Terminal colours (disabled when not a TTY) ────────────────────────────────
 if [[ -t 1 ]]; then
@@ -63,6 +62,8 @@ case "$ENV_CHOICE" in
     2) APP_ENV="prod" ;;
     *) die "Invalid choice." ;;
 esac
+
+APP_IMAGE="${COMPOSE_PROJECT}-${APP_ENV}-app"
 
 COMPOSE_FILE="$SCRIPT_DIR/docker-compose.${APP_ENV}.yml"
 
@@ -205,7 +206,7 @@ else
         warn "  certbot renew"
         warn "  cp /etc/letsencrypt/live/${FQDN}/fullchain.pem $SSL_DIR/cert.pem"
         warn "  cp /etc/letsencrypt/live/${FQDN}/privkey.pem $SSL_DIR/key.pem"
-        warn "  docker run --rm -v ${COMPOSE_PROJECT}_ssl_certs:/ssl -v $SSL_DIR:/src:ro alpine sh -c 'cp /src/cert.pem /src/key.pem /ssl/'"
+        warn "  docker run --rm -v ${COMPOSE_PROJECT}-${APP_ENV}_ssl_certs:/ssl -v $SSL_DIR:/src:ro alpine sh -c 'cp /src/cert.pem /src/key.pem /ssl/'"
         warn "  docker compose -f docker-compose.prod.yml restart nginx"
         ;;
     3)
@@ -275,6 +276,7 @@ if [[ "$APP_ENV" == "dev" ]]; then
     header "Writing docker-compose.dev.yml"
 
     sed \
+        -e "s|replace_with_compose_project|${COMPOSE_PROJECT}-dev|g" \
         -e "s|replace_with_32plus_char_secret|${APP_SECRET}|g" \
         -e "s|run: docker compose exec app php bin/console app:generate-encryption-key|${APP_ENCRYPTION_KEY}|g" \
         -e "s|https://your-dev-hostname.example.com|${BASE_URL}|g" \
@@ -336,6 +338,8 @@ YAML
     fi
 
     cat > "$COMPOSE_FILE" << EOF
+name: ${COMPOSE_PROJECT}-prod
+
 services:
   app:
     build:
@@ -479,7 +483,7 @@ fi
 header "Copying SSL certificates into volume"
 
 docker run --rm \
-    -v "${COMPOSE_PROJECT}_ssl_certs:/ssl" \
+    -v "${COMPOSE_PROJECT}-${APP_ENV}_ssl_certs:/ssl" \
     -v "$SSL_DIR:/src:ro" \
     alpine sh -c "cp /src/cert.pem /src/key.pem /ssl/ && chmod 644 /ssl/*.pem"
 ok "SSL certificates ready in named volume"
@@ -612,7 +616,7 @@ if [[ "$APP_ENV" == "dev" ]]; then
 elif [[ "${SSL_CHOICE:-}" == "1" ]]; then
     warn "Self-signed cert in use — browsers will show a warning."
     warn "To switch to a trusted cert, replace docker/ssl/cert.pem and key.pem, then run:"
-    warn "  docker run --rm -v ${COMPOSE_PROJECT}_ssl_certs:/ssl -v $SSL_DIR:/src:ro alpine sh -c 'cp /src/cert.pem /src/key.pem /ssl/'"
+    warn "  docker run --rm -v ${COMPOSE_PROJECT}-${APP_ENV}_ssl_certs:/ssl -v $SSL_DIR:/src:ro alpine sh -c 'cp /src/cert.pem /src/key.pem /ssl/'"
     warn "  docker compose -f docker-compose.${APP_ENV}.yml restart nginx"
 fi
 echo
