@@ -49,6 +49,14 @@ Files are written to `{remoteZonePath}/{viewName}/`:
 - **Reverse zones:** one file per subnet (e.g., `10.0.1.0.zone` for IPv4, `ip6.arpa` zone for IPv6)
 - **`dashddi.conf`:** ACL definitions and all `view {}` blocks with `zone {}` stanzas
 
+Add the following to your BIND `named.conf` (replacing the path with your configured remote zone path):
+
+```
+include "/etc/bind/zones/dashddi.conf";
+```
+
+The generated `dashddi.conf` also contains this line as a comment at the top as a reminder.
+
 Includes:
 - SOA record (serial, refresh, retry, expire, TTL from domain/subnet settings)
 - A/AAAA records from interface names
