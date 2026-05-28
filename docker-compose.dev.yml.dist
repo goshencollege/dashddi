@@ -1,3 +1,5 @@
+name: replace_with_compose_project
+
 x-worker-base: &worker-base
   build:
     context: .

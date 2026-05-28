@@ -37,7 +37,7 @@ enum SchedulableTask: string
             self::PushClearpass          => 'Syncs interface data to the endpoint repository on all configured ClearPass servers. Creates, updates, and removes only endpoints managed by DashDDI.',
             self::PullClearpassLogs      => 'Pulls authentication session logs from all configured ClearPass servers using the REST API. On first run, imports the last 24 hours. Subsequent runs pick up where the previous left off.',
             self::PurgeClearpassAuthLogs => 'Deletes ClearPass authentication log entries older than the retention period configured in Application Settings (default 90 days).',
-            self::PushDns                => 'Generates BIND zone files and views.conf, then deploys them to all configured DNS servers.',
+            self::PushDns                => 'Generates BIND zone files and dashddi.conf, then deploys them to all configured DNS servers.',
             self::PushDhcp               => 'Generates DHCP subnet configuration and deploys it to all configured DHCP servers.',
             self::PurgeLeases            => 'Deletes DHCP lease log entries that exceed each subnet\'s configured retention period. A default retention period (for subnets with no per-subnet setting and unmatched leases) can be configured in Application Settings.',
             self::PurgePushLogs          => 'Deletes DNS/DHCP push log entries older than the retention period configured in Application Settings (default 30 days).',

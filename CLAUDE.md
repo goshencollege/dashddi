@@ -2,6 +2,11 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Git workflow
+
+Always use **merge commits** when merging pull requests — never squash. Use `gh pr merge <number> --merge --delete-branch`.
+
+
 ## What this is
 
 DashDDI is a Symfony 7.4 / PHP 8.3 web application for DNS, DHCP, and IP address management. It manages subnets, hosts, DNS zones/records, DHCP servers, VLANs, and VRFs, with SAML authentication, API token access, encrypted sensitive fields, and async push notifications to external systems (BIND, Kea DHCP, ClearPass NAC, Snipe-IT).
@@ -21,6 +26,8 @@ make cc          # clear Symfony cache
 make db-shell    # MySQL shell
 make reset       # wipe volumes, rebuild, migrate, load fixtures (full reset)
 make cert        # generate a self-signed SSL cert in docker/ssl/
+make test-setup  # create/migrate/seed the ipam_test database (run once before first test run)
+make test        # run the full test suite (91 unit + 91 functional)
 ```
 
 The PHP container is named `app`. For commands not in the Makefile:
@@ -89,6 +96,63 @@ docker compose -f docker-compose.dev.yml exec app php bin/console make:migration
 make migrate
 ```
 
-## No test suite
+## Test suite
 
-There is currently no `tests/` directory or `phpunit.xml`. Do not reference tests when describing changes.
+182 tests total: 91 unit tests (`tests/Unit/`) and 91 functional tests (`tests/Functional/`).
+
+```bash
+make test-setup  # first-time only: creates ipam_test DB, runs migrations, loads fixtures
+make test        # run all 182 tests
+```
+
+Both targets auto-generate `.env.test.local` (gitignored) from `.env.test.local.dist` on first run, pulling `APP_ENCRYPTION_KEY` and `DATABASE_URL` out of `docker-compose.dev.yml`. Delete `.env.test.local` and re-run to regenerate after running `setup.sh` again.
+
+### Test structure
+
+```
+tests/Unit/
+  Service/         # one test class per service
+  Entity/Trait/    # tests for AuditableTrait and SoftDeletableTrait
+  Validator/       # tests for custom Symfony validators
+tests/Functional/
+  AppWebTestCase.php          # base class: fake SAML auth, DBAL transaction isolation
+  Controller/                 # HTTP-level CRUD tests for all controllers
+  Api/                        # JSON API endpoint tests
+```
+
+### How functional tests work
+
+- Each test is wrapped in a DBAL transaction that is rolled back in `tearDown`, so the `ipam_test` database stays clean between tests — no fixture reloads needed between runs.
+- A fake SAML user is injected via `KernelBrowser::loginUser()` so every request is authenticated.
+- `KernelBrowser::disableReboot()` keeps one kernel and one DBAL connection for the whole test, which is required for the transaction isolation to work.
+- Stateless CSRF (`SameOriginCsrfTokenManager`) is satisfied by setting `Sec-Fetch-Site: same-origin` on all test requests.
+
+### What is covered
+
+| File | What it tests |
+|---|---|
+| `Service/EncryptionServiceTest` | encrypt/decrypt round-trip, prefix detection, wrong key, corrupt data |
+| `Service/ReservedTagPrefixServiceTest` | prefix matching (case-insensitive), no-match, getPrefixes |
+| `Service/DnsViewResolverTest` | view intersection, null domain/subnet, isDomainUsable, reason strings |
+| `Service/SshKeyServiceTest` | Ed25519 key-pair generation, public-key extraction |
+| `Service/IpAddressManagerTest` | available IPv4/IPv6 ranges, limit, allocation exclusion, EUI-64, IPv6-from-IPv4 |
+| `Service/BindZoneFileParserTest` | A/AAAA/CNAME/MX/NS/TXT records, $ORIGIN/$TTL directives, comments, multi-line parens, inherited names |
+| `Service/PushScopeServiceTest` | affectsDhcp entity types, clearpassMacsFor (iface/IP/IPv6/unrelated) |
+| `Entity/Trait/SoftDeletableTraitTest` | softDelete, restore, isDeleted |
+| `Entity/Trait/AuditableTraitTest` | all getters/setters, null acceptance |
+| `Validator/UniqueMacAddressValidatorTest` | zero-MAC pass-through, unique/duplicate MAC, self-edit, non-interface value |
+
+### Rules for new features
+
+Every new **Service**, **Validator**, or **Entity trait** must ship with a corresponding unit test file in `tests/Unit/`. The test file goes in the matching subdirectory and is named `<ClassName>Test.php`.
+
+**Unit test conventions:**
+- Extend `PHPUnit\Framework\TestCase` directly (no Symfony kernel needed for unit tests).
+- Use `createStub()` for dependencies you only need to control return values on; use `createMock()` only when you need to assert a method was called a specific number of times.
+- Set entity IDs via `ReflectionProperty` when testing code that calls `getId()` on unpersisted objects.
+- Each test method name must read as a sentence describing the expected behaviour (e.g., `testDecryptPlaintextPassthrough`).
+
+**What not to test in unit tests:**
+- Deploy services that open SSH connections (`DnsDeployService`, `DhcpDeployService`) — these require real infrastructure.
+- SAML authentication — requires an external IdP.
+- Message handlers that depend on the full Symfony Messenger stack.
