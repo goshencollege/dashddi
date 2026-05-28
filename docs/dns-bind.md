@@ -35,6 +35,16 @@ DashDDI generates an Ed25519 SSH key pair per server. To authorize DashDDI:
 2. Add it to `~/.ssh/authorized_keys` (or the configured user's home) on the BIND server.
 3. Ensure the SSH user has write access to the remote zone path and can run `rndc`.
 
+### named.conf Include
+
+DashDDI deploys all ACLs, views, and zone stanzas into a single file (`dashddi.conf`) in the configured remote zone path. Add one line to your BIND `named.conf` to load it:
+
+```
+include "/etc/bind/zones/dashddi.conf";
+```
+
+Adjust the path if you changed the **Remote Zone Path** setting. The generated `dashddi.conf` contains this line as a comment at the top as a reminder.
+
 ## DNS Views
 
 DashDDI uses views to serve different zone data to different clients. Each DNS server can be assigned one or more views. Each domain and subnet belongs to one or more views; only records in matching views are included in the zone files uploaded to a given server.
@@ -48,14 +58,6 @@ Files are written to `{remoteZonePath}/{viewName}/`:
 - **Forward zones:** one file per domain (e.g., `example.com.zone`)
 - **Reverse zones:** one file per subnet (e.g., `10.0.1.0.zone` for IPv4, `ip6.arpa` zone for IPv6)
 - **`dashddi.conf`:** ACL definitions and all `view {}` blocks with `zone {}` stanzas
-
-Add the following to your BIND `named.conf` (replacing the path with your configured remote zone path):
-
-```
-include "/etc/bind/zones/dashddi.conf";
-```
-
-The generated `dashddi.conf` also contains this line as a comment at the top as a reminder.
 
 Includes:
 - SOA record (serial, refresh, retry, expire, TTL from domain/subnet settings)
