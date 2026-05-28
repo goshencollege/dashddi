@@ -169,6 +169,18 @@ make test        # run all 182 tests
 
 Functional tests run against a real `ipam_test` MySQL database. Each test is wrapped in a DBAL transaction that is rolled back after the test, so the database stays clean between runs without reloading fixtures.
 
+## Integrations
+
+DashDDI connects to several external systems for configuration deployment, asset sync, and network access control. Each integration has its own setup guide:
+
+| Integration | Description |
+|---|---|
+| [DNS / BIND](docs/dns-bind.md) | Generate and deploy BIND zone files to DNS servers via SSH |
+| [DHCP / Kea](docs/dhcp-kea.md) | Generate and deploy Kea DHCP config via SSH; receive lease notifications via webhook |
+| [Aruba CX Switch](docs/aruba-cx-switch.md) | Query port info and perform port actions (bounce, reauthenticate, POE) |
+| [Snipe-IT](docs/snipe-it.md) | Pull asset and MAC address data from Snipe-IT to populate hosts and interfaces |
+| [ClearPass](docs/clearpass.md) | Push managed endpoints to ClearPass and pull RADIUS authentication logs |
+
 ## Certbot DNS Plugin
 
 The `certbot-dns-dashddi` directory contains a Python plugin that enables Let's Encrypt DNS-01 challenge automation through DashDDI's API. See [`certbot-dns-dashddi/README.md`](certbot-dns-dashddi/README.md) for installation and usage instructions.
