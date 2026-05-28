@@ -289,7 +289,7 @@ else
     header "Writing docker-compose.prod.yml"
 
     if [[ "$USE_CONTAINER_DB" == "true" ]]; then
-        read -r -d '' DB_SERVICE_BLOCK << YAML || true
+        IFS= read -r -d '' DB_SERVICE_BLOCK << YAML || true
 
   db:
     image: mysql:8.0
@@ -312,13 +312,13 @@ else
 
 YAML
 
-        read -r -d '' DEPENDS_ON_BLOCK << YAML || true
+        IFS= read -r -d '' DEPENDS_ON_BLOCK << YAML || true
     depends_on:
       db:
         condition: service_healthy
 YAML
 
-        read -r -d '' VOLUMES_BLOCK << YAML || true
+        IFS= read -r -d '' VOLUMES_BLOCK << YAML || true
 volumes:
   ssl_certs:
   mysql_data:
@@ -328,7 +328,7 @@ YAML
     else
         DB_SERVICE_BLOCK=""
         DEPENDS_ON_BLOCK=""
-        read -r -d '' VOLUMES_BLOCK << YAML || true
+        IFS= read -r -d '' VOLUMES_BLOCK << YAML || true
 volumes:
   ssl_certs:
   symfony_var:
