@@ -181,6 +181,8 @@ DashDDI connects to several external systems for configuration deployment, asset
 | [Snipe-IT](docs/snipe-it.md) | Pull asset and MAC address data from Snipe-IT to populate hosts and interfaces |
 | [ClearPass](docs/clearpass.md) | Push managed endpoints to ClearPass and pull RADIUS authentication logs |
 
+DashDDI also exposes a REST API for programmatic access to all resources. Full API documentation — including all endpoints, request/response schemas, and authentication details — is available within the app at `/api-docs`.
+
 ## Certbot DNS Plugin
 
 The `certbot-dns-dashddi` directory contains a Python plugin that enables Let's Encrypt DNS-01 challenge automation through DashDDI's API. See [`certbot-dns-dashddi/README.md`](certbot-dns-dashddi/README.md) for installation and usage instructions.
