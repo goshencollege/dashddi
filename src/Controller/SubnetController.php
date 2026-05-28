@@ -205,8 +205,12 @@ class SubnetController extends AbstractController
     #[Route('/{id}', name: 'subnet_show', methods: ['GET'])]
     public function show(Subnet $subnet, IpAddressManager $manager): Response
     {
+        $blocks = $subnet->getAddressBlocks()->toArray();
+        usort($blocks, fn($a, $b) => ip2long($a->getStartIp()) <=> ip2long($b->getStartIp()));
+
         return $this->render('subnet/show.html.twig', [
             'subnet'          => $subnet,
+            'blocks'          => $blocks,
             'available_ipv4'  => $subnet->getIpv4Cidr() ? $manager->getAvailableIpv4($subnet, 255) : [],
             'available_ipv6'  => $subnet->getIpv6Cidr() ? $manager->getAvailableIpv6($subnet, 20) : [],
         ]);
