@@ -40,7 +40,7 @@ DashDDI pushes network interface data to the ClearPass Endpoint repository. This
 
 ### What Gets Pushed
 
-For each interface that has the RADIUS authentication tag set, DashDDI creates or updates a ClearPass endpoint with the following attributes:
+For each non-deleted interface with a real MAC address, DashDDI creates or updates a ClearPass endpoint with the following attributes:
 
 | ClearPass Attribute | Source |
 |---|---|
