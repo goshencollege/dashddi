@@ -1,0 +1,811 @@
+<?php
+
+namespace App\Command;
+
+use App\Entity\AddressBlock;
+use App\Entity\Building;
+use App\Entity\DnsView;
+use App\Entity\Domain;
+use App\Entity\Host;
+use App\Entity\InterfaceName;
+use App\Entity\IpAddress;
+use App\Entity\Ipv6Address;
+use App\Entity\NetworkInterface;
+use App\Entity\SnipeItCategorySubnetMap;
+use App\Entity\SnipeItServer;
+use App\Entity\Subnet;
+use App\Entity\Tag;
+use App\Enum\BlockType;
+use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Component\Console\Attribute\AsCommand;
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
+use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\Console\Style\SymfonyStyle;
+
+#[AsCommand(
+    name: 'app:import:legacy',
+    description: 'Import data from the legacy IPAM MySQL database',
+)]
+class ImportLegacyCommand extends Command
+{
+    public function __construct(private readonly EntityManagerInterface $em)
+    {
+        parent::__construct();
+    }
+
+    protected function configure(): void
+    {
+        $this->addOption('dry-run', null, InputOption::VALUE_NONE, 'Simulate import without writing to the database');
+    }
+
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
+        ini_set('memory_limit', '512M');
+
+        $io     = new SymfonyStyle($input, $output);
+        $dryRun = $input->getOption('dry-run');
+
+        if ($dryRun) {
+            $io->note('Dry run — no changes will be written');
+        }
+
+        $pdo  = $this->connectLegacy();
+        $conn = $this->em->getConnection();
+
+        if (!$dryRun) {
+            $io->section('Truncating');
+            $this->truncateImportedTables($conn, $io);
+            $conn->beginTransaction();
+        }
+
+        try {
+            $io->section('Buildings');
+            $buildings = $this->importBuildings($pdo, $io, $dryRun);
+
+            $io->section('Domains');
+            $domains = $this->importDomains($pdo, $io, $dryRun);
+
+            $io->section('Subnets');
+            $subnets = $this->importSubnets($pdo, $io, $dryRun, $domains);
+
+            $io->section('DNS Views');
+            $this->setupDnsViews($io, $dryRun, $domains, $subnets);
+
+            $io->section('Tags');
+            $tags = $this->importTags($pdo, $io, $dryRun);
+
+            $io->section('Hosts');
+            $this->importHosts($pdo, $io, $dryRun, $buildings, $domains, $subnets, $tags);
+
+            $io->section('Seed Data');
+            $this->seedLocalData($io, $dryRun);
+
+            if (!$dryRun) {
+                $conn->commit();
+            }
+        } catch (\Throwable $e) {
+            if (!$dryRun) {
+                $conn->rollBack();
+            }
+            throw $e;
+        }
+
+        $io->success($dryRun ? 'Dry run complete — no changes written' : 'Import complete');
+
+        return Command::SUCCESS;
+    }
+
+    private function setupDnsViews(SymfonyStyle $io, bool $dryRun, array $domains, array $subnets): void
+    {
+        $internal = new DnsView();
+        $internal->setName('internal');
+
+        $external = new DnsView();
+        $external->setName('external');
+
+        if (!$dryRun) {
+            $this->em->persist($internal);
+            $this->em->persist($external);
+            $this->em->flush();
+        }
+
+        foreach ($domains as $domain) {
+            $domain->addView($internal);
+            if ($domain->getName() !== 'printers.goshen.edu') {
+                $domain->addView($external);
+            }
+        }
+
+        foreach ($subnets as $subnet) {
+            $cidr       = $subnet->getIpv4Cidr();
+            $firstOctet = $cidr !== null ? (int) explode('.', $cidr)[0] : null;
+            $subnet->addView($internal);
+            if (in_array($firstOctet, [198, 199], true)) {
+                $subnet->addView($external);
+            }
+        }
+
+        if (!$dryRun) {
+            $this->em->flush();
+        }
+
+        $io->writeln('  Created views: internal, external');
+    }
+
+    private function truncateImportedTables(\Doctrine\DBAL\Connection $conn, SymfonyStyle $io): void
+    {
+        $tables = [
+            'interface_name_dns_view',
+            'interface_name',
+            'ip_address',
+            'ipv6_address',
+            'network_interface',
+            'host_tag',
+            'host',
+            'subnet_dns_view',
+            'domain_dns_view',
+            'subnet_tag',
+            'address_block',
+            'subnet',
+            'tag',
+            'domain',
+            'dns_view',
+            'building',
+            'snipe_it_category_subnet_map',
+            'snipe_it_server',
+        ];
+
+        $conn->executeStatement('SET FOREIGN_KEY_CHECKS=0');
+        foreach ($tables as $table) {
+            $conn->executeStatement('TRUNCATE TABLE `' . $table . '`');
+        }
+        $conn->executeStatement('SET FOREIGN_KEY_CHECKS=1');
+
+        $io->writeln(sprintf('  Truncated %d tables', count($tables)));
+    }
+
+    private function connectLegacy(): \PDO
+    {
+        $url = $_ENV['LEGACY_DATABASE_URL'] ?? getenv('LEGACY_DATABASE_URL') ?? '';
+        if (!$url) {
+            throw new \RuntimeException('LEGACY_DATABASE_URL is not set');
+        }
+
+        // The URL uses a non-standard user@password@host form (@ instead of : between user and pass).
+        // parse_url treats the last @ as the userinfo/host separator, so $parsed['user']
+        // ends up as "user@password" — split on that to recover both parts.
+        $parsed = parse_url($url);
+        $host   = $parsed['host'] ?? 'localhost';
+        $port   = $parsed['port'] ?? 3306;
+        $dbname = ltrim($parsed['path'] ?? '/dns', '/');
+        // strip query string params from dbname if any bled through
+        $dbname = explode('?', $dbname)[0];
+
+        $userinfo = $parsed['user'] ?? '';
+        if (str_contains($userinfo, '@')) {
+            [$user, $pass] = explode('@', $userinfo, 2);
+        } else {
+            $user = $userinfo;
+            $pass = urldecode($parsed['pass'] ?? '');
+        }
+
+        return new \PDO(
+            "mysql:host={$host};port={$port};dbname={$dbname};charset=utf8mb4",
+            $user,
+            $pass,
+            [
+                \PDO::ATTR_ERRMODE                      => \PDO::ERRMODE_EXCEPTION,
+                \PDO::ATTR_DEFAULT_FETCH_MODE           => \PDO::FETCH_ASSOC,
+                \PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => false,
+            ]
+        );
+    }
+
+    // -------------------------------------------------------------------------
+    // Buildings
+    // -------------------------------------------------------------------------
+
+    /** @return array<string, Building> keyed by legacy bID */
+    private function importBuildings(\PDO $pdo, SymfonyStyle $io, bool $dryRun): array
+    {
+        $map = [];
+
+        foreach ($pdo->query('SELECT bID, name FROM building ORDER BY bID')->fetchAll() as $row) {
+            $building = new Building();
+            $building->setName($row['bID']);
+            $building->setDescription($row['name']);
+            $map[$row['bID']] = $building;
+            if (!$dryRun) {
+                $this->em->persist($building);
+            }
+        }
+
+        if (!$dryRun) {
+            $this->em->flush();
+        }
+
+        $io->writeln(sprintf('  %d buildings', count($map)));
+
+        return $map;
+    }
+
+    // -------------------------------------------------------------------------
+    // Domains (zones)
+    // -------------------------------------------------------------------------
+
+    /** @return array<int, Domain> keyed by legacy zID */
+    private function importDomains(\PDO $pdo, SymfonyStyle $io, bool $dryRun): array
+    {
+        $map = [];
+
+        foreach ($pdo->query('SELECT zID, name FROM zone ORDER BY zID')->fetchAll() as $row) {
+            $domain = new Domain();
+            $domain->setName(preg_replace('/^db\./', '', $row['name']));
+            $map[(int) $row['zID']] = $domain;
+            if (!$dryRun) {
+                $this->em->persist($domain);
+            }
+        }
+
+        if (!$dryRun) {
+            $this->em->flush();
+        }
+
+        $io->writeln(sprintf('  %d domains', count($map)));
+
+        return $map;
+    }
+
+    // -------------------------------------------------------------------------
+    // Subnets + address blocks
+    // -------------------------------------------------------------------------
+
+    /**
+     * Returns subnets keyed by legacy nID.
+     *
+     * @return array<string, Subnet>
+     */
+    private function importSubnets(\PDO $pdo, SymfonyStyle $io, bool $dryRun, array $domains): array
+    {
+        $addressRanges = $this->loadAddressRanges($pdo);
+
+        $rows = $pdo->query('SELECT nID, vID, zID, name FROM subnet ORDER BY nID')->fetchAll();
+        $map  = [];
+
+        foreach ($rows as $row) {
+            $nid   = $row['nID'];
+            $range = $addressRanges[$nid] ?? null;
+
+            if ($range === null) {
+                $subnet    = $this->makeSubnet($row['name'], (int) $row['vID'], null);
+                $map[$nid] = $subnet;
+                if (!$dryRun) {
+                    $this->em->persist($subnet);
+                }
+                continue;
+            }
+
+            [$cidr, $network] = $this->computeCidr($range['min_ip'], $range['max_ip']);
+
+            $subnet    = $this->makeSubnet($row['name'], (int) $row['vID'], $cidr, $network);
+            $map[$nid] = $subnet;
+
+            if (!$dryRun) {
+                $this->em->persist($subnet);
+            }
+
+            // Reserved block: .1 – .5 of network base
+            $reserved = new AddressBlock();
+            $reserved->setSubnet($subnet);
+            $reserved->setType(BlockType::Reserved);
+            $reserved->setLabel('Infrastructure');
+            $reserved->setStartIp(long2ip(ip2long($network) + 1));
+            $reserved->setEndIp(long2ip(ip2long($network) + 5));
+            if (!$dryRun) {
+                $this->em->persist($reserved);
+            }
+
+            // Fixed block: max(min_ip, base+6) – max_ip
+            $fixedStart = long2ip(max(ip2long($range['min_ip']), ip2long($network) + 6));
+            $fixedEnd   = $range['max_ip'];
+
+            if (ip2long($fixedEnd) >= ip2long($fixedStart)) {
+                $fixed = new AddressBlock();
+                $fixed->setSubnet($subnet);
+                $fixed->setType(BlockType::Fixed);
+                $fixed->setStartIp($fixedStart);
+                $fixed->setEndIp($fixedEnd);
+                if (!$dryRun) {
+                    $this->em->persist($fixed);
+                }
+            }
+
+            // Dynamic block: max_ip+1 – last usable address (broadcast−1)
+            $prefixLen      = (int) explode('/', $cidr)[1];
+            $lastUsableLong = ip2long($network) + (1 << (32 - $prefixLen)) - 2;
+            $dynamicStart   = long2ip(ip2long($fixedEnd) + 1);
+
+            if ($lastUsableLong >= ip2long($dynamicStart)) {
+                $dynamic = new AddressBlock();
+                $dynamic->setSubnet($subnet);
+                $dynamic->setType(BlockType::Dynamic);
+                $dynamic->setStartIp($dynamicStart);
+                $dynamic->setEndIp(long2ip($lastUsableLong));
+                if (!$dryRun) {
+                    $this->em->persist($dynamic);
+                }
+            }
+        }
+
+        if (!$dryRun) {
+            $this->em->flush();
+        }
+
+        $io->writeln(sprintf('  %d subnets', count($map)));
+
+        return $map;
+    }
+
+    /**
+     * Returns the smallest power-of-2 CIDR covering $minIp–$maxIp.
+     *
+     * @return array{string, string} [$cidr, $networkIp]
+     */
+    private function computeCidr(string $minIp, string $maxIp): array
+    {
+        $minLong  = ip2long($minIp);
+        $maxLong  = ip2long($maxIp);
+        $diff     = $minLong ^ $maxLong;
+        $hostBits = 0;
+        while ((1 << $hostBits) <= $diff) {
+            $hostBits++;
+        }
+        $prefixLen = min(32 - $hostBits, 24);  // never a prefix longer than /24
+        $hostBits  = 32 - $prefixLen;
+        $mask        = $hostBits === 0 ? -1 : ~((1 << $hostBits) - 1);
+        $networkLong = $minLong & $mask;
+        $network     = long2ip($networkLong);
+
+        return [$network . '/' . $prefixLen, $network];
+    }
+
+    /**
+     * Groups address table by nID, returning overall min/max IP per subnet.
+     *
+     * @return array<string, array{min_ip: string, max_ip: string}>
+     */
+    private function loadAddressRanges(\PDO $pdo): array
+    {
+        $rows = $pdo->query(
+            'SELECT
+                nID,
+                INET_NTOA(MIN(INET_ATON(ip))) AS min_ip,
+                INET_NTOA(MAX(INET_ATON(ip))) AS max_ip
+             FROM address
+             GROUP BY nID
+             ORDER BY nID'
+        )->fetchAll();
+
+        $map = [];
+        foreach ($rows as $row) {
+            $map[$row['nID']] = ['min_ip' => $row['min_ip'], 'max_ip' => $row['max_ip']];
+        }
+
+        return $map;
+    }
+
+    private function makeSubnet(string $name, int $vlan, ?string $cidr, ?string $networkIp = null): Subnet
+    {
+        $subnet = new Subnet();
+        $subnet->setName($name);
+        $subnet->setVlan($vlan ?: null);
+        $subnet->setIpv4Cidr($cidr);
+
+        if ($networkIp !== null && $cidr !== null) {
+            $prefixLen  = (int) explode('/', $cidr)[1];
+            $octets     = explode('.', $networkIp);
+            $firstOctet = (int) $octets[0];
+
+            if ($firstOctet !== 10) {
+                $thirdOctet  = (int) $octets[2];
+                $seventhByte = in_array($firstOctet, [198, 199], true) ? 0x01 : 0x00;
+                $fourthGroup = dechex(($seventhByte << 8) | $thirdOctet);
+                $subnet->setIpv6Cidr('2001:18e8:408:' . $fourthGroup . '::/64');
+            }
+        }
+
+        return $subnet;
+    }
+
+    // -------------------------------------------------------------------------
+    // Tags (device classes + departments)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Returns tags keyed by "c:{cID}" for classes and "d:{dID}" for departments,
+     * allowing host rows to look up their tags by the legacy code columns.
+     *
+     * @return array<string, Tag>
+     */
+    private function importTags(\PDO $pdo, SymfonyStyle $io, bool $dryRun): array
+    {
+        $map = [];
+
+        foreach ($pdo->query('SELECT cID, name FROM class ORDER BY cID')->fetchAll() as $row) {
+            $tag = new Tag();
+            $tag->setName(substr('class:' . $row['name'], 0, 50));
+            $map['c:' . $row['cID']] = $tag;
+            if (!$dryRun) {
+                $this->em->persist($tag);
+            }
+        }
+
+        foreach ($pdo->query('SELECT dID, name FROM dept ORDER BY dID')->fetchAll() as $row) {
+            $tag = new Tag();
+            $tag->setName(substr('dept:' . $row['name'], 0, 50));
+            $map['d:' . $row['dID']] = $tag;
+            if (!$dryRun) {
+                $this->em->persist($tag);
+            }
+        }
+
+        if (!$dryRun) {
+            $this->em->flush();
+        }
+
+        $io->writeln(sprintf('  %d tags', count($map)));
+
+        return $map;
+    }
+
+    // -------------------------------------------------------------------------
+    // Hosts
+    // -------------------------------------------------------------------------
+
+    private function importHosts(
+        \PDO $pdo,
+        SymfonyStyle $io,
+        bool $dryRun,
+        array $buildings,
+        array $domains,
+        array $subnets,
+        array $tags,
+    ): void {
+        // nID → zID for domain resolution
+        $subnetZones = [];
+        foreach ($pdo->query('SELECT nID, zID FROM subnet')->fetchAll() as $row) {
+            $subnetZones[$row['nID']] = (int) $row['zID'];
+        }
+
+        // hID → list of alias names
+        $aliasMap = [];
+        foreach ($pdo->query('SELECT hID, name FROM alias ORDER BY aID')->fetchAll() as $row) {
+            $aliasMap[(int) $row['hID']][] = $row['name'];
+        }
+
+        // Track used IPs to skip duplicates
+        $usedIps = [];
+        $count   = 0;
+        $skipped = 0;
+
+        $stmt = $pdo->query(
+            'SELECT hID, name, ip, hw, bID, room, nID, cID, dID, ipv6 FROM host ORDER BY hID'
+        );
+
+        while ($row = $stmt->fetch()) {
+            $hid    = (int) $row['hID'];
+            $nid    = $row['nID'];
+            $zid    = $subnetZones[$nid] ?? 1;
+            $domain = $domains[$zid] ?? null;
+            $subnet = $subnets[$nid] ?? null;
+
+            $host = new Host();
+            $host->setName($row['name']);
+            $host->setRoom($row['room'] ?: null);
+
+            if ($row['bID'] && isset($buildings[$row['bID']])) {
+                $host->setBuilding($buildings[$row['bID']]);
+            }
+
+            if ($row['cID'] && isset($tags['c:' . $row['cID']])) {
+                $host->addTag($tags['c:' . $row['cID']]);
+            }
+
+            if ($row['dID'] && isset($tags['d:' . $row['dID']])) {
+                $host->addTag($tags['d:' . $row['dID']]);
+            }
+
+            $iface = new NetworkInterface();
+            $iface->setMacAddress($row['hw']);
+            $iface->setSubnet($subnet);
+
+            // IPv4 address — skip if duplicate
+            $ip = trim($row['ip'] ?? '');
+            if ($ip !== '' && $subnet !== null) {
+                if (!isset($usedIps[$ip])) {
+                    $usedIps[$ip] = true;
+                    $ipEntity     = new IpAddress();
+                    $ipEntity->setAddress($ip);
+                    $ipEntity->setSubnet($subnet);
+                    $iface->setIpAddress($ipEntity);
+                    if (!$dryRun) {
+                        $this->em->persist($ipEntity);
+                    }
+                } else {
+                    $io->writeln(sprintf('  <comment>Skipping duplicate IP %s on host %s</comment>', $ip, $row['name']));
+                    $skipped++;
+                }
+            }
+
+            // IPv6 address derived from IPv4 last octet
+            if ($row['ipv6'] && $ip !== '' && $subnet?->getIpv6Cidr()) {
+                $ipv6Str = $this->deriveIpv6FromIpv4($ip, $subnet);
+                if ($ipv6Str !== null && !isset($usedIps['v6:' . $ipv6Str])) {
+                    $usedIps['v6:' . $ipv6Str] = true;
+                    $ipv6Entity = new Ipv6Address();
+                    $ipv6Entity->setAddress($ipv6Str);
+                    $ipv6Entity->setSubnet($subnet);
+                    $iface->setIpv6Address($ipv6Entity);
+                    if (!$dryRun) {
+                        $this->em->persist($ipv6Entity);
+                    }
+                }
+            }
+
+            $hasIp = $iface->getIpAddress() !== null || $iface->getIpv6Address() !== null;
+            $sharedViews = $this->intersectViews($domain, $subnet);
+
+            if ($hasIp) {
+                // Canonical name from host.name
+                if ($this->isValidDnsLabel($row['name'])) {
+                    $canonical = new InterfaceName();
+                    $canonical->setName($row['name']);
+                    $canonical->setDomain($domain);
+                    $canonical->setIsCanonical(true);
+                    foreach ($sharedViews as $view) {
+                        $canonical->addView($view);
+                    }
+                    $iface->addName($canonical);
+                    if (!$dryRun) {
+                        $this->em->persist($canonical);
+                    }
+                }
+
+                // Non-canonical names from alias table
+                foreach ($aliasMap[$hid] ?? [] as $aliasName) {
+                    if (!$this->isValidDnsLabel($aliasName)) {
+                        continue;
+                    }
+                    $alias = new InterfaceName();
+                    $alias->setName($aliasName);
+                    $alias->setDomain($domain);
+                    $alias->setIsCanonical(false);
+                    foreach ($sharedViews as $view) {
+                        $alias->addView($view);
+                    }
+                    $iface->addName($alias);
+                    if (!$dryRun) {
+                        $this->em->persist($alias);
+                    }
+                }
+            }
+
+            $host->addInterface($iface);
+
+            if (!$dryRun) {
+                $this->em->persist($iface);
+                $this->em->persist($host);
+            }
+
+            $count++;
+
+            if (!$dryRun && $count % 200 === 0) {
+                $this->em->flush();
+                $io->writeln(sprintf('  ...%d hosts', $count));
+            }
+        }
+
+        if (!$dryRun) {
+            $this->em->flush();
+        }
+
+        $io->writeln(sprintf('  %d hosts imported', $count));
+
+        if ($skipped > 0) {
+            $io->writeln(sprintf('  <comment>%d duplicate IPs skipped</comment>', $skipped));
+        }
+    }
+
+    private function deriveIpv6FromIpv4(string $ipv4, Subnet $subnet): ?string
+    {
+        $octets = explode('.', $ipv4);
+        if (count($octets) !== 4) {
+            return null;
+        }
+
+        [$prefix] = explode('/', $subnet->getIpv6Cidr());
+        $raw = inet_pton($prefix);
+        if ($raw === false || strlen($raw) !== 16) {
+            return null;
+        }
+
+        $raw[15] = chr((int) $octets[3]);
+        $result  = inet_ntop($raw);
+
+        return $result !== false ? $result : null;
+    }
+
+    /**
+     * Returns the views shared by both the domain and the subnet (intersection).
+     * Uses spl_object_id so it works in dry-run (where IDs are null) as well.
+     *
+     * @return DnsView[]
+     */
+    private function intersectViews(?Domain $domain, ?Subnet $subnet): array
+    {
+        if ($domain === null) {
+            return [];
+        }
+
+        $domainViewIds = [];
+        foreach ($domain->getViews() as $v) {
+            $domainViewIds[spl_object_id($v)] = $v;
+        }
+
+        if (empty($domainViewIds)) {
+            return [];
+        }
+
+        if ($subnet === null) {
+            return array_values($domainViewIds);
+        }
+
+        $shared = [];
+        foreach ($subnet->getViews() as $v) {
+            if (isset($domainViewIds[spl_object_id($v)])) {
+                $shared[] = $v;
+            }
+        }
+
+        return $shared;
+    }
+
+    private function isValidDnsLabel(string $name): bool
+    {
+        return (bool) preg_match('/^[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?$/', $name);
+    }
+
+    // -------------------------------------------------------------------------
+    // Local seed data (subnets, Snipe-IT server, category maps)
+    // -------------------------------------------------------------------------
+
+    private function seedLocalData(SymfonyStyle $io, bool $dryRun): void
+    {
+        // Additional subnets not present in the legacy database
+        $subnetDefs = [
+            ['name' => "10's",                    'ipv4' => '10.0.0.0/8',        'ipv6' => null,                    'vlan' => null, 'gateway' => null,            'container' => true],
+            ['name' => 'vlan249 Building Special','ipv4' => '10.249.0.0/16',     'ipv6' => null,                    'vlan' => 249,  'gateway' => null,            'container' => true],
+            ['name' => 'A/V Subnets',             'ipv4' => '10.251.0.0/16',     'ipv6' => null,                    'vlan' => 251,  'gateway' => null,            'container' => true],
+            ['name' => 'KMC Subnets',             'ipv4' => '10.253.0.0/16',     'ipv6' => null,                    'vlan' => 253,  'gateway' => null,            'container' => true],
+            ['name' => "192's",                   'ipv4' => '192.168.0.0/16',    'ipv6' => '2001:18e8:408::/56',    'vlan' => null, 'gateway' => null,            'container' => true],
+            ['name' => 'vlan44',                  'ipv4' => null,                'ipv6' => null,                    'vlan' => 44,   'gateway' => null,            'container' => false],
+            ['name' => 'Siemens EMS',             'ipv4' => '192.168.253.0/24',  'ipv6' => null,                    'vlan' => null, 'gateway' => null,            'container' => false],
+            ['name' => 'EMP_INST',                'ipv4' => '192.168.112.0/22',  'ipv6' => '2001:18e8:408:70/64',   'vlan' => 112,  'gateway' => '192.168.112.1', 'container' => false],
+            ['name' => 'EMP_JENZ',                'ipv4' => '192.168.121.0/24',  'ipv6' => '2001:18e8:408:79::/64', 'vlan' => 121,  'gateway' => '192.168.121.1', 'container' => false],
+        ];
+
+        $seedSubnets = [];
+        foreach ($subnetDefs as $def) {
+            $subnet = new Subnet();
+            $subnet->setName($def['name']);
+            $subnet->setIpv4Cidr($def['ipv4']);
+            $subnet->setIpv6Cidr($def['ipv6']);
+            $subnet->setVlan($def['vlan']);
+            $subnet->setGateway($def['gateway']);
+            $subnet->setIsContainer($def['container']);
+            $seedSubnets[$def['name']] = $subnet;
+            if (!$dryRun) {
+                $this->em->persist($subnet);
+            }
+        }
+
+        if (!$dryRun) {
+            $this->em->flush();
+        }
+
+        $io->writeln(sprintf('  %d additional subnets', count($seedSubnets)));
+
+        // Snipe-IT server — API key read from SNIPE_API_KEY env var
+        $apiKey = $_ENV['SNIPE_API_KEY'] ?? getenv('SNIPE_API_KEY') ?? null;
+        if (!$apiKey) {
+            $io->warning('SNIPE_API_KEY is not set — Snipe-IT server will be created without an API key');
+        }
+
+        $server = new SnipeItServer();
+        $server->setName('snipe.goshen.edu');
+        $server->setApiUrl('https://snipe.goshen.edu');
+        $server->setApiKey($apiKey ?: null);
+        $server->setVerifyTls(false);
+        $server->setMacCustomFields('MAC Address, MAC Address 2, MAC Address 3, MAC Address 4, MAC Address 5, Wireless MAC');
+
+        if (!$dryRun) {
+            $this->em->persist($server);
+            $this->em->flush();
+        }
+
+        $io->writeln('  Snipe-IT server: snipe.goshen.edu');
+
+        // Category → subnet mappings. Subnets referenced here must exist either in the
+        // legacy import or in $seedSubnets above.
+        $subnetByName = function (string $name) use ($seedSubnets): ?Subnet {
+            return $seedSubnets[$name]
+                ?? $this->em->getRepository(Subnet::class)->findOneBy(['name' => $name]);
+        };
+
+        $categoryMaps = [
+            [39, '25',                            null],
+            [25, 'Access Point',                  'vlan44'],
+            [14, 'Analog Telephone Adapter',      'vlan44'],
+            [52, 'Audio',                         null],
+            [ 6, 'AudioVisual',                   null],
+            [ 5, 'Desktop',                       null],
+            [45, 'Digital Signage',               null],
+            [38, 'Docking Monitor',               null],
+            [32, 'Elemental Essence',             null],
+            [33, 'Energy Management',             'Siemens EMS'],
+            [35, 'Ethernet Adapter',              null],
+            [ 8, 'Ethernet Adapters',             null],
+            [20, 'Film Scanner',                  null],
+            [29, 'Headset',                       null],
+            [48, 'Keyboard',                      null],
+            [42, 'KMC',                           'KMC Subnets'],
+            [ 7, 'Laptop',                        null],
+            [30, 'Laptop Dock',                   null],
+            [21, 'Mail Scale',                    null],
+            [15, 'MFP',                           'printers'],
+            [12, 'Monitor',                       null],
+            [46, 'Network Attached Storage (NAS)',null],
+            [49, 'Network Tester',                null],
+            [ 4, 'Networking',                    null],
+            [50, 'Nursing',                       'vlan249 Building Special'],
+            [43, 'Other',                         null],
+            [13, 'Phone',                         'vlan44'],
+            [18, 'Power Supply',                  null],
+            [16, 'Printer',                       'printers'],
+            [34, 'Radio Equipment',               null],
+            [23, 'Scanner',                       null],
+            [11, 'Security',                      'Access Control'],
+            [27, 'Security Camera',               'Access Control'],
+            [ 2, 'Servers',                       null],
+            [19, 'Switch Module',                 null],
+            [44, 'Tablet',                        null],
+            [22, 'TV',                            null],
+            [26, 'UPS',                           'vlan44'],
+            [47, 'Utility',                       null],
+            [41, 'Video',                         null],
+            [17, 'Webcam Accessory',              null],
+            [ 9, 'Zero Client',                   null],
+        ];
+
+        foreach ($categoryMaps as [$catId, $catName, $subnetName]) {
+            $map = new SnipeItCategorySubnetMap();
+            $map->setServer($server);
+            $map->setSnipeCategoryId($catId);
+            $map->setSnipeCategoryName($catName);
+            if ($subnetName !== null) {
+                $map->setSubnet($subnetByName($subnetName));
+            }
+            if (!$dryRun) {
+                $this->em->persist($map);
+            }
+        }
+
+        if (!$dryRun) {
+            $this->em->flush();
+        }
+
+        $io->writeln(sprintf('  %d category maps', count($categoryMaps)));
+    }
+}
