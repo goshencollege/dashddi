@@ -41,7 +41,8 @@ reset:
 	@echo "Created .env.test.local"
 
 test-setup: .env.test.local
-	docker compose -f docker-compose.dev.yml exec -T app php bin/console doctrine:database:create --env=test --if-not-exists --no-interaction
+	$(eval ROOT_PASS := $(shell grep 'MYSQL_ROOT_PASSWORD:' docker-compose.dev.yml | head -1 | sed 's/.*MYSQL_ROOT_PASSWORD: //;s/[[:space:]].*//'))
+	docker compose -f docker-compose.dev.yml exec -T db mysql -u root -p$(ROOT_PASS) -e "CREATE DATABASE IF NOT EXISTS \`dashddi_test\`; GRANT ALL PRIVILEGES ON \`dashddi_test\`.* TO 'dash'@'%'; FLUSH PRIVILEGES;"
 	docker compose -f docker-compose.dev.yml exec -T app php bin/console doctrine:migrations:migrate --env=test --no-interaction --allow-no-migration
 	docker compose -f docker-compose.dev.yml exec -T app php bin/console doctrine:fixtures:load --env=test --group=test --no-interaction
 
