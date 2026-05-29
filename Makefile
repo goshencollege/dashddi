@@ -24,7 +24,7 @@ logs:
 	docker compose -f docker-compose.dev.yml logs -f
 
 db-shell:
-	docker compose -f docker-compose.dev.yml exec db mysql -u ipam -pipam_password ipam
+	docker compose -f docker-compose.dev.yml exec db sh -c 'mysql -u$$MYSQL_USER -p$$MYSQL_PASSWORD $$MYSQL_DATABASE'
 
 reset:
 	docker compose -f docker-compose.dev.yml down -v
