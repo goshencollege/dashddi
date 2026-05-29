@@ -235,8 +235,8 @@ if [[ "$APP_ENV" == "prod" ]]; then
         USE_CONTAINER_DB=true
         DB_HOST="db"
         DB_PORT="3306"
-        DB_NAME="ipam"
-        DB_USER="ipam"
+        DB_NAME="dashddi"
+        DB_USER="dash"
         DB_PASSWORD=$(openssl rand -hex 24)
         DB_ROOT_PASSWORD=$(openssl rand -hex 24)
         ok "MySQL will run in a container with auto-generated credentials"
@@ -245,7 +245,7 @@ if [[ "$APP_ENV" == "prod" ]]; then
         USE_CONTAINER_DB=false
         ask        DB_HOST       "MySQL hostname or IP"
         ask        DB_PORT       "MySQL port" "3306"
-        ask        DB_NAME       "Database name" "ipam"
+        ask        DB_NAME       "Database name" "dashddi"
         ask        DB_USER       "MySQL username"
         ask_secret DB_PASSWORD   "MySQL password"
         ok "External MySQL: ${DB_USER}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
@@ -265,8 +265,8 @@ else
     USE_CONTAINER_DB=true
     DB_HOST="db"
     DB_PORT="3306"
-    DB_NAME="ipam"
-    DB_USER="ipam"
+    DB_NAME="dashddi"
+    DB_USER="dash"
     DB_PASSWORD=$(openssl rand -hex 16)
     DB_ROOT_PASSWORD=$(openssl rand -hex 16)
 fi
@@ -603,7 +603,7 @@ echo
 
 echo -e "  ${BOLD}MySQL credentials (save these — they are not stored elsewhere):${NC}"
 if [[ "$APP_ENV" == "dev" ]]; then
-    echo "    App user:  ipam / $DB_PASSWORD"
+    echo "    App user:  dash / $DB_PASSWORD"
     echo "    Root:      root / $DB_ROOT_PASSWORD"
 elif [[ "$USE_CONTAINER_DB" == "true" ]]; then
     echo "    App user:  $DB_USER / $DB_PASSWORD"

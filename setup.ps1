@@ -247,8 +247,8 @@ if ($AppEnv -eq 'prod') {
         '1' {
             $DbHost         = 'db'
             $DbPort         = '3306'
-            $DbName         = 'ipam'
-            $DbUser         = 'ipam'
+            $DbName         = 'dashddi'
+            $DbUser         = 'dash'
             $DbPassword     = RandHex 24
             $DbRootPassword = RandHex 24
             Ok 'MySQL will run in a container with auto-generated credentials'
@@ -257,7 +257,7 @@ if ($AppEnv -eq 'prod') {
             $UseContainerDb = $false
             $DbHost         = Ask 'MySQL hostname or IP'
             $DbPort         = Ask 'MySQL port' '3306'
-            $DbName         = Ask 'Database name' 'ipam'
+            $DbName         = Ask 'Database name' 'dashddi'
             $DbUser         = Ask 'MySQL username'
             $DbPassword     = AskSecret 'MySQL password'
             Ok "External MySQL: ${DbUser}@${DbHost}:${DbPort}/$DbName"
@@ -274,8 +274,8 @@ if ($AppEnv -eq 'prod') {
 } else {
     $DbHost         = 'db'
     $DbPort         = '3306'
-    $DbName         = 'ipam'
-    $DbUser         = 'ipam'
+    $DbName         = 'dashddi'
+    $DbUser         = 'dash'
     $DbPassword     = RandHex 16
     $DbRootPassword = RandHex 16
 }
@@ -607,7 +607,7 @@ Write-Host
 Write-Host '  MySQL credentials (save these — they are not stored elsewhere):' -ForegroundColor White
 if ($AppEnv -eq 'dev' -or $UseContainerDb) {
     if ($AppEnv -eq 'dev') {
-        Write-Host "    App user:  ipam / $DbPassword"
+        Write-Host "    App user:  dash / $DbPassword"
     } else {
         Write-Host "    App user:  $DbUser / $DbPassword"
     }
