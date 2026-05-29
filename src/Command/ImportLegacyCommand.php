@@ -685,17 +685,15 @@ class ImportLegacyCommand extends Command
     {
         // Additional subnets not present in the legacy database
         $subnetDefs = [
-            ['name' => "10's",                   'ipv4' => '10.0.0.0/8',        'ipv6' => null,                    'vlan' => null, 'gateway' => null,            'container' => true],
-            ['name' => 'A/V Subnets',             'ipv4' => '10.251.0.0/16',     'ipv6' => null,                    'vlan' => null, 'gateway' => null,            'container' => true],
-            ['name' => 'KMC Subnets',             'ipv4' => '10.253.0.0/16',     'ipv6' => null,                    'vlan' => null, 'gateway' => null,            'container' => true],
+            ['name' => "10's",                    'ipv4' => '10.0.0.0/8',        'ipv6' => null,                    'vlan' => null, 'gateway' => null,            'container' => true],
+            ['name' => 'vlan249 Building Special','ipv4' => '10.249.0.0/16',     'ipv6' => null,                    'vlan' => 249,  'gateway' => null,            'container' => true],
+            ['name' => 'A/V Subnets',             'ipv4' => '10.251.0.0/16',     'ipv6' => null,                    'vlan' => 251,  'gateway' => null,            'container' => true],
+            ['name' => 'KMC Subnets',             'ipv4' => '10.253.0.0/16',     'ipv6' => null,                    'vlan' => 253,  'gateway' => null,            'container' => true],
             ['name' => "192's",                   'ipv4' => '192.168.0.0/16',    'ipv6' => '2001:18e8:408::/56',    'vlan' => null, 'gateway' => null,            'container' => true],
             ['name' => 'vlan44',                  'ipv4' => null,                'ipv6' => null,                    'vlan' => 44,   'gateway' => null,            'container' => false],
-            ['name' => 'vlan253',                 'ipv4' => null,                'ipv6' => null,                    'vlan' => 253,  'gateway' => null,            'container' => false],
             ['name' => 'Siemens EMS',             'ipv4' => '192.168.253.0/24',  'ipv6' => null,                    'vlan' => null, 'gateway' => null,            'container' => false],
             ['name' => 'EMP_INST',                'ipv4' => '192.168.112.0/22',  'ipv6' => '2001:18e8:408:70/64',   'vlan' => 112,  'gateway' => '192.168.112.1', 'container' => false],
             ['name' => 'EMP_JENZ',                'ipv4' => '192.168.121.0/24',  'ipv6' => '2001:18e8:408:79::/64', 'vlan' => 121,  'gateway' => '192.168.121.1', 'container' => false],
-            ['name' => 'vlan249 Building Special','ipv4' => null,                'ipv6' => null,                    'vlan' => 249,  'gateway' => null,            'container' => false],
-            ['name' => 'vlan251',                 'ipv4' => null,                'ipv6' => null,                    'vlan' => 251,  'gateway' => null,            'container' => false],
         ];
 
         $seedSubnets = [];
@@ -762,7 +760,7 @@ class ImportLegacyCommand extends Command
             [20, 'Film Scanner',                  null],
             [29, 'Headset',                       null],
             [48, 'Keyboard',                      null],
-            [42, 'KMC',                           'vlan253'],
+            [42, 'KMC',                           'KMC Subnets'],
             [ 7, 'Laptop',                        null],
             [30, 'Laptop Dock',                   null],
             [21, 'Mail Scale',                    null],
