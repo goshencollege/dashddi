@@ -46,7 +46,6 @@ class NetworkInterfaceType extends AbstractType
             ] + ($options['subnet_choices'] !== null
                 ? ['choices' => $options['subnet_choices']]
                 : ['query_builder' => fn($repo) => $repo->createQueryBuilder('s')
-                        ->where('s.isContainer = false')
                         ->orderBy('s.name', 'ASC')]
             ))
             ->add('ipv4Assignment', ChoiceType::class, [

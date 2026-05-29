@@ -66,11 +66,14 @@ class InterfaceController extends AbstractController
             }
         }
 
+        $containerSubnetIds = array_map(fn($s) => $s->getId(), $subnetRepo->findBy(['isContainer' => true]));
+
         return $this->render('interface/form.html.twig', [
-            'form'      => $form,
-            'interface' => $interface,
-            'host'      => $host,
-            'title'     => 'Add Interface to ' . $host->getName(),
+            'form'               => $form,
+            'interface'          => $interface,
+            'host'               => $host,
+            'title'              => 'Add Interface to ' . $host->getName(),
+            'containerSubnetIds' => $containerSubnetIds,
         ]);
     }
 
@@ -146,11 +149,14 @@ class InterfaceController extends AbstractController
             }
         }
 
+        $containerSubnetIds = array_map(fn($s) => $s->getId(), $subnetRepo->findBy(['isContainer' => true]));
+
         return $this->render('interface/form.html.twig', [
-            'form'      => $form,
-            'interface' => $interface,
-            'host'      => $interface->getHost(),
-            'title'     => 'Edit Interface',
+            'form'               => $form,
+            'interface'          => $interface,
+            'host'               => $interface->getHost(),
+            'title'              => 'Edit Interface',
+            'containerSubnetIds' => $containerSubnetIds,
         ]);
     }
 
@@ -378,6 +384,10 @@ class InterfaceController extends AbstractController
 
     private function validateIpInputs(\Symfony\Component\Form\FormInterface $form, ?\App\Entity\Subnet $subnet, ?NetworkInterface $current): array
     {
+        if ($subnet?->isContainer()) {
+            return [];
+        }
+
         $errors = [];
 
         if ($form->get('ipv4Assignment')->getData() === 'select' && $subnet) {
@@ -406,6 +416,10 @@ class InterfaceController extends AbstractController
     private function handleIpAssignment(\Symfony\Component\Form\FormInterface $form, NetworkInterface $interface, bool $isEdit = false): void
     {
         $subnet = $interface->getSubnet();
+
+        if ($subnet?->isContainer()) {
+            return;
+        }
 
         $ipv4Mode = $form->get('ipv4Assignment')->getData();
         if ($ipv4Mode !== 'keep') {

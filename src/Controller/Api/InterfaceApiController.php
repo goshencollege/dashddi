@@ -214,6 +214,10 @@ class InterfaceApiController extends AbstractController
 
         $subnet = $iface->getSubnet();
 
+        if ($subnet?->isContainer()) {
+            return 'Cannot assign an IPv4 address to an interface in a container subnet.';
+        }
+
         if ($value === 'auto') {
             if (!$subnet?->getIpv4Cidr()) {
                 return 'Cannot auto-assign IPv4: the interface has no subnet with an IPv4 CIDR.';
@@ -253,6 +257,10 @@ class InterfaceApiController extends AbstractController
         }
 
         $subnet = $iface->getSubnet();
+
+        if ($subnet?->isContainer()) {
+            return 'Cannot assign an IPv6 address to an interface in a container subnet.';
+        }
 
         if ($value === 'auto') {
             if (!$subnet?->getIpv6Cidr()) {

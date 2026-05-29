@@ -171,7 +171,6 @@ class SubnetRepository extends ServiceEntityRepository
     public function buildGroupedChoices(?array $savedSearch): array
     {
         $all = $this->createQueryBuilder('s')
-            ->where('s.isContainer = false')
             ->orderBy('s.name', 'ASC')
             ->getQuery()
             ->getResult();

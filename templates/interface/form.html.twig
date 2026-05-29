@@ -48,19 +48,24 @@
                         {% endif %}
                     </div>
                     <div class="card-body">
-                        <div class="mb-2">
-                            {% for child in form.ipv4Assignment %}
-                                <div class="form-check">
-                                    {{ form_widget(child, {attr: {class: 'form-check-input', id: 'ipv4_' ~ loop.index}}) }}
-                                    {{ form_label(child, null, {label_attr: {class: 'form-check-label', for: 'ipv4_' ~ loop.index}}) }}
-                                </div>
-                            {% endfor %}
+                        <div id="ipv4-assignment-options">
+                            <div class="mb-2">
+                                {% for child in form.ipv4Assignment %}
+                                    <div class="form-check">
+                                        {{ form_widget(child, {attr: {class: 'form-check-input', id: 'ipv4_' ~ loop.index}}) }}
+                                        {{ form_label(child, null, {label_attr: {class: 'form-check-label', for: 'ipv4_' ~ loop.index}}) }}
+                                    </div>
+                                {% endfor %}
+                            </div>
+                            <div id="ipv4-input-section" class="mt-2" style="display:none">
+                                {{ form_label(form.ipv4AddressInput, null, {label_attr: {class: 'form-label small'}}) }}
+                                {{ form_widget(form.ipv4AddressInput, {attr: {class: 'form-control font-monospace'}}) }}
+                                <datalist id="available-ipv4-list"></datalist>
+                            </div>
                         </div>
-                        <div id="ipv4-input-section" class="mt-2" style="display:none">
-                            {{ form_label(form.ipv4AddressInput, null, {label_attr: {class: 'form-label small'}}) }}
-                            {{ form_widget(form.ipv4AddressInput, {attr: {class: 'form-control font-monospace'}}) }}
-                            <datalist id="available-ipv4-list"></datalist>
-                        </div>
+                        <p id="ipv4-container-notice" class="text-muted small mb-0" style="display:none">
+                            IP assignment is not available for container subnets.
+                        </p>
                     </div>
                 </div>
             </div>
@@ -73,19 +78,24 @@
                         {% endif %}
                     </div>
                     <div class="card-body">
-                        <div class="mb-2">
-                            {% for child in form.ipv6Assignment %}
-                                <div class="form-check">
-                                    {{ form_widget(child, {attr: {class: 'form-check-input', id: 'ipv6_' ~ loop.index}}) }}
-                                    {{ form_label(child, null, {label_attr: {class: 'form-check-label', for: 'ipv6_' ~ loop.index}}) }}
-                                </div>
-                            {% endfor %}
+                        <div id="ipv6-assignment-options">
+                            <div class="mb-2">
+                                {% for child in form.ipv6Assignment %}
+                                    <div class="form-check">
+                                        {{ form_widget(child, {attr: {class: 'form-check-input', id: 'ipv6_' ~ loop.index}}) }}
+                                        {{ form_label(child, null, {label_attr: {class: 'form-check-label', for: 'ipv6_' ~ loop.index}}) }}
+                                    </div>
+                                {% endfor %}
+                            </div>
+                            <div id="ipv6-input-section" class="mt-2" style="display:none">
+                                {{ form_label(form.ipv6AddressInput, null, {label_attr: {class: 'form-label small'}}) }}
+                                {{ form_widget(form.ipv6AddressInput, {attr: {class: 'form-control font-monospace'}}) }}
+                                <datalist id="available-ipv6-list"></datalist>
+                            </div>
                         </div>
-                        <div id="ipv6-input-section" class="mt-2" style="display:none">
-                            {{ form_label(form.ipv6AddressInput, null, {label_attr: {class: 'form-label small'}}) }}
-                            {{ form_widget(form.ipv6AddressInput, {attr: {class: 'form-control font-monospace'}}) }}
-                            <datalist id="available-ipv6-list"></datalist>
-                        </div>
+                        <p id="ipv6-container-notice" class="text-muted small mb-0" style="display:none">
+                            IP assignment is not available for container subnets.
+                        </p>
                     </div>
                 </div>
             </div>
@@ -189,6 +199,8 @@
 {% block scripts %}
 <script>
 (function () {
+    const containerSubnetIds = new Set({{ containerSubnetIds|default([])|json_encode }});
+
     // Show/hide the IP input section based on radio selection
     function bindIpRadios(prefix, sectionId) {
         const radios = document.querySelectorAll('input[name$="[' + prefix + 'Assignment]"]');
@@ -202,6 +214,15 @@
     }
     bindIpRadios('ipv4', 'ipv4-input-section');
     bindIpRadios('ipv6', 'ipv6-input-section');
+
+    function setContainerSubnetMode(isContainer) {
+        ['ipv4', 'ipv6'].forEach(prefix => {
+            const options = document.getElementById(prefix + '-assignment-options');
+            const notice  = document.getElementById(prefix + '-container-notice');
+            if (options) options.style.display = isContainer ? 'none' : '';
+            if (notice)  notice.style.display  = isContainer ? '' : 'none';
+        });
+    }
 
     // Fetch available IPs when subnet changes
     const subnetSelect = document.getElementById('network_interface_subnet');
@@ -235,10 +256,14 @@
 
     if (subnetSelect) {
         subnetSelect.addEventListener('change', () => {
-            loadAvailableIps(subnetSelect.value);
+            const isContainer = containerSubnetIds.has(parseInt(subnetSelect.value, 10));
+            setContainerSubnetMode(isContainer);
+            if (!isContainer) loadAvailableIps(subnetSelect.value);
             resetIpAssignmentsForSubnetChange();
         });
-        if (subnetSelect.value) loadAvailableIps(subnetSelect.value);
+        const initialIsContainer = containerSubnetIds.has(parseInt(subnetSelect.value, 10));
+        setContainerSubnetMode(initialIsContainer);
+        if (subnetSelect.value && !initialIsContainer) loadAvailableIps(subnetSelect.value);
     }
 
     // DNS name collection: add / remove entries
