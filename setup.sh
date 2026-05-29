@@ -280,7 +280,7 @@ if [[ "$APP_ENV" == "dev" ]]; then
         -e "s|replace_with_32plus_char_secret|${APP_SECRET}|g" \
         -e "s|run: docker compose exec app php bin/console app:generate-encryption-key|${APP_ENCRYPTION_KEY}|g" \
         -e "s|https://your-dev-hostname.example.com|${BASE_URL}|g" \
-        -e "s|ipam_password|${DB_PASSWORD}|g" \
+        -e "s|dash_password|${DB_PASSWORD}|g" \
         -e "s|root_password|${DB_ROOT_PASSWORD}|g" \
         -e "s|\"8080:80\"|\"${HTTP_PORT}:80\"|g" \
         -e "s|\"8443:443\"|\"${HTTPS_PORT}:443\"|g" \

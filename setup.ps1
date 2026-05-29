@@ -288,7 +288,7 @@ if ($AppEnv -eq 'dev') {
     $content = $content.Replace('replace_with_32plus_char_secret',                                          $AppSecret)
     $content = $content.Replace('run: docker compose exec app php bin/console app:generate-encryption-key', $AppEncryptionKey)
     $content = $content.Replace('https://your-dev-hostname.example.com',                                    $BaseUrl)
-    $content = $content.Replace('ipam_password',                                                            $DbPassword)
+    $content = $content.Replace('dash_password',                                                            $DbPassword)
     $content = $content.Replace('root_password',                                                            $DbRootPassword)
     $content = $content.Replace('"8080:80"',                                                               "`"${HttpPort}:80`"")
     $content = $content.Replace('"8443:443"',                                                              "`"${HttpsPort}:443`"")
