@@ -11,6 +11,8 @@ use App\Entity\InterfaceName;
 use App\Entity\IpAddress;
 use App\Entity\Ipv6Address;
 use App\Entity\NetworkInterface;
+use App\Entity\SnipeItCategorySubnetMap;
+use App\Entity\SnipeItServer;
 use App\Entity\Subnet;
 use App\Entity\Tag;
 use App\Enum\BlockType;
@@ -76,6 +78,9 @@ class ImportLegacyCommand extends Command
 
             $io->section('Hosts');
             $this->importHosts($pdo, $io, $dryRun, $buildings, $domains, $subnets, $tags);
+
+            $io->section('Seed Data');
+            $this->seedLocalData($io, $dryRun);
 
             if (!$dryRun) {
                 $conn->commit();
@@ -148,6 +153,8 @@ class ImportLegacyCommand extends Command
             'domain',
             'dns_view',
             'building',
+            'snipe_it_category_subnet_map',
+            'snipe_it_server',
         ];
 
         $conn->executeStatement('SET FOREIGN_KEY_CHECKS=0');
@@ -668,5 +675,139 @@ class ImportLegacyCommand extends Command
     private function isValidDnsLabel(string $name): bool
     {
         return (bool) preg_match('/^[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?$/', $name);
+    }
+
+    // -------------------------------------------------------------------------
+    // Local seed data (subnets, Snipe-IT server, category maps)
+    // -------------------------------------------------------------------------
+
+    private function seedLocalData(SymfonyStyle $io, bool $dryRun): void
+    {
+        // Additional subnets not present in the legacy database
+        $subnetDefs = [
+            ['name' => "10's",                   'ipv4' => '10.0.0.0/8',        'ipv6' => null,                    'vlan' => null, 'gateway' => null,            'container' => true],
+            ['name' => 'A/V Subnets',             'ipv4' => '10.251.0.0/16',     'ipv6' => null,                    'vlan' => null, 'gateway' => null,            'container' => true],
+            ['name' => 'KMC Subnets',             'ipv4' => '10.253.0.0/16',     'ipv6' => null,                    'vlan' => null, 'gateway' => null,            'container' => true],
+            ['name' => "192's",                   'ipv4' => '192.168.0.0/16',    'ipv6' => '2001:18e8:408::/56',    'vlan' => null, 'gateway' => null,            'container' => true],
+            ['name' => 'vlan44',                  'ipv4' => null,                'ipv6' => null,                    'vlan' => 44,   'gateway' => null,            'container' => false],
+            ['name' => 'vlan253',                 'ipv4' => null,                'ipv6' => null,                    'vlan' => 253,  'gateway' => null,            'container' => false],
+            ['name' => 'Siemens EMS',             'ipv4' => '192.168.253.0/24',  'ipv6' => null,                    'vlan' => null, 'gateway' => null,            'container' => false],
+            ['name' => 'EMP_INST',                'ipv4' => '192.168.112.0/22',  'ipv6' => '2001:18e8:408:70/64',   'vlan' => 112,  'gateway' => '192.168.112.1', 'container' => false],
+            ['name' => 'EMP_JENZ',                'ipv4' => '192.168.121.0/24',  'ipv6' => '2001:18e8:408:79::/64', 'vlan' => 121,  'gateway' => '192.168.121.1', 'container' => false],
+            ['name' => 'vlan249 Building Special','ipv4' => null,                'ipv6' => null,                    'vlan' => 249,  'gateway' => null,            'container' => false],
+            ['name' => 'vlan251',                 'ipv4' => null,                'ipv6' => null,                    'vlan' => 251,  'gateway' => null,            'container' => false],
+        ];
+
+        $seedSubnets = [];
+        foreach ($subnetDefs as $def) {
+            $subnet = new Subnet();
+            $subnet->setName($def['name']);
+            $subnet->setIpv4Cidr($def['ipv4']);
+            $subnet->setIpv6Cidr($def['ipv6']);
+            $subnet->setVlan($def['vlan']);
+            $subnet->setGateway($def['gateway']);
+            $subnet->setIsContainer($def['container']);
+            $seedSubnets[$def['name']] = $subnet;
+            if (!$dryRun) {
+                $this->em->persist($subnet);
+            }
+        }
+
+        if (!$dryRun) {
+            $this->em->flush();
+        }
+
+        $io->writeln(sprintf('  %d additional subnets', count($seedSubnets)));
+
+        // Snipe-IT server — API key read from SNIPE_API_KEY env var
+        $apiKey = $_ENV['SNIPE_API_KEY'] ?? getenv('SNIPE_API_KEY') ?? null;
+        if (!$apiKey) {
+            $io->warning('SNIPE_API_KEY is not set — Snipe-IT server will be created without an API key');
+        }
+
+        $server = new SnipeItServer();
+        $server->setName('snipe.goshen.edu');
+        $server->setApiUrl('https://snipe.goshen.edu');
+        $server->setApiKey($apiKey ?: null);
+        $server->setVerifyTls(false);
+        $server->setMacCustomFields('MAC Address, MAC Address 2, MAC Address 3, MAC Address 4, MAC Address 5, Wireless MAC');
+
+        if (!$dryRun) {
+            $this->em->persist($server);
+            $this->em->flush();
+        }
+
+        $io->writeln('  Snipe-IT server: snipe.goshen.edu');
+
+        // Category → subnet mappings. Subnets referenced here must exist either in the
+        // legacy import or in $seedSubnets above.
+        $subnetByName = function (string $name) use ($seedSubnets): ?Subnet {
+            return $seedSubnets[$name]
+                ?? $this->em->getRepository(Subnet::class)->findOneBy(['name' => $name]);
+        };
+
+        $categoryMaps = [
+            [39, '25',                            null],
+            [25, 'Access Point',                  'vlan44'],
+            [14, 'Analog Telephone Adapter',      'vlan44'],
+            [52, 'Audio',                         null],
+            [ 6, 'AudioVisual',                   null],
+            [ 5, 'Desktop',                       null],
+            [45, 'Digital Signage',               null],
+            [38, 'Docking Monitor',               null],
+            [32, 'Elemental Essence',             null],
+            [33, 'Energy Management',             'Siemens EMS'],
+            [35, 'Ethernet Adapter',              null],
+            [ 8, 'Ethernet Adapters',             null],
+            [20, 'Film Scanner',                  null],
+            [29, 'Headset',                       null],
+            [48, 'Keyboard',                      null],
+            [42, 'KMC',                           'vlan253'],
+            [ 7, 'Laptop',                        null],
+            [30, 'Laptop Dock',                   null],
+            [21, 'Mail Scale',                    null],
+            [15, 'MFP',                           'printers'],
+            [12, 'Monitor',                       null],
+            [46, 'Network Attached Storage (NAS)',null],
+            [49, 'Network Tester',                null],
+            [ 4, 'Networking',                    null],
+            [50, 'Nursing',                       'vlan249 Building Special'],
+            [43, 'Other',                         null],
+            [13, 'Phone',                         'vlan44'],
+            [18, 'Power Supply',                  null],
+            [16, 'Printer',                       'printers'],
+            [34, 'Radio Equipment',               null],
+            [23, 'Scanner',                       null],
+            [11, 'Security',                      'Access Control'],
+            [27, 'Security Camera',               'Access Control'],
+            [ 2, 'Servers',                       null],
+            [19, 'Switch Module',                 null],
+            [44, 'Tablet',                        null],
+            [22, 'TV',                            null],
+            [26, 'UPS',                           'vlan44'],
+            [47, 'Utility',                       null],
+            [41, 'Video',                         null],
+            [17, 'Webcam Accessory',              null],
+            [ 9, 'Zero Client',                   null],
+        ];
+
+        foreach ($categoryMaps as [$catId, $catName, $subnetName]) {
+            $map = new SnipeItCategorySubnetMap();
+            $map->setServer($server);
+            $map->setSnipeCategoryId($catId);
+            $map->setSnipeCategoryName($catName);
+            if ($subnetName !== null) {
+                $map->setSubnet($subnetByName($subnetName));
+            }
+            if (!$dryRun) {
+                $this->em->persist($map);
+            }
+        }
+
+        if (!$dryRun) {
+            $this->em->flush();
+        }
+
+        $io->writeln(sprintf('  %d category maps', count($categoryMaps)));
     }
 }
