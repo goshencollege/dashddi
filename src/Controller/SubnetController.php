@@ -208,9 +208,17 @@ class SubnetController extends AbstractController
         $blocks = $subnet->getAddressBlocks()->toArray();
         usort($blocks, fn($a, $b) => ip2long($a->getStartIp()) <=> ip2long($b->getStartIp()));
 
+        $ipv4 = $subnet->getIpAddresses()->toArray();
+        usort($ipv4, fn($a, $b) => ip2long($a->getAddress()) <=> ip2long($b->getAddress()));
+
+        $ipv6 = $subnet->getIpv6Addresses()->toArray();
+        usort($ipv6, fn($a, $b) => inet_pton($a->getAddress()) <=> inet_pton($b->getAddress()));
+
         return $this->render('subnet/show.html.twig', [
             'subnet'          => $subnet,
             'blocks'          => $blocks,
+            'ipv4_addresses'  => $ipv4,
+            'ipv6_addresses'  => $ipv6,
             'available_ipv4'  => $subnet->getIpv4Cidr() ? $manager->getAvailableIpv4($subnet, 255) : [],
             'available_ipv6'  => $subnet->getIpv6Cidr() ? $manager->getAvailableIpv6($subnet, 20) : [],
         ]);

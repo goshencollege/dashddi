@@ -235,8 +235,8 @@ if [[ "$APP_ENV" == "prod" ]]; then
         USE_CONTAINER_DB=true
         DB_HOST="db"
         DB_PORT="3306"
-        DB_NAME="ipam"
-        DB_USER="ipam"
+        DB_NAME="dashddi"
+        DB_USER="dash"
         DB_PASSWORD=$(openssl rand -hex 24)
         DB_ROOT_PASSWORD=$(openssl rand -hex 24)
         ok "MySQL will run in a container with auto-generated credentials"
@@ -245,7 +245,7 @@ if [[ "$APP_ENV" == "prod" ]]; then
         USE_CONTAINER_DB=false
         ask        DB_HOST       "MySQL hostname or IP"
         ask        DB_PORT       "MySQL port" "3306"
-        ask        DB_NAME       "Database name" "ipam"
+        ask        DB_NAME       "Database name" "dashddi"
         ask        DB_USER       "MySQL username"
         ask_secret DB_PASSWORD   "MySQL password"
         ok "External MySQL: ${DB_USER}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
@@ -265,8 +265,8 @@ else
     USE_CONTAINER_DB=true
     DB_HOST="db"
     DB_PORT="3306"
-    DB_NAME="ipam"
-    DB_USER="ipam"
+    DB_NAME="dashddi"
+    DB_USER="dash"
     DB_PASSWORD=$(openssl rand -hex 16)
     DB_ROOT_PASSWORD=$(openssl rand -hex 16)
 fi
@@ -280,7 +280,7 @@ if [[ "$APP_ENV" == "dev" ]]; then
         -e "s|replace_with_32plus_char_secret|${APP_SECRET}|g" \
         -e "s|run: docker compose exec app php bin/console app:generate-encryption-key|${APP_ENCRYPTION_KEY}|g" \
         -e "s|https://your-dev-hostname.example.com|${BASE_URL}|g" \
-        -e "s|ipam_password|${DB_PASSWORD}|g" \
+        -e "s|dash_password|${DB_PASSWORD}|g" \
         -e "s|root_password|${DB_ROOT_PASSWORD}|g" \
         -e "s|\"8080:80\"|\"${HTTP_PORT}:80\"|g" \
         -e "s|\"8443:443\"|\"${HTTPS_PORT}:443\"|g" \
@@ -603,7 +603,7 @@ echo
 
 echo -e "  ${BOLD}MySQL credentials (save these — they are not stored elsewhere):${NC}"
 if [[ "$APP_ENV" == "dev" ]]; then
-    echo "    App user:  ipam / $DB_PASSWORD"
+    echo "    App user:  dash / $DB_PASSWORD"
     echo "    Root:      root / $DB_ROOT_PASSWORD"
 elif [[ "$USE_CONTAINER_DB" == "true" ]]; then
     echo "    App user:  $DB_USER / $DB_PASSWORD"

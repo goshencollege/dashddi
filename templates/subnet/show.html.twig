@@ -163,16 +163,16 @@
         <div class="card h-100">
             <div class="card-header d-flex justify-content-between">
                 <span><i class="bi bi-4-square me-1"></i>IPv4 Allocations</span>
-                <span class="badge bg-secondary">{{ subnet.ipAddresses|length }} assigned</span>
+                <span class="badge bg-secondary">{{ ipv4_addresses|length }} assigned</span>
             </div>
-            {% if subnet.ipAddresses is empty %}
+            {% if ipv4_addresses is empty %}
                 <div class="card-body text-muted text-center py-3">No allocations</div>
             {% else %}
                 <div class="table-responsive">
                     <table class="table table-sm mb-0">
                         <thead class=""><tr><th>Address</th><th>Interface</th><th>Host</th></tr></thead>
                         <tbody>
-                            {% for ip in subnet.ipAddresses %}
+                            {% for ip in ipv4_addresses %}
                                 {% set iface = subnet.interfaces|filter(i => i.ipAddress and i.ipAddress.id == ip.id)|first %}
                                 <tr>
                                     <td class="ip-address">{{ ip.address }}</td>
@@ -209,16 +209,16 @@
         <div class="card h-100">
             <div class="card-header d-flex justify-content-between">
                 <span><i class="bi bi-6-square me-1"></i>IPv6 Allocations</span>
-                <span class="badge bg-secondary">{{ subnet.ipv6Addresses|length }} assigned</span>
+                <span class="badge bg-secondary">{{ ipv6_addresses|length }} assigned</span>
             </div>
-            {% if subnet.ipv6Addresses is empty %}
+            {% if ipv6_addresses is empty %}
                 <div class="card-body text-muted text-center py-3">No allocations</div>
             {% else %}
                 <div class="table-responsive">
                     <table class="table table-sm mb-0">
                         <thead class=""><tr><th>Address</th><th>Interface</th></tr></thead>
                         <tbody>
-                            {% for ip in subnet.ipv6Addresses %}
+                            {% for ip in ipv6_addresses %}
                                 {% set iface = subnet.interfaces|filter(i => i.ipv6Address and i.ipv6Address.id == ip.id)|first %}
                                 <tr>
                                     <td class="ip-address small">{{ ip.address }}</td>
