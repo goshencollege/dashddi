@@ -34,6 +34,8 @@ class BindZoneFileParser
         foreach ($lines as $line) {
             $trimmed = trim($line);
             if ($trimmed === '') {
+                $pendingComment = null;
+                $inCommentBlock = false;
                 continue;
             }
 
