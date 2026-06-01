@@ -31,6 +31,7 @@ upgrade:
 
 reset:
 	docker compose -f docker-compose.dev.yml down -v
+	docker run --rm -v dashddi-dev-dev_ssl_certs:/ssl -v $(CURDIR)/docker/ssl:/src:ro alpine sh -c 'cp /src/cert.pem /src/key.pem /ssl/ && chmod 644 /ssl/*.pem'
 	docker compose -f docker-compose.dev.yml up -d --build
 	@echo "Waiting for app container…"
 	@until docker compose -f docker-compose.dev.yml exec -T app php -r 'echo "ok";' 2>/dev/null | grep -q ok; do sleep 2; done
