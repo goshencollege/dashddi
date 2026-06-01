@@ -1,7 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-COMPOSE="docker compose -f docker-compose.dev.yml"
+if [ -n "${COMPOSE_FILE:-}" ]; then
+    COMPOSE="docker compose -f $COMPOSE_FILE"
+elif [ -f docker-compose.yml ]; then
+    COMPOSE="docker compose -f docker-compose.yml"
+elif [ -f docker-compose.dev.yml ]; then
+    COMPOSE="docker compose -f docker-compose.dev.yml"
+else
+    echo "Error: no docker-compose.yml or docker-compose.dev.yml found" >&2
+    exit 1
+fi
 
 echo "==> Pulling latest code..."
 git pull
