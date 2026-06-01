@@ -4,6 +4,7 @@ namespace App\Tests\Functional\Controller;
 
 use App\Entity\DnsView;
 use App\Entity\Subnet;
+use App\Entity\SubnetRecord;
 use App\Entity\Tag;
 use App\Tests\Functional\AppWebTestCase;
 
@@ -275,5 +276,150 @@ class SubnetBulkEditControllerTest extends AppWebTestCase
         $this->em->clear();
         $s1 = $this->em->find(Subnet::class, $s1Id);
         $this->assertSame(90, $s1->getLeaseRetentionDays());
+    }
+
+    // ── Add DNS Records ───────────────────────────────────────────────────────
+
+    private function postBulkEditWithRecords(array $subnetIds, array $recordTemplates): void
+    {
+        $idQuery   = implode('&', array_map(fn($id) => 'ids[]=' . $id, $subnetIds));
+        $crawler   = $this->client->request('GET', '/subnets/bulk-edit?' . $idQuery);
+        $csrfToken = $crawler->filter('input[name="subnet_bulk_edit[_token]"]')->attr('value');
+
+        $postData = [
+            'subnet_bulk_edit'  => ['_token' => $csrfToken],
+            'subnet_ids'        => $subnetIds,
+            'apply_records'     => '1',
+            'record_templates'  => $recordTemplates,
+        ];
+
+        $this->client->request('POST', '/subnets/bulk-edit', $postData);
+    }
+
+    public function testPostAddsRecordToAllSelectedSubnets(): void
+    {
+        $s1 = $this->makeSubnet('Record Bulk A', '10.73.0.0/24');
+        $s2 = $this->makeSubnet('Record Bulk B', '10.74.0.0/24');
+        $s1Id = $s1->getId();
+        $s2Id = $s2->getId();
+
+        $this->postBulkEditWithRecords(
+            [$s1Id, $s2Id],
+            [['hostname' => '@', 'type' => 'NS', 'value' => 'ns1.bulk.example.', 'ttl' => '']],
+        );
+        $this->assertResponseRedirects('/subnets');
+
+        $this->em->clear();
+        $s1 = $this->em->find(Subnet::class, $s1Id);
+        $s2 = $this->em->find(Subnet::class, $s2Id);
+        $this->assertCount(1, $s1->getRecords());
+        $this->assertCount(1, $s2->getRecords());
+        $this->assertSame('ns1.bulk.example.', $s1->getRecords()->first()->getValue());
+    }
+
+    public function testPostAddsMultipleRecordTemplates(): void
+    {
+        $s1   = $this->makeSubnet('Record Bulk Multi', '10.75.0.0/24');
+        $s1Id = $s1->getId();
+
+        $this->postBulkEditWithRecords(
+            [$s1Id],
+            [
+                ['hostname' => '@',   'type' => 'NS', 'value' => 'ns1.bulk.example.', 'ttl' => ''],
+                ['hostname' => '@',   'type' => 'NS', 'value' => 'ns2.bulk.example.', 'ttl' => '3600'],
+            ],
+        );
+        $this->assertResponseRedirects('/subnets');
+
+        $this->em->clear();
+        $s1     = $this->em->find(Subnet::class, $s1Id);
+        $values = $s1->getRecords()->map(fn(SubnetRecord $r) => $r->getValue())->toArray();
+        $this->assertContains('ns1.bulk.example.', $values);
+        $this->assertContains('ns2.bulk.example.', $values);
+        $ttls = $s1->getRecords()->map(fn(SubnetRecord $r) => $r->getTtl())->toArray();
+        $this->assertContains(3600, $ttls);
+    }
+
+    public function testPostSkipsInvalidRecordTemplate(): void
+    {
+        $s1   = $this->makeSubnet('Record Bulk Skip', '10.76.0.0/24');
+        $s1Id = $s1->getId();
+
+        $this->postBulkEditWithRecords(
+            [$s1Id],
+            [
+                ['hostname' => '',  'type' => 'NS',  'value' => 'ns1.example.',  'ttl' => ''], // blank hostname
+                ['hostname' => '@', 'type' => 'NS',  'value' => '',              'ttl' => ''], // blank value
+                ['hostname' => '@', 'type' => 'BAD', 'value' => 'ns1.example.', 'ttl' => ''], // bad type
+                ['hostname' => '@', 'type' => 'NS',  'value' => 'ns.valid.',     'ttl' => ''], // valid
+            ],
+        );
+        $this->assertResponseRedirects('/subnets');
+
+        $this->em->clear();
+        $s1 = $this->em->find(Subnet::class, $s1Id);
+        $this->assertCount(1, $s1->getRecords());
+    }
+
+    public function testPostRecordViewsScopedToSubnet(): void
+    {
+        $v1 = (new DnsView())->setName('bulk-rec-view-1');
+        $v2 = (new DnsView())->setName('bulk-rec-view-2');
+        $this->em->persist($v1);
+        $this->em->persist($v2);
+
+        // s1 has only v1; s2 has both
+        $s1 = (new Subnet())->setName('Rec View Subnet A')->setIpv4Cidr('10.77.0.0/24');
+        $s1->addView($v1);
+        $s2 = (new Subnet())->setName('Rec View Subnet B')->setIpv4Cidr('10.78.0.0/24');
+        $s2->addView($v1)->addView($v2);
+        $this->em->persist($s1);
+        $this->em->persist($s2);
+        $this->em->flush();
+        $s1Id = $s1->getId();
+        $s2Id = $s2->getId();
+
+        // Request both v1 and v2 for the record template
+        $this->postBulkEditWithRecords(
+            [$s1Id, $s2Id],
+            [['hostname' => '@', 'type' => 'NS', 'value' => 'ns1.example.', 'ttl' => '',
+              'views' => [$v1->getId(), $v2->getId()]]],
+        );
+        $this->assertResponseRedirects('/subnets');
+
+        $this->em->clear();
+        $s1 = $this->em->find(Subnet::class, $s1Id);
+        $s2 = $this->em->find(Subnet::class, $s2Id);
+
+        $s1RecordViews = $s1->getRecords()->first()->getViews()->map(fn(DnsView $v) => $v->getName())->toArray();
+        $this->assertContains('bulk-rec-view-1', $s1RecordViews);
+        $this->assertNotContains('bulk-rec-view-2', $s1RecordViews); // s1 doesn't have v2
+
+        $s2RecordViews = $s2->getRecords()->first()->getViews()->map(fn(DnsView $v) => $v->getName())->toArray();
+        $this->assertContains('bulk-rec-view-1', $s2RecordViews);
+        $this->assertContains('bulk-rec-view-2', $s2RecordViews); // s2 has both
+    }
+
+    public function testPostRecordsNotAddedWhenApplyUnchecked(): void
+    {
+        $s1   = $this->makeSubnet('Record No Apply', '10.79.0.0/24');
+        $s1Id = $s1->getId();
+
+        $idQuery   = "ids[]={$s1Id}";
+        $crawler   = $this->client->request('GET', '/subnets/bulk-edit?' . $idQuery);
+        $csrfToken = $crawler->filter('input[name="subnet_bulk_edit[_token]"]')->attr('value');
+
+        // POST with record_templates but WITHOUT apply_records
+        $this->client->request('POST', '/subnets/bulk-edit', [
+            'subnet_bulk_edit' => ['_token' => $csrfToken],
+            'subnet_ids'       => [$s1Id],
+            'record_templates' => [['hostname' => '@', 'type' => 'NS', 'value' => 'ns1.example.', 'ttl' => '']],
+            // apply_records intentionally omitted
+        ]);
+        $this->assertResponseRedirects('/subnets');
+
+        $this->em->clear();
+        $s1 = $this->em->find(Subnet::class, $s1Id);
+        $this->assertCount(0, $s1->getRecords());
     }
 }

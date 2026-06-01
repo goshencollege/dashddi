@@ -2,7 +2,10 @@
 
 namespace App\Controller;
 
+use App\Entity\SubnetRecord;
+use App\Enum\RecordType;
 use App\Form\SubnetBulkEditType;
+use App\Repository\DnsViewRepository;
 use App\Repository\SubnetRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -14,7 +17,7 @@ use Symfony\Component\Routing\Attribute\Route;
 class SubnetBulkEditController extends AbstractController
 {
     #[Route('/bulk-edit', name: 'subnet_bulk_edit', methods: ['GET', 'POST'])]
-    public function bulkEdit(Request $request, SubnetRepository $repo, EntityManagerInterface $em): Response
+    public function bulkEdit(Request $request, SubnetRepository $repo, EntityManagerInterface $em, DnsViewRepository $viewRepo): Response
     {
         if ($request->isMethod('POST')) {
             $raw = $request->request->all();
@@ -131,16 +134,58 @@ class SubnetBulkEditController extends AbstractController
                 }
             }
 
+            $recordsApplied = 0;
+            if (!empty($post['apply_records'])) {
+                $allViewsById = [];
+                foreach ($viewRepo->findAll() as $v) {
+                    $allViewsById[$v->getId()] = $v;
+                }
+                foreach ((array)($post['record_templates'] ?? []) as $tpl) {
+                    $hostname = trim($tpl['hostname'] ?? '');
+                    $typeStr  = $tpl['type'] ?? '';
+                    $value    = trim($tpl['value'] ?? '');
+                    $ttlRaw   = $tpl['ttl'] ?? '';
+                    $ttl      = $ttlRaw !== '' ? (int)$ttlRaw : null;
+                    $viewIds  = array_map('intval', (array)($tpl['views'] ?? []));
+                    if ($hostname === '' || $value === '' || !RecordType::tryFrom($typeStr)) {
+                        continue;
+                    }
+                    $type = RecordType::from($typeStr);
+                    $recordsApplied++;
+                    foreach ($subnets as $subnet) {
+                        $record = (new SubnetRecord())
+                            ->setSubnet($subnet)
+                            ->setHostname($hostname)
+                            ->setType($type)
+                            ->setValue($value)
+                            ->setTtl($ttl);
+                        $subnetViewIds = $subnet->getViews()->map(fn($v) => $v->getId())->toArray();
+                        foreach ($viewIds as $vid) {
+                            if (in_array($vid, $subnetViewIds, true) && isset($allViewsById[$vid])) {
+                                $record->addView($allViewsById[$vid]);
+                            }
+                        }
+                        $em->persist($record);
+                    }
+                }
+            }
+
             $em->flush();
             $count = count($subnets);
-            $this->addFlash('success', sprintf('Updated %d subnet%s.', $count, $count !== 1 ? 's' : ''));
+            $msg   = sprintf('Updated %d subnet%s.', $count, $count !== 1 ? 's' : '');
+            if ($recordsApplied > 0) {
+                $msg .= sprintf(' Added %d record%s to each.', $recordsApplied, $recordsApplied !== 1 ? 's' : '');
+            }
+            $this->addFlash('success', $msg);
             return $this->redirectToRoute('subnet_index');
         }
 
         return $this->render('subnet/bulk_edit.html.twig', [
-            'subnets' => $subnets,
-            'form'    => $form,
-            'ids'     => $ids,
+            'subnets'      => $subnets,
+            'form'         => $form,
+            'ids'          => $ids,
+            'all_views'    => $viewRepo->findBy([], ['name' => 'ASC']),
+            'record_types' => RecordType::cases(),
         ]);
     }
 }

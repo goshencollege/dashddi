@@ -249,6 +249,75 @@
     </table>
     </div>
 
+    {# ── Add DNS Records ──────────────────────────────── #}
+    <div class="border-top">
+        <div class="px-3 py-3 d-flex align-items-center gap-2">
+            <input type="checkbox" class="form-check-input" name="apply_records" id="apply_records">
+            <label for="apply_records" class="fw-semibold cursor-pointer mb-0">
+                <i class="bi bi-file-earmark-plus me-1"></i>Add DNS Records
+            </label>
+            <span class="text-muted small ms-1">Records will be appended to every selected subnet.</span>
+        </div>
+        <div id="records-panel" class="px-3 pb-3" style="display:none">
+            <div class="table-responsive">
+            <table class="table table-sm align-middle mb-2">
+                <thead>
+                    <tr>
+                        <th style="width:9rem">Hostname</th>
+                        <th style="width:6.5rem">Type</th>
+                        <th>Value</th>
+                        <th style="width:6rem">TTL</th>
+                        {% if all_views is not empty %}
+                        <th>Views <span class="text-muted fw-normal small">(only applied to subnets that have the view)</span></th>
+                        {% endif %}
+                        <th style="width:2.5rem"></th>
+                    </tr>
+                </thead>
+                <tbody id="records-tbody"></tbody>
+            </table>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="add-record-btn">
+                <i class="bi bi-plus-lg me-1"></i>Add record
+            </button>
+        </div>
+    </div>
+
+    {# Row template – cloned by JS; __IDX__ is replaced with the row counter #}
+    <template id="record-row-tpl">
+        <tr>
+            <td><input type="text" name="record_templates[__IDX__][hostname]" value="@" class="form-control form-control-sm font-monospace"></td>
+            <td>
+                <select name="record_templates[__IDX__][type]" class="form-select form-select-sm">
+                    {% for rt in record_types %}
+                    <option value="{{ rt.value }}"{% if rt.value == 'NS' %} selected{% endif %}>{{ rt.value }}</option>
+                    {% endfor %}
+                </select>
+            </td>
+            <td><input type="text" name="record_templates[__IDX__][value]" class="form-control form-control-sm font-monospace" placeholder="ns1.example.com."></td>
+            <td><input type="number" name="record_templates[__IDX__][ttl]" class="form-control form-control-sm" placeholder="default" min="0"></td>
+            {% if all_views is not empty %}
+            <td>
+                <div class="d-flex flex-wrap gap-3">
+                    {% for view in all_views %}
+                    <div class="form-check form-check-inline mb-0">
+                        <input class="form-check-input" type="checkbox"
+                               name="record_templates[__IDX__][views][]"
+                               value="{{ view.id }}"
+                               id="rv___IDX____{{ view.id }}">
+                        <label class="form-check-label small" for="rv___IDX____{{ view.id }}">{{ view.name }}</label>
+                    </div>
+                    {% endfor %}
+                </div>
+            </td>
+            {% endif %}
+            <td>
+                <button type="button" class="btn btn-sm btn-outline-danger remove-record-row">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </td>
+        </tr>
+    </template>
+
     <div class="card-footer d-flex gap-2">
         <button type="submit" class="btn btn-primary">
             <i class="bi bi-check-lg me-1"></i>Apply Changes
@@ -344,6 +413,54 @@
             if (row.contains(ts.input)) ts.disable();
         });
     });
+})();
+
+// ── DNS Records section ───────────────────────────────────────────────────
+(function () {
+    var panel      = document.getElementById('records-panel');
+    var tbody      = document.getElementById('records-tbody');
+    var applyChk   = document.getElementById('apply_records');
+    var addBtn     = document.getElementById('add-record-btn');
+    var rowTpl     = document.getElementById('record-row-tpl');
+    var rowCounter = 0;
+
+    function disablePanelInputs() {
+        panel.querySelectorAll('input, select, textarea').forEach(function (el) {
+            el.disabled = true;
+        });
+    }
+
+    function enablePanelInputs() {
+        panel.querySelectorAll('input, select, textarea').forEach(function (el) {
+            el.disabled = false;
+        });
+    }
+
+    function addRow() {
+        var frag = rowTpl.content.cloneNode(true);
+        var tr   = frag.querySelector('tr');
+        tr.innerHTML = tr.innerHTML.replaceAll('__IDX__', rowCounter++);
+        tr.querySelector('.remove-record-row').addEventListener('click', function () {
+            tr.remove();
+        });
+        tbody.appendChild(tr);
+    }
+
+    applyChk.addEventListener('change', function () {
+        if (this.checked) {
+            panel.style.display = '';
+            enablePanelInputs();
+            if (tbody.children.length === 0) addRow();
+        } else {
+            panel.style.display = 'none';
+            disablePanelInputs();
+        }
+    });
+
+    addBtn.addEventListener('click', addRow);
+
+    // Start disabled
+    disablePanelInputs();
 })();
 </script>
 {% endblock %}
