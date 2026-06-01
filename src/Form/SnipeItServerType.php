@@ -3,6 +3,8 @@
 namespace App\Form;
 
 use App\Entity\SnipeItServer;
+use App\Entity\Subnet;
+use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
 use Symfony\Component\Form\Extension\Core\Type\PasswordType;
@@ -41,6 +43,15 @@ class SnipeItServerType extends AbstractType
                 'required' => false,
                 'attr'     => ['placeholder' => 'e.g. VLAN Override'],
                 'help'     => 'Optional. Display name of a Snipe-IT custom field containing a numeric VLAN ID. When set, overrides the category-based subnet assignment for individual assets.',
+            ])
+            ->add('defaultSubnet', EntityType::class, [
+                'class'         => Subnet::class,
+                'choice_label'  => fn(Subnet $s) => (string) $s,
+                'query_builder' => fn($repo) => $repo->createQueryBuilder('s')->orderBy('s.name', 'ASC'),
+                'placeholder'   => '— none —',
+                'required'      => false,
+                'label'         => 'Default Subnet',
+                'help'          => 'Optional. Assigned to interfaces when neither the category map nor the VLAN override resolves to a subnet.',
             ])
             ->add('verifyTls', CheckboxType::class, [
                 'label'    => 'Verify TLS certificate',

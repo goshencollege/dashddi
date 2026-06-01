@@ -29,6 +29,15 @@
                     </div>
                 {% endfor %}
 
+                <div class="mb-3">
+                    {{ form_label(form.defaultSubnet, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                    {{ form_widget(form.defaultSubnet, {attr: {class: 'form-select'}}) }}
+                    {{ form_errors(form.defaultSubnet) }}
+                    {% if form.defaultSubnet.vars.help is defined and form.defaultSubnet.vars.help %}
+                        <div class="form-text">{{ form.defaultSubnet.vars.help }}</div>
+                    {% endif %}
+                </div>
+
                 <div class="mb-3 form-check">
                     {{ form_widget(form.verifyTls, {attr: {class: 'form-check-input'}}) }}
                     {{ form_label(form.verifyTls, null, {label_attr: {class: 'form-check-label'}}) }}

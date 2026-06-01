@@ -4,6 +4,7 @@ namespace App\Entity;
 
 use App\Entity\Trait\AuditableTrait;
 use App\Repository\SnipeItServerRepository;
+use App\Entity\Subnet;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
@@ -50,6 +51,10 @@ class SnipeItServer
     #[ORM\Column(nullable: true)]
     private ?\DateTimeImmutable $lastSyncAt = null;
 
+    #[ORM\ManyToOne(targetEntity: Subnet::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?Subnet $defaultSubnet = null;
+
     #[ORM\OneToMany(targetEntity: SnipeItCategorySubnetMap::class, mappedBy: 'server', cascade: ['remove'], orphanRemoval: true)]
     #[ORM\OrderBy(['snipeCategoryName' => 'ASC'])]
     private Collection $categorySubnetMaps;
@@ -84,6 +89,9 @@ class SnipeItServer
 
     public function getVlanOverrideCustomField(): ?string { return $this->vlanOverrideCustomField; }
     public function setVlanOverrideCustomField(?string $v): static { $this->vlanOverrideCustomField = $v ?: null; return $this; }
+
+    public function getDefaultSubnet(): ?Subnet { return $this->defaultSubnet; }
+    public function setDefaultSubnet(?Subnet $subnet): static { $this->defaultSubnet = $subnet; return $this; }
 
     public function getDescription(): ?string { return $this->description; }
     public function setDescription(?string $description): static { $this->description = $description; return $this; }
