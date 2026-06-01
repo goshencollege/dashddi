@@ -42,6 +42,9 @@ class DomainRecord
     #[Assert\Positive]
     private ?int $ttl = null;
 
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $comment = null;
+
     #[ORM\ManyToMany(targetEntity: DnsView::class)]
     #[ORM\JoinTable(name: 'domain_record_dns_view')]
     private Collection $views;
@@ -67,6 +70,9 @@ class DomainRecord
 
     public function getTtl(): ?int { return $this->ttl; }
     public function setTtl(?int $ttl): static { $this->ttl = $ttl; return $this; }
+
+    public function getComment(): ?string { return $this->comment; }
+    public function setComment(?string $comment): static { $this->comment = $comment; return $this; }
 
     public function getViews(): Collection { return $this->views; }
 
