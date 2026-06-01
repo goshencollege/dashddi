@@ -1,0 +1,73 @@
+{% extends 'base.html.twig' %}
+{% block title %}{{ record.id ? 'Edit Record' : 'Add Record' }} – {{ subnet.name }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ path('subnet_index') }}">Subnets</a></li>
+        <li class="breadcrumb-item"><a href="{{ path('subnet_show', {id: subnet.id}) }}">{{ subnet.name }}</a></li>
+        <li class="breadcrumb-item active">{{ record.id ? 'Edit Record' : 'Add Record' }}</li>
+    </ol>
+</nav>
+
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-list-ul me-1"></i>{{ record.id ? 'Edit DNS Record' : 'Add DNS Record' }}
+                <span class="text-muted ms-1">– {{ subnet.name }}</span>
+            </div>
+            <div class="card-body">
+                {{ form_start(form) }}
+                <div class="mb-3">
+                    {{ form_label(form.hostname, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                    {{ form_widget(form.hostname, {attr: {class: 'form-control font-monospace'}}) }}
+                    <div class="form-text">Use <code>@</code> for the zone apex.</div>
+                    {{ form_errors(form.hostname) }}
+                </div>
+                <div class="mb-3">
+                    {{ form_label(form.type, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                    {{ form_widget(form.type, {attr: {class: 'form-select'}}) }}
+                    {{ form_errors(form.type) }}
+                </div>
+                <div class="mb-3">
+                    {{ form_label(form.value, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                    {{ form_widget(form.value, {attr: {class: 'form-control font-monospace'}}) }}
+                    {{ form_errors(form.value) }}
+                </div>
+                <div class="mb-3">
+                    {{ form_label(form.ttl, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                    {{ form_widget(form.ttl, {attr: {class: 'form-control'}}) }}
+                    <div class="form-text">Leave blank to inherit the zone's minimum TTL.</div>
+                    {{ form_errors(form.ttl) }}
+                </div>
+                {% if form.views is defined %}
+                <div class="mb-4">
+                    {{ form_label(form.views, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                    {% if form.views|length > 0 %}
+                        <div class="d-flex flex-wrap gap-3">
+                            {% for viewWidget in form.views %}
+                                <div class="form-check">
+                                    {{ form_widget(viewWidget, {attr: {class: 'form-check-input'}}) }}
+                                    {{ form_label(viewWidget, null, {label_attr: {class: 'form-check-label'}}) }}
+                                </div>
+                            {% endfor %}
+                        </div>
+                        <div class="form-text">Record will only appear in the selected views.</div>
+                    {% else %}
+                        <p class="text-muted small mb-0">No views configured for this subnet.</p>
+                    {% endif %}
+                </div>
+                {% endif %}
+                <div class="d-flex justify-content-between">
+                    <a href="{{ path('subnet_show', {id: subnet.id}) }}" class="btn btn-outline-secondary">Cancel</a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg me-1"></i>{{ record.id ? 'Save Changes' : 'Add Record' }}
+                    </button>
+                </div>
+                {{ form_end(form) }}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

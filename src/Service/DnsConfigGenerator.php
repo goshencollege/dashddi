@@ -178,6 +178,21 @@ class DnsConfigGenerator
             $lines[] = '';
         }
 
+        // Manual records
+        $recordLines = [];
+        foreach ($subnet->getRecords() as $record) {
+            if (!$this->inView($view, $record->getViews()->toArray())) {
+                continue;
+            }
+            $ttl           = $record->getTtl() ? (' ' . $record->getTtl()) : '';
+            $recordLines[] = sprintf('%s%s IN %s %s', $record->getHostname(), $ttl, $record->getType()->value, $record->getValue());
+        }
+        if (!empty($recordLines)) {
+            $lines[] = '; Manual records';
+            array_push($lines, ...$recordLines);
+            $lines[] = '';
+        }
+
         return implode("\n", $lines);
     }
 

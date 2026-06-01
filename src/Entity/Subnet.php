@@ -67,6 +67,10 @@ class Subnet
     #[ORM\OrderBy(['startIp' => 'ASC'])]
     private Collection $addressBlocks;
 
+    #[ORM\OneToMany(targetEntity: SubnetRecord::class, mappedBy: 'subnet', cascade: ['persist', 'remove'], orphanRemoval: true)]
+    #[ORM\OrderBy(['hostname' => 'ASC', 'type' => 'ASC'])]
+    private Collection $records;
+
     #[ORM\ManyToMany(targetEntity: Tag::class, inversedBy: 'subnets')]
     #[ORM\JoinTable(name: 'subnet_tag')]
     #[ORM\OrderBy(['name' => 'ASC'])]
@@ -118,8 +122,9 @@ class Subnet
         $this->ipv6Addresses = new ArrayCollection();
         $this->interfaces = new ArrayCollection();
         $this->addressBlocks = new ArrayCollection();
-        $this->tags = new ArrayCollection();
-        $this->views = new ArrayCollection();
+        $this->tags    = new ArrayCollection();
+        $this->views   = new ArrayCollection();
+        $this->records = new ArrayCollection();
     }
 
     public function getId(): ?int { return $this->id; }
@@ -149,6 +154,7 @@ class Subnet
     public function getIpv6Addresses(): Collection { return $this->ipv6Addresses; }
     public function getInterfaces(): Collection { return $this->interfaces; }
     public function getAddressBlocks(): Collection { return $this->addressBlocks; }
+    public function getRecords(): Collection { return $this->records; }
     public function getSoaNameserver(): ?string { return $this->soaNameserver; }
     public function setSoaNameserver(?string $v): static { $this->soaNameserver = $v; return $this; }
 

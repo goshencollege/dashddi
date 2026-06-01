@@ -102,6 +102,65 @@
 
 <div class="card mb-4">
     <div class="card-header d-flex justify-content-between align-items-center">
+        <span>
+            <i class="bi bi-list-ul me-1"></i>DNS Records
+            <span class="badge bg-secondary ms-1">{{ subnet.records|length }}</span>
+        </span>
+        <a href="{{ path('subnet_record_new', {subnetId: subnet.id}) }}" class="btn btn-sm btn-primary">
+            <i class="bi bi-plus-lg me-1"></i>Add Record
+        </a>
+    </div>
+    {% if subnet.records is empty %}
+        <div class="card-body text-center text-muted py-3">
+            No records yet. <a href="{{ path('subnet_record_new', {subnetId: subnet.id}) }}">Add one →</a>
+        </div>
+    {% else %}
+        <table class="table table-sm table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>Hostname</th>
+                    <th>Type</th>
+                    <th>Value</th>
+                    <th>TTL</th>
+                    <th>Views</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for record in subnet.records %}
+                <tr>
+                    <td class="font-monospace">{{ record.hostname }}</td>
+                    <td><span class="badge bg-secondary">{{ record.type.value }}</span></td>
+                    <td class="font-monospace small" style="word-break:break-all">{{ record.value }}</td>
+                    <td class="text-muted small">{{ record.ttl ?: '—' }}</td>
+                    <td>
+                        {% for view in record.views %}
+                            <span class="badge bg-secondary me-1">{{ view.name }}</span>
+                        {% else %}
+                            <span class="text-muted">—</span>
+                        {% endfor %}
+                    </td>
+                    <td class="text-end" style="white-space:nowrap">
+                        <a href="{{ path('subnet_record_edit', {id: record.id}) }}" class="btn btn-sm btn-outline-secondary me-1">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                        <form method="post" action="{{ path('subnet_record_delete', {id: record.id}) }}" class="d-inline"
+                              onsubmit="return confirm('Delete this record?')">
+                            <input type="hidden" name="_token" value="{{ csrf_token('delete_subnet_record_' ~ record.id) }}">
+                            <button type="submit" class="btn btn-sm btn-outline-danger">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+</div>
+
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
         <span><i class="bi bi-grid me-1"></i>Address Blocks ({{ blocks|length }})</span>
         <a href="{{ path('block_new', {subnetId: subnet.id}) }}" class="btn btn-sm btn-primary">
             <i class="bi bi-plus-lg me-1"></i>Add Block
