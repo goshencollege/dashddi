@@ -40,6 +40,10 @@ class SnipeItServer
     #[Assert\NotBlank(message: 'Enter at least one MAC address custom field name.')]
     private string $macCustomFields = '';
 
+    /** Snipe-IT custom field display name whose value is a numeric VLAN ID used to override the category-based subnet assignment. */
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $vlanOverrideCustomField = null;
+
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $description = null;
 
@@ -77,6 +81,9 @@ class SnipeItServer
     {
         return array_filter(array_map('trim', explode(',', $this->macCustomFields)));
     }
+
+    public function getVlanOverrideCustomField(): ?string { return $this->vlanOverrideCustomField; }
+    public function setVlanOverrideCustomField(?string $v): static { $this->vlanOverrideCustomField = $v ?: null; return $this; }
 
     public function getDescription(): ?string { return $this->description; }
     public function setDescription(?string $description): static { $this->description = $description; return $this; }

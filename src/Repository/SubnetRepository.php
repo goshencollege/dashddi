@@ -162,6 +162,27 @@ class SubnetRepository extends ServiceEntityRepository
     }
 
     /**
+     * Groups all subnets that have a VLAN ID by that ID.
+     * Returns [vlanId => Subnet[]], ordered within each group by ascending ID.
+     *
+     * @return array<int, Subnet[]>
+     */
+    public function groupByVlan(): array
+    {
+        $subnets = $this->createQueryBuilder('s')
+            ->where('s.vlan IS NOT NULL')
+            ->orderBy('s.id', 'ASC')
+            ->getQuery()
+            ->getResult();
+
+        $grouped = [];
+        foreach ($subnets as $subnet) {
+            $grouped[$subnet->getVlan()][] = $subnet;
+        }
+        return $grouped;
+    }
+
+    /**
      * Returns subnet choices for form dropdowns.
      * If the saved search yields results, returns a grouped array with matches first.
      * Otherwise returns a flat ordered array of all non-container subnets.

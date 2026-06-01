@@ -36,6 +36,12 @@ class SnipeItServerType extends AbstractType
                 'attr'  => ['placeholder' => 'MAC Address, Secondary MAC, MAC 2'],
                 'help'  => 'Comma-separated display names of the Snipe-IT custom fields that store MAC addresses.',
             ])
+            ->add('vlanOverrideCustomField', TextType::class, [
+                'label'    => 'VLAN Override Custom Field Name',
+                'required' => false,
+                'attr'     => ['placeholder' => 'e.g. VLAN Override'],
+                'help'     => 'Optional. Display name of a Snipe-IT custom field containing a numeric VLAN ID. When set, overrides the category-based subnet assignment for individual assets.',
+            ])
             ->add('verifyTls', CheckboxType::class, [
                 'label'    => 'Verify TLS certificate',
                 'required' => false,

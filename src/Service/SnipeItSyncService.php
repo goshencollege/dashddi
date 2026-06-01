@@ -10,6 +10,7 @@ use App\Entity\Subnet;
 use App\Entity\Tag;
 use App\Repository\NetworkInterfaceRepository;
 use App\Repository\SnipeItAssetLinkRepository;
+use App\Repository\SubnetRepository;
 use App\Repository\TagRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -26,6 +27,7 @@ class SnipeItSyncService
         private readonly SnipeItAssetLinkRepository  $linkRepo,
         private readonly NetworkInterfaceRepository  $ifaceRepo,
         private readonly TagRepository               $tagRepo,
+        private readonly SubnetRepository            $subnetRepo,
     ) {}
 
     /**
@@ -40,13 +42,15 @@ class SnipeItSyncService
         $result = ['created' => 0, 'updated' => 0, 'deleted' => 0, 'skipped' => 0, 'errors' => []];
 
         // Cache scalar values before any em->clear() detaches $server
-        $serverId      = $server->getId();
-        $macFieldNames = $server->getMacCustomFieldNames();
+        $serverId            = $server->getId();
+        $macFieldNames       = $server->getMacCustomFieldNames();
+        $vlanOverrideField   = $server->getVlanOverrideCustomField();
 
         $snipeTag = $this->ensureTag(self::TAG_NAME);
         $this->em->flush(); // persist new tag before first clear
 
         $categorySubnetIdMap = $this->buildCategorySubnetIdMap($server);
+        $vlanSubnetIdMap     = $vlanOverrideField !== null ? $this->buildVlanSubnetIdMap($result['errors']) : [];
 
         $activeAssetIds  = [];
         $adoptedHostIds  = []; // host IDs adopted this session; checked before DB flush makes the link visible
@@ -101,11 +105,23 @@ class SnipeItSyncService
                 $categoryId   = (int) ($asset['category']['id'] ?? 0);
                 $categoryName = str_replace('|', '_', trim((string) ($asset['category']['name'] ?? '')));
 
+                $overrideSubnetId = null;
+                if ($vlanOverrideField !== null) {
+                    $rawVlan = (int) trim((string) ($asset['custom_fields'][$vlanOverrideField]['value'] ?? ''));
+                    if ($rawVlan > 0) {
+                        if (isset($vlanSubnetIdMap[$rawVlan])) {
+                            $overrideSubnetId = $vlanSubnetIdMap[$rawVlan];
+                        } else {
+                            $result['errors'][] = sprintf('Asset "%s": VLAN override %d has no matching subnet — falling back to category map.', $assetName, $rawVlan);
+                        }
+                    }
+                }
+
                 $link = $this->linkRepo->findByServerAndAssetId($server, $assetId);
 
                 try {
                     if ($link !== null) {
-                        $kept = $this->updateHost($link, $assetName, $assetTagStr, $macs, $result['errors'], $categorySubnetIdMap, $categoryId, $categoryName);
+                        $kept = $this->updateHost($link, $assetName, $assetTagStr, $macs, $result['errors'], $categorySubnetIdMap, $categoryId, $categoryName, $overrideSubnetId);
                         if (!$kept) {
                             // soft-delete done inside updateHost; delete only the link row
                             $link->getHost()->setSnipeItAssetLink(null);
@@ -177,7 +193,7 @@ class SnipeItSyncService
                             usort($hosts, fn($a, $b) => $b->getInterfaces()->count() <=> $a->getInterfaces()->count());
                             $host = $hosts[0];
                             $this->mergeHosts($host, array_slice($hosts, 1));
-                            $this->adoptHost($host, $normalizedMacs, $snipeTag, $categorySubnetIdMap, $categoryId, $categoryName);
+                            $this->adoptHost($host, $normalizedMacs, $snipeTag, $categorySubnetIdMap, $categoryId, $categoryName, $overrideSubnetId);
                             $adoptedHostIds[$host->getId()] = true;
                             $adopted = true;
                         } elseif (count($conflictHosts) === 1) {
@@ -192,9 +208,9 @@ class SnipeItSyncService
                             $adoptedHostIds[$hostId] = true;
                             // Adopt the pre-existing DashDDI host instead of creating a new one
                             $adopted = true;
-                            $this->adoptHost($host, $normalizedMacs, $snipeTag, $categorySubnetIdMap, $categoryId, $categoryName);
+                            $this->adoptHost($host, $normalizedMacs, $snipeTag, $categorySubnetIdMap, $categoryId, $categoryName, $overrideSubnetId);
                         } else {
-                            $host = $this->createHost($assetName, $macs, $snipeTag, $result['errors'], $categorySubnetIdMap, $categoryId, $categoryName);
+                            $host = $this->createHost($assetName, $macs, $snipeTag, $result['errors'], $categorySubnetIdMap, $categoryId, $categoryName, $overrideSubnetId);
                             if ($host === null) {
                                 $result['skipped']++;
                                 continue;
@@ -341,7 +357,7 @@ class SnipeItSyncService
      * Does not change the host's name. Assigns a default subnet to interfaces that
      * have none, based on the category→subnet mapping.
      */
-    private function adoptHost(Host $host, array $normalizedMacs, Tag $snipeTag, array $categorySubnetIdMap, int $categoryId, string $categoryName): void
+    private function adoptHost(Host $host, array $normalizedMacs, Tag $snipeTag, array $categorySubnetIdMap, int $categoryId, string $categoryName, ?int $overrideSubnetId = null): void
     {
         $host->addTag($snipeTag);
         if ($categoryName !== '') {
@@ -357,7 +373,7 @@ class SnipeItSyncService
             if ($existingIface->isDeleted()) {
                 continue;
             }
-            $this->assignSubnetIfMissing($existingIface, $categorySubnetIdMap, $categoryId);
+            $this->assignSubnetIfMissing($existingIface, $categorySubnetIdMap, $categoryId, $overrideSubnetId);
         }
 
         foreach ($normalizedMacs as $mac) {
@@ -372,13 +388,13 @@ class SnipeItSyncService
             $iface = new NetworkInterface();
             $iface->setMacAddress($mac);
             $iface->setHost($host);
-            $this->assignSubnetIfMissing($iface, $categorySubnetIdMap, $categoryId);
+            $this->assignSubnetIfMissing($iface, $categorySubnetIdMap, $categoryId, $overrideSubnetId);
             $this->em->persist($iface);
         }
     }
 
     /** Returns null if no interfaces could be created (all MACs already assigned elsewhere). */
-    private function createHost(string $name, array $macs, Tag $snipeTag, array &$errors, array $categorySubnetIdMap, int $categoryId, string $categoryName): ?Host
+    private function createHost(string $name, array $macs, Tag $snipeTag, array &$errors, array $categorySubnetIdMap, int $categoryId, string $categoryName, ?int $overrideSubnetId = null): ?Host
     {
         $host = new Host();
         $host->setName($name);
@@ -397,7 +413,7 @@ class SnipeItSyncService
             $iface = new NetworkInterface();
             $iface->setMacAddress($mac);
             $iface->setHost($host);
-            $this->assignSubnetIfMissing($iface, $categorySubnetIdMap, $categoryId);
+            $this->assignSubnetIfMissing($iface, $categorySubnetIdMap, $categoryId, $overrideSubnetId);
             $this->em->persist($iface);
             $added++;
         }
@@ -415,7 +431,7 @@ class SnipeItSyncService
      * Preserves the DashDDI host name when it has been customised or adopted (differs from the
      * previously stored Snipe name); otherwise updates it to track renames in Snipe-IT.
      */
-    private function updateHost(SnipeItAssetLink $link, string $name, string $assetTagStr, array $macs, array &$errors, array $categorySubnetIdMap, int $categoryId, string $categoryName): bool
+    private function updateHost(SnipeItAssetLink $link, string $name, string $assetTagStr, array $macs, array &$errors, array $categorySubnetIdMap, int $categoryId, string $categoryName, ?int $overrideSubnetId = null): bool
     {
         $host = $link->getHost();
 
@@ -457,7 +473,7 @@ class SnipeItSyncService
             if ($iface->isDeleted()) {
                 continue;
             }
-            $this->assignSubnetIfMissing($iface, $categorySubnetIdMap, $categoryId);
+            $this->assignSubnetIfMissing($iface, $categorySubnetIdMap, $categoryId, $overrideSubnetId);
         }
 
         // Add new interfaces for MACs not yet on this host (restore soft-deleted ones if possible)
@@ -474,7 +490,7 @@ class SnipeItSyncService
             foreach ($host->getInterfaces() as $existing) {
                 if ($existing->isDeleted() && $existing->getMacAddress() === $mac) {
                     $existing->restore();
-                    $this->assignSubnetIfMissing($existing, $categorySubnetIdMap, $categoryId);
+                    $this->assignSubnetIfMissing($existing, $categorySubnetIdMap, $categoryId, $overrideSubnetId);
                     $existingMacs[] = $mac;
                     continue 2;
                 }
@@ -508,7 +524,7 @@ class SnipeItSyncService
             $iface = new NetworkInterface();
             $iface->setMacAddress($mac);
             $iface->setHost($host);
-            $this->assignSubnetIfMissing($iface, $categorySubnetIdMap, $categoryId);
+            $this->assignSubnetIfMissing($iface, $categorySubnetIdMap, $categoryId, $overrideSubnetId);
             $this->em->persist($iface);
         }
 
@@ -533,13 +549,58 @@ class SnipeItSyncService
         return $map;
     }
 
-    /** Sets the subnet on $iface if it has none and a mapping exists for $categoryId. */
-    private function assignSubnetIfMissing(NetworkInterface $iface, array $categorySubnetIdMap, int $categoryId): void
+    /** Sets the subnet on $iface if it has none. Override takes priority over the category map. */
+    private function assignSubnetIfMissing(NetworkInterface $iface, array $categorySubnetIdMap, int $categoryId, ?int $overrideSubnetId = null): void
     {
-        if ($iface->getSubnet() !== null || $categoryId === 0 || !isset($categorySubnetIdMap[$categoryId])) {
+        if ($iface->getSubnet() !== null) {
             return;
         }
-        $iface->setSubnet($this->em->getReference(Subnet::class, $categorySubnetIdMap[$categoryId]));
+        $subnetId = $overrideSubnetId ?? ($categoryId !== 0 ? ($categorySubnetIdMap[$categoryId] ?? null) : null);
+        if ($subnetId === null) {
+            return;
+        }
+        $iface->setSubnet($this->em->getReference(Subnet::class, $subnetId));
+    }
+
+    /**
+     * Builds [vlanId => subnetId] from all subnets that have a VLAN ID set.
+     * When multiple subnets share a VLAN, picks the most generic (shortest prefix = widest CIDR).
+     * Ties in prefix length are broken by lowest DB ID; a warning is appended to $warnings.
+     *
+     * @param string[] $warnings
+     * @return array<int, int>
+     */
+    private function buildVlanSubnetIdMap(array &$warnings): array
+    {
+        $grouped = $this->subnetRepo->groupByVlan();
+        $map     = [];
+
+        foreach ($grouped as $vlanId => $subnets) {
+            usort($subnets, function (Subnet $a, Subnet $b) {
+                return $this->subnetPrefixLength($a) <=> $this->subnetPrefixLength($b);
+            });
+
+            $shortest = $this->subnetPrefixLength($subnets[0]);
+            $ties     = array_filter($subnets, fn(Subnet $s) => $this->subnetPrefixLength($s) === $shortest);
+
+            if (count($ties) > 1) {
+                $names = implode(', ', array_map(fn(Subnet $s) => sprintf('"%s" (id %d)', $s->getName(), $s->getId()), $ties));
+                $warnings[] = sprintf('VLAN %d: multiple subnets with prefix /%d (%s) — using "%s".', $vlanId, $shortest, $names, $subnets[0]->getName());
+            }
+
+            $map[$vlanId] = $subnets[0]->getId();
+        }
+
+        return $map;
+    }
+
+    private function subnetPrefixLength(Subnet $subnet): int
+    {
+        $cidr = $subnet->getIpv4Cidr() ?? $subnet->getIpv6Cidr();
+        if ($cidr === null) {
+            return PHP_INT_MAX;
+        }
+        return (int) substr($cidr, strpos($cidr, '/') + 1);
     }
 
     private function ensureTag(string $tagName): Tag
