@@ -1,4 +1,4 @@
-.PHONY: up down restart bash migrate cc logs db-shell cert reset test-setup test
+.PHONY: up down restart bash migrate cc logs db-shell cert reset test-setup test upgrade
 # .env.test.local is a file target — Make skips the recipe if the file already exists.
 # Delete .env.test.local to force regeneration (e.g. after running setup.sh again).
 
@@ -25,6 +25,9 @@ logs:
 
 db-shell:
 	docker compose -f docker-compose.dev.yml exec db sh -c 'mysql -u$$MYSQL_USER -p$$MYSQL_PASSWORD $$MYSQL_DATABASE'
+
+upgrade:
+	@bash upgrade.sh
 
 reset:
 	docker compose -f docker-compose.dev.yml down -v
