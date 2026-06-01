@@ -25,15 +25,30 @@ class BindZoneFileParser
         $flattened = $this->flattenContent($content);
         $lines     = explode("\n", $flattened);
 
-        $origin     = $assumedOrigin !== '' ? rtrim($assumedOrigin, '.') . '.' : '';
-        $defaultTtl = null;
-        $lastName   = null;
+        $origin         = $assumedOrigin !== '' ? rtrim($assumedOrigin, '.') . '.' : '';
+        $defaultTtl     = null;
+        $lastName       = null;
+        $pendingComment = null;
+        $inCommentBlock = false;
 
         foreach ($lines as $line) {
             $trimmed = trim($line);
             if ($trimmed === '') {
                 continue;
             }
+
+            if (str_starts_with($trimmed, ';')) {
+                $commentText = trim(substr($trimmed, 1));
+                if ($inCommentBlock) {
+                    $pendingComment .= "\n" . $commentText;
+                } else {
+                    $pendingComment = $commentText;
+                    $inCommentBlock = true;
+                }
+                continue;
+            }
+
+            $inCommentBlock = false;
 
             if ($trimmed[0] === '$') {
                 $parts     = preg_split('/\s+/', $trimmed, 3);
@@ -58,6 +73,7 @@ class BindZoneFileParser
                 continue;
             }
 
+            $record['comment']    = $pendingComment;
             $result['records'][] = $record;
         }
 
@@ -66,23 +82,36 @@ class BindZoneFileParser
 
     private function flattenContent(string $content): string
     {
-        $result = '';
-        $depth  = 0;
-        $i      = 0;
-        $len    = strlen($content);
+        $result    = '';
+        $depth     = 0;
+        $i         = 0;
+        $len       = strlen($content);
+        $lineEmpty = true;
 
         while ($i < $len) {
             $ch = $content[$i];
 
             if ($ch === ';') {
-                while ($i < $len && $content[$i] !== "\n") {
-                    $i++;
+                if ($lineEmpty && $depth === 0) {
+                    // Full-line comment — preserve so parse() can attach it to records.
+                    $start = $i;
+                    while ($i < $len && $content[$i] !== "\n") {
+                        $i++;
+                    }
+                    $result .= substr($content, $start, $i - $start);
+                    // Leave the \n to be handled by the \n branch below.
+                } else {
+                    // Inline comment — strip to end of line.
+                    while ($i < $len && $content[$i] !== "\n") {
+                        $i++;
+                    }
                 }
                 continue;
             }
 
             if ($ch === '"') {
-                $result .= $ch;
+                $lineEmpty = false;
+                $result   .= $ch;
                 $i++;
                 while ($i < $len && $content[$i] !== '"') {
                     if ($content[$i] === '\\' && $i + 1 < $len) {
@@ -97,6 +126,7 @@ class BindZoneFileParser
             }
 
             if ($ch === '(') {
+                $lineEmpty = false;
                 $depth++;
                 $i++;
                 continue;
@@ -111,11 +141,15 @@ class BindZoneFileParser
             }
 
             if ($ch === "\n") {
-                $result .= $depth > 0 ? ' ' : "\n";
+                $result   .= $depth > 0 ? ' ' : "\n";
+                $lineEmpty = true;
                 $i++;
                 continue;
             }
 
+            if ($ch !== ' ' && $ch !== "\t") {
+                $lineEmpty = false;
+            }
             $result .= $ch;
             $i++;
         }

@@ -167,6 +167,7 @@ class ZoneImportController extends AbstractController
                 $record->setType($recordType);
                 $record->setValue($r['value']);
                 $record->setTtl($r['ttl']);
+                $record->setComment($r['comment'] ?? null);
                 foreach ($views as $view) {
                     $record->addView($view);
                 }
@@ -320,6 +321,7 @@ class ZoneImportController extends AbstractController
                 'type'                   => $r['type'],
                 'value'                  => $r['value'],
                 'ttl'                    => $r['ttl'],
+                'comment'                => $r['comment'] ?? null,
                 'action'                 => 'dns_record',
                 'skip_reason'            => null,
                 'host_name'              => null,

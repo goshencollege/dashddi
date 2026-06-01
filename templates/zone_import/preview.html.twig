@@ -64,6 +64,7 @@
                     <th>Type</th>
                     <th>Value</th>
                     <th>TTL</th>
+                    <th>Comment</th>
                     <th>Action</th>
                 </tr>
             </thead>
@@ -74,6 +75,7 @@
                     <td><span class="badge bg-secondary">{{ r.type }}</span></td>
                     <td class="font-monospace small" style="word-break: break-all;">{{ r.value }}</td>
                     <td class="text-muted small">{{ r.ttl ?: '—' }}</td>
+                    <td class="text-muted small" style="white-space: pre-line;">{{ r.comment ?: '' }}</td>
                     <td>
                         {% if r.action == 'host_dns_name' %}
                             <span class="badge bg-success">
