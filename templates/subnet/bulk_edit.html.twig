@@ -1,0 +1,350 @@
+{% extends 'base.html.twig' %}
+{% block title %}Bulk Edit Subnets{% endblock %}
+
+{% block stylesheets %}
+{{ parent() }}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css">
+{% endblock %}
+
+{% block page_styles %}
+{{ include('_tom_select_dark.html.twig') }}
+<style>
+.bulk-edit-table .bulk-row.inactive td:not(:first-child) {
+    opacity: 0.38;
+}
+.bulk-edit-table .bulk-row td {
+    padding-top: 0.6rem;
+    padding-bottom: 0.6rem;
+}
+.cursor-pointer { cursor: pointer; }
+</style>
+{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ path('subnet_index') }}">Subnets</a></li>
+        <li class="breadcrumb-item active">Bulk Edit</li>
+    </ol>
+</nav>
+
+<div class="row justify-content-center">
+<div class="col-xl-8 col-lg-10">
+
+<div class="card mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-pencil-square me-2"></i>Bulk Edit Subnets</h5>
+        <span class="badge bg-primary rounded-pill">{{ subnets|length }} subnet{{ subnets|length != 1 ? 's' }}</span>
+    </div>
+    <div class="card-body py-2 px-3">
+        <div class="d-flex flex-wrap gap-1">
+            {% for subnet in subnets %}
+                <span class="badge bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle fw-normal">
+                    <i class="bi bi-diagram-2 me-1"></i>{{ subnet.name }}
+                </span>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+{{ form_start(form, {attr: {id: 'bulk-edit-form', novalidate: 'novalidate'}}) }}
+
+{% for id in ids %}
+    <input type="hidden" name="subnet_ids[]" value="{{ id }}">
+{% endfor %}
+
+<div class="card">
+    <div class="card-header">
+        <span class="fw-semibold">Fields to Update</span>
+        <span class="text-muted small ms-2">Check a row to include it in the update — unchecked fields are left unchanged on all selected subnets.</span>
+    </div>
+
+    <div class="table-responsive">
+    <table class="table align-middle mb-0 bulk-edit-table">
+        <colgroup>
+            <col style="width:2.75rem">
+            <col style="width:13rem">
+            <col>
+            <col style="width:13rem">
+        </colgroup>
+        <tbody>
+
+        {# ── General ──────────────────────────────────────────── #}
+        <tr class="table-secondary">
+            <td colspan="4" class="small text-uppercase text-muted fw-semibold py-2 ps-3">General</td>
+        </tr>
+
+        <tr class="bulk-row inactive" data-field="vlan">
+            <td class="text-center ps-2">
+                <input type="checkbox" class="form-check-input apply-checkbox" name="apply_vlan" id="apply_vlan">
+            </td>
+            <td><label for="apply_vlan" class="form-label fw-semibold mb-0 cursor-pointer">VLAN ID</label></td>
+            <td>
+                {{ form_widget(form.vlan, {attr: {class: 'form-control form-control-sm', style: 'max-width:10rem'}}) }}
+            </td>
+            <td></td>
+        </tr>
+
+        <tr class="bulk-row inactive" data-field="description">
+            <td class="text-center ps-2">
+                <input type="checkbox" class="form-check-input apply-checkbox" name="apply_description" id="apply_description">
+            </td>
+            <td><label for="apply_description" class="form-label fw-semibold mb-0 cursor-pointer">Description</label></td>
+            <td>
+                {{ form_widget(form.description, {attr: {class: 'form-control form-control-sm'}}) }}
+            </td>
+            <td></td>
+        </tr>
+
+        <tr class="bulk-row inactive" data-field="tags">
+            <td class="text-center ps-2">
+                <input type="checkbox" class="form-check-input apply-checkbox" name="apply_tags" id="apply_tags">
+            </td>
+            <td><label for="apply_tags" class="form-label fw-semibold mb-0 cursor-pointer">Tags</label></td>
+            <td>
+                {{ form_widget(form.tags, {attr: {class: 'form-select form-select-sm', id: 'bulk_tags'}}) }}
+            </td>
+            <td>
+                <select name="tags_mode" class="form-select form-select-sm">
+                    <option value="replace">Replace all</option>
+                    <option value="add">Add to existing</option>
+                    <option value="remove">Remove from existing</option>
+                </select>
+            </td>
+        </tr>
+
+        {# ── Reverse Zone SOA ─────────────────────────────────── #}
+        <tr class="table-secondary">
+            <td colspan="4" class="small text-uppercase text-muted fw-semibold py-2 ps-3">Reverse Zone SOA</td>
+        </tr>
+
+        <tr class="bulk-row inactive" data-field="soaNameserver">
+            <td class="text-center ps-2">
+                <input type="checkbox" class="form-check-input apply-checkbox" name="apply_soaNameserver" id="apply_soaNameserver">
+            </td>
+            <td><label for="apply_soaNameserver" class="form-label fw-semibold mb-0 cursor-pointer">Primary Nameserver</label></td>
+            <td>
+                {{ form_widget(form.soaNameserver, {attr: {class: 'form-control form-control-sm'}}) }}
+            </td>
+            <td></td>
+        </tr>
+
+        <tr class="bulk-row inactive" data-field="soaEmail">
+            <td class="text-center ps-2">
+                <input type="checkbox" class="form-check-input apply-checkbox" name="apply_soaEmail" id="apply_soaEmail">
+            </td>
+            <td><label for="apply_soaEmail" class="form-label fw-semibold mb-0 cursor-pointer">Responsible Email</label></td>
+            <td>
+                {{ form_widget(form.soaEmail, {attr: {class: 'form-control form-control-sm'}}) }}
+            </td>
+            <td></td>
+        </tr>
+
+        <tr class="bulk-row inactive" data-field="soaRefresh">
+            <td class="text-center ps-2">
+                <input type="checkbox" class="form-check-input apply-checkbox" name="apply_soaRefresh" id="apply_soaRefresh">
+            </td>
+            <td><label for="apply_soaRefresh" class="form-label fw-semibold mb-0 cursor-pointer">Refresh (s)</label></td>
+            <td>
+                {{ form_widget(form.soaRefresh, {attr: {class: 'form-control form-control-sm', style: 'max-width:10rem'}}) }}
+            </td>
+            <td></td>
+        </tr>
+
+        <tr class="bulk-row inactive" data-field="soaRetry">
+            <td class="text-center ps-2">
+                <input type="checkbox" class="form-check-input apply-checkbox" name="apply_soaRetry" id="apply_soaRetry">
+            </td>
+            <td><label for="apply_soaRetry" class="form-label fw-semibold mb-0 cursor-pointer">Retry (s)</label></td>
+            <td>
+                {{ form_widget(form.soaRetry, {attr: {class: 'form-control form-control-sm', style: 'max-width:10rem'}}) }}
+            </td>
+            <td></td>
+        </tr>
+
+        <tr class="bulk-row inactive" data-field="soaExpire">
+            <td class="text-center ps-2">
+                <input type="checkbox" class="form-check-input apply-checkbox" name="apply_soaExpire" id="apply_soaExpire">
+            </td>
+            <td><label for="apply_soaExpire" class="form-label fw-semibold mb-0 cursor-pointer">Expire (s)</label></td>
+            <td>
+                {{ form_widget(form.soaExpire, {attr: {class: 'form-control form-control-sm', style: 'max-width:10rem'}}) }}
+            </td>
+            <td></td>
+        </tr>
+
+        <tr class="bulk-row inactive" data-field="soaTtl">
+            <td class="text-center ps-2">
+                <input type="checkbox" class="form-check-input apply-checkbox" name="apply_soaTtl" id="apply_soaTtl">
+            </td>
+            <td><label for="apply_soaTtl" class="form-label fw-semibold mb-0 cursor-pointer">Minimum TTL (s)</label></td>
+            <td>
+                {{ form_widget(form.soaTtl, {attr: {class: 'form-control form-control-sm', style: 'max-width:10rem'}}) }}
+            </td>
+            <td></td>
+        </tr>
+
+        {# ── DNS Views ─────────────────────────────────────────── #}
+        <tr class="table-secondary">
+            <td colspan="4" class="small text-uppercase text-muted fw-semibold py-2 ps-3">DNS</td>
+        </tr>
+
+        <tr class="bulk-row inactive" data-field="views">
+            <td class="text-center ps-2">
+                <input type="checkbox" class="form-check-input apply-checkbox" name="apply_views" id="apply_views">
+            </td>
+            <td><label for="apply_views" class="form-label fw-semibold mb-0 cursor-pointer">DNS Views</label></td>
+            <td>
+                {{ form_widget(form.views, {attr: {class: 'form-select form-select-sm', id: 'bulk_views'}}) }}
+                <div class="form-text">Reverse zones for selected subnets will be generated for these views.</div>
+            </td>
+            <td>
+                <select name="views_mode" class="form-select form-select-sm">
+                    <option value="replace">Replace all</option>
+                    <option value="add">Add to existing</option>
+                    <option value="remove">Remove from existing</option>
+                </select>
+            </td>
+        </tr>
+
+        {# ── DNSSEC ────────────────────────────────────────────── #}
+        <tr class="table-secondary">
+            <td colspan="4" class="small text-uppercase text-muted fw-semibold py-2 ps-3">
+                <i class="bi bi-shield-check me-1"></i>DNSSEC
+            </td>
+        </tr>
+
+        <tr class="bulk-row inactive" data-field="dnssecPolicy">
+            <td class="text-center ps-2">
+                <input type="checkbox" class="form-check-input apply-checkbox" name="apply_dnssecPolicy" id="apply_dnssecPolicy">
+            </td>
+            <td><label for="apply_dnssecPolicy" class="form-label fw-semibold mb-0 cursor-pointer">DNSSEC Policy</label></td>
+            <td>
+                {{ form_widget(form.dnssecPolicy, {attr: {class: 'form-select form-select-sm', style: 'max-width:20rem'}}) }}
+                <div class="form-text">Select "— None —" to remove the policy from selected subnets.</div>
+            </td>
+            <td></td>
+        </tr>
+
+        {# ── DHCP Lease Log ────────────────────────────────────── #}
+        <tr class="table-secondary">
+            <td colspan="4" class="small text-uppercase text-muted fw-semibold py-2 ps-3">
+                <i class="bi bi-journal-text me-1"></i>DHCP Lease Log
+            </td>
+        </tr>
+
+        <tr class="bulk-row inactive" data-field="leaseRetentionDays">
+            <td class="text-center ps-2">
+                <input type="checkbox" class="form-check-input apply-checkbox" name="apply_leaseRetentionDays" id="apply_leaseRetentionDays">
+            </td>
+            <td><label for="apply_leaseRetentionDays" class="form-label fw-semibold mb-0 cursor-pointer">Retention (days)</label></td>
+            <td>
+                {{ form_widget(form.leaseRetentionDays, {attr: {class: 'form-control form-control-sm', style: 'max-width:10rem'}}) }}
+                <div class="form-text">Leave blank to keep lease logs forever.</div>
+            </td>
+            <td></td>
+        </tr>
+
+        </tbody>
+    </table>
+    </div>
+
+    <div class="card-footer d-flex gap-2">
+        <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check-lg me-1"></i>Apply Changes
+        </button>
+        <a href="{{ path('subnet_index') }}" class="btn btn-outline-secondary">Cancel</a>
+    </div>
+</div>
+
+{{ form_end(form) }}
+
+</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ parent() }}
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
+
+<script>
+(function () {
+    // Track TomSelect instances so we can enable/disable them
+    var tsInstances = {};
+
+    // Tags — API-backed with create
+    var tagsEl = document.getElementById('bulk_tags');
+    if (tagsEl) {
+        Array.from(tagsEl.options).forEach(opt => { if (!opt.selected) opt.remove(); });
+        tsInstances['tags'] = new TomSelect(tagsEl, {
+            plugins: ['remove_button'],
+            persist: false,
+            load: function (query, callback) {
+                fetch('/api/tags?q=' + encodeURIComponent(query))
+                    .then(r => r.json()).then(callback).catch(() => callback());
+            },
+            create: function (input, callback) {
+                fetch('/api/tags', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: input }),
+                })
+                    .then(r => r.json().then(data => ({ ok: r.ok, data })))
+                    .then(({ ok, data }) => { ok ? callback(data) : callback(); })
+                    .catch(() => callback());
+            },
+            render: {
+                option_create: (d, esc) => '<div class="create">Create tag <strong>' + esc(d.input) + '</strong></div>',
+                no_results:    (d, esc) => '<div class="no-results">No tags matching <strong>' + esc(d.input) + '</strong></div>',
+            },
+        });
+    }
+
+    // Views — local multi-select
+    var viewsEl = document.getElementById('bulk_views');
+    if (viewsEl) {
+        tsInstances['views'] = new TomSelect(viewsEl, {
+            plugins: ['remove_button'],
+            persist: false,
+        });
+    }
+
+    // Apply-toggle behaviour
+    document.querySelectorAll('.apply-checkbox').forEach(function (cb) {
+        var row = cb.closest('.bulk-row');
+
+        function sync() {
+            if (cb.checked) {
+                row.classList.remove('inactive');
+                row.querySelectorAll('input:not([type=checkbox]), select, textarea').forEach(function (el) {
+                    el.disabled = false;
+                });
+                // Enable TomSelect instances in this row
+                Object.values(tsInstances).forEach(function (ts) {
+                    if (row.contains(ts.input)) ts.enable();
+                });
+            } else {
+                row.classList.add('inactive');
+                row.querySelectorAll('input:not([type=checkbox]), select, textarea').forEach(function (el) {
+                    el.disabled = true;
+                });
+                Object.values(tsInstances).forEach(function (ts) {
+                    if (row.contains(ts.input)) ts.disable();
+                });
+            }
+        }
+
+        cb.addEventListener('change', sync);
+
+        // Set initial disabled state (rows start inactive)
+        row.querySelectorAll('input:not([type=checkbox]), select, textarea').forEach(function (el) {
+            el.disabled = true;
+        });
+        Object.values(tsInstances).forEach(function (ts) {
+            if (row.contains(ts.input)) ts.disable();
+        });
+    });
+})();
+</script>
+{% endblock %}
+
