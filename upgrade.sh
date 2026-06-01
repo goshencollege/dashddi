@@ -3,12 +3,12 @@ set -euo pipefail
 
 if [ -n "${COMPOSE_FILE:-}" ]; then
     COMPOSE="docker compose -f $COMPOSE_FILE"
-elif [ -f docker-compose.yml ]; then
-    COMPOSE="docker compose -f docker-compose.yml"
+elif [ -f docker-compose.prod.yml ]; then
+    COMPOSE="docker compose -f docker-compose.prod.yml"
 elif [ -f docker-compose.dev.yml ]; then
     COMPOSE="docker compose -f docker-compose.dev.yml"
 else
-    echo "Error: no docker-compose.yml or docker-compose.dev.yml found" >&2
+    echo "Error: no docker-compose.prod.yml or docker-compose.dev.yml found" >&2
     exit 1
 fi
 
