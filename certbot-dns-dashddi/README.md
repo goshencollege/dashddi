@@ -1,6 +1,6 @@
 # certbot-dns-dashddi
 
-A Certbot DNS authenticator plugin that uses the [DashDDI](https://github.com/your-org/dashddi) DNS management API to perform DNS-01 challenges. This allows you to obtain certificates from an ACME CA without requiring the server to be publicly accessible.
+A Certbot DNS authenticator plugin that uses the [DashDDI](https://github.com/goshencollege/dashddi) DNS management API to perform DNS-01 challenges. This allows you to obtain certificates from an ACME CA without requiring the server to be publicly accessible.
 
 ## Installation
 
@@ -10,7 +10,7 @@ Certbot and the plugin must share the same Python environment. On modern Debian/
 apt install -y python3-venv
 python3 -m venv /opt/certbot
 /opt/certbot/bin/pip install certbot
-/opt/certbot/bin/pip install git+https://github.com/davidwkdavidwk/dashddi/#subdirectory=certbot-dns-dashddi
+/opt/certbot/bin/pip install git+https://github.com/goshencollege/dashddi/#subdirectory=certbot-dns-dashddi
 ln -s /opt/certbot/bin/certbot /usr/local/bin/certbot
 ```
 
