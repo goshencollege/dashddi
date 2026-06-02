@@ -449,12 +449,6 @@
                     </ul>
                 </li>
             </ul>
-            <li class="nav-item">
-                    <a class="nav-link {{ app.request.attributes.get('_route') starts with 'user_guide' ? 'active' }}"
-                       href="{{ path('user_guide_index') }}">
-                        <i class="bi bi-book me-1"></i>Help
-                    </a>
-                </li>
             {% if app.user %}
             <ul class="navbar-nav ms-auto align-items-center">
                 <li class="nav-item dropdown me-2">
@@ -500,6 +494,12 @@
                             </button>
                         </li>
                     </ul>
+                </li>
+                <li class="nav-item me-1">
+                    <a class="nav-link {{ app.request.attributes.get('_route') starts with 'user_guide' ? 'active' }}"
+                       href="{{ path('user_guide_index') }}" title="Help">
+                        <i class="bi bi-book me-1"></i>Help
+                    </a>
                 </li>
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
