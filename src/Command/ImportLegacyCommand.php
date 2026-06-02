@@ -317,6 +317,7 @@ class ImportLegacyCommand extends Command
 
             $subnet = $this->makeSubnet($row['name'], (int) $row['vID'], $cidr, $network);
             $subnet->setVrf(in_array($cidr, $datacenterCidrs, true) ? $vrfs['datacenter'] : $vrfs['corporate']);
+            $subnet->setGateway(long2ip(ip2long($network) + 1));
             $map[$nid] = $subnet;
 
             if (!$dryRun) {
