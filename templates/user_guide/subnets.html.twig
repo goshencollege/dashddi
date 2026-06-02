@@ -1,0 +1,159 @@
+{% extends 'base.html.twig' %}
+{% block title %}User Guide – Subnets & IP Management{% endblock %}
+
+{% block content %}
+{% set section_title = 'Subnets & IP Management' %}
+{{ include('user_guide/_breadcrumb.html.twig') }}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0"><i class="bi bi-diagram-2 me-2"></i>Subnets &amp; IP Management</h1>
+    <a href="{{ path('subnet_index') }}" class="btn btn-sm btn-outline-primary">
+        <i class="bi bi-arrow-right-circle me-1"></i>Go to Subnets
+    </a>
+</div>
+
+<div class="row g-4">
+<div class="col-lg-9">
+
+<div class="card mb-4" id="overview">
+    <div class="card-header fw-semibold"><i class="bi bi-info-circle me-1"></i>Overview</div>
+    <div class="card-body">
+        <p>A <strong>subnet</strong> defines a range of IP addresses on your network (e.g. <code>10.1.2.0/24</code>). DashDDI tracks which addresses in each subnet are allocated to host interfaces, which are reserved, and which are free.</p>
+        <p class="mb-0">Subnets can hold both IPv4 and IPv6 CIDR blocks simultaneously. When a network interface is assigned to a subnet, its IP address is drawn from that subnet's address space.</p>
+    </div>
+</div>
+
+<div class="card mb-4" id="subnet-list">
+    <div class="card-header fw-semibold"><i class="bi bi-list-ul me-1"></i>Subnet List Views</div>
+    <div class="card-body">
+        <p>The Subnets page (<strong>DHCP → Subnets</strong>) offers three view tabs:</p>
+        <dl class="row mb-0">
+            <dt class="col-sm-3">By Name</dt>
+            <dd class="col-sm-9">Alphabetical list of all subnets. Fastest for finding a subnet by label.</dd>
+            <dt class="col-sm-3">IPv4 Tree</dt>
+            <dd class="col-sm-9">Subnets grouped and indented by CIDR containment — useful for understanding how your address space is structured.</dd>
+            <dt class="col-sm-3">IPv6 Tree</dt>
+            <dd class="col-sm-9">Same as IPv4 tree but for IPv6 address space.</dd>
+        </dl>
+    </div>
+</div>
+
+<div class="card mb-4" id="create-subnet">
+    <div class="card-header fw-semibold"><i class="bi bi-plus-circle me-1"></i>Creating a Subnet</div>
+    <div class="card-body">
+        <dl class="row mb-0">
+            <dt class="col-sm-3">Name <span class="text-danger">*</span></dt>
+            <dd class="col-sm-9">A human-readable label, e.g. <code>Server Room A</code> or <code>Student WiFi</code>.</dd>
+            <dt class="col-sm-3">IPv4 CIDR</dt>
+            <dd class="col-sm-9">The IPv4 address range in CIDR notation, e.g. <code>10.1.2.0/24</code>. Leave blank for IPv6-only subnets.</dd>
+            <dt class="col-sm-3">IPv6 CIDR</dt>
+            <dd class="col-sm-9">The IPv6 address range, e.g. <code>2001:db8:1::/48</code>. Leave blank for IPv4-only subnets.</dd>
+            <dt class="col-sm-3">Gateway</dt>
+            <dd class="col-sm-9">The default gateway IP address for this subnet (used in DHCP config generation).</dd>
+            <dt class="col-sm-3">VLAN</dt>
+            <dd class="col-sm-9">The VLAN ID (1–4094) associated with this subnet. Informational only — DashDDI does not configure switch VLANs.</dd>
+            <dt class="col-sm-3">VRF</dt>
+            <dd class="col-sm-9">The Virtual Routing and Forwarding instance this subnet belongs to, if your network uses VRFs for traffic isolation.</dd>
+            <dt class="col-sm-3">DNS Views</dt>
+            <dd class="col-sm-9">Associate this subnet with one or more DNS views for split-DNS configurations.</dd>
+            <dt class="col-sm-3">DNSSEC Policy</dt>
+            <dd class="col-sm-9">Apply a DNSSEC policy for inline zone signing of records in this subnet.</dd>
+            <dt class="col-sm-3">Is Container</dt>
+            <dd class="col-sm-9">Mark this subnet as a supernet (container) that holds smaller subnets. Container subnets don't have individual IP allocations and don't appear in DHCP config.</dd>
+            <dt class="col-sm-3">Lease Retention</dt>
+            <dd class="col-sm-9">How long (in days) to keep soft-deleted hosts and interfaces from this subnet before permanently purging them. Overrides the application-wide default.</dd>
+            <dt class="col-sm-3">Description</dt>
+            <dd class="col-sm-9">Free-text notes shown on the subnet detail page.</dd>
+            <dt class="col-sm-3">Tags</dt>
+            <dd class="col-sm-9">Labels for grouping and filtering subnets.</dd>
+        </dl>
+    </div>
+</div>
+
+<div class="card mb-4" id="subnet-detail">
+    <div class="card-header fw-semibold"><i class="bi bi-eye me-1"></i>Subnet Detail Page</div>
+    <div class="card-body">
+        <p>Click a subnet name to open its detail page. This shows:</p>
+        <ul>
+            <li><strong>Summary bar</strong> — VRF, gateway, VLAN, DNS views, and tags at a glance</li>
+            <li><strong>DNS Records</strong> — records attached directly to the subnet (e.g. reverse-zone SOA/NS records)</li>
+            <li><strong>Address Blocks</strong> — reserved or fixed IP ranges within the subnet</li>
+            <li><strong>IPv4 / IPv6 Allocations</strong> — every IP address assigned to an interface in this subnet, with a link to the interface and host. Shows the next available address and count of free addresses.</li>
+        </ul>
+    </div>
+</div>
+
+<div class="card mb-4" id="address-blocks">
+    <div class="card-header fw-semibold"><i class="bi bi-grid me-1"></i>Address Blocks</div>
+    <div class="card-body">
+        <p>Address blocks let you mark ranges of IPs within a subnet as having a specific purpose. Add them from the subnet detail page using <strong>Add Block</strong>.</p>
+        <div class="table-responsive">
+            <table class="table table-sm table-bordered mb-0">
+                <thead><tr><th>Type</th><th>Purpose</th><th>Example</th></tr></thead>
+                <tbody>
+                    <tr>
+                        <td><span class="badge bg-warning text-dark">Reserved</span></td>
+                        <td>IPs excluded from DHCP dynamic allocation (e.g. the gateway, printers, or network appliances)</td>
+                        <td><code>10.1.2.1</code> – <code>10.1.2.10</code></td>
+                    </tr>
+                    <tr>
+                        <td><span class="badge bg-info text-dark">Fixed</span></td>
+                        <td>IP range for static host reservations (used in DHCP config as a fixed-address pool)</td>
+                        <td><code>10.1.2.100</code> – <code>10.1.2.150</code></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="mt-3 mb-0">Each block has a start IP, end IP, and an optional label. Blocks are included in the generated Kea DHCP configuration to tell the DHCP server which ranges to hand out versus skip.</p>
+    </div>
+</div>
+
+<div class="card mb-4" id="vrfs">
+    <div class="card-header fw-semibold"><i class="bi bi-signpost-split me-1"></i>VRFs (Virtual Routing &amp; Forwarding)</div>
+    <div class="card-body">
+        <p>A <strong>VRF</strong> is a named routing context that isolates traffic between different network segments. If your organization uses VRFs, assign subnets to them so DashDDI can group and filter address space by VRF.</p>
+        <p>Manage VRFs at <strong>DHCP → VRFs</strong>. Each VRF just needs a name and an optional description. Once created, you can assign it to any subnet.</p>
+        <p class="mb-0 text-muted small">VRFs in DashDDI are informational — they help organize your IPAM data but do not configure routers.</p>
+    </div>
+</div>
+
+<div class="card mb-4" id="bulk-edit">
+    <div class="card-header fw-semibold"><i class="bi bi-pencil-square me-1"></i>Bulk Edit Subnets</div>
+    <div class="card-body">
+        <p>From the subnet list, click <strong>Bulk Edit</strong> to update multiple subnets at once. You can change VLAN, VRF, gateway, DNS views, tags, or DHCP server assignment in bulk without editing each subnet individually.</p>
+        <p class="mb-0 text-muted small">Only fields you explicitly set in the bulk editor are updated — fields left blank are left unchanged.</p>
+    </div>
+</div>
+
+<div class="card mb-4" id="import">
+    <div class="card-header fw-semibold"><i class="bi bi-upload me-1"></i>Importing Subnets</div>
+    <div class="card-body">
+        <p>DashDDI can parse an existing Kea DHCP configuration file and import subnets and host reservations from it. Go to <strong>DHCP → Subnets</strong> and click <strong>Import</strong>.</p>
+        <ol class="mb-0">
+            <li>Upload the Kea config file (<code>kea-dhcp4.conf</code> or similar)</li>
+            <li>DashDDI parses the file and shows a preview of subnets and hosts to be created, flagging any conflicts with existing records</li>
+            <li>Review the preview and confirm to import</li>
+        </ol>
+    </div>
+</div>
+
+</div>{# /col-lg-9 #}
+
+<div class="col-lg-3 d-none d-lg-block">
+    <div class="card sticky-top" style="top:80px">
+        <div class="card-header small fw-semibold">On this page</div>
+        <div class="list-group list-group-flush small">
+            <a href="#overview" class="list-group-item list-group-item-action py-1">Overview</a>
+            <a href="#subnet-list" class="list-group-item list-group-item-action py-1">Subnet List Views</a>
+            <a href="#create-subnet" class="list-group-item list-group-item-action py-1">Creating a Subnet</a>
+            <a href="#subnet-detail" class="list-group-item list-group-item-action py-1">Subnet Detail Page</a>
+            <a href="#address-blocks" class="list-group-item list-group-item-action py-1">Address Blocks</a>
+            <a href="#vrfs" class="list-group-item list-group-item-action py-1">VRFs</a>
+            <a href="#bulk-edit" class="list-group-item list-group-item-action py-1">Bulk Edit</a>
+            <a href="#import" class="list-group-item list-group-item-action py-1">Importing Subnets</a>
+        </div>
+    </div>
+</div>
+
+</div>{# /row #}
+{% endblock %}

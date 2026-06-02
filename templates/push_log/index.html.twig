@@ -14,7 +14,10 @@
 <div class="list-page-content">
     <div class="sticky-list-header d-flex justify-content-between align-items-center mb-3">
         <h1 class="h4 mb-0"><i class="bi bi-journal-code me-2"></i>Push Logs</h1>
-        <span class="text-muted small">Last {{ logs|length }} push operations</span>
+        <div class="d-flex align-items-center gap-3">
+            <span class="text-muted small">Last {{ logs|length }} push operations</span>
+            <a href="{{ path('user_guide_servers') }}#push-logs" class="btn btn-sm btn-outline-secondary" title="User Guide" target="_blank"><i class="bi bi-question-circle"></i></a>
+        </div>
     </div>
 
     {% if logs is empty %}

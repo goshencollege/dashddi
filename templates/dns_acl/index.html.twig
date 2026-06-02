@@ -4,9 +4,12 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1 class="h3 mb-0"><i class="bi bi-list-check me-2"></i>DNS ACLs</h1>
-    <a href="{{ path('dns_acl_new') }}" class="btn btn-primary">
-        <i class="bi bi-plus-lg me-1"></i>Add ACL
-    </a>
+    <div class="d-flex gap-2">
+        <a href="{{ path('user_guide_dns') }}#acls" class="btn btn-sm btn-outline-secondary" title="User Guide" target="_blank"><i class="bi bi-question-circle"></i></a>
+        <a href="{{ path('dns_acl_new') }}" class="btn btn-primary">
+            <i class="bi bi-plus-lg me-1"></i>Add ACL
+        </a>
+    </div>
 </div>
 
 {% if acls is empty %}

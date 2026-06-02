@@ -1,0 +1,147 @@
+{% extends 'base.html.twig' %}
+{% block title %}User Guide – DNS Management{% endblock %}
+
+{% block content %}
+{% set section_title = 'DNS Management' %}
+{{ include('user_guide/_breadcrumb.html.twig') }}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0"><i class="bi bi-globe me-2"></i>DNS Management</h1>
+    <a href="{{ path('domain_index') }}" class="btn btn-sm btn-outline-primary">
+        <i class="bi bi-arrow-right-circle me-1"></i>Go to Domains
+    </a>
+</div>
+
+<div class="row g-4">
+<div class="col-lg-9">
+
+<div class="card mb-4" id="overview">
+    <div class="card-header fw-semibold"><i class="bi bi-info-circle me-1"></i>Overview</div>
+    <div class="card-body">
+        <p>DashDDI acts as the authoritative source for your DNS zones. You define domains (zones) and records here; DashDDI generates BIND-format zone files and deploys them to your DNS servers via SSH.</p>
+        <p class="mb-0">DNS records can come from two sources:</p>
+        <ul class="mt-2 mb-0">
+            <li><strong>Interface names</strong> — A/AAAA records generated automatically from host interface DNS name assignments</li>
+            <li><strong>Manual records</strong> — MX, CNAME, TXT, NS, or other records added directly to a domain</li>
+        </ul>
+    </div>
+</div>
+
+<div class="card mb-4" id="domains">
+    <div class="card-header fw-semibold"><i class="bi bi-globe me-1"></i>Domains (Zones)</div>
+    <div class="card-body">
+        <p>A <strong>domain</strong> is a DNS zone, such as <code>example.com</code> or <code>1.168.192.in-addr.arpa</code>. Manage them at <strong>DNS → Domains</strong>.</p>
+        <dl class="row mb-2">
+            <dt class="col-sm-3">Name <span class="text-danger">*</span></dt>
+            <dd class="col-sm-9">The zone name, e.g. <code>example.com</code> (do not include a trailing dot).</dd>
+            <dt class="col-sm-3">DNS View</dt>
+            <dd class="col-sm-9">Optionally restrict this domain to a specific DNS view (see Views below).</dd>
+            <dt class="col-sm-3">Primary DNS Server</dt>
+            <dd class="col-sm-9">The DNS server that hosts this zone. Used when generating and pushing configuration.</dd>
+            <dt class="col-sm-3">DNSSEC Policy</dt>
+            <dd class="col-sm-9">Apply a DNSSEC inline-signing policy to this zone.</dd>
+        </dl>
+        <p class="mb-0">The domain detail page shows all DNS records in the zone — both manual records and those derived from host interface names.</p>
+    </div>
+</div>
+
+<div class="card mb-4" id="records">
+    <div class="card-header fw-semibold"><i class="bi bi-list-ul me-1"></i>DNS Record Types</div>
+    <div class="card-body">
+        <p>Add records from the domain detail page using <strong>Add Record</strong>. Supported types:</p>
+        <div class="table-responsive">
+            <table class="table table-sm table-bordered mb-0">
+                <thead><tr><th>Type</th><th>Purpose</th><th>Value example</th></tr></thead>
+                <tbody>
+                    <tr><td><code>A</code></td><td>Maps a hostname to an IPv4 address</td><td><code>192.168.1.10</code></td></tr>
+                    <tr><td><code>AAAA</code></td><td>Maps a hostname to an IPv6 address</td><td><code>2001:db8::1</code></td></tr>
+                    <tr><td><code>CNAME</code></td><td>Alias pointing to another hostname</td><td><code>web.example.com.</code></td></tr>
+                    <tr><td><code>MX</code></td><td>Mail exchanger for the domain</td><td><code>10 mail.example.com.</code></td></tr>
+                    <tr><td><code>NS</code></td><td>Nameserver for a delegated zone</td><td><code>ns1.example.com.</code></td></tr>
+                    <tr><td><code>TXT</code></td><td>Arbitrary text (SPF, DKIM, verification)</td><td><code>v=spf1 include:… -all</code></td></tr>
+                    <tr><td><code>SRV</code></td><td>Service location record</td><td><code>10 5 443 host.example.com.</code></td></tr>
+                    <tr><td><code>PTR</code></td><td>Reverse-DNS pointer record</td><td><code>host.example.com.</code></td></tr>
+                    <tr><td><code>CAA</code></td><td>Certificate Authority Authorization</td><td><code>0 issue "letsencrypt.org"</code></td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="mt-3 mb-0 text-muted small">Every record has a <strong>TTL</strong> field (in seconds). Leave it blank to inherit the zone default. Use <strong>Views</strong> to include a record only in specific DNS views.</p>
+    </div>
+</div>
+
+<div class="card mb-4" id="views">
+    <div class="card-header fw-semibold"><i class="bi bi-eye me-1"></i>DNS Views (Split DNS)</div>
+    <div class="card-body">
+        <p>DNS views let you serve different answers to different clients — for example, returning internal addresses to inside clients and external addresses to the internet.</p>
+        <p>Create views at <strong>DNS → Views</strong>. Give each view a name (e.g. <code>internal</code>, <code>external</code>). Then:</p>
+        <ul class="mb-0">
+            <li>Assign subnets to views (on the subnet edit page) to indicate which source addresses belong to each view</li>
+            <li>Assign domains to views to restrict which zones appear in which view</li>
+            <li>Assign individual DNS records to views if they should only appear in certain views</li>
+        </ul>
+        <p class="mt-2 mb-0 text-muted small">Views map directly to BIND's <code>view</code> configuration blocks. The generated zone files respect view assignments.</p>
+    </div>
+</div>
+
+<div class="card mb-4" id="acls">
+    <div class="card-header fw-semibold"><i class="bi bi-list-check me-1"></i>DNS ACLs</div>
+    <div class="card-body">
+        <p>DNS ACLs (Access Control Lists) define sets of IP addresses or CIDR ranges used to control query access in BIND. Manage them at <strong>DNS → ACLs</strong>.</p>
+        <p>Each ACL has a name and a list of address entries. Once created, ACLs can be referenced in DNS views and server configuration to restrict which clients can query specific zones.</p>
+        <div class="alert alert-info py-2 small mb-0">
+            <i class="bi bi-lightbulb me-1"></i>Example: create an ACL named <code>internal-clients</code> with your RFC 1918 address ranges, then restrict your internal view to only answer queries from that ACL.
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4" id="dnssec">
+    <div class="card-header fw-semibold"><i class="bi bi-shield-check me-1"></i>DNSSEC Policies</div>
+    <div class="card-body">
+        <p>DNSSEC adds cryptographic signatures to DNS records, allowing resolvers to verify authenticity. DashDDI supports BIND 9's <strong>inline signing</strong> approach via named policy definitions.</p>
+        <p>Create a DNSSEC policy at <strong>DNS → DNSSEC Policies</strong> with a name and key parameters. Assign the policy to a domain or subnet on the respective edit page. DashDDI includes the policy reference in the generated BIND configuration.</p>
+
+        <h6 class="mt-3">KSK Rollover</h6>
+        <p class="mb-0">The Key Signing Key (KSK) must be rolled over periodically. DashDDI provides a guided rollover workflow at <strong>DNS → KSK Rollovers</strong>. The rollover steps through the required phases (pre-publication, active, post-rollover) with prompts for each action you need to take on the authoritative DNS server.</p>
+    </div>
+</div>
+
+<div class="card mb-4" id="push">
+    <div class="card-header fw-semibold"><i class="bi bi-cloud-upload me-1"></i>Pushing DNS Configuration</div>
+    <div class="card-body">
+        <p>After making changes to domains or records, deploy them to your BIND server by running a <strong>DNS push</strong>. You can trigger it in two ways:</p>
+        <ol class="mb-0">
+            <li><strong>Manually</strong> — go to <strong>Servers → Servers</strong>, find the DNS server, and click <strong>Push Config</strong></li>
+            <li><strong>Scheduled</strong> — configure a cron schedule for the DNS push task under <strong>Other Settings → Scheduler</strong></li>
+        </ol>
+        <p class="mt-2 mb-0">The push connects to the DNS server via SSH using the generated SSH key pair, uploads zone files, and reloads BIND. Results are logged in <strong>Servers → Push Logs</strong>.</p>
+    </div>
+</div>
+
+<div class="card mb-4" id="zone-import">
+    <div class="card-header fw-semibold"><i class="bi bi-upload me-1"></i>Importing a Zone File</div>
+    <div class="card-body">
+        <p>If you have an existing BIND zone file, you can import it into DashDDI. Open the domain detail page and click <strong>Import Zone File</strong>. Upload the file; DashDDI parses the records, shows a preview, and creates the records that don't already exist.</p>
+        <p class="mb-0 text-muted small">The import handles standard BIND zone file syntax including <code>$ORIGIN</code>, <code>$TTL</code>, and relative/absolute names.</p>
+    </div>
+</div>
+
+</div>{# /col-lg-9 #}
+
+<div class="col-lg-3 d-none d-lg-block">
+    <div class="card sticky-top" style="top:80px">
+        <div class="card-header small fw-semibold">On this page</div>
+        <div class="list-group list-group-flush small">
+            <a href="#overview" class="list-group-item list-group-item-action py-1">Overview</a>
+            <a href="#domains" class="list-group-item list-group-item-action py-1">Domains (Zones)</a>
+            <a href="#records" class="list-group-item list-group-item-action py-1">Record Types</a>
+            <a href="#views" class="list-group-item list-group-item-action py-1">DNS Views</a>
+            <a href="#acls" class="list-group-item list-group-item-action py-1">DNS ACLs</a>
+            <a href="#dnssec" class="list-group-item list-group-item-action py-1">DNSSEC</a>
+            <a href="#push" class="list-group-item list-group-item-action py-1">Pushing Config</a>
+            <a href="#zone-import" class="list-group-item list-group-item-action py-1">Importing Zone Files</a>
+        </div>
+    </div>
+</div>
+
+</div>{# /row #}
+{% endblock %}

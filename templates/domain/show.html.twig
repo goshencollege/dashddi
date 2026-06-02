@@ -65,8 +65,9 @@
             </div>
         {% endif %}
     </div>
-    <div>
-        <a href="{{ path('domain_edit', {id: domain.id}) }}" class="btn btn-outline-secondary me-2">
+    <div class="d-flex gap-2">
+        <a href="{{ path('user_guide_dns') }}#domains" class="btn btn-sm btn-outline-secondary" title="User Guide" target="_blank"><i class="bi bi-question-circle"></i></a>
+        <a href="{{ path('domain_edit', {id: domain.id}) }}" class="btn btn-outline-secondary">
             <i class="bi bi-pencil me-1"></i>Edit
         </a>
         <form method="post" action="{{ path('domain_delete', {id: domain.id}) }}" class="d-inline"

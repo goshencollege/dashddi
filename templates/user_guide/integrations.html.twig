@@ -1,0 +1,152 @@
+{% extends 'base.html.twig' %}
+{% block title %}User Guide – Integrations{% endblock %}
+
+{% block content %}
+{% set section_title = 'Integrations' %}
+{{ include('user_guide/_breadcrumb.html.twig') }}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0"><i class="bi bi-plug me-2"></i>Integrations</h1>
+</div>
+
+<div class="row g-4">
+<div class="col-lg-9">
+
+<div class="card mb-4" id="overview">
+    <div class="card-header fw-semibold"><i class="bi bi-info-circle me-1"></i>Overview</div>
+    <div class="card-body">
+        <p>DashDDI connects to several external systems to enrich your IPAM data and provide network control capabilities. Integrations are managed from <strong>Servers → Servers</strong>.</p>
+        <div class="table-responsive">
+            <table class="table table-sm table-bordered mb-0">
+                <thead><tr><th>Integration</th><th>What it provides</th></tr></thead>
+                <tbody>
+                    <tr><td><strong>ClearPass</strong></td><td>Push managed endpoints for NAC; pull RADIUS authentication logs</td></tr>
+                    <tr><td><strong>Snipe-IT</strong></td><td>Pull asset records and MAC addresses to populate hosts and interfaces</td></tr>
+                    <tr><td><strong>Aruba CX</strong></td><td>Query switch port status; bounce, reauthenticate, or toggle PoE on ports</td></tr>
+                    <tr><td><strong>BIND DNS</strong></td><td>Deploy zone files via SSH</td></tr>
+                    <tr><td><strong>Kea DHCP</strong></td><td>Deploy Kea config via SSH; receive lease notifications via webhook</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4" id="dns-integration">
+    <div class="card-header fw-semibold"><i class="bi bi-globe me-1"></i>DNS / BIND Integration</div>
+    <div class="card-body">
+        <p>DashDDI generates BIND zone files from your domain and record data, then uploads them to the DNS server via SSH and reloads BIND.</p>
+        <h6>Server-side setup</h6>
+        <ol>
+            <li>Create a dedicated Linux user account on the DNS server (e.g. <code>dashddi</code>)</li>
+            <li>In DashDDI, add the DNS server under <strong>Servers → Servers</strong> and click <strong>Generate SSH Key</strong> — DashDDI generates a key pair and shows you the public key</li>
+            <li>Add the public key to <code>~/.ssh/authorized_keys</code> for that user on the DNS server</li>
+            <li>Grant the user write permission on the BIND zone directory and permission to run <code>rndc reload</code> (typically via <code>sudoers</code>)</li>
+            <li>Test the connection using the <strong>Test SSH</strong> button in DashDDI</li>
+        </ol>
+        <p class="mb-0 text-muted small">Full instructions are in <code>docs/dns-bind.md</code> in the DashDDI repository.</p>
+    </div>
+</div>
+
+<div class="card mb-4" id="dhcp-integration">
+    <div class="card-header fw-semibold"><i class="bi bi-hdd-network me-1"></i>DHCP / Kea Integration</div>
+    <div class="card-body">
+        <p>DashDDI generates a Kea DHCP4 configuration file and deploys it via SSH. It also receives lease notifications via a webhook endpoint.</p>
+        <h6>Server-side setup</h6>
+        <ol>
+            <li>Add the DHCP server in DashDDI and generate an SSH key as described for DNS</li>
+            <li>Configure Kea's <code>lease_cmds</code> hook library to call DashDDI's webhook endpoint on lease events:
+                <code>{{ app.request ? app.request.schemeAndHttpHost : '' }}/api/dhcp/lease-notification</code></li>
+            <li>Ensure the Kea user on the server can reload the service via the configured reload command</li>
+        </ol>
+        <p class="mb-0 text-muted small">Full instructions are in <code>docs/dhcp-kea.md</code> in the DashDDI repository.</p>
+    </div>
+</div>
+
+<div class="card mb-4" id="clearpass">
+    <div class="card-header fw-semibold"><i class="bi bi-shield-lock me-1"></i>ClearPass (NAC)</div>
+    <div class="card-body">
+        <p>The ClearPass integration lets DashDDI push your host interfaces as <strong>managed endpoints</strong> into ClearPass's endpoint database, and pull RADIUS authentication event logs back for visibility.</p>
+        <h6>Setup</h6>
+        <ol>
+            <li>In ClearPass, create an API client with endpoint management permissions and note the client ID and secret</li>
+            <li>In DashDDI, add a ClearPass server under <strong>Servers → Servers</strong> with the ClearPass hostname and API credentials</li>
+            <li>Configure which subnets or tags should be pushed to ClearPass as managed endpoints</li>
+        </ol>
+        <h6>Features</h6>
+        <dl class="row mb-0">
+            <dt class="col-sm-4">Endpoint Sync</dt>
+            <dd class="col-sm-8">DashDDI pushes host interfaces with their MAC address and metadata to ClearPass so NAC policies can identify and classify endpoints.</dd>
+            <dt class="col-sm-4">Auth Logs</dt>
+            <dd class="col-sm-8">DashDDI pulls RADIUS authentication events from ClearPass and displays them at <strong>DHCP → ClearPass Auth Logs</strong>. Useful for correlating network access failures with host data.</dd>
+        </dl>
+        <p class="mt-2 mb-0 text-muted small">Full instructions are in <code>docs/clearpass.md</code>.</p>
+    </div>
+</div>
+
+<div class="card mb-4" id="snipeit">
+    <div class="card-header fw-semibold"><i class="bi bi-box-seam me-1"></i>Snipe-IT (Asset Management)</div>
+    <div class="card-body">
+        <p>Snipe-IT is an open-source asset management system. DashDDI can pull asset records and MAC addresses from Snipe-IT to automatically create or update hosts and interfaces in your IPAM database.</p>
+        <h6>Setup</h6>
+        <ol>
+            <li>Generate an API token in Snipe-IT (under your user profile → API)</li>
+            <li>In DashDDI, add a Snipe-IT server under <strong>Servers → Servers</strong> with the Snipe-IT URL and API token</li>
+            <li>Configure <strong>category-to-subnet mappings</strong> — specify which Snipe-IT asset categories should be assigned to which DashDDI subnets when hosts are created</li>
+        </ol>
+        <h6>How it works</h6>
+        <p class="mb-0">When the Snipe-IT pull task runs (manually or on a schedule), DashDDI fetches all assets from Snipe-IT, matches them to existing hosts by name and MAC address, creates new hosts for unmatched assets, and updates interface subnet assignments based on the category mapping. Assets are linked — from the host detail page you can see the Snipe-IT asset name alongside the DashDDI host name.</p>
+        <p class="mt-2 mb-0 text-muted small">Full instructions are in <code>docs/snipe-it.md</code>.</p>
+    </div>
+</div>
+
+<div class="card mb-4" id="aruba">
+    <div class="card-header fw-semibold"><i class="bi bi-router me-1"></i>Aruba CX Switches</div>
+    <div class="card-body">
+        <p>If your network uses Aruba CX switches, DashDDI can connect to their REST API to provide real-time port visibility and control — without logging into the switch CLI.</p>
+        <h6>Setup</h6>
+        <ol>
+            <li>Enable the REST API on each Aruba CX switch</li>
+            <li>Create a dedicated API user on the switch with appropriate permissions</li>
+            <li>In DashDDI, add the switch under <strong>Servers → Servers</strong> (Aruba section) with the switch IP and credentials</li>
+        </ol>
+        <h6>Port actions</h6>
+        <p>From the Aruba Switch page, you can:</p>
+        <ul class="mb-0">
+            <li><strong>View port status</strong> — see which ports are up/down, their VLAN assignment, and connected device (if LLDP data is available)</li>
+            <li><strong>Reauthenticate</strong> — trigger 802.1X reauthentication on a specific port</li>
+            <li><strong>Bounce port</strong> — disable and re-enable a port to force a device to reconnect</li>
+            <li><strong>PoE bounce</strong> — cycle power on a PoE port (useful for resetting IP phones, APs, etc.)</li>
+        </ul>
+        <p class="mt-2 mb-0 text-muted small">Full instructions are in <code>docs/aruba-cx-switch.md</code>.</p>
+    </div>
+</div>
+
+<div class="card mb-4" id="api">
+    <div class="card-header fw-semibold"><i class="bi bi-code-slash me-1"></i>REST API</div>
+    <div class="card-body">
+        <p>DashDDI exposes a REST API that covers all major resources — hosts, interfaces, subnets, domains, records, and more. The API is useful for scripting bulk operations, integrating with other tools, or building automation workflows.</p>
+        <p>Interactive API documentation with request/response schemas and the ability to test calls is available at <a href="{{ path('api_docs') }}"><strong>API Docs</strong></a>.</p>
+        <p>Authentication uses Bearer tokens — create a token under <strong>Other Settings → API Tokens</strong>. Each token has granular per-route permissions so you can issue a token with only the access a specific integration needs.</p>
+        <p class="mb-0 text-muted small">There is also a <strong>certbot-dns-dashddi</strong> plugin included in the repository that enables Let's Encrypt DNS-01 challenge automation via DashDDI's API.</p>
+    </div>
+</div>
+
+</div>{# /col-lg-9 #}
+
+<div class="col-lg-3 d-none d-lg-block">
+    <div class="card sticky-top" style="top:80px">
+        <div class="card-header small fw-semibold">On this page</div>
+        <div class="list-group list-group-flush small">
+            <a href="#overview" class="list-group-item list-group-item-action py-1">Overview</a>
+            <a href="#dns-integration" class="list-group-item list-group-item-action py-1">DNS / BIND</a>
+            <a href="#dhcp-integration" class="list-group-item list-group-item-action py-1">DHCP / Kea</a>
+            <a href="#clearpass" class="list-group-item list-group-item-action py-1">ClearPass</a>
+            <a href="#snipeit" class="list-group-item list-group-item-action py-1">Snipe-IT</a>
+            <a href="#aruba" class="list-group-item list-group-item-action py-1">Aruba CX</a>
+            <a href="#api" class="list-group-item list-group-item-action py-1">REST API</a>
+        </div>
+    </div>
+</div>
+
+</div>{# /row #}
+{% endblock %}
