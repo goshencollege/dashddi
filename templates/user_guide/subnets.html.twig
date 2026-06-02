@@ -88,23 +88,35 @@
     <div class="card-body">
         <p>Address blocks let you mark ranges of IPs within a subnet as having a specific purpose. Add them from the subnet detail page using <strong>Add Block</strong>.</p>
         <div class="table-responsive">
-            <table class="table table-sm table-bordered mb-0">
+            <table class="table table-sm table-bordered mb-3">
                 <thead><tr><th>Type</th><th>Purpose</th><th>Example</th></tr></thead>
                 <tbody>
                     <tr>
-                        <td><span class="badge bg-warning text-dark">Reserved</span></td>
-                        <td>IPs excluded from DHCP dynamic allocation (e.g. the gateway, printers, or network appliances)</td>
-                        <td><code>10.1.2.1</code> – <code>10.1.2.10</code></td>
+                        <td><span class="badge bg-success">Fixed</span></td>
+                        <td>Addresses assignable to interfaces. <strong>Auto-assign picks exclusively from Fixed blocks</strong> when any exist on the subnet. Manual IP entry is also allowed within Fixed blocks.</td>
+                        <td><code>10.1.2.100</code> – <code>10.1.2.200</code></td>
                     </tr>
                     <tr>
-                        <td><span class="badge bg-info text-dark">Fixed</span></td>
-                        <td>IP range for static host reservations (used in DHCP config as a fixed-address pool)</td>
-                        <td><code>10.1.2.100</code> – <code>10.1.2.150</code></td>
+                        <td><span class="badge bg-warning text-dark">Dynamic</span></td>
+                        <td>DHCP dynamic pool range (tracked for reference only). DashDDI does <strong>not</strong> use Dynamic blocks for auto-assignment or validation — they are informational and can be referenced when generating DHCP server config.</td>
+                        <td><code>10.1.2.50</code> – <code>10.1.2.99</code></td>
+                    </tr>
+                    <tr>
+                        <td><span class="badge bg-danger">Reserved</span></td>
+                        <td>Infrastructure or excluded addresses (e.g. gateway, network appliances). Auto-assign <strong>never</strong> uses Reserved blocks. Manual IP entry <em>is</em> allowed within Reserved blocks.</td>
+                        <td><code>10.1.2.1</code> – <code>10.1.2.10</code></td>
                     </tr>
                 </tbody>
             </table>
         </div>
-        <p class="mt-3 mb-0">Each block has a start IP, end IP, and an optional label. Blocks are included in the generated Kea DHCP configuration to tell the DHCP server which ranges to hand out versus skip.</p>
+
+        <h6>How blocks affect IP assignment</h6>
+        <ul class="mb-3">
+            <li><strong>Auto-assign</strong> — When Fixed blocks exist on the subnet, the next available IP is drawn exclusively from Fixed blocks, in order. If no Fixed blocks are defined, auto-assign falls back to the full subnet CIDR range.</li>
+            <li><strong>Manual entry</strong> — When Fixed or Reserved blocks exist on the subnet, a manually entered IP must fall within one of those blocks (either Fixed or Reserved). Dynamic blocks are ignored for this check. If no Fixed or Reserved blocks are defined, the IP just needs to be within the subnet CIDR.</li>
+        </ul>
+
+        <p class="mb-0">Each block has a start IP, end IP, and an optional label.</p>
     </div>
 </div>
 
