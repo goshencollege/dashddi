@@ -777,6 +777,44 @@ class ImportLegacyCommand extends Command
 
         $io->writeln(sprintf('  %d additional subnets', count($seedSubnets)));
 
+        // Address blocks for subnets that need them
+        foreach (['Siemens EMS', 'EMP_INST', 'EMP_JENZ'] as $subnetName) {
+            $subnet = $seedSubnets[$subnetName];
+            $cidr   = $subnet->getIpv4Cidr();
+            [$networkIp, $prefixLen] = explode('/', $cidr);
+            $base          = ip2long($networkIp);
+            $lastUsableLong = $base + (1 << (32 - (int) $prefixLen)) - 2;
+
+            $reserved = new AddressBlock();
+            $reserved->setSubnet($subnet);
+            $reserved->setType(BlockType::Reserved);
+            $reserved->setLabel('Infrastructure');
+            $reserved->setStartIp(long2ip($base + 1));
+            $reserved->setEndIp(long2ip($base + 10));
+
+            $fixed = new AddressBlock();
+            $fixed->setSubnet($subnet);
+            $fixed->setType(BlockType::Fixed);
+            $fixed->setStartIp(long2ip($base + 11));
+            $fixed->setEndIp(long2ip($base + 15));
+
+            $dynamic = new AddressBlock();
+            $dynamic->setSubnet($subnet);
+            $dynamic->setType(BlockType::Dynamic);
+            $dynamic->setStartIp(long2ip($base + 16));
+            $dynamic->setEndIp(long2ip($lastUsableLong));
+
+            if (!$dryRun) {
+                $this->em->persist($reserved);
+                $this->em->persist($fixed);
+                $this->em->persist($dynamic);
+            }
+        }
+
+        if (!$dryRun) {
+            $this->em->flush();
+        }
+
         // Snipe-IT server — API key read from SNIPE_API_KEY env var
         $apiKey = $_ENV['SNIPE_API_KEY'] ?? getenv('SNIPE_API_KEY') ?? null;
         if (!$apiKey) {
