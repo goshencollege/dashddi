@@ -112,30 +112,32 @@
             {% set proto = form.names.vars.prototype %}
             {% set proto_html %}
             <div class="name-entry border rounded p-2 mb-2 d-flex align-items-center gap-2 flex-wrap">
-                <div class="flex-shrink-0" title="Set as canonical (reverse DNS) name">
+                <div class="flex-shrink-0 text-center" style="min-width:5rem" title="Set as canonical (reverse DNS) name">
                     <input type="radio" class="form-check-input canonical-radio" name="canonical_radio" value="__name__">
                 </div>
                 <div class="d-none">{{ form_widget(proto.isCanonical) }}</div>
-                <div class="flex-fill" style="min-width:7rem">
+                <div style="flex:1 1 0%;min-width:7rem">
                     {{ form_widget(proto.name, {attr: {class: 'form-control form-control-sm font-monospace'}}) }}
                     {{ form_errors(proto.name) }}
                 </div>
                 <span class="fw-semibold">.</span>
-                <div class="flex-fill" style="min-width:10rem">
+                <div style="flex:1 1 0%;min-width:10rem">
                     {{ form_widget(proto.domain, {attr: {class: 'form-select form-select-sm'}}) }}
                     {{ form_errors(proto.domain) }}
                 </div>
                 <div style="width:7rem">
                     {{ form_widget(proto.ttl, {attr: {class: 'form-control form-control-sm', placeholder: 'TTL'}}) }}
                 </div>
-                {% for viewWidget in proto.views %}
-                    <div class="form-check form-check-inline mb-0" data-view-id="{{ viewWidget.vars.value }}">
-                        {{ form_widget(viewWidget, {attr: {class: 'form-check-input'}}) }}
-                        {{ form_label(viewWidget, null, {label_attr: {class: 'form-check-label small'}}) }}
-                    </div>
-                {% else %}
-                    <div class="d-none">{{ form_widget(proto.views) }}</div>
-                {% endfor %}
+                <div class="d-flex flex-wrap align-items-center gap-1" style="min-width:10rem">
+                    {% for viewWidget in proto.views %}
+                        <div class="form-check form-check-inline mb-0" data-view-id="{{ viewWidget.vars.value }}">
+                            {{ form_widget(viewWidget, {attr: {class: 'form-check-input'}}) }}
+                            {{ form_label(viewWidget, null, {label_attr: {class: 'form-check-label small'}}) }}
+                        </div>
+                    {% else %}
+                        <div class="d-none">{{ form_widget(proto.views) }}</div>
+                    {% endfor %}
+                </div>
                 <button type="button" class="btn btn-sm btn-outline-danger remove-name-btn ms-auto">
                     <i class="bi bi-trash"></i>
                 </button>
@@ -143,32 +145,43 @@
             {% endset %}
             <div class="card-body" id="names-collection"
                  data-prototype="{{ proto_html|e('html_attr') }}">
+                <div class="d-flex align-items-center gap-2 flex-wrap px-2 mb-1 text-muted fw-semibold border-bottom pb-1{% if form.names|length == 0 %} d-none{% endif %}" id="names-column-header">
+                    <div class="flex-shrink-0 text-center small" style="min-width:5rem">Canonical</div>
+                    <div class="small" style="flex:1 1 0%;min-width:7rem">Name</div>
+                    <span style="visibility:hidden" class="fw-semibold">.</span>
+                    <div class="small" style="flex:1 1 0%;min-width:10rem">Domain</div>
+                    <div class="small" style="width:7rem">TTL</div>
+                    <div class="small" style="min-width:10rem">Views</div>
+                    <button class="btn btn-sm btn-outline-danger ms-auto" style="visibility:hidden" tabindex="-1" aria-hidden="true"><i class="bi bi-trash"></i></button>
+                </div>
                 {% for nameForm in form.names %}
                     <div class="name-entry border rounded p-2 mb-2 d-flex align-items-center gap-2 flex-wrap">
-                        <div class="flex-shrink-0" title="Set as canonical (reverse DNS) name">
+                        <div class="flex-shrink-0 text-center" style="min-width:5rem" title="Set as canonical (reverse DNS) name">
                             <input type="radio" class="form-check-input canonical-radio" name="canonical_radio" value="{{ nameForm.vars.name }}">
                         </div>
                         <div class="d-none">{{ form_widget(nameForm.isCanonical) }}</div>
-                        <div class="flex-fill" style="min-width:7rem">
+                        <div style="flex:1 1 0%;min-width:7rem">
                             {{ form_widget(nameForm.name, {attr: {class: 'form-control form-control-sm font-monospace'}}) }}
                             {{ form_errors(nameForm.name) }}
                         </div>
                         <span class="fw-semibold">.</span>
-                        <div class="flex-fill" style="min-width:10rem">
+                        <div style="flex:1 1 0%;min-width:10rem">
                             {{ form_widget(nameForm.domain, {attr: {class: 'form-select form-select-sm'}}) }}
                             {{ form_errors(nameForm.domain) }}
                         </div>
                         <div style="width:7rem">
                             {{ form_widget(nameForm.ttl, {attr: {class: 'form-control form-control-sm', placeholder: 'TTL'}}) }}
                         </div>
-                        {% for viewWidget in nameForm.views %}
-                            <div class="form-check form-check-inline mb-0" data-view-id="{{ viewWidget.vars.value }}">
-                                {{ form_widget(viewWidget, {attr: {class: 'form-check-input'}}) }}
-                                {{ form_label(viewWidget, null, {label_attr: {class: 'form-check-label small'}}) }}
-                            </div>
-                        {% else %}
-                            <div class="d-none">{{ form_widget(nameForm.views) }}</div>
-                        {% endfor %}
+                        <div class="d-flex flex-wrap align-items-center gap-1" style="min-width:10rem">
+                            {% for viewWidget in nameForm.views %}
+                                <div class="form-check form-check-inline mb-0" data-view-id="{{ viewWidget.vars.value }}">
+                                    {{ form_widget(viewWidget, {attr: {class: 'form-check-input'}}) }}
+                                    {{ form_label(viewWidget, null, {label_attr: {class: 'form-check-label small'}}) }}
+                                </div>
+                            {% else %}
+                                <div class="d-none">{{ form_widget(nameForm.views) }}</div>
+                            {% endfor %}
+                        </div>
                         <button type="button" class="btn btn-sm btn-outline-danger remove-name-btn ms-auto">
                             <i class="bi bi-trash"></i>
                         </button>
@@ -365,6 +378,7 @@
 
     addBtn.addEventListener('click', async function () {
         document.getElementById('no-names-msg')?.remove();
+        document.getElementById('names-column-header')?.classList.remove('d-none');
         const div = document.createElement('div');
         div.innerHTML = collection.dataset.prototype.replace(/__name__/g, index++);
         const entry = div.firstElementChild;
