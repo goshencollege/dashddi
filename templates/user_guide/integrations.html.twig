@@ -54,8 +54,7 @@
         <h6>Server-side setup</h6>
         <ol>
             <li>Add the DHCP server in DashDDI and generate an SSH key as described for DNS</li>
-            <li>Configure Kea's <code>lease_cmds</code> hook library to call DashDDI's webhook endpoint on lease events:
-                <code>{{ app.request ? app.request.schemeAndHttpHost : '' }}/api/dhcp/lease-notification</code></li>
+            <li>Configure Kea's <code>run_script</code> hook library to POST lease events to DashDDI's lease endpoint — see the <a href="{{ path('user_guide_dhcp') }}#kea-lease-notifications">Kea lease notifications setup guide</a> for the full steps.</li>
             <li>Ensure the Kea user on the server can reload the service via the configured reload command</li>
         </ol>
         <p class="mb-0 text-muted small">Full instructions are in <code>docs/dhcp-kea.md</code> in the DashDDI repository.</p>

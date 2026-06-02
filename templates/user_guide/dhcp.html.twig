@@ -77,15 +77,62 @@
 <div class="card mb-4" id="leases">
     <div class="card-header fw-semibold"><i class="bi bi-journal-text me-1"></i>DHCP Leases</div>
     <div class="card-body">
-        <p>Browse active and historical DHCP leases at <strong>DHCP → DHCP Leases</strong>. DashDDI receives lease events from Kea via an HTTP webhook — when a lease is acquired, renewed, or released, Kea calls DashDDI's webhook endpoint and the record is stored.</p>
+        <p>Browse active and historical DHCP leases at <strong>DHCP → DHCP Leases</strong>. When Kea is configured to notify DashDDI (see below), lease records are stored automatically whenever a lease is granted or renewed.</p>
         <p>The lease list shows:</p>
-        <ul>
+        <ul class="mb-2">
             <li>IP address, MAC address, hostname reported by the client</li>
             <li>Subnet the lease belongs to</li>
             <li>Lease start and expiry times</li>
             <li>Whether the lease is currently active</li>
         </ul>
         <p class="mb-0">The host list and host detail pages show the <strong>current active lease</strong> for each interface's MAC address alongside any static IP — making it easy to see if a device is getting the expected address.</p>
+    </div>
+</div>
+
+<div class="card mb-4" id="kea-lease-notifications">
+    <div class="card-header fw-semibold"><i class="bi bi-arrow-left-right me-1"></i>Configuring Kea to Send Lease Notifications</div>
+    <div class="card-body">
+        <p>Kea can be configured to POST lease events to DashDDI whenever an address is granted or renewed. This requires <strong>Kea 2.2 or later</strong> and uses the <code>run_script</code> hook library.</p>
+
+        <h6>Step 1 — Create an API token</h6>
+        <p>Go to <strong>Other Settings → API Tokens</strong>, create a new token, and grant it permission for the <code>POST /api/dhcp/lease</code> route. Copy the token value — it is shown only once.</p>
+
+        <h6>Step 2 — Create the notify script on the Kea server</h6>
+        <p>Create <code>/etc/kea/notify-dashddi.sh</code> on the Kea server and make it executable (<code>chmod +x</code>):</p>
+        <pre class="bg-body-secondary rounded p-3 small mb-3"><code>#!/bin/bash
+# Called by Kea run_script hook on lease4_select and lease4_renew events
+if [[ "$LEASES4_AT0_ADDRESS" == "" ]]; then exit 0; fi
+
+curl -s -X POST https://dashddi.example.com/api/dhcp/lease \
+  -H "Authorization: Bearer &lt;YOUR_API_TOKEN&gt;" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"ip-address\": \"$LEASES4_AT0_ADDRESS\",
+    \"hw-address\": \"$LEASES4_AT0_HWADDR\",
+    \"hostname\": \"$LEASES4_AT0_HOSTNAME\",
+    \"expire\": $LEASES4_AT0_CLTT
+  }"</code></pre>
+        <p>Replace <code>dashddi.example.com</code> with your DashDDI hostname and <code>&lt;YOUR_API_TOKEN&gt;</code> with the token created above.</p>
+
+        <h6>Step 3 — Add the hook to <code>kea-dhcp4.conf</code></h6>
+        <p>Add the <code>run_script</code> hook library to the <code>hooks-libraries</code> array in your Kea DHCPv4 configuration:</p>
+        <pre class="bg-body-secondary rounded p-3 small mb-3"><code>"hooks-libraries": [
+    {
+        "library": "/usr/lib/kea/hooks/libdhcp_run_script.so",
+        "parameters": {
+            "name": "/etc/kea/notify-dashddi.sh",
+            "sync": false
+        }
+    }
+]</code></pre>
+        <p>The <code>sync: false</code> setting lets Kea process leases without waiting for the script to complete, so a slow or unavailable DashDDI instance does not delay DHCP responses.</p>
+
+        <h6>Step 4 — Reload Kea</h6>
+        <p class="mb-3">Reload or restart the Kea DHCPv4 service to apply the hook configuration:</p>
+        <pre class="bg-body-secondary rounded p-3 small mb-3"><code>sudo systemctl reload kea-dhcp4</code></pre>
+
+        <h6>DHCPv6</h6>
+        <p class="mb-0">The same pattern applies for DHCPv6. Use the <code>LEASES6_AT0_*</code> environment variables in the script (<code>LEASES6_AT0_ADDRESS</code>, <code>LEASES6_AT0_HWADDR</code>, etc.) and add the hook to <code>kea-dhcp6.conf</code> instead.</p>
     </div>
 </div>
 
@@ -108,6 +155,7 @@
             <a href="#config-generation" class="list-group-item list-group-item-action py-1">Config Generation</a>
             <a href="#push-dhcp" class="list-group-item list-group-item-action py-1">Pushing Config</a>
             <a href="#leases" class="list-group-item list-group-item-action py-1">DHCP Leases</a>
+            <a href="#kea-lease-notifications" class="list-group-item list-group-item-action py-1">Kea Lease Notifications</a>
             <a href="#clearpass-auth-logs" class="list-group-item list-group-item-action py-1">Auth Logs</a>
         </div>
     </div>
