@@ -33,13 +33,26 @@ upgrade:
 	@bash upgrade.sh
 
 reset:
+	@if [ "$(COMPOSE)" = "docker-compose.prod.yml" ]; then \
+		printf '\033[1;31m\nWARNING: PRODUCTION RESET\033[0m\n'; \
+		printf 'This will destroy all volumes including the database.\n\n'; \
+		printf 'Type "reset production" to confirm: '; read confirm; \
+		if [ "$$confirm" != "reset production" ]; then printf 'Aborted.\n'; exit 1; fi; \
+	else \
+		printf 'Reset dev environment? This will destroy all volumes. [y/N] '; read confirm; \
+		if [ "$$confirm" != "y" ] && [ "$$confirm" != "Y" ]; then printf 'Aborted.\n'; exit 1; fi; \
+	fi
 	docker compose -f $(COMPOSE) down -v
-	docker run --rm -v dashddi-dev-dev_ssl_certs:/ssl -v $(CURDIR)/docker/ssl:/src:ro alpine sh -c 'cp /src/cert.pem /src/key.pem /ssl/ && chmod 644 /ssl/*.pem'
+	@PROJECT=$$(docker compose -f $(COMPOSE) config 2>/dev/null | awk '/^name:/{print $$2}'); \
+	docker run --rm -v $${PROJECT}_ssl_certs:/ssl -v $(CURDIR)/docker/ssl:/src:ro alpine sh -c 'cp /src/cert.pem /src/key.pem /ssl/ && chmod 644 /ssl/*.pem'
 	docker compose -f $(COMPOSE) up -d --build
 	@echo "Waiting for app container…"
 	@until docker compose -f $(COMPOSE) exec -T app php -r 'echo "ok";' 2>/dev/null | grep -q ok; do sleep 2; done
 	docker compose -f $(COMPOSE) exec -T app php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
-	docker compose -f $(COMPOSE) exec -T app php bin/console doctrine:fixtures:load --no-interaction --purge-exclusions=scheduled_task
+	docker compose -f $(COMPOSE) exec -T app php bin/console messenger:setup-transports --no-interaction
+	@if [ "$(COMPOSE)" != "docker-compose.prod.yml" ]; then \
+		docker compose -f $(COMPOSE) exec -T app php bin/console doctrine:fixtures:load --no-interaction --purge-exclusions=scheduled_task; \
+	fi
 
 .env.test.local:
 	$(eval PASS := $(shell grep 'MYSQL_PASSWORD:' $(COMPOSE) | head -1 | sed 's/.*MYSQL_PASSWORD: //;s/[[:space:]].*//'))

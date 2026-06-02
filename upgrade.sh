@@ -26,6 +26,9 @@ done
 echo "==> Running migrations..."
 $COMPOSE exec -T app php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
 
+echo "==> Setting up messenger transports..."
+$COMPOSE exec -T app php bin/console messenger:setup-transports --no-interaction
+
 echo "==> Clearing cache..."
 $COMPOSE exec -T app php bin/console cache:clear
 
