@@ -15,6 +15,7 @@ use App\Entity\NetworkInterface;
 use App\Entity\SnipeItCategorySubnetMap;
 use App\Entity\SnipeItServer;
 use App\Entity\Subnet;
+use App\Entity\Vrf;
 use App\Entity\SubnetRecord;
 use App\Entity\Tag;
 use App\Enum\BlockType;
@@ -70,8 +71,11 @@ class ImportLegacyCommand extends Command
             $io->section('Domains');
             $domains = $this->importDomains($pdo, $io, $dryRun);
 
+            $io->section('VRFs');
+            $vrfs = $this->seedVrfs($io, $dryRun);
+
             $io->section('Subnets');
-            $subnets = $this->importSubnets($pdo, $io, $dryRun, $domains);
+            $subnets = $this->importSubnets($pdo, $io, $dryRun, $domains, $vrfs);
 
             $io->section('DNS Views');
             $this->setupDnsViews($io, $dryRun, $domains, $subnets);
@@ -83,7 +87,7 @@ class ImportLegacyCommand extends Command
             $this->importHosts($pdo, $io, $dryRun, $buildings, $domains, $subnets, $tags);
 
             $io->section('Seed Data');
-            $this->seedLocalData($io, $dryRun);
+            $this->seedLocalData($io, $dryRun, $vrfs);
 
             $io->section('Domain Records');
             $this->seedDomainRecords($io, $dryRun);
@@ -282,9 +286,14 @@ class ImportLegacyCommand extends Command
      *
      * @return array<string, Subnet>
      */
-    private function importSubnets(\PDO $pdo, SymfonyStyle $io, bool $dryRun, array $domains): array
+    private function importSubnets(\PDO $pdo, SymfonyStyle $io, bool $dryRun, array $domains, array $vrfs): array
     {
         $addressRanges = $this->loadAddressRanges($pdo);
+
+        $datacenterCidrs = [
+            '199.8.232.0/24', '199.8.233.0/24',
+            '192.168.59.0/24', '192.168.60.0/24', '192.168.61.0/24',
+        ];
 
         $rows = $pdo->query('SELECT nID, vID, zID, name FROM subnet ORDER BY nID')->fetchAll();
         $map  = [];
@@ -294,7 +303,8 @@ class ImportLegacyCommand extends Command
             $range = $addressRanges[$nid] ?? null;
 
             if ($range === null) {
-                $subnet    = $this->makeSubnet($row['name'], (int) $row['vID'], null);
+                $subnet = $this->makeSubnet($row['name'], (int) $row['vID'], null);
+                $subnet->setVrf($vrfs['corporate']);
                 $map[$nid] = $subnet;
                 if (!$dryRun) {
                     $this->em->persist($subnet);
@@ -304,7 +314,8 @@ class ImportLegacyCommand extends Command
 
             [$cidr, $network] = $this->computeCidr($range['min_ip'], $range['max_ip']);
 
-            $subnet    = $this->makeSubnet($row['name'], (int) $row['vID'], $cidr, $network);
+            $subnet = $this->makeSubnet($row['name'], (int) $row['vID'], $cidr, $network);
+            $subnet->setVrf(in_array($cidr, $datacenterCidrs, true) ? $vrfs['datacenter'] : $vrfs['corporate']);
             $map[$nid] = $subnet;
 
             if (!$dryRun) {
@@ -695,10 +706,35 @@ class ImportLegacyCommand extends Command
     }
 
     // -------------------------------------------------------------------------
+    // VRFs
+    // -------------------------------------------------------------------------
+
+    /** @return array<string, Vrf> keyed by name */
+    private function seedVrfs(SymfonyStyle $io, bool $dryRun): array
+    {
+        $vrfNames = ['datacenter', 'corporate', 'student'];
+        $vrfs = [];
+        foreach ($vrfNames as $name) {
+            $vrf = new Vrf();
+            $vrf->setName($name);
+            $vrfs[$name] = $vrf;
+            if (!$dryRun) {
+                $this->em->persist($vrf);
+            }
+        }
+        if (!$dryRun) {
+            $this->em->flush();
+        }
+        $io->writeln(sprintf('  %d VRFs', count($vrfs)));
+
+        return $vrfs;
+    }
+
+    // -------------------------------------------------------------------------
     // Local seed data (subnets, Snipe-IT server, category maps)
     // -------------------------------------------------------------------------
 
-    private function seedLocalData(SymfonyStyle $io, bool $dryRun): void
+    private function seedLocalData(SymfonyStyle $io, bool $dryRun, array $vrfs): void
     {
         // Additional subnets not present in the legacy database
         $subnetDefs = [
@@ -713,6 +749,11 @@ class ImportLegacyCommand extends Command
             ['name' => 'EMP_JENZ',                'ipv4' => '192.168.121.0/24',  'ipv6' => '2001:18e8:408:79::/64', 'vlan' => 121,  'gateway' => '192.168.121.1', 'container' => false],
         ];
 
+        $datacenterCidrs = [
+            '199.8.232.0/24', '199.8.233.0/24',
+            '192.168.59.0/24', '192.168.60.0/24', '192.168.61.0/24',
+        ];
+
         $seedSubnets = [];
         foreach ($subnetDefs as $def) {
             $subnet = new Subnet();
@@ -722,6 +763,8 @@ class ImportLegacyCommand extends Command
             $subnet->setVlan($def['vlan']);
             $subnet->setGateway($def['gateway']);
             $subnet->setIsContainer($def['container']);
+            $vrf = in_array($def['ipv4'], $datacenterCidrs, true) ? $vrfs['datacenter'] : $vrfs['corporate'];
+            $subnet->setVrf($vrf);
             $seedSubnets[$def['name']] = $subnet;
             if (!$dryRun) {
                 $this->em->persist($subnet);
