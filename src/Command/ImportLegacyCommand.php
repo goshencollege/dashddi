@@ -748,6 +748,7 @@ class ImportLegacyCommand extends Command
             ['name' => 'vlan44',                  'ipv4' => null,                'ipv6' => null,                    'vlan' => 44,   'gateway' => null,            'container' => false],
             ['name' => 'Siemens EMS',             'ipv4' => '192.168.253.0/24',  'ipv6' => null,                    'vlan' => null, 'gateway' => null,            'container' => false],
             ['name' => 'EMP_INST',                'ipv4' => '192.168.112.0/22',  'ipv6' => '2001:18e8:408:70/64',   'vlan' => 112,  'gateway' => null,            'container' => false],
+            ['name' => 'EMP_BYOD',                'ipv4' => '192.168.116.0/22',  'ipv6' => '2001:18e8:408:74/64',   'vlan' => 116,  'gateway' => null,            'container' => false],
             ['name' => 'EMP_JENZ',                'ipv4' => '192.168.121.0/24',  'ipv6' => '2001:18e8:408:79::/64', 'vlan' => 121,  'gateway' => null,            'container' => false],
         ];
 
