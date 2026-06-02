@@ -43,6 +43,8 @@ class ScheduledTaskController extends AbstractController
             'nextRun'        => $nextRun,
             'schedulerStale' => $schedulerStale,
             'lastHeartbeat'  => $lastHeartbeat !== null ? \DateTimeImmutable::createFromFormat('U', (string) $lastHeartbeat) : null,
+            'projectDir'     => $this->getParameter('kernel.project_dir'),
+            'appEnv'         => $this->getParameter('kernel.environment'),
         ]);
     }
 
