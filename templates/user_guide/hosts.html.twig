@@ -1,0 +1,190 @@
+{% extends 'base.html.twig' %}
+{% block title %}User Guide – Hosts & Interfaces{% endblock %}
+
+{% block content %}
+{% set section_title = 'Hosts & Interfaces' %}
+{{ include('user_guide/_breadcrumb.html.twig') }}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0"><i class="bi bi-pc-display me-2"></i>Hosts &amp; Interfaces</h1>
+    <a href="{{ path('host_index') }}" class="btn btn-sm btn-outline-primary">
+        <i class="bi bi-arrow-right-circle me-1"></i>Go to Hosts
+    </a>
+</div>
+
+<div class="row g-4">
+<div class="col-lg-9">
+
+{# Overview #}
+<div class="card mb-4" id="overview">
+    <div class="card-header fw-semibold"><i class="bi bi-info-circle me-1"></i>Overview</div>
+    <div class="card-body">
+        <p>A <strong>host</strong> represents a physical or virtual device on your network — a server, workstation, printer, IoT device, or any other addressable endpoint. Each host has one or more <strong>network interfaces</strong>, and each interface can have a MAC address, an IPv4 address, an IPv6 address, and one or more DNS names.</p>
+        <p class="mb-0">The data model looks like this:</p>
+        <ul class="mt-2 mb-0">
+            <li><strong>Host</strong> → name, location (building + room), tags, notes</li>
+            <li><strong>Network Interface</strong> → MAC address, subnet assignment, IPv4/IPv6 addresses, DNS names</li>
+        </ul>
+    </div>
+</div>
+
+{# Host list #}
+<div class="card mb-4" id="host-list">
+    <div class="card-header fw-semibold"><i class="bi bi-list-ul me-1"></i>The Host List</div>
+    <div class="card-body">
+        <p>The Hosts page (<strong>Hosts</strong> in the top nav) shows all active hosts. You can switch between two display modes using the toggle in the top-right:</p>
+        <dl class="row mb-0">
+            <dt class="col-sm-3">By Host</dt>
+            <dd class="col-sm-9">One row per host. Shows all IP addresses and DNS names assigned to any interface on that host. Best for locating a specific device by name.</dd>
+            <dt class="col-sm-3">By Interface</dt>
+            <dd class="col-sm-9">One row per network interface. Shows the subnet, MAC address, and individual IP for each interface. Best for viewing MAC-to-IP mappings or troubleshooting specific ports.</dd>
+        </dl>
+        <p class="mb-0 mt-3 text-muted small">Your view mode preference is saved automatically per user.</p>
+    </div>
+</div>
+
+{# Search #}
+<div class="card mb-4" id="search">
+    <div class="card-header fw-semibold"><i class="bi bi-search me-1"></i>Searching for Hosts</div>
+    <div class="card-body">
+        <h6>Simple Search</h6>
+        <p>Type in the search bar at the top of the host list. The simple search matches against:</p>
+        <ul>
+            <li>Host name</li>
+            <li>Location (building / room)</li>
+            <li>Subnet name</li>
+            <li>IP address (IPv4 or IPv6)</li>
+            <li>MAC address</li>
+            <li>DNS name</li>
+        </ul>
+
+        <h6>Advanced Search</h6>
+        <p>Click the <strong>Advanced</strong> button to expand additional filter fields:</p>
+        <div class="table-responsive">
+            <table class="table table-sm table-bordered">
+                <thead><tr><th>Field</th><th>Description</th><th>Example</th></tr></thead>
+                <tbody>
+                    <tr><td>Host Name</td><td>Filter by hostname, supports wildcards</td><td><code>web*</code>, <code>server-01</code></td></tr>
+                    <tr><td>Building</td><td>Select a building from the dropdown</td><td>—</td></tr>
+                    <tr><td>Room</td><td>Filter by room number, supports wildcards</td><td><code>1*</code>, <code>101</code></td></tr>
+                    <tr><td>Subnet</td><td>Filter to hosts with interfaces in a specific subnet, or choose <em>No subnet</em></td><td>—</td></tr>
+                    <tr><td>IP Address</td><td>Filter by IPv4 or IPv6 address, supports wildcards</td><td><code>10.0.1.*</code></td></tr>
+                    <tr><td>MAC Address</td><td>Filter by MAC address, supports wildcards</td><td><code>aa:bb:*</code></td></tr>
+                    <tr><td>DNS Name</td><td>Filter by FQDN, supports wildcards</td><td><code>*.example.com</code></td></tr>
+                    <tr><td>Tag</td><td>Filter to hosts with a specific tag</td><td>—</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="mb-0 text-muted small">Use <code>*</code> as a wildcard anywhere in a text field. Search state is preserved across page navigations per user.</p>
+    </div>
+</div>
+
+{# Adding a host #}
+<div class="card mb-4" id="add-host">
+    <div class="card-header fw-semibold"><i class="bi bi-plus-circle me-1"></i>Adding a Host</div>
+    <div class="card-body">
+        <p>Click <strong>Add Host</strong> in the top-right of the host list (or the Dashboard). Fill in:</p>
+        <dl class="row mb-0">
+            <dt class="col-sm-3">Name <span class="text-danger">*</span></dt>
+            <dd class="col-sm-9">The hostname for this device. Should match what you'd use in DNS.</dd>
+            <dt class="col-sm-3">Building</dt>
+            <dd class="col-sm-9">Physical building where the device lives (optional, for searching).</dd>
+            <dt class="col-sm-3">Room</dt>
+            <dd class="col-sm-9">Room number or label within the building.</dd>
+            <dt class="col-sm-3">Tags</dt>
+            <dd class="col-sm-9">One or more labels for grouping and filtering. Start typing to search existing tags.</dd>
+            <dt class="col-sm-3">Notes</dt>
+            <dd class="col-sm-9">Free-text notes visible on the host detail page.</dd>
+        </dl>
+        <div class="alert alert-info mt-3 mb-0 py-2 small">
+            <i class="bi bi-lightbulb me-1"></i>After saving the host, you'll be redirected to the host detail page where you can add network interfaces.
+        </div>
+    </div>
+</div>
+
+{# Interfaces #}
+<div class="card mb-4" id="interfaces">
+    <div class="card-header fw-semibold"><i class="bi bi-hdd-network me-1"></i>Network Interfaces</div>
+    <div class="card-body">
+        <p>Each interface represents a physical or logical network port. From the host detail page, click <strong>Add Interface</strong> to create one.</p>
+        <dl class="row mb-0">
+            <dt class="col-sm-3">MAC Address <span class="text-danger">*</span></dt>
+            <dd class="col-sm-9">The hardware address of the interface, in <code>aa:bb:cc:dd:ee:ff</code> format. Used by DHCP for host reservations.</dd>
+            <dt class="col-sm-3">Name</dt>
+            <dd class="col-sm-9">Optional label (e.g. <code>eth0</code>, <code>Management</code>).</dd>
+            <dt class="col-sm-3">Subnet</dt>
+            <dd class="col-sm-9">The subnet this interface belongs to. Required before assigning an IP address.</dd>
+            <dt class="col-sm-3">IPv4 Address</dt>
+            <dd class="col-sm-9">Choose <strong>Auto-assign</strong> to use the next available IP in the subnet, or enter a specific address.</dd>
+            <dt class="col-sm-3">IPv6 Address</dt>
+            <dd class="col-sm-9">Optional. Choose auto-assign (uses EUI-64 generation or next available), IPv4-mapped, or manual entry.</dd>
+        </dl>
+
+        <h6 class="mt-4">DNS Names</h6>
+        <p>After saving an interface, use the <strong>DNS Names</strong> section on the interface detail page to add hostnames. Each DNS name has:</p>
+        <ul class="mb-0">
+            <li><strong>Hostname</strong> — the name part (without the domain, e.g. <code>web01</code>)</li>
+            <li><strong>Domain</strong> — the DNS zone this name belongs to</li>
+            <li><strong>Views</strong> — optionally restrict which DNS views include this record</li>
+        </ul>
+        <p class="mt-2 mb-0 text-muted small">DNS records for interface names are generated automatically when you push configuration to your DNS server.</p>
+    </div>
+</div>
+
+{# DHCP leases #}
+<div class="card mb-4" id="leases">
+    <div class="card-header fw-semibold"><i class="bi bi-journal-text me-1"></i>DHCP Leases on a Host</div>
+    <div class="card-body">
+        <p>If DashDDI is receiving lease notifications from your Kea DHCP server, the host detail page shows the <strong>current active lease</strong> for each interface (alongside the static IP, if one is assigned). A lease IP shown in parentheses means it differs from the static assignment.</p>
+        <p class="mb-0">Full lease history is available under <strong>DHCP → DHCP Leases</strong>.</p>
+    </div>
+</div>
+
+{# Bulk operations #}
+<div class="card mb-4" id="bulk">
+    <div class="card-header fw-semibold"><i class="bi bi-check2-square me-1"></i>Bulk Operations</div>
+    <div class="card-body">
+        <p>In the host list, check the boxes on the left side of any rows to select them. A toolbar appears at the top of the table with these actions:</p>
+        <ul class="mb-0">
+            <li><strong>Add Tag</strong> — apply a tag to all selected hosts at once</li>
+            <li><strong>Remove Tag</strong> — remove a tag from all selected hosts</li>
+            <li><strong>Delete Selected</strong> — soft-delete all selected hosts (they go to the deleted hosts view and are purged later)</li>
+        </ul>
+        <p class="mt-2 mb-0 text-muted small">Use the header checkbox to select all hosts on the current page. Bulk operations apply only to the selected rows, not the entire search result.</p>
+    </div>
+</div>
+
+{# Soft delete #}
+<div class="card mb-4" id="soft-delete">
+    <div class="card-header fw-semibold"><i class="bi bi-trash me-1"></i>Deleted Hosts &amp; Restore</div>
+    <div class="card-body">
+        <p>When you delete a host, it is <strong>soft-deleted</strong> — marked as deleted but not removed from the database. Soft-deleted hosts are hidden from normal views and excluded from DNS and DHCP generation.</p>
+        <p>To see deleted hosts, click the <strong>Deleted</strong> button at the top of the host list. From that view you can:</p>
+        <ul class="mb-0">
+            <li><strong>Restore</strong> — click the restore icon (<i class="bi bi-arrow-counterclockwise"></i>) to bring the host back to active status</li>
+        </ul>
+        <p class="mt-2 mb-0 text-muted small">Deleted hosts are permanently purged automatically based on the <em>lease retention</em> setting configured on each subnet, or after a default period. Check <strong>Application Settings</strong> for the global default.</p>
+    </div>
+</div>
+
+</div>{# /col-lg-9 #}
+
+{# On-page nav #}
+<div class="col-lg-3 d-none d-lg-block">
+    <div class="card sticky-top" style="top:80px">
+        <div class="card-header small fw-semibold">On this page</div>
+        <div class="list-group list-group-flush small">
+            <a href="#overview" class="list-group-item list-group-item-action py-1">Overview</a>
+            <a href="#host-list" class="list-group-item list-group-item-action py-1">The Host List</a>
+            <a href="#search" class="list-group-item list-group-item-action py-1">Searching</a>
+            <a href="#add-host" class="list-group-item list-group-item-action py-1">Adding a Host</a>
+            <a href="#interfaces" class="list-group-item list-group-item-action py-1">Network Interfaces</a>
+            <a href="#leases" class="list-group-item list-group-item-action py-1">DHCP Leases</a>
+            <a href="#bulk" class="list-group-item list-group-item-action py-1">Bulk Operations</a>
+            <a href="#soft-delete" class="list-group-item list-group-item-action py-1">Deleted Hosts</a>
+        </div>
+    </div>
+</div>
+
+</div>{# /row #}
+{% endblock %}

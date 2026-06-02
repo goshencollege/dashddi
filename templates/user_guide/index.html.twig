@@ -1,0 +1,120 @@
+{% extends 'base.html.twig' %}
+{% block title %}User Guide{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0"><i class="bi bi-book me-2"></i>User Guide</h1>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <p class="mb-0 lead">
+                    DashDDI is a unified DNS, DHCP, and IP Address Management (IPAM) system. Use it to track every device on your network, manage DNS zones and records, configure DHCP servers, and coordinate with external systems — all from one interface.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-md-6 col-xl-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-pc-display me-2 text-primary"></i>Hosts &amp; Interfaces</h5>
+                <p class="card-text text-muted small">
+                    Create and manage devices (hosts) and their network interfaces. Assign IP addresses, MAC addresses, and DNS names. Search with wildcards, use bulk operations, and recover soft-deleted records.
+                </p>
+            </div>
+            <div class="card-footer bg-transparent">
+                <a href="{{ path('user_guide_hosts') }}" class="btn btn-sm btn-primary">Read guide →</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-xl-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-diagram-2 me-2 text-success"></i>Subnets &amp; IP Management</h5>
+                <p class="card-text text-muted small">
+                    Define IPv4 and IPv6 subnets with VLAN, VRF, and gateway settings. Create address blocks to mark reserved or fixed IP ranges. View all allocated addresses within a subnet.
+                </p>
+            </div>
+            <div class="card-footer bg-transparent">
+                <a href="{{ path('user_guide_subnets') }}" class="btn btn-sm btn-primary">Read guide →</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-xl-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-globe me-2 text-info"></i>DNS Management</h5>
+                <p class="card-text text-muted small">
+                    Manage DNS zones (domains) and records. Configure split-DNS views, access control lists, DNSSEC policies, and push generated zone files to BIND servers via SSH.
+                </p>
+            </div>
+            <div class="card-footer bg-transparent">
+                <a href="{{ path('user_guide_dns') }}" class="btn btn-sm btn-primary">Read guide →</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-xl-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-hdd-network me-2 text-warning"></i>DHCP Management</h5>
+                <p class="card-text text-muted small">
+                    Configure Kea DHCP servers, generate and deploy DHCP configuration from your subnet and host data, and browse current and historical leases.
+                </p>
+            </div>
+            <div class="card-footer bg-transparent">
+                <a href="{{ path('user_guide_dhcp') }}" class="btn btn-sm btn-primary">Read guide →</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-xl-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-server me-2 text-danger"></i>Servers &amp; Operations</h5>
+                <p class="card-text text-muted small">
+                    Manage external DNS and DHCP server credentials. Monitor push logs, worker queue status, and the scheduled task runner that automates deployments and backups.
+                </p>
+            </div>
+            <div class="card-footer bg-transparent">
+                <a href="{{ path('user_guide_servers') }}" class="btn btn-sm btn-primary">Read guide →</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-xl-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-plug me-2 text-secondary"></i>Integrations</h5>
+                <p class="card-text text-muted small">
+                    Connect DashDDI to ClearPass for NAC endpoint management, Snipe-IT for asset data sync, and Aruba CX switches for real-time port control.
+                </p>
+            </div>
+            <div class="card-footer bg-transparent">
+                <a href="{{ path('user_guide_integrations') }}" class="btn btn-sm btn-primary">Read guide →</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-xl-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-gear me-2"></i>Settings &amp; Administration</h5>
+                <p class="card-text text-muted small">
+                    Configure buildings, tags, application settings, backups, API tokens, and SAML authentication providers.
+                </p>
+            </div>
+            <div class="card-footer bg-transparent">
+                <a href="{{ path('user_guide_settings') }}" class="btn btn-sm btn-primary">Read guide →</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

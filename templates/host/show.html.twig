@@ -40,8 +40,9 @@
         {% endif %}
     </div>
     {% if not host.deleted %}
-    <div>
-        <a href="{{ path('host_edit', {id: host.id}) }}" class="btn btn-outline-secondary me-2">
+    <div class="d-flex gap-2">
+        <a href="{{ path('user_guide_hosts') }}#interfaces" class="btn btn-sm btn-outline-secondary" title="User Guide" target="_blank"><i class="bi bi-question-circle"></i></a>
+        <a href="{{ path('host_edit', {id: host.id}) }}" class="btn btn-outline-secondary">
             <i class="bi bi-pencil me-1"></i>Edit
         </a>
         <form method="post" action="{{ path('host_delete', {id: host.id}) }}" class="d-inline"

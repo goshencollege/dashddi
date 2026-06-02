@@ -1,0 +1,139 @@
+{% extends 'base.html.twig' %}
+{% block title %}User Guide – Settings & Administration{% endblock %}
+
+{% block content %}
+{% set section_title = 'Settings & Administration' %}
+{{ include('user_guide/_breadcrumb.html.twig') }}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0"><i class="bi bi-gear me-2"></i>Settings &amp; Administration</h1>
+</div>
+
+<div class="row g-4">
+<div class="col-lg-9">
+
+<div class="card mb-4" id="buildings">
+    <div class="card-header fw-semibold"><i class="bi bi-building me-1"></i>Buildings</div>
+    <div class="card-body">
+        <p>Buildings are physical location labels you can assign to hosts. Manage them at <strong>Other Settings → Buildings</strong>.</p>
+        <p>Each building has a name (e.g. <code>Science Hall</code>). When adding a host, you can select a building and enter a room number. This location data is searchable from the host list — useful for quickly finding all devices in a specific building or room.</p>
+        <p class="mb-0 text-muted small">Buildings are optional. If your organization doesn't track physical locations, you can ignore them entirely.</p>
+    </div>
+</div>
+
+<div class="card mb-4" id="tags">
+    <div class="card-header fw-semibold"><i class="bi bi-tags me-1"></i>Tags</div>
+    <div class="card-body">
+        <p>Tags are free-form labels you can apply to hosts and subnets for grouping and filtering. Manage them at <strong>Other Settings → Tags</strong>.</p>
+        <p>Examples of useful tags: <code>lab</code>, <code>production</code>, <code>iot</code>, <code>wifi</code>, <code>managed</code>, <code>unmanaged</code>.</p>
+        <p>Tags can be applied to hosts individually (via the host edit form or the bulk-tag operation on the host list) and to subnets (via the subnet edit form). The host advanced search filter lets you show only hosts with a specific tag.</p>
+        <p class="mb-0 text-muted small">Tags are shared across the whole application — the same tag can be applied to both hosts and subnets.</p>
+    </div>
+</div>
+
+<div class="card mb-4" id="app-settings">
+    <div class="card-header fw-semibold"><i class="bi bi-sliders me-1"></i>Application Settings</div>
+    <div class="card-body">
+        <p>Configure global application behavior at <strong>Other Settings → Application Settings</strong>.</p>
+        <div class="table-responsive">
+            <table class="table table-sm table-bordered mb-0">
+                <thead><tr><th>Setting</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td>Timezone</td><td>Timezone used for scheduled task evaluation and timestamps throughout the UI</td></tr>
+                    <tr><td>SMTP Host / Port / From</td><td>Outbound mail configuration for notifications. Use <strong>Send Test Email</strong> to verify.</td></tr>
+                    <tr><td>Default Lease Retention (days)</td><td>How many days soft-deleted hosts are kept before being permanently purged. Subnets can override this.</td></tr>
+                    <tr><td>Backup Retention (days)</td><td>How long database backup files are kept before being deleted by the scheduled backup task</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4" id="backup">
+    <div class="card-header fw-semibold"><i class="bi bi-database-down me-1"></i>Backup &amp; Restore</div>
+    <div class="card-body">
+        <p>DashDDI creates encrypted database backups that you can restore if needed. Manage backups at <strong>Other Settings → Backup &amp; Restore</strong>.</p>
+        <h6>Creating backups</h6>
+        <ul>
+            <li><strong>Manual</strong> — click <strong>Backup Now</strong> on the Backup page</li>
+            <li><strong>Scheduled</strong> — configure a cron schedule in <strong>Other Settings → Scheduler</strong> for the Database Backup task</li>
+        </ul>
+        <h6>What's included</h6>
+        <p>Each backup is an encrypted MySQL dump of the entire application database. Optionally, the backup can embed the <code>APP_ENCRYPTION_KEY</code> so encrypted fields (SSH keys, passwords) remain readable after a restore to a different server.</p>
+        <h6>Restoring a backup</h6>
+        <ol class="mb-0">
+            <li>On the Backup page, click <strong>Restore</strong> next to the backup you want, or upload a backup file from another server</li>
+            <li>If the backup includes an <code>APP_ENCRYPTION_KEY</code>, DashDDI will show it in a banner — update your server's <code>.env.local</code> file with the key before using the app</li>
+            <li>Confirm the restore — all current data will be replaced by the backup</li>
+        </ol>
+    </div>
+</div>
+
+<div class="card mb-4" id="api-tokens">
+    <div class="card-header fw-semibold"><i class="bi bi-key me-1"></i>API Tokens</div>
+    <div class="card-body">
+        <p>API tokens allow external scripts and tools to authenticate to DashDDI's REST API. Manage them at <strong>Other Settings → API Tokens</strong>.</p>
+        <h6>Creating a token</h6>
+        <ol>
+            <li>Click <strong>New Token</strong></li>
+            <li>Enter a name that identifies what this token is used for (e.g. <code>certbot-script</code>, <code>monitoring-tool</code>)</li>
+            <li>Save — the token value is shown <strong>once only</strong>. Copy it immediately.</li>
+        </ol>
+        <h6>Permissions</h6>
+        <p class="mb-0">Each token has granular per-route permissions. Click <strong>Edit Permissions</strong> on a token to toggle access to individual API endpoints. By default, new tokens have no access — you must explicitly grant the routes they need. This allows you to issue narrowly-scoped tokens (e.g. a certbot token with only DNS record write access).</p>
+        <p class="mt-2 mb-0 text-muted small">Tokens can be regenerated at any time (invalidating the old value) or deleted. Use tokens in the <code>Authorization: Bearer &lt;token&gt;</code> HTTP header.</p>
+    </div>
+</div>
+
+<div class="card mb-4" id="saml">
+    <div class="card-header fw-semibold"><i class="bi bi-shield-lock me-1"></i>SAML Authentication</div>
+    <div class="card-body">
+        <p>DashDDI authenticates users via SAML 2.0. Manage identity provider (IdP) configurations at <strong>Other Settings → SAML Providers</strong>.</p>
+        <h6>Adding a SAML provider</h6>
+        <ol>
+            <li>In your IdP (e.g. Okta, OneLogin, Azure AD, Shibboleth), create a new SAML application. The <strong>ACS (Assertion Consumer Service) URL</strong> and <strong>Entity ID</strong> are available from the DashDDI SAML provider page.</li>
+            <li>In DashDDI, add a SAML provider and paste the IdP metadata XML (or provide the metadata URL)</li>
+            <li>Save — users can now log in via SAML at the DashDDI login page</li>
+        </ol>
+        <h6>Attribute mapping</h6>
+        <p class="mb-0">DashDDI reads the SAML <code>NameID</code> as the user identifier and expects <code>email</code> and <code>displayName</code> (or <code>cn</code>) attributes from the IdP. Configure your IdP application to send these attributes in the SAML assertion.</p>
+        <div class="alert alert-info mt-3 mb-0 py-2 small">
+            <i class="bi bi-lightbulb me-1"></i>The SAML metadata import console command (<code>app:saml:import-idp-metadata</code>) can import IdP metadata directly from a URL — useful during initial setup before a SAML provider is configured in the UI.
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4" id="themes">
+    <div class="card-header fw-semibold"><i class="bi bi-palette2 me-1"></i>Themes</div>
+    <div class="card-body">
+        <p>DashDDI supports multiple color themes. Click the palette icon (<i class="bi bi-palette2"></i>) in the top-right navbar to switch between:</p>
+        <ul class="mb-0">
+            <li><strong>Light</strong> — standard Bootstrap light theme</li>
+            <li><strong>Dark</strong> — dark background for reduced eye strain</li>
+            <li><strong>Purple</strong> — dark theme with purple accents</li>
+            <li><strong>Green</strong> — dark theme with green accents</li>
+            <li><strong>Rainbow</strong> — animated multi-color theme</li>
+        </ul>
+        <p class="mt-2 mb-0 text-muted small">Your theme preference is saved per-user automatically.</p>
+    </div>
+</div>
+
+</div>{# /col-lg-9 #}
+
+<div class="col-lg-3 d-none d-lg-block">
+    <div class="card sticky-top" style="top:80px">
+        <div class="card-header small fw-semibold">On this page</div>
+        <div class="list-group list-group-flush small">
+            <a href="#buildings" class="list-group-item list-group-item-action py-1">Buildings</a>
+            <a href="#tags" class="list-group-item list-group-item-action py-1">Tags</a>
+            <a href="#app-settings" class="list-group-item list-group-item-action py-1">Application Settings</a>
+            <a href="#backup" class="list-group-item list-group-item-action py-1">Backup &amp; Restore</a>
+            <a href="#api-tokens" class="list-group-item list-group-item-action py-1">API Tokens</a>
+            <a href="#saml" class="list-group-item list-group-item-action py-1">SAML Authentication</a>
+            <a href="#themes" class="list-group-item list-group-item-action py-1">Themes</a>
+        </div>
+    </div>
+</div>
+
+</div>{# /row #}
+{% endblock %}
