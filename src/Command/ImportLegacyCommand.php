@@ -156,6 +156,7 @@ class ImportLegacyCommand extends Command
             'ipv6_address',
             'network_interface',
             'host_tag',
+            'snipe_it_asset_link',
             'host',
             'subnet_record_dns_view',
             'subnet_record',
