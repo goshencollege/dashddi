@@ -15,118 +15,388 @@
 <div class="card mb-4" id="overview">
     <div class="card-header fw-semibold"><i class="bi bi-info-circle me-1"></i>Overview</div>
     <div class="card-body">
-        <p>DashDDI connects to several external systems to enrich your IPAM data and provide network control capabilities. Integrations are managed from <strong>Servers → Servers</strong>.</p>
-        <div class="table-responsive">
+        <p>DashDDI connects to several external systems for configuration deployment, asset sync, and network access control.</p>
+        <div class="table-responsive mb-0">
             <table class="table table-sm table-bordered mb-0">
                 <thead><tr><th>Integration</th><th>What it provides</th></tr></thead>
                 <tbody>
-                    <tr><td><strong>ClearPass</strong></td><td>Push managed endpoints for NAC; pull RADIUS authentication logs</td></tr>
-                    <tr><td><strong>Snipe-IT</strong></td><td>Pull asset records and MAC addresses to populate hosts and interfaces</td></tr>
+                    <tr><td><strong>BIND DNS</strong></td><td>Generate and deploy zone files to DNS servers via SSH</td></tr>
+                    <tr><td><strong>Kea DHCP</strong></td><td>Generate and deploy Kea config via SSH; receive lease notifications via API</td></tr>
+                    <tr><td><strong>ClearPass</strong></td><td>Push managed endpoints to ClearPass; pull RADIUS authentication logs</td></tr>
+                    <tr><td><strong>Snipe-IT</strong></td><td>Pull asset and MAC address data to populate hosts and interfaces</td></tr>
                     <tr><td><strong>Aruba CX</strong></td><td>Query switch port status; bounce, reauthenticate, or toggle PoE on ports</td></tr>
-                    <tr><td><strong>BIND DNS</strong></td><td>Deploy zone files via SSH</td></tr>
-                    <tr><td><strong>Kea DHCP</strong></td><td>Deploy Kea config via SSH; receive lease notifications via webhook</td></tr>
                 </tbody>
             </table>
         </div>
     </div>
 </div>
 
+{# ── DNS / BIND ─────────────────────────────────────────────────────────── #}
 <div class="card mb-4" id="dns-integration">
-    <div class="card-header fw-semibold"><i class="bi bi-globe me-1"></i>DNS / BIND Integration</div>
+    <div class="card-header fw-semibold"><i class="bi bi-globe me-1"></i>DNS / BIND</div>
     <div class="card-body">
-        <p>DashDDI generates BIND zone files from your domain and record data, then uploads them to the DNS server via SSH and reloads BIND.</p>
-        <h6>Server-side setup</h6>
-        <ol>
-            <li>Create a dedicated Linux user account on the DNS server (e.g. <code>dashddi</code>)</li>
-            <li>In DashDDI, add the DNS server under <strong>Servers → Servers</strong> and click <strong>Generate SSH Key</strong> — DashDDI generates a key pair and shows you the public key</li>
-            <li>Add the public key to <code>~/.ssh/authorized_keys</code> for that user on the DNS server</li>
-            <li>Grant the user write permission on the BIND zone directory and permission to run <code>rndc reload</code> (typically via <code>sudoers</code>)</li>
-            <li>Test the connection using the <strong>Test SSH</strong> button in DashDDI</li>
-        </ol>
-        <p class="mb-0 text-muted small">Full instructions are in <code>docs/dns-bind.md</code> in the DashDDI repository.</p>
-    </div>
-</div>
-
-<div class="card mb-4" id="dhcp-integration">
-    <div class="card-header fw-semibold"><i class="bi bi-hdd-network me-1"></i>DHCP / Kea Integration</div>
-    <div class="card-body">
-        <p>DashDDI generates a Kea DHCP4 configuration file and deploys it via SSH. It also receives lease notifications via a webhook endpoint.</p>
-        <h6>Server-side setup</h6>
-        <ol>
-            <li>Add the DHCP server in DashDDI and generate an SSH key as described for DNS</li>
-            <li>Configure Kea's <code>run_script</code> hook library to POST lease events to DashDDI's lease endpoint — see the <a href="{{ path('user_guide_dhcp') }}#kea-lease-notifications">Kea lease notifications setup guide</a> for the full steps.</li>
-            <li>Ensure the Kea user on the server can reload the service via the configured reload command</li>
-        </ol>
-        <p class="mb-0 text-muted small">Full instructions are in <code>docs/dhcp-kea.md</code> in the DashDDI repository.</p>
-    </div>
-</div>
-
-<div class="card mb-4" id="clearpass">
-    <div class="card-header fw-semibold"><i class="bi bi-shield-lock me-1"></i>ClearPass (NAC)</div>
-    <div class="card-body">
-        <p>The ClearPass integration lets DashDDI push your host interfaces as <strong>managed endpoints</strong> into ClearPass's endpoint database, and pull RADIUS authentication event logs back for visibility.</p>
-        <h6>Setup</h6>
-        <ol>
-            <li>In ClearPass, create an API client with endpoint management permissions and note the client ID and secret</li>
-            <li>In DashDDI, add a ClearPass server under <strong>Servers → Servers</strong> with the ClearPass hostname and API credentials</li>
-            <li>Configure which subnets or tags should be pushed to ClearPass as managed endpoints</li>
-        </ol>
-        <h6>Features</h6>
-        <dl class="row mb-0">
-            <dt class="col-sm-4">Endpoint Sync</dt>
-            <dd class="col-sm-8">DashDDI pushes host interfaces with their MAC address and metadata to ClearPass so NAC policies can identify and classify endpoints.</dd>
-            <dt class="col-sm-4">Auth Logs</dt>
-            <dd class="col-sm-8">DashDDI pulls RADIUS authentication events from ClearPass and displays them at <strong>DHCP → ClearPass Auth Logs</strong>. Useful for correlating network access failures with host data.</dd>
-        </dl>
-        <p class="mt-2 mb-0 text-muted small">Full instructions are in <code>docs/clearpass.md</code>.</p>
-    </div>
-</div>
-
-<div class="card mb-4" id="snipeit">
-    <div class="card-header fw-semibold"><i class="bi bi-box-seam me-1"></i>Snipe-IT (Asset Management)</div>
-    <div class="card-body">
-        <p>Snipe-IT is an open-source asset management system. DashDDI can pull asset records and MAC addresses from Snipe-IT to automatically create or update hosts and interfaces in your IPAM database.</p>
-        <h6>Setup</h6>
-        <ol>
-            <li>Generate an API token in Snipe-IT (under your user profile → API)</li>
-            <li>In DashDDI, add a Snipe-IT server under <strong>Servers → Servers</strong> with the Snipe-IT URL and API token</li>
-            <li>Configure <strong>category-to-subnet mappings</strong> — specify which Snipe-IT asset categories should be assigned to which DashDDI subnets when hosts are created</li>
-        </ol>
         <h6>How it works</h6>
-        <p class="mb-0">When the Snipe-IT pull task runs (manually or on a schedule), DashDDI fetches all assets from Snipe-IT, matches them to existing hosts by name and MAC address, creates new hosts for unmatched assets, and updates interface subnet assignments based on the category mapping. Assets are linked — from the host detail page you can see the Snipe-IT asset name alongside the DashDDI host name.</p>
-        <p class="mt-2 mb-0 text-muted small">Full instructions are in <code>docs/snipe-it.md</code>.</p>
+        <ol class="mb-3">
+            <li>DashDDI reads all domains, subnets, DNS views, and network interfaces from the database.</li>
+            <li>It generates BIND-compatible zone files (one forward zone per domain, one reverse zone per subnet) and a <code>dashddi.conf</code> file containing all ACL and view definitions.</li>
+            <li>The generated files are uploaded to each DNS server via SFTP.</li>
+            <li>DashDDI runs <code>rndc reload</code> on the remote server to apply the changes without restarting BIND.</li>
+        </ol>
+        <p class="text-muted small mb-3">Deployments are triggered automatically via the async queue when DNS-relevant data changes, or manually from the Servers page or via console command.</p>
+
+        <hr class="my-3">
+        <h6>Configuring a DNS server in DashDDI</h6>
+        <p>Add a server under <strong>Servers → Servers</strong> (DNS section). Fields:</p>
+        <div class="table-responsive mb-3">
+            <table class="table table-sm table-bordered mb-0">
+                <thead><tr><th>Field</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td>Name</td><td>Display label for this server</td></tr>
+                    <tr><td>Hostname</td><td>IP address or hostname DashDDI SSH connects to</td></tr>
+                    <tr><td>SSH User</td><td>Linux user account for the SSH connection (default: <code>root</code>)</td></tr>
+                    <tr><td>SSH Private Key</td><td>Ed25519 key pair generated by DashDDI — copy the public key to the server's <code>authorized_keys</code></td></tr>
+                    <tr><td>Remote Zone Path</td><td>Directory on the server where zone files are written (default: <code>/etc/bind/zones</code>)</td></tr>
+                    <tr><td>Key Directory</td><td>Path to the DNSSEC key directory on the remote server (optional)</td></tr>
+                    <tr><td>Server Type</td><td><code>primary</code> or <code>secondary</code></td></tr>
+                    <tr><td>Primary Hostname</td><td>For secondary servers: IP/hostname of the primary BIND server (used in <code>primaries</code> directives)</td></tr>
+                    <tr><td>Views</td><td>Which DNS views this server serves</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <hr class="my-3">
+        <h6>SSH key setup</h6>
+        <ol class="mb-3">
+            <li>Open the DNS server record in DashDDI and click <strong>Generate SSH Key</strong>. DashDDI creates an Ed25519 key pair and displays the public key.</li>
+            <li>Copy the public key and append it to <code>~/.ssh/authorized_keys</code> for the configured SSH user on the BIND server.</li>
+            <li>Ensure that user has write access to the remote zone path and permission to run <code>rndc reload</code> (typically via <code>sudoers</code>).</li>
+        </ol>
+
+        <hr class="my-3">
+        <h6>BIND <code>named.conf</code> include</h6>
+        <p>DashDDI writes all ACLs, views, and zone stanzas into a single file called <code>dashddi.conf</code> in the configured remote zone path. Add one line to your BIND <code>named.conf</code> to load it:</p>
+        <pre class="bg-body-secondary rounded p-3 small mb-3"><code>include "/etc/bind/zones/dashddi.conf";</code></pre>
+        <p class="mb-3">Adjust the path if you changed the Remote Zone Path setting. The generated <code>dashddi.conf</code> includes this line as a comment at the top as a reminder.</p>
+
+        <hr class="my-3">
+        <h6>Zone file structure</h6>
+        <p class="mb-1">Files are written to <code>{remoteZonePath}/{viewName}/</code>:</p>
+        <ul class="mb-3">
+            <li><strong>Forward zones</strong> — one file per domain (e.g. <code>example.com.zone</code>)</li>
+            <li><strong>Reverse zones</strong> — one file per subnet (e.g. <code>10.0.1.0.zone</code> for IPv4, <code>ip6.arpa</code> zone for IPv6)</li>
+            <li><strong><code>dashddi.conf</code></strong> — ACL definitions and all <code>view {}</code> blocks with <code>zone {}</code> stanzas</li>
+        </ul>
+        <p class="mb-3">Each zone includes SOA records, A/AAAA records from interface names, PTR records, and DNSSEC inline-signing directives when a policy is configured. IPv4 reverse zones use RFC 2317 classless delegation where applicable.</p>
+
+        <hr class="my-3">
+        <h6>Console command</h6>
+        <pre class="bg-body-secondary rounded p-3 small mb-1"><code>docker compose exec app bin/console app:dns:generate-config [--output-dir=/tmp/dns-zones] [--deploy]</code></pre>
+        <p class="text-muted small mb-0">Omit <code>--deploy</code> to preview generated files locally without uploading. Results are logged in <strong>Servers → Push Logs</strong>.</p>
     </div>
 </div>
 
+{# ── DHCP / Kea ─────────────────────────────────────────────────────────── #}
+<div class="card mb-4" id="dhcp-integration">
+    <div class="card-header fw-semibold"><i class="bi bi-hdd-network me-1"></i>DHCP / Kea</div>
+    <div class="card-body">
+        <h6>How it works</h6>
+        <ol class="mb-3">
+            <li>DashDDI reads subnets, address blocks, and network interfaces from the database.</li>
+            <li>It generates <code>subnets4.json</code> (DHCPv4) and <code>subnets6.json</code> (DHCPv6) in Kea's JSON format.</li>
+            <li>The files are uploaded to the Kea server via SFTP.</li>
+            <li>DashDDI calls the Kea Control Agent to reload the config. If the reload fails, the previous config is automatically restored and a second reload is attempted to return Kea to its last working state.</li>
+        </ol>
+        <p class="text-muted small mb-3">Deployments are triggered automatically via the async queue when DHCP-relevant data changes, or manually from the Servers page or via console command.</p>
+
+        <hr class="my-3">
+        <h6>Configuring a DHCP server in DashDDI</h6>
+        <p>Add a server under <strong>Servers → Servers</strong> (DHCP section). Fields:</p>
+        <div class="table-responsive mb-3">
+            <table class="table table-sm table-bordered mb-0">
+                <thead><tr><th>Field</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td>Name</td><td>Display label for this server</td></tr>
+                    <tr><td>Hostname</td><td>IP address or hostname DashDDI SSH connects to</td></tr>
+                    <tr><td>SSH User</td><td>Linux user account for the SSH connection (default: <code>root</code>)</td></tr>
+                    <tr><td>SSH Private Key</td><td>Ed25519 key pair generated by DashDDI — copy the public key to the server's <code>authorized_keys</code></td></tr>
+                    <tr><td>Remote Path</td><td>Directory on the server where config files are written (default: <code>/etc/kea</code>)</td></tr>
+                    <tr><td>Control URL</td><td>HTTP(S) URL of the Kea Control Agent (e.g. <code>http://localhost:8000</code>). Required for config reload.</td></tr>
+                    <tr><td>Control User</td><td>Basic auth username for the Control Agent (optional)</td></tr>
+                    <tr><td>Control Password</td><td>Basic auth password for the Control Agent (optional)</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <hr class="my-3">
+        <h6>SSH key setup</h6>
+        <ol class="mb-3">
+            <li>Open the DHCP server record in DashDDI and click <strong>Generate SSH Key</strong>. DashDDI creates an Ed25519 key pair and displays the public key.</li>
+            <li>Copy the public key and append it to <code>~/.ssh/authorized_keys</code> for the configured SSH user on the Kea server.</li>
+            <li>Ensure that user has write access to the remote path.</li>
+        </ol>
+
+        <hr class="my-3">
+        <h6>Generated configuration</h6>
+        <p class="mb-1"><strong><code>subnets4.json</code> (DHCPv4)</strong> — for each subnet with an IPv4 CIDR:</p>
+        <ul class="mb-2">
+            <li><strong>Pools</strong> — all Dynamic address blocks on the subnet</li>
+            <li><strong>Router option</strong> — the subnet's gateway IP (if set)</li>
+            <li><strong>Reservations</strong> — all non-deleted interfaces with a MAC address, mapping <code>hw-address</code> → <code>ip-address</code></li>
+        </ul>
+        <p class="mb-1"><strong><code>subnets6.json</code> (DHCPv6)</strong> — for each subnet with an IPv6 CIDR:</p>
+        <ul class="mb-3">
+            <li><strong>Pools</strong> — all Dynamic address blocks (IPv6) on the subnet</li>
+            <li><strong>Reservations</strong> — all non-deleted interfaces with an IPv6 address, mapping <code>hw-address</code> → <code>ip-addresses</code></li>
+        </ul>
+        <p class="text-muted small mb-3">Interfaces with the all-zeros MAC (<code>00:00:00:00:00:00</code>) are excluded from reservations.</p>
+
+        <hr class="my-3">
+        <h6>Console command</h6>
+        <pre class="bg-body-secondary rounded p-3 small mb-1"><code>docker compose exec app bin/console app:dhcp:generate-config [--output-dir=/tmp/dhcp] [--reload]</code></pre>
+        <p class="text-muted small mb-3">Use <code>--output-dir</code> to write files locally for inspection without uploading. Add <code>--reload</code> to trigger a Kea Control Agent reload after deploy. Results are logged in <strong>Servers → Push Logs</strong>.</p>
+
+        <hr class="my-3">
+        <h6 id="kea-lease-notifications">Configuring Kea to send lease notifications</h6>
+        <p>Kea can POST lease events to DashDDI whenever an address is granted or renewed. This requires <strong>Kea 2.2 or later</strong> and uses the <code>run_script</code> hook library.</p>
+
+        <p><strong>Step 1 — Create an API token</strong></p>
+        <p class="mb-3">Go to <strong>Other Settings → API Tokens</strong>, create a new token, and grant it permission for the <code>POST /api/dhcp/lease</code> route. Copy the token value — it is shown only once.</p>
+
+        <p><strong>Step 2 — Create the notify script on the Kea server</strong></p>
+        <p>Create <code>/etc/kea/notify-dashddi.sh</code> on the Kea server and make it executable (<code>chmod +x</code>):</p>
+        <pre class="bg-body-secondary rounded p-3 small mb-3"><code>#!/bin/bash
+# Called by Kea run_script hook on lease4_select and lease4_renew events
+if [[ "$LEASES4_AT0_ADDRESS" == "" ]]; then exit 0; fi
+
+curl -s -X POST https://dashddi.example.com/api/dhcp/lease \
+  -H "Authorization: Bearer &lt;YOUR_API_TOKEN&gt;" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"ip-address\": \"$LEASES4_AT0_ADDRESS\",
+    \"hw-address\": \"$LEASES4_AT0_HWADDR\",
+    \"hostname\": \"$LEASES4_AT0_HOSTNAME\",
+    \"expire\": $LEASES4_AT0_CLTT
+  }"</code></pre>
+        <p class="mb-3">Replace <code>dashddi.example.com</code> with your DashDDI hostname and <code>&lt;YOUR_API_TOKEN&gt;</code> with the token from step 1.</p>
+
+        <p><strong>Step 3 — Add the hook to <code>kea-dhcp4.conf</code></strong></p>
+        <p>Add the <code>run_script</code> hook to the <code>hooks-libraries</code> array in your Kea DHCPv4 configuration:</p>
+        <pre class="bg-body-secondary rounded p-3 small mb-3"><code>"hooks-libraries": [
+    {
+        "library": "/usr/lib/kea/hooks/libdhcp_run_script.so",
+        "parameters": {
+            "name": "/etc/kea/notify-dashddi.sh",
+            "sync": false
+        }
+    }
+]</code></pre>
+        <p class="mb-3"><code>sync: false</code> lets Kea process leases without waiting for the script to finish, so a slow or unreachable DashDDI instance does not delay DHCP responses.</p>
+
+        <p><strong>Step 4 — Reload Kea</strong></p>
+        <pre class="bg-body-secondary rounded p-3 small mb-3"><code>sudo systemctl reload kea-dhcp4</code></pre>
+
+        <p class="mb-0"><strong>DHCPv6</strong> — the same pattern applies for DHCPv6. Use the <code>LEASES6_AT0_*</code> environment variables (<code>LEASES6_AT0_ADDRESS</code>, <code>LEASES6_AT0_HWADDR</code>, etc.) in the script and add the hook to <code>kea-dhcp6.conf</code>.</p>
+    </div>
+</div>
+
+{# ── ClearPass ──────────────────────────────────────────────────────────── #}
+<div class="card mb-4" id="clearpass">
+    <div class="card-header fw-semibold"><i class="bi bi-shield-lock me-1"></i>ClearPass</div>
+    <div class="card-body">
+        <p>DashDDI integrates with Aruba ClearPass in two directions: <strong>push</strong> (DashDDI sends host/interface data to ClearPass as managed endpoints) and <strong>pull</strong> (DashDDI retrieves RADIUS authentication session records from ClearPass Insight).</p>
+
+        <hr class="my-3">
+        <h6>Configuring a ClearPass server in DashDDI</h6>
+        <p>Add a server under <strong>Servers → Servers</strong> (ClearPass section). Fields:</p>
+        <div class="table-responsive mb-3">
+            <table class="table table-sm table-bordered mb-0">
+                <thead><tr><th>Field</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td>Name</td><td>Display label for this connection</td></tr>
+                    <tr><td>API URL</td><td>Base URL of the ClearPass REST API (e.g. <code>https://clearpass.example.com</code>)</td></tr>
+                    <tr><td>Client ID</td><td>OAuth application client ID (see below)</td></tr>
+                    <tr><td>Client Secret</td><td>OAuth application client secret</td></tr>
+                    <tr><td>Verify TLS</td><td>Whether to validate ClearPass's TLS certificate (default: on)</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h6>OAuth application setup in ClearPass</h6>
+        <ol class="mb-3">
+            <li>In ClearPass: <strong>Administration → API Services → API Clients</strong></li>
+            <li>Create a new API client with:
+                <ul>
+                    <li><strong>Grant Type:</strong> <code>client_credentials</code></li>
+                    <li><strong>Operating Mode:</strong> <code>Rest API Client</code></li>
+                    <li><strong>Operator Profile:</strong> read/write access to <strong>Endpoint</strong> (for push) and read access to <strong>Session / Insight API</strong> (for pull)</li>
+                </ul>
+            </li>
+            <li>Copy the <strong>Client ID</strong> and <strong>Client Secret</strong> into DashDDI. DashDDI obtains a fresh access token before each API call — no token management is needed on your end.</li>
+        </ol>
+
+        <hr class="my-3">
+        <h6>Push — endpoint management</h6>
+        <p>DashDDI pushes network interface data to the ClearPass Endpoint repository so ClearPass policies can reference DashDDI-managed attributes. For each non-deleted interface with a real MAC address, DashDDI creates or updates a ClearPass endpoint with:</p>
+        <div class="table-responsive mb-3">
+            <table class="table table-sm table-bordered mb-0">
+                <thead><tr><th>ClearPass attribute</th><th>Source</th></tr></thead>
+                <tbody>
+                    <tr><td><code>mac_address</code></td><td>Interface MAC address</td></tr>
+                    <tr><td><code>status</code></td><td>Always <code>Known</code></td></tr>
+                    <tr><td><code>Managed By</code></td><td>Always <code>DashDDI</code> (used to track managed endpoints)</td></tr>
+                    <tr><td><code>Device Name</code></td><td>Host name</td></tr>
+                    <tr><td><code>Hostname</code></td><td>Primary DNS name of the interface</td></tr>
+                    <tr><td><code>IP Address</code></td><td>IPv4 address</td></tr>
+                    <tr><td><code>IPv6 Address</code></td><td>IPv6 address</td></tr>
+                    <tr><td><code>Subnet</code></td><td>IPv4 CIDR of the subnet</td></tr>
+                    <tr><td><code>VLAN ID</code></td><td>VLAN number from the subnet</td></tr>
+                    <tr><td><code>Tags</code></td><td>Pipe-delimited list of host tags</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="mb-1"><strong>Create/Update/Delete behavior:</strong></p>
+        <ul class="mb-3">
+            <li><strong>Create</strong> — if the MAC doesn't exist in ClearPass, a new endpoint is created</li>
+            <li><strong>Update</strong> — if the MAC exists, endpoint attributes are updated</li>
+            <li><strong>Delete</strong> — if an interface is soft-deleted in DashDDI, the corresponding ClearPass endpoint is removed — but only if its <code>Managed By</code> attribute is <code>DashDDI</code>; endpoints created outside DashDDI are never deleted</li>
+        </ul>
+        <pre class="bg-body-secondary rounded p-3 small mb-1"><code>docker compose exec app bin/console app:push-clearpass [--mac=&lt;mac_address&gt;]</code></pre>
+        <p class="text-muted small mb-3">Use <code>--mac</code> to push a single interface by MAC address for testing. Pushes can also be scheduled under <strong>Other Settings → Scheduler</strong>.</p>
+
+        <hr class="my-3">
+        <h6>Pull — authentication logs</h6>
+        <p>DashDDI retrieves RADIUS authentication session records from ClearPass Insight and stores them locally, linked to matching host interfaces by MAC address. Each record includes:</p>
+        <ul class="mb-3">
+            <li>Session ID, MAC address, auth timestamp, IP address, username</li>
+            <li>ClearPass service matched, auth protocol (e.g. EAP-TLS, PEAP)</li>
+            <li>NAS IP (switch/AP address), NAS Port ID (switch port), enforcement role, VLAN assigned</li>
+        </ul>
+        <p class="mb-1"><strong>Pull behavior:</strong> first run fetches sessions from the past hour; subsequent runs fetch only sessions newer than the last pull; duplicates are skipped; sessions are fetched in batches of 1000.</p>
+        <pre class="bg-body-secondary rounded p-3 small mb-1"><code>docker compose exec app bin/console app:pull-clearpass-logs</code></pre>
+        <p class="text-muted small mb-0">Auth log pulls can also be scheduled under <strong>Other Settings → Scheduler</strong>.</p>
+    </div>
+</div>
+
+{# ── Snipe-IT ──────────────────────────────────────────────────────────── #}
+<div class="card mb-4" id="snipeit">
+    <div class="card-header fw-semibold"><i class="bi bi-box-seam me-1"></i>Snipe-IT</div>
+    <div class="card-body">
+        <p>DashDDI pulls asset data from Snipe-IT and automatically creates or updates host and interface records, keeping your IPAM data in sync with your asset inventory. The integration is <strong>read-only</strong> — DashDDI never writes to Snipe-IT.</p>
+
+        <h6>How it works</h6>
+        <ol class="mb-3">
+            <li>DashDDI fetches all active (non-archived) assets from the Snipe-IT API.</li>
+            <li>For each asset, it reads MAC addresses from one or more configured custom fields.</li>
+            <li>It creates or updates a DashDDI Host and Network Interface for each MAC found.</li>
+            <li>Assets that are later archived or deleted in Snipe-IT cause the corresponding DashDDI host to be soft-deleted or unlinked.</li>
+        </ol>
+
+        <hr class="my-3">
+        <h6>Configuring a Snipe-IT server in DashDDI</h6>
+        <p>Add a server under <strong>Servers → Servers</strong> (Snipe-IT section). Fields:</p>
+        <div class="table-responsive mb-3">
+            <table class="table table-sm table-bordered mb-0">
+                <thead><tr><th>Field</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td>Name</td><td>Display label for this connection</td></tr>
+                    <tr><td>API URL</td><td>Base URL of the Snipe-IT API (e.g. <code>https://snipeit.example.com/api/v1</code>)</td></tr>
+                    <tr><td>API Key</td><td>Snipe-IT API token — generate one under your user profile in Snipe-IT (<strong>Profile → API Keys → Create</strong>). Read-only access is sufficient.</td></tr>
+                    <tr><td>MAC Custom Fields</td><td>Comma-separated list of Snipe-IT custom field names that contain MAC addresses (e.g. <code>MAC Address,Secondary MAC</code>). Multiple values in a single field can be separated by newlines, semicolons, or commas.</td></tr>
+                    <tr><td>Verify TLS</td><td>Whether to validate Snipe-IT's TLS certificate. Disable if using a self-signed cert.</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="alert alert-info py-2 small mb-3">
+            <i class="bi bi-lightbulb me-1"></i>Snipe-IT has no built-in MAC address field — you must create custom fields in Snipe-IT and add them to your asset fieldsets before they can be mapped here.
+        </div>
+
+        <hr class="my-3">
+        <h6>Category → subnet mapping</h6>
+        <p class="mb-3">Configure mappings between Snipe-IT asset categories and DashDDI subnets on the Snipe-IT server record under <strong>Category Subnet Maps</strong>. When a new interface is created from a Snipe-IT asset, DashDDI automatically assigns it to the subnet configured for that asset's category.</p>
+
+        <hr class="my-3">
+        <h6>Sync behavior</h6>
+        <div class="table-responsive mb-3">
+            <table class="table table-sm table-bordered mb-0">
+                <thead><tr><th>Situation</th><th>What DashDDI does</th></tr></thead>
+                <tbody>
+                    <tr><td>Asset MAC not known to DashDDI</td><td>Creates a new Host and NetworkInterface. Tags the host with <code>snipeit</code>.</td></tr>
+                    <tr><td>Asset matches an existing unlinked host</td><td>Adopts the host (links it to the asset, preserves the existing name).</td></tr>
+                    <tr><td>Multiple existing hosts each match one of the asset's MACs</td><td>Merges them into a single host linked to the asset.</td></tr>
+                    <tr><td>Subsequent sync runs</td><td>Updates host name to match asset name (unless manually changed since last sync); soft-deletes interfaces whose MACs no longer appear; restores interfaces whose MACs reappear.</td></tr>
+                    <tr><td>Asset archived/deleted — adopted host</td><td>Removes the <code>snipeit</code> tag and unlinks the asset; host is preserved.</td></tr>
+                    <tr><td>Asset archived/deleted — sync-created host</td><td>Soft-deletes the host and its interfaces.</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <pre class="bg-body-secondary rounded p-3 small mb-1"><code>docker compose exec app bin/console app:pull-snipe-it [--server-id=&lt;id&gt;]</code></pre>
+        <p class="text-muted small mb-0">Omit <code>--server-id</code> to sync all configured servers. The command prints a summary of created/updated/deleted/skipped counts. Syncs can also be scheduled under <strong>Other Settings → Scheduler</strong>.</p>
+    </div>
+</div>
+
+{# ── Aruba CX ──────────────────────────────────────────────────────────── #}
 <div class="card mb-4" id="aruba">
     <div class="card-header fw-semibold"><i class="bi bi-router me-1"></i>Aruba CX Switches</div>
     <div class="card-body">
-        <p>If your network uses Aruba CX switches, DashDDI can connect to their REST API to provide real-time port visibility and control — without logging into the switch CLI.</p>
-        <h6>Setup</h6>
-        <ol>
-            <li>Enable the REST API on each Aruba CX switch</li>
-            <li>Create a dedicated API user on the switch with appropriate permissions</li>
-            <li>In DashDDI, add the switch under <strong>Servers → Servers</strong> (Aruba section) with the switch IP and credentials</li>
-        </ol>
-        <h6>Port actions</h6>
-        <p>From the Aruba Switch page, you can:</p>
-        <ul class="mb-0">
-            <li><strong>View port status</strong> — see which ports are up/down, their VLAN assignment, and connected device (if LLDP data is available)</li>
-            <li><strong>Reauthenticate</strong> — trigger 802.1X reauthentication on a specific port</li>
-            <li><strong>Bounce port</strong> — disable and re-enable a port to force a device to reconnect</li>
-            <li><strong>PoE bounce</strong> — cycle power on a PoE port (useful for resetting IP phones, APs, etc.)</li>
+        <p>DashDDI can query Aruba CX switches to retrieve port access information and perform port management actions. This integration works in conjunction with ClearPass authentication logs — the NAS IP and NAS Port ID from an auth log entry are used to identify and act on the switch port a device is connected to.</p>
+
+        <h6>Capabilities</h6>
+        <ul class="mb-3">
+            <li><strong>View port client info</strong> — connected device, MAC address, VLAN, authentication status, and enforcement role</li>
+            <li><strong>Reauthenticate</strong> — trigger 802.1X reauthentication without disrupting connectivity</li>
+            <li><strong>Bounce port</strong> — administratively shut down and re-enable the port, forcing the device to reconnect</li>
+            <li><strong>PoE bounce</strong> — power-cycle the PoE output (useful for IP phones and access points)</li>
         </ul>
-        <p class="mt-2 mb-0 text-muted small">Full instructions are in <code>docs/aruba-cx-switch.md</code>.</p>
+
+        <hr class="my-3">
+        <h6>Configuring a switch in DashDDI</h6>
+        <p>Add a switch under <strong>Servers → Servers</strong> (Aruba section). Fields:</p>
+        <div class="table-responsive mb-3">
+            <table class="table table-sm table-bordered mb-0">
+                <thead><tr><th>Field</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td>Name</td><td>Display label for this switch</td></tr>
+                    <tr><td>Username</td><td>Username for REST API and SSH login</td></tr>
+                    <tr><td>Password</td><td>Password for REST API and SSH password auth</td></tr>
+                    <tr><td>SSH Private Key</td><td>SSH private key for key-based authentication (alternative to password for SSH)</td></tr>
+                    <tr><td>REST API Version</td><td>API version for REST calls (default: <code>v10.12</code>)</td></tr>
+                    <tr><td>Verify TLS</td><td>Whether to validate the switch's TLS certificate. Default: off — most switches use self-signed certs.</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="text-muted small mb-3">The switch's IP address is not stored on the server record — it is taken at action time from the NAS IP recorded in the ClearPass auth log.</p>
+
+        <h6>Connection methods</h6>
+        <div class="table-responsive mb-3">
+            <table class="table table-sm table-bordered mb-0">
+                <thead><tr><th>Method</th><th>Used for</th><th>Requirements</th></tr></thead>
+                <tbody>
+                    <tr><td>REST API</td><td>Port info retrieval (primary)</td><td>Username + Password</td></tr>
+                    <tr><td>SSH</td><td>Port info retrieval (fallback), all port actions</td><td>Username + Password or SSH Private Key</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="mb-3">DashDDI tries REST first for queries and falls back to SSH on failure. Port actions (bounce, reauthenticate, PoE bounce) always use SSH.</p>
+
+        <h6>Usage flow</h6>
+        <ol class="mb-3">
+            <li>A device authenticates through ClearPass. DashDDI pulls the auth log, which records the NAS IP (switch) and NAS Port ID (port).</li>
+            <li>From the auth log entry in DashDDI, click the port info button to view the connected device, VLAN, auth method, and role.</li>
+            <li>From the same view, trigger reauthentication, bounce, or PoE bounce on that port.</li>
+        </ol>
+
+        <p class="mb-0 text-muted small">Port IDs in ClearPass logs are typically in <code>NAS-Port-ID</code> format (e.g. <code>1/1/5 - Profile Name</code>). DashDDI normalizes these automatically, extracting just the port identifier before sending it to the switch.</p>
     </div>
 </div>
 
+{# ── REST API ──────────────────────────────────────────────────────────── #}
 <div class="card mb-4" id="api">
     <div class="card-header fw-semibold"><i class="bi bi-code-slash me-1"></i>REST API</div>
     <div class="card-body">
-        <p>DashDDI exposes a REST API that covers all major resources — hosts, interfaces, subnets, domains, records, and more. The API is useful for scripting bulk operations, integrating with other tools, or building automation workflows.</p>
-        <p>Interactive API documentation with request/response schemas and the ability to test calls is available at <a href="{{ path('api_docs') }}"><strong>API Docs</strong></a>.</p>
-        <p>Authentication uses Bearer tokens — create a token under <strong>Other Settings → API Tokens</strong>. Each token has granular per-route permissions so you can issue a token with only the access a specific integration needs.</p>
-        <p class="mb-0 text-muted small">There is also a <strong>certbot-dns-dashddi</strong> plugin included in the repository that enables Let's Encrypt DNS-01 challenge automation via DashDDI's API.</p>
+        <p>DashDDI exposes a REST API covering all major resources — hosts, interfaces, subnets, domains, records, and more. Interactive API documentation with request/response schemas and the ability to test calls is available at <a href="{{ path('api_docs') }}"><strong>API Docs</strong></a>.</p>
+        <p>Authentication uses Bearer tokens. Create a token under <strong>Other Settings → API Tokens</strong> and grant only the per-route permissions that integration needs.</p>
+        <p class="mb-0 text-muted small">The repository also includes a <strong>certbot-dns-dashddi</strong> Python plugin that enables Let's Encrypt DNS-01 challenge automation via DashDDI's API.</p>
     </div>
 </div>
 
@@ -139,6 +409,7 @@
             <a href="#overview" class="list-group-item list-group-item-action py-1">Overview</a>
             <a href="#dns-integration" class="list-group-item list-group-item-action py-1">DNS / BIND</a>
             <a href="#dhcp-integration" class="list-group-item list-group-item-action py-1">DHCP / Kea</a>
+            <a href="#kea-lease-notifications" class="list-group-item list-group-item-action py-1 ps-4">↳ Lease notifications</a>
             <a href="#clearpass" class="list-group-item list-group-item-action py-1">ClearPass</a>
             <a href="#snipeit" class="list-group-item list-group-item-action py-1">Snipe-IT</a>
             <a href="#aruba" class="list-group-item list-group-item-action py-1">Aruba CX</a>

@@ -114,6 +114,7 @@
             <li><strong>Scheduled</strong> — configure a cron schedule for the DNS push task under <strong>Other Settings → Scheduler</strong></li>
         </ol>
         <p class="mt-2 mb-0">The push connects to the DNS server via SSH using the generated SSH key pair, uploads zone files, and reloads BIND. Results are logged in <strong>Servers → Push Logs</strong>.</p>
+        <p class="mt-2 mb-0 text-muted small">For initial BIND server configuration — SSH key installation, <code>named.conf</code> include directives, and zone file layout — see the <a href="{{ path('user_guide_integrations') }}#dns-bind">DNS/BIND integration guide</a>.</p>
     </div>
 </div>
 
