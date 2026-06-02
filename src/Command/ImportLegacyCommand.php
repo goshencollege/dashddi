@@ -256,6 +256,8 @@ class ImportLegacyCommand extends Command
         foreach ($pdo->query('SELECT zID, name FROM zone ORDER BY zID')->fetchAll() as $row) {
             $domain = new Domain();
             $domain->setName(preg_replace('/^db\./', '', $row['name']));
+            $domain->setSoaNameserver('dns1.goshen.edu');
+            $domain->setSoaEmail('hostmaster@goshen.edu');
             $map[(int) $row['zID']] = $domain;
             if (!$dryRun) {
                 $this->em->persist($domain);
@@ -415,6 +417,8 @@ class ImportLegacyCommand extends Command
         $subnet->setName($name);
         $subnet->setVlan($vlan ?: null);
         $subnet->setIpv4Cidr($cidr);
+        $subnet->setSoaNameserver('dns1.goshen.edu');
+        $subnet->setSoaEmail('hostmaster@goshen.edu');
 
         if ($networkIp !== null && $cidr !== null) {
             $prefixLen  = (int) explode('/', $cidr)[1];
