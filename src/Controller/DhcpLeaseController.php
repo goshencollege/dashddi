@@ -91,17 +91,25 @@ class DhcpLeaseController extends AbstractController
             return null;
         }
 
+        $bestSubnet = null;
+        $bestPrefixLen = -1;
+
         foreach ($subnetRepo->findAll() as $subnet) {
             $cidr = ($parsed instanceof IPv6) ? $subnet->getIpv6Cidr() : $subnet->getIpv4Cidr();
             if ($cidr === null) {
                 continue;
             }
             $range = IpFactory::parseRangeString($cidr);
-            if ($range !== null && $range->contains($parsed)) {
-                return $subnet;
+            if ($range === null || !$range->contains($parsed)) {
+                continue;
+            }
+            $prefixLen = (int) substr($cidr, strrpos($cidr, '/') + 1);
+            if ($prefixLen > $bestPrefixLen) {
+                $bestPrefixLen = $prefixLen;
+                $bestSubnet = $subnet;
             }
         }
 
-        return null;
+        return $bestSubnet;
     }
 }
