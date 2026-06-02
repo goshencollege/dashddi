@@ -48,7 +48,7 @@ jobs:
 
       - name: Create test environment file
         run: |
-          printf 'APP_ENCRYPTION_KEY=%s\nDATABASE_URL="mysql://dash:testpassword@127.0.0.1:3306/dashddi_test?serverVersion=8.0&charset=utf8mb4"\n' \
+          printf 'APP_ENCRYPTION_KEY=%s\nDATABASE_URL="mysql://dash:testpassword@127.0.0.1:3306/dashddi?serverVersion=8.0&charset=utf8mb4"\n' \
             "$(openssl rand -base64 32)" > .env.test.local
 
       - name: Create test database
