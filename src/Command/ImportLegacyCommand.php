@@ -172,6 +172,7 @@ class ImportLegacyCommand extends Command
             'building',
             'snipe_it_category_subnet_map',
             'snipe_it_server',
+            'vrf',
         ];
 
         $conn->executeStatement('SET FOREIGN_KEY_CHECKS=0');
