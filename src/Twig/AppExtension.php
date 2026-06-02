@@ -25,10 +25,10 @@ class AppExtension extends AbstractExtension
     {
         $user = $this->security->getUser();
         if (!$user) {
-            return 'light';
+            return 'purple';
         }
 
         $pref = $this->prefRepo->findByIdentifier($user->getUserIdentifier());
-        return $pref?->getTheme() ?? 'light';
+        return $pref?->getTheme() ?? 'purple';
     }
 }

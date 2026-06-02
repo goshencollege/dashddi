@@ -18,7 +18,7 @@ class UserPreference
     private string $userIdentifier;
 
     #[ORM\Column(length: 16)]
-    private string $theme = 'light';
+    private string $theme = 'purple';
 
     #[ORM\Column(length: 16)]
     private string $hostViewMode = 'host';
