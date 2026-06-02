@@ -372,12 +372,12 @@ curl -s -X POST https://dashddi.example.com/api/dhcp/lease \
             <table class="table table-sm table-bordered mb-0">
                 <thead><tr><th>Method</th><th>Used for</th><th>Requirements</th></tr></thead>
                 <tbody>
-                    <tr><td>REST API</td><td>Port info retrieval (primary)</td><td>Username + Password</td></tr>
-                    <tr><td>SSH</td><td>Port info retrieval (fallback), all port actions</td><td>Username + Password or SSH Private Key</td></tr>
+                    <tr><td>REST API</td><td>Port info retrieval (primary); bounce port (primary)</td><td>Username + Password</td></tr>
+                    <tr><td>SSH</td><td>Port info retrieval (fallback); bounce port (fallback); reauthenticate; PoE bounce</td><td>Username + Password or SSH Private Key</td></tr>
                 </tbody>
             </table>
         </div>
-        <p class="mb-3">DashDDI tries REST first for queries and falls back to SSH on failure. Port actions (bounce, reauthenticate, PoE bounce) always use SSH.</p>
+        <p class="mb-3">DashDDI tries REST first for port info queries and for bounce port, falling back to SSH if the REST call fails. Reauthenticate and PoE bounce always use SSH.</p>
 
         <h6>Usage flow</h6>
         <ol class="mb-3">
