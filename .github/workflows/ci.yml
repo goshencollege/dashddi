@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      db:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: dashddi
+          MYSQL_USER: dash
+          MYSQL_PASSWORD: testpassword
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo, pdo_mysql, intl
+          coverage: none
+
+      - name: Cache Composer packages
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: composer-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-
+
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Create test environment file
+        run: |
+          printf 'APP_ENCRYPTION_KEY=%s\nDATABASE_URL="mysql://dash:testpassword@127.0.0.1:3306/dashddi_test?serverVersion=8.0&charset=utf8mb4"\n' \
+            "$(openssl rand -base64 32)" > .env.test.local
+
+      - name: Create test database
+        run: |
+          mysql -u root -proot -h 127.0.0.1 --protocol=TCP -e \
+            "CREATE DATABASE IF NOT EXISTS \`dashddi_test\`;
+             GRANT ALL PRIVILEGES ON \`dashddi_test\`.* TO 'dash'@'%';
+             FLUSH PRIVILEGES;"
+
+      - name: Run migrations
+        run: php bin/console doctrine:migrations:migrate --env=test --no-interaction --allow-no-migration
+
+      - name: Load test fixtures
+        run: php bin/console doctrine:fixtures:load --env=test --group=test --no-interaction
+
+      - name: Run tests
+        run: php vendor/bin/phpunit
