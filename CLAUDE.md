@@ -142,6 +142,22 @@ tests/Functional/
 | `Entity/Trait/AuditableTraitTest` | all getters/setters, null acceptance |
 | `Validator/UniqueMacAddressValidatorTest` | zero-MAC pass-through, unique/duplicate MAC, self-edit, non-interface value |
 
+### Documentation
+
+Whenever a feature is added or changed, update the relevant user guide page(s) in `templates/user_guide/`. The guide pages map to app areas as follows:
+
+| Guide page | Covers |
+|---|---|
+| `hosts.html.twig` | Hosts, interfaces, bulk operations, deleted-host restore |
+| `subnets.html.twig` | Subnets, address blocks, VRFs, import |
+| `dns.html.twig` | Domains, records, views, ACLs, DNSSEC, zone import |
+| `dhcp.html.twig` | DHCP config generation, pushing config, leases, ClearPass auth logs |
+| `servers.html.twig` | DNS/DHCP servers, push logs, worker queue, scheduled tasks |
+| `integrations.html.twig` | Server-side setup for BIND, Kea, ClearPass, Snipe-IT, Aruba CX, REST API |
+| `settings.html.twig` | Buildings, tags, app settings, backup/restore, API tokens, SAML, themes |
+
+If a new section is added to a guide page, add it to the on-page nav (the sticky `list-group` in `col-lg-3`). If a new app page is created, add a contextual help link following the `btn btn-sm btn-outline-secondary` + `bi-question-circle` pattern used on all other pages.
+
 ### Rules for new features
 
 Every new **Service**, **Validator**, or **Entity trait** must ship with a corresponding unit test file in `tests/Unit/`. The test file goes in the matching subdirectory and is named `<ClassName>Test.php`.
