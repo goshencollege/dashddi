@@ -1,4 +1,4 @@
-.PHONY: up down restart bash migrate cc logs db-shell cert reset test-setup test upgrade
+.PHONY: up down restart bash migrate cc logs db-shell cert cert-install reset test-setup test upgrade
 
 COMPOSE := $(if $(wildcard docker-compose.prod.yml),docker-compose.prod.yml,docker-compose.dev.yml)
 
@@ -43,8 +43,7 @@ reset:
 		if [ "$$confirm" != "y" ] && [ "$$confirm" != "Y" ]; then printf 'Aborted.\n'; exit 1; fi; \
 	fi
 	docker compose -f $(COMPOSE) down -v
-	@PROJECT=$$(docker compose -f $(COMPOSE) config 2>/dev/null | awk '/^name:/{print $$2}'); \
-	docker run --rm -v $${PROJECT}_ssl_certs:/ssl -v $(CURDIR)/docker/ssl:/src:ro alpine sh -c 'cp /src/cert.pem /src/key.pem /ssl/ && chmod 644 /ssl/*.pem'
+	$(MAKE) cert-install
 	docker compose -f $(COMPOSE) up -d --build
 	@echo "Waiting for app container…"
 	@until docker compose -f $(COMPOSE) exec -T app php -r 'echo "ok";' 2>/dev/null | grep -q ok; do sleep 2; done
@@ -76,3 +75,9 @@ cert:
 	  -out  docker/ssl/cert.pem \
 	  -subj "/CN=ipam.local" \
 	  -addext "subjectAltName=DNS:ipam.local,DNS:localhost,IP:127.0.0.1"
+	$(MAKE) cert-install
+
+cert-install:
+	@PROJECT=$$(docker compose -f $(COMPOSE) config 2>/dev/null | awk '/^name:/{print $$2}'); \
+	docker run --rm -v $${PROJECT}_ssl_certs:/ssl -v $(CURDIR)/docker/ssl:/src:ro alpine sh -c 'cp /src/cert.pem /src/key.pem /ssl/ && chmod 644 /ssl/*.pem'
+	docker compose -f $(COMPOSE) restart nginx 2>/dev/null || true
