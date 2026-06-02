@@ -55,7 +55,7 @@
             <dt class="col-sm-3">VRF</dt>
             <dd class="col-sm-9">The Virtual Routing and Forwarding instance this subnet belongs to, if your network uses VRFs for traffic isolation.</dd>
             <dt class="col-sm-3">DNS Views</dt>
-            <dd class="col-sm-9">Associate this subnet with one or more DNS views for split-DNS configurations.</dd>
+            <dd class="col-sm-9">Associate this subnet with one or more DNS views. The reverse zone for this subnet will be generated for the selected views only.</dd>
             <dt class="col-sm-3">DNSSEC Policy</dt>
             <dd class="col-sm-9">Apply a DNSSEC policy for inline zone signing of records in this subnet.</dd>
             <dt class="col-sm-3">Is Container</dt>
@@ -67,6 +67,26 @@
             <dt class="col-sm-3">Tags</dt>
             <dd class="col-sm-9">Labels for grouping and filtering subnets.</dd>
         </dl>
+
+        <h6 class="mt-4">Reverse Zone SOA</h6>
+        <p>These fields populate the SOA (Start of Authority) record for this subnet's automatically generated reverse DNS zone (e.g. <code>1.168.192.in-addr.arpa</code>). All fields are optional — leave them blank to omit the reverse SOA from the generated zone file.</p>
+        <dl class="row mb-0">
+            <dt class="col-sm-3">SOA Nameserver</dt>
+            <dd class="col-sm-9">The primary nameserver for the reverse zone, e.g. <code>ns1.example.com.</code> (include the trailing dot).</dd>
+            <dt class="col-sm-3">SOA Email</dt>
+            <dd class="col-sm-9">The zone administrator email in DNS format, e.g. <code>hostmaster.example.com.</code> (replace the <code>@</code> with a dot and include the trailing dot).</dd>
+            <dt class="col-sm-3">SOA Refresh</dt>
+            <dd class="col-sm-9">How often secondary nameservers check for updates, in seconds (e.g. <code>3600</code>).</dd>
+            <dt class="col-sm-3">SOA Retry</dt>
+            <dd class="col-sm-9">How long a secondary waits before retrying a failed refresh, in seconds (e.g. <code>900</code>).</dd>
+            <dt class="col-sm-3">SOA Expire</dt>
+            <dd class="col-sm-9">How long a secondary continues serving the zone if the primary is unreachable, in seconds (e.g. <code>604800</code>).</dd>
+            <dt class="col-sm-3">SOA TTL</dt>
+            <dd class="col-sm-9">The default TTL for records in the reverse zone, in seconds (e.g. <code>300</code>).</dd>
+        </dl>
+
+        <h6 class="mt-4">Initial Address Blocks</h6>
+        <p class="mb-0">When creating a new subnet, the form includes optional inline fields to define a <strong>Reserved Block</strong> and a <strong>Fixed Block</strong> immediately — saving a trip to a separate form after saving. Enter a start IP, end IP, and optional label for each block you want to create. Leave the fields blank to skip. Additional blocks can always be added later from the subnet detail page.</p>
     </div>
 </div>
 
