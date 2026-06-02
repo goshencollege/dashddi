@@ -328,14 +328,15 @@ class SubnetRepository extends ServiceEntityRepository
         usort($ids, function (int $aId, int $bId) use ($subnetById, $cidrMethod, $version): int {
             [$aIp, $aPrefix] = explode('/', $subnetById[$aId]->$cidrMethod());
             [$bIp, $bPrefix] = explode('/', $subnetById[$bId]->$cidrMethod());
-            $prefixDiff = (int) $aPrefix - (int) $bPrefix;
-            if ($prefixDiff !== 0) {
-                return $prefixDiff;
-            }
             if ($version === 'ipv4') {
-                return ip2long($aIp) <=> ip2long($bIp);
+                $ipDiff = ip2long($aIp) <=> ip2long($bIp);
+            } else {
+                $ipDiff = strcmp((string) inet_pton($aIp), (string) inet_pton($bIp));
             }
-            return strcmp((string) inet_pton($aIp), (string) inet_pton($bIp));
+            if ($ipDiff !== 0) {
+                return $ipDiff;
+            }
+            return (int) $aPrefix - (int) $bPrefix;
         });
     }
 
