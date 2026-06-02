@@ -748,9 +748,12 @@ class ImportLegacyCommand extends Command
             ['name' => "192's",                   'ipv4' => '192.168.0.0/16',    'ipv6' => '2001:18e8:408::/56',    'vlan' => null, 'gateway' => null,            'container' => true],
             ['name' => 'vlan44',                  'ipv4' => null,                'ipv6' => null,                    'vlan' => 44,   'gateway' => null,            'container' => false],
             ['name' => 'Siemens EMS',             'ipv4' => '192.168.253.0/24',  'ipv6' => null,                    'vlan' => null, 'gateway' => null,            'container' => false],
+            ['name' => 'Valpo',                   'ipv4' => '192.168.59.0/24',   'ipv6' => '2001:18e8:408:3b/64',   'vlan' => null, 'gateway' => null,            'container' => false],
+            ['name' => 'iLO',                     'ipv4' => '192.168.61.0/24',   'ipv6' => '2001:18e8:408:3d/64',   'vlan' => 61,   'gateway' => null,            'container' => false],
             ['name' => 'EMP_INST',                'ipv4' => '192.168.112.0/22',  'ipv6' => '2001:18e8:408:70/64',   'vlan' => 112,  'gateway' => null,            'container' => false],
             ['name' => 'EMP_BYOD',                'ipv4' => '192.168.116.0/22',  'ipv6' => '2001:18e8:408:74/64',   'vlan' => 116,  'gateway' => null,            'container' => false],
             ['name' => 'EMP_JENZ',                'ipv4' => '192.168.121.0/24',  'ipv6' => '2001:18e8:408:79::/64', 'vlan' => 121,  'gateway' => null,            'container' => false],
+            ['name' => 'WIFI_128',                'ipv4' => '192.168.128.0/19',  'ipv6' => '2001:18e8:408:80::/64', 'vlan' => 128,  'gateway' => null,            'container' => false],
         ];
 
         $datacenterCidrs = [
@@ -782,7 +785,7 @@ class ImportLegacyCommand extends Command
         $io->writeln(sprintf('  %d additional subnets', count($seedSubnets)));
 
         // Address blocks for subnets that need them
-        foreach (['Siemens EMS', 'EMP_INST', 'EMP_JENZ'] as $subnetName) {
+        foreach (['Siemens EMS', 'Valpo', 'iLO', 'EMP_INST', 'EMP_BYOD', 'EMP_JENZ', 'WIFI_128'] as $subnetName) {
             $subnet = $seedSubnets[$subnetName];
             $cidr   = $subnet->getIpv4Cidr();
             [$networkIp, $prefixLen] = explode('/', $cidr);
