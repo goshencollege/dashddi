@@ -796,12 +796,12 @@ class ImportLegacyCommand extends Command
             $fixed->setSubnet($subnet);
             $fixed->setType(BlockType::Fixed);
             $fixed->setStartIp(long2ip($base + 11));
-            $fixed->setEndIp(long2ip($base + 15));
+            $fixed->setEndIp(long2ip($base + 50));
 
             $dynamic = new AddressBlock();
             $dynamic->setSubnet($subnet);
             $dynamic->setType(BlockType::Dynamic);
-            $dynamic->setStartIp(long2ip($base + 16));
+            $dynamic->setStartIp(long2ip($base + 51));
             $dynamic->setEndIp(long2ip($lastUsableLong));
 
             if (!$dryRun) {
