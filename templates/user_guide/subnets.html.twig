@@ -44,6 +44,8 @@
         <dl class="row mb-0">
             <dt class="col-sm-3">Name <span class="text-danger">*</span></dt>
             <dd class="col-sm-9">A human-readable label, e.g. <code>Server Room A</code> or <code>Student WiFi</code>.</dd>
+            <dt class="col-sm-3">Is Container</dt>
+            <dd class="col-sm-9">Mark this subnet as a supernet (container) that holds smaller subnets. Container subnets don't have individual IP allocations and don't appear in DHCP config. When checked, the Lease Retention field is hidden.</dd>
             <dt class="col-sm-3">IPv4 CIDR</dt>
             <dd class="col-sm-9">The IPv4 address range in CIDR notation, e.g. <code>10.1.2.0/24</code>. Leave blank for IPv6-only subnets.</dd>
             <dt class="col-sm-3">IPv6 CIDR</dt>
@@ -54,14 +56,6 @@
             <dd class="col-sm-9">The VLAN ID (1–4094) associated with this subnet. Informational only — DashDDI does not configure switch VLANs.</dd>
             <dt class="col-sm-3">VRF</dt>
             <dd class="col-sm-9">The Virtual Routing and Forwarding instance this subnet belongs to, if your network uses VRFs for traffic isolation.</dd>
-            <dt class="col-sm-3">DNS Views</dt>
-            <dd class="col-sm-9">Associate this subnet with one or more DNS views. The reverse zone for this subnet will be generated for the selected views only.</dd>
-            <dt class="col-sm-3">DNSSEC Policy</dt>
-            <dd class="col-sm-9">Apply a DNSSEC policy for inline zone signing of records in this subnet.</dd>
-            <dt class="col-sm-3">Is Container</dt>
-            <dd class="col-sm-9">Mark this subnet as a supernet (container) that holds smaller subnets. Container subnets don't have individual IP allocations and don't appear in DHCP config.</dd>
-            <dt class="col-sm-3">Lease Retention</dt>
-            <dd class="col-sm-9">How long (in days) to keep soft-deleted hosts and interfaces from this subnet before permanently purging them. Overrides the application-wide default.</dd>
             <dt class="col-sm-3">Description</dt>
             <dd class="col-sm-9">Free-text notes shown on the subnet detail page.</dd>
             <dt class="col-sm-3">Tags</dt>
@@ -83,6 +77,21 @@
             <dd class="col-sm-9">How long a secondary continues serving the zone if the primary is unreachable, in seconds (e.g. <code>604800</code>).</dd>
             <dt class="col-sm-3">SOA TTL</dt>
             <dd class="col-sm-9">The default TTL for records in the reverse zone, in seconds (e.g. <code>300</code>).</dd>
+        </dl>
+
+        <h6 class="mt-4">DNS Views</h6>
+        <p class="mb-0">Associate this subnet with one or more DNS views. The reverse zone for this subnet will be generated for the selected views only.</p>
+
+        <h6 class="mt-4">DNSSEC</h6>
+        <dl class="row mb-0">
+            <dt class="col-sm-3">DNSSEC Policy</dt>
+            <dd class="col-sm-9">Apply a DNSSEC policy for inline zone signing of records in this subnet. Policies are defined under <strong>DNS → DNSSEC Policies</strong>.</dd>
+        </dl>
+
+        <h6 class="mt-4">DHCP Lease Log</h6>
+        <dl class="row mb-0">
+            <dt class="col-sm-3">Lease Retention</dt>
+            <dd class="col-sm-9">How long (in days) to keep soft-deleted hosts and interfaces from this subnet before permanently purging them. Overrides the application-wide default. Hidden when <em>Is Container</em> is checked.</dd>
         </dl>
 
         <h6 class="mt-4">Initial Address Blocks</h6>
