@@ -27,7 +27,7 @@
     <div class="card-body text-muted small">
         <i class="bi bi-info-circle me-1"></i>
         To activate automatic scheduling, add the following to your system crontab (run every minute):
-        <code class="ms-2">* * * * * /usr/bin/docker compose -f {{ projectDir }}/docker-compose.{{ appEnv }}.yml exec -T app php bin/console app:run-scheduled-tasks &gt;&gt; /var/log/dashddi-scheduler.log 2&gt;&amp;1</code>
+        <code class="ms-2">* * * * * /usr/bin/docker compose -f /path/to/dashddi/docker-compose.{{ appEnv }}.yml exec -T app php bin/console app:run-scheduled-tasks &gt;&gt; /var/log/dashddi-scheduler.log 2&gt;&amp;1</code>
     </div>
 </div>
 
