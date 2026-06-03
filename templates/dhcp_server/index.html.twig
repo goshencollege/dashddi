@@ -34,6 +34,7 @@
                         <th>Hostname / IP</th>
                         <th>SSH User</th>
                         <th>Remote Path</th>
+                        <th>Versions</th>
                         <th>SSH Key</th>
                         <th>Description</th>
                         <th class="text-end">Actions</th>
@@ -46,6 +47,15 @@
                             <td class="font-monospace">{{ server.hostname }}</td>
                             <td class="font-monospace">{{ server.sshUser }}</td>
                             <td class="font-monospace">{{ server.remotePath }}</td>
+                            <td>
+                                {% if server.versionScope == 'v4' %}
+                                    <span class="badge bg-primary">IPv4 only</span>
+                                {% elseif server.versionScope == 'v6' %}
+                                    <span class="badge bg-info text-dark">IPv6 only</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">IPv4 + IPv6</span>
+                                {% endif %}
+                            </td>
                             <td class="font-monospace small text-muted">{{ server.sshKeyPath }}</td>
                             <td class="text-muted">{{ server.description ?: '—' }}</td>
                             <td class="text-end">
