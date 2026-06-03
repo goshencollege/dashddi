@@ -16,7 +16,21 @@
             <div class="card-body">
                 {{ form_start(form) }}
 
-                {% for field in ['name', 'hostname', 'sshUser', 'remotePath', 'controlUrl', 'controlUser', 'controlPassword', 'description'] %}
+                {% for field in ['name', 'hostname', 'sshUser', 'remotePath'] %}
+                    <div class="mb-3">
+                        {{ form_label(form[field], null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                        {{ form_widget(form[field], {attr: {class: 'form-control' ~ (form[field].vars.errors|length ? ' is-invalid' : '')}}) }}
+                        {{ form_errors(form[field]) }}
+                    </div>
+                {% endfor %}
+
+                <div class="mb-3">
+                    {{ form_label(form.versionScope, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                    {{ form_widget(form.versionScope, {attr: {class: 'form-select' ~ (form.versionScope.vars.errors|length ? ' is-invalid' : '')}}) }}
+                    {{ form_errors(form.versionScope) }}
+                </div>
+
+                {% for field in ['controlUrl', 'controlUser', 'controlPassword', 'description'] %}
                     <div class="mb-3">
                         {{ form_label(form[field], null, {label_attr: {class: 'form-label fw-semibold'}}) }}
                         {{ form_widget(form[field], {attr: {class: 'form-control' ~ (form[field].vars.errors|length ? ' is-invalid' : '')}}) }}

@@ -38,7 +38,16 @@ class DhcpDeployService
     public function deployToServer(DhcpServer $server, bool $reload = true): array
     {
         $sftp  = $this->getSftp($server);
-        $files = $this->generateFiles(sys_get_temp_dir() . '/dhcp');
+        $scope = $server->getVersionScope();
+        $files = array_filter(
+            $this->generateFiles(sys_get_temp_dir() . '/dhcp'),
+            fn($type) => match ($scope) {
+                'v4'    => $type === 'dhcp4',
+                'v6'    => $type === 'dhcp6',
+                default => true,
+            },
+            ARRAY_FILTER_USE_KEY,
+        );
         $results = [];
 
         foreach ($files as $type => $localFile) {
