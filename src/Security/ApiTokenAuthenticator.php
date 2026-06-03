@@ -53,6 +53,14 @@ class ApiTokenAuthenticator extends AbstractAuthenticator
             throw new CustomUserMessageAuthenticationException('Token has expired.');
         }
 
+        if (!$token->isAllowedOnRoute($request->attributes->get('_route', ''))) {
+            throw new CustomUserMessageAuthenticationException('Token not permitted for this endpoint.');
+        }
+
+        if (!$token->isAllowedFromIp((string) $request->getClientIp())) {
+            throw new CustomUserMessageAuthenticationException('Token not permitted from this IP address.');
+        }
+
         $request->attributes->set('_api_token', $token);
 
         return new SelfValidatingPassport(
@@ -63,15 +71,6 @@ class ApiTokenAuthenticator extends AbstractAuthenticator
     public function onAuthenticationSuccess(Request $request, TokenInterface $token, string $firewallName): ?Response
     {
         $apiToken = $request->attributes->get('_api_token');
-
-        if ($apiToken && !$apiToken->isAllowedOnRoute($request->attributes->get('_route', ''))) {
-            return new JsonResponse(['error' => 'Token not permitted for this endpoint.'], Response::HTTP_FORBIDDEN);
-        }
-
-        if ($apiToken && !$apiToken->isAllowedFromIp((string) $request->getClientIp())) {
-            return new JsonResponse(['error' => 'Token not permitted from this IP address.'], Response::HTTP_FORBIDDEN);
-        }
-
         if ($apiToken) {
             $apiToken->setLastUsedAt(new \DateTimeImmutable());
             $this->em->flush();
