@@ -163,7 +163,7 @@
         <p class="mb-3">Go to <strong>Other Settings → API Tokens</strong>, create a new token, and grant it permission for the <code>POST /api/dhcp/lease</code> route. Copy the token value — it is shown only once.</p>
 
         <p><strong>Step 2 — Create the notify script on the Kea server</strong></p>
-        <p>Create <code>/etc/kea/notify-dashddi.sh</code> on the Kea server and make it executable (<code>chmod +x</code>):</p>
+        <p>Create <code>/usr/share/kea/scripts/notify-dashddi.sh</code> on the Kea server and make it executable (<code>chmod +x</code>):</p>
         <pre class="bg-body-secondary rounded p-3 small mb-3"><code>#!/bin/bash
 # Called by Kea run_script hook on lease4_select and lease4_renew events
 if [[ "$LEASES4_AT0_ADDRESS" == "" ]]; then exit 0; fi
@@ -177,7 +177,7 @@ curl -s -X POST https://dashddi.example.com/api/dhcp/lease \
     \"hostname\": \"$LEASES4_AT0_HOSTNAME\",
     \"expire\": $LEASES4_AT0_CLTT
   }"</code></pre>
-        <p class="mb-3">Replace <code>dashddi.example.com</code> with your DashDDI hostname and <code>&lt;YOUR_API_TOKEN&gt;</code> with the token from step 1.</p>
+        <p class="mb-3">Replace <code>dashddi.example.com</code> with your DashDDI hostname and <code>&lt;YOUR_API_TOKEN&gt;</code> with the token from step 1. The script must reside under <code>/usr/share/kea/scripts/</code> — some versions of the <code>run_script</code> hook reject scripts placed elsewhere (e.g. <code>/etc/kea</code>).</p>
 
         <p><strong>Step 3 — Add the hook to <code>kea-dhcp4.conf</code></strong></p>
         <p>Add the <code>run_script</code> hook to the <code>hooks-libraries</code> array in your Kea DHCPv4 configuration:</p>
@@ -185,7 +185,7 @@ curl -s -X POST https://dashddi.example.com/api/dhcp/lease \
     {
         "library": "/usr/lib/kea/hooks/libdhcp_run_script.so",
         "parameters": {
-            "name": "/etc/kea/notify-dashddi.sh",
+            "name": "/usr/share/kea/scripts/notify-dashddi.sh",
             "sync": false
         }
     }

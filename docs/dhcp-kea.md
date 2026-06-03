@@ -129,7 +129,9 @@ HTTP `201 Created` on success. HTTP `400 Bad Request` if `ip-address` or `hw-add
 
 Use the Kea **`run_script`** hook library (Kea 2.2+) or the **`lease_cmds`** + a custom script to POST lease events to DashDDI. A minimal example using `run_script`:
 
-**`/etc/kea/notify-dashddi.sh`:**
+> **Note:** Some versions of the `run_script` hook enforce that scripts must reside under `/usr/share/kea/scripts/`. If Kea fails to start with `RUN_SCRIPT_LOAD_ERROR invalid path specified`, place your script there instead of `/etc/kea/`.
+
+**`/usr/share/kea/scripts/notify-dashddi.sh`:**
 ```bash
 #!/bin/bash
 # Called by Kea run_script hook on lease4_select and lease4_renew events
@@ -152,7 +154,7 @@ In `kea-dhcp4.conf`:
     {
         "library": "/usr/lib/kea/hooks/libdhcp_run_script.so",
         "parameters": {
-            "name": "/etc/kea/notify-dashddi.sh",
+            "name": "/usr/share/kea/scripts/notify-dashddi.sh",
             "sync": false
         }
     }
