@@ -98,6 +98,26 @@ class DhcpServerController extends AbstractController
         return $this->redirectToRoute('dhcp_server_index');
     }
 
+    #[Route('/{id}/test-ssh', name: 'dhcp_server_test_ssh', methods: ['POST'])]
+    public function testSsh(Request $request, DhcpServer $server): JsonResponse
+    {
+        if (!$this->isCsrfTokenValid('test_ssh_dhcp_' . $server->getId(), $request->request->get('_token'))) {
+            return $this->json(['error' => 'Invalid CSRF token.'], 403);
+        }
+
+        if (!$server->getSshPrivateKey()) {
+            return $this->json(['error' => 'No SSH key configured for this server.'], 400);
+        }
+
+        $result = $this->sshKeys->testConnection(
+            $server->getHostname(),
+            $server->getSshUser(),
+            $server->getSshPrivateKey(),
+        );
+
+        return $this->json($result);
+    }
+
     #[Route('/push', name: 'dhcp_server_push', methods: ['POST'])]
     public function push(DhcpServerRepository $repo, MessageBusInterface $bus): JsonResponse
     {
