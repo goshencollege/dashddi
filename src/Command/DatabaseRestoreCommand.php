@@ -45,7 +45,7 @@ class DatabaseRestoreCommand extends Command
         $settings = $this->settingRepo->getInstance();
         $filePath = $input->getArgument('file');
 
-        $backupPassword = $input->getOption('backup-password') ?? '';
+        $backupPassword = $input->getOption('backup-password') ?? getenv('BACKUP_PASSWORD') ?: '';
         $cifsServer     = $input->getOption('cifs-server')     ?? $settings->getCifsServer()   ?? '';
         $cifsUser       = $input->getOption('cifs-user')       ?? $settings->getCifsUsername() ?? '';
         $cifsPassword   = $input->getOption('cifs-password')   ?? $settings->getCifsPassword() ?? '';

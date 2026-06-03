@@ -104,12 +104,12 @@ class BackupController extends AbstractController
 
         $consolePath = $this->getParameter('kernel.project_dir') . '/bin/console';
         $args        = ['php', $consolePath, 'app:database:restore', $tmpPath, '--no-interaction'];
-        if ($password !== '') {
-            $args[] = '--backup-password=' . $password;
-        }
 
         $process = new Process($args);
         $process->setTimeout(600);
+        if ($password !== '') {
+            $process->setEnv(['BACKUP_PASSWORD' => $password]);
+        }
         $process->run();
 
         @unlink($tmpPath);
@@ -156,12 +156,12 @@ class BackupController extends AbstractController
 
         $consolePath = $this->getParameter('kernel.project_dir') . '/bin/console';
         $args        = ['php', $consolePath, 'app:database:restore', $filePath, '--no-interaction'];
-        if ($isEncrypted) {
-            $args[] = '--backup-password=' . $password;
-        }
 
         $process = new Process($args);
         $process->setTimeout(600);
+        if ($isEncrypted) {
+            $process->setEnv(['BACKUP_PASSWORD' => $password]);
+        }
         $process->run();
 
         if ($process->isSuccessful()) {
