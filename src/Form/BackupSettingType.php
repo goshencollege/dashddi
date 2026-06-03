@@ -53,7 +53,7 @@ class BackupSettingType extends AbstractType
                 'label'    => 'CIFS Subdirectory',
                 'required' => false,
                 'attr'     => ['placeholder' => 'backups', 'class' => 'form-control'],
-                'help'     => 'Optional subdirectory within the share to store backup files.',
+                'help'     => 'Optional subdirectory within the share to store backup files. Allowed characters: letters, numbers, hyphens, underscores, dots, forward slashes.',
             ])
             ->add('decryptFields', CheckboxType::class, [
                 'label'    => 'Decrypt encrypted database fields',

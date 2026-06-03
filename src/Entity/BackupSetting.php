@@ -4,6 +4,7 @@ namespace App\Entity;
 
 use App\Repository\BackupSettingRepository;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: BackupSettingRepository::class)]
 #[ORM\Table(name: 'backup_setting')]
@@ -32,6 +33,7 @@ class BackupSetting
 
     /** Subdirectory within the CIFS share, e.g. "backups" */
     #[ORM\Column(length: 255, nullable: true)]
+    #[Assert\Regex(pattern: '/^[a-zA-Z0-9_\-\/\.]*$/', message: 'Subdirectory may only contain letters, numbers, hyphens, underscores, dots, and forward slashes.')]
     private ?string $cifsSubdir = null;
 
     /** Decrypt encrypted DB fields in the backup (produces human-readable SQL) */

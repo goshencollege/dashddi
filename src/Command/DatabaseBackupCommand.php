@@ -78,6 +78,11 @@ class DatabaseBackupCommand extends Command
             ? (int) $input->getOption('retention')
             : $settings->getRetentionCount();
 
+        if ($cifsSubdir !== '' && !preg_match('/^[a-zA-Z0-9_\-\/\.]*$/', $cifsSubdir)) {
+            $io->error('Invalid CIFS subdirectory. Allowed characters: letters, numbers, hyphens, underscores, dots, forward slashes.');
+            return Command::FAILURE;
+        }
+
         if ($encryptBackup && $backupPassword === '') {
             $io->error('Backup encryption requires a password. Set --backup-password or configure one in Backup Settings.');
             return Command::FAILURE;
