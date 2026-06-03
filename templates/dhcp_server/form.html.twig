@@ -35,6 +35,23 @@
         </div>
 
         {% if server.id %}
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-terminal me-2"></i>Test SSH Connection</h5>
+                <button type="button" class="btn btn-sm btn-outline-primary" id="ssh-test-btn"
+                        onclick="runSshTest('{{ path('dhcp_server_test_ssh', {id: server.id}) }}', '{{ csrf_token('test_ssh_dhcp_' ~ server.id) }}')">
+                    <i class="bi bi-play me-1"></i>Test Connection
+                </button>
+            </div>
+            <div class="card-body">
+                <div id="ssh-test-result" class="d-none">
+                    <div id="ssh-test-alert" class="alert mb-2"></div>
+                    <pre id="ssh-test-detail" class="bg-body-secondary rounded p-3 small mb-0" style="white-space: pre-wrap; max-height: 300px; overflow-y: auto;"></pre>
+                </div>
+                <p class="text-muted small mb-0" id="ssh-test-hint">Tests the SSH connection using the stored key. Results appear here without leaving the page.</p>
+            </div>
+        </div>
+
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0"><i class="bi bi-key me-2"></i>SSH Public Key</h5>
@@ -64,4 +81,62 @@
         {% endif %}
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function runSshTest(url, token) {
+    const btn    = document.getElementById('ssh-test-btn');
+    const result = document.getElementById('ssh-test-result');
+    const alert  = document.getElementById('ssh-test-alert');
+    const detail = document.getElementById('ssh-test-detail');
+    const hint   = document.getElementById('ssh-test-hint');
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Testing…';
+    result.classList.add('d-none');
+
+    const body = new URLSearchParams({ _token: token });
+    fetch(url, { method: 'POST', body })
+        .then(r => r.json())
+        .then(data => {
+            hint.classList.add('d-none');
+            result.classList.remove('d-none');
+
+            if (data.error) {
+                alert.className = 'alert alert-danger mb-2';
+                alert.textContent = data.error;
+                detail.textContent = '';
+                detail.classList.add('d-none');
+                return;
+            }
+
+            alert.className = 'alert mb-2 ' + (data.success ? 'alert-success' : 'alert-danger');
+            alert.textContent = data.success ? 'Connection successful.' : 'Connection failed.';
+
+            const lines = [];
+            if (data.serverIdentification) lines.push('Server: ' + data.serverIdentification);
+            if (data.authMethods && data.authMethods.length)
+                lines.push('Auth methods server will accept: ' + data.authMethods.join(', '));
+            if (data.errors && data.errors.length)
+                lines.push('Errors:\n' + data.errors.map(e => '  ' + e).join('\n'));
+            if (data.log && data.log.length)
+                lines.push('Message sequence:\n' + data.log.map(m => '  ' + m).join('\n'));
+
+            detail.textContent = lines.join('\n\n');
+            detail.classList.toggle('d-none', lines.length === 0);
+        })
+        .catch(err => {
+            hint.classList.add('d-none');
+            result.classList.remove('d-none');
+            alert.className = 'alert alert-danger mb-2';
+            alert.textContent = 'Request failed: ' + err.message;
+            detail.classList.add('d-none');
+        })
+        .finally(() => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-play me-1"></i>Test Connection';
+        });
+}
+</script>
 {% endblock %}

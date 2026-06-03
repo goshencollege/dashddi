@@ -34,4 +34,34 @@ class SshKeyService
 
         return $sftp;
     }
+
+    public function testConnection(string $hostname, string $user, string $privateKey): array
+    {
+        if (!defined('NET_SSH2_LOGGING')) {
+            define('NET_SSH2_LOGGING', SFTP::LOG_SIMPLE);
+        }
+
+        $result = [
+            'success'              => false,
+            'serverIdentification' => null,
+            'errors'               => [],
+            'authMethods'          => null,
+            'log'                  => [],
+        ];
+
+        try {
+            $key  = PublicKeyLoader::load($privateKey);
+            $sftp = new SFTP($hostname);
+
+            $result['success']              = $sftp->login($user, $key);
+            $result['serverIdentification'] = $sftp->getServerIdentification() ?: null;
+            $result['errors']               = $sftp->getErrors();
+            $result['authMethods']          = $sftp->getAuthMethodsToContinue();
+            $result['log']                  = (array) ($sftp->getLog() ?: []);
+        } catch (\Throwable $e) {
+            $result['errors'][] = $e->getMessage();
+        }
+
+        return $result;
+    }
 }

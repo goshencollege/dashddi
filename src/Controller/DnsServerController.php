@@ -94,6 +94,26 @@ class DnsServerController extends AbstractController
         return $this->redirectToRoute('dns_server_index');
     }
 
+    #[Route('/{id}/test-ssh', name: 'dns_server_test_ssh', methods: ['POST'])]
+    public function testSsh(Request $request, DnsServer $server): JsonResponse
+    {
+        if (!$this->isCsrfTokenValid('test_ssh_dns_' . $server->getId(), $request->request->get('_token'))) {
+            return $this->json(['error' => 'Invalid CSRF token.'], 403);
+        }
+
+        if (!$server->getSshPrivateKey()) {
+            return $this->json(['error' => 'No SSH key configured for this server.'], 400);
+        }
+
+        $result = $this->sshKeys->testConnection(
+            $server->getHostname(),
+            $server->getSshUser(),
+            $server->getSshPrivateKey(),
+        );
+
+        return $this->json($result);
+    }
+
     #[Route('/push', name: 'dns_server_push', methods: ['POST'])]
     public function push(DnsServerRepository $repo, MessageBusInterface $bus): JsonResponse
     {
