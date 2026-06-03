@@ -98,7 +98,13 @@ class ArubaCxService
     /** Normalise a NAS-Port-ID string to just the interface name ("1/1/5 - ..." → "1/1/5"). */
     public static function normalisePortId(string $portId): string
     {
-        return preg_replace('/[\s,]+.*$/', '', trim($portId)) ?? trim($portId);
+        $normalized = preg_replace('/[\s,]+.*$/', '', trim($portId)) ?? trim($portId);
+
+        if (!preg_match('/^\d+\/\d+\/\d+$/', $normalized)) {
+            throw new \InvalidArgumentException('Invalid port ID: ' . $portId);
+        }
+
+        return $normalized;
     }
 
     private function encodePort(string $portId): string
