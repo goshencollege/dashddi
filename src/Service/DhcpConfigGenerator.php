@@ -16,7 +16,7 @@ class DhcpConfigGenerator
         $subnet4 = [];
 
         foreach ($this->subnetRepository->findAll() as $subnet) {
-            if (!$subnet->getIpv4Cidr()) {
+            if ($subnet->isContainer() || !$subnet->getIpv4Cidr()) {
                 continue;
             }
 
@@ -70,7 +70,7 @@ class DhcpConfigGenerator
         $subnet6 = [];
 
         foreach ($this->subnetRepository->findAll() as $subnet) {
-            if (!$subnet->getIpv6Cidr()) {
+            if ($subnet->isContainer() || !$subnet->getIpv6Cidr()) {
                 continue;
             }
 
