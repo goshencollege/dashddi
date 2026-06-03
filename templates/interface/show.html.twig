@@ -240,13 +240,11 @@
 (function () {
     const statusBtn  = document.getElementById('port-status-btn');
     const statusBody = document.getElementById('port-status-body');
-    const statusUrl    = {{ (path('aruba_switch_port_status') ~ '?portId=' ~ switchInfo.nasPortId|url_encode ~ '&switchIp=' ~ switchInfo.nasIp|url_encode)|json_encode|raw }};
-    const reauthUrl    = {{ path('aruba_switch_port_reauthenticate')|json_encode|raw }};
-    const bounceUrl    = {{ path('aruba_switch_port_bounce')|json_encode|raw }};
-    const poeBounceUrl = {{ path('aruba_switch_port_poe_bounce')|json_encode|raw }};
-    const portId     = {{ switchInfo.nasPortId|json_encode|raw }};
-    const switchIp   = {{ switchInfo.nasIp|json_encode|raw }};
-    const csrfToken  = {{ csrf_token('bounce_port')|json_encode|raw }};
+    const statusUrl    = {{ (path('api_switch_port_status') ~ '?mac=' ~ interface.macAddress|url_encode)|json_encode|raw }};
+    const reauthUrl    = {{ path('api_switch_port_reauthenticate')|json_encode|raw }};
+    const bounceUrl    = {{ path('api_switch_port_bounce')|json_encode|raw }};
+    const poeBounceUrl = {{ path('api_switch_port_poe_bounce')|json_encode|raw }};
+    const mac        = {{ interface.macAddress|json_encode|raw }};
 
     function renderClients(data) {
         if (data.error) {
@@ -304,12 +302,7 @@
         btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span>${busyLabel}`;
         statusBody.innerHTML = `<span class="text-muted">${busyLabel}…</span>`;
 
-        const fd = new FormData();
-        fd.append('_token', csrfToken);
-        fd.append('portId', portId);
-        fd.append('switchIp', switchIp);
-
-        fetch(url, { method: 'POST', body: fd })
+        fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mac }) })
             .then(r => r.json())
             .then(data => {
                 const out = data.output ? `<pre class="mt-2 mb-0 p-2 border rounded small" style="max-height:120px;overflow:auto">${data.output}</pre>` : '';

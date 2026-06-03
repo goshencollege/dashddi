@@ -85,17 +85,15 @@ class SwitchApiController extends AbstractController
     }
 
     /**
-     * Resolves switch IP and port ID from the given parameters.
-     * Accepts: mac, ip, or explicit switch_ip + port_id.
+     * Resolves switch IP and port ID by looking up the most recent ClearPass auth log
+     * for the given device MAC or IP address.
      *
      * @return array{switch_ip: string, port_id: string}|JsonResponse
      */
     private function resolveSwitch(array $params): array|JsonResponse
     {
-        $mac      = trim((string) ($params['mac']       ?? ''));
-        $ip       = trim((string) ($params['ip']        ?? ''));
-        $switchIp = trim((string) ($params['switch_ip'] ?? ''));
-        $portId   = trim((string) ($params['port_id']   ?? ''));
+        $mac = trim((string) ($params['mac'] ?? ''));
+        $ip  = trim((string) ($params['ip']  ?? ''));
 
         if ($mac === '' && $ip !== '') {
             $iface = $this->ifaceRepo->findByIpString($ip);
@@ -105,27 +103,23 @@ class SwitchApiController extends AbstractController
             $mac = $iface->getMacAddress();
         }
 
-        if ($mac !== '') {
-            $mac    = $this->normaliseMac($mac);
-            $maxAge = $this->settingRepo->getInstance()->getSwitchInfoMaxAgeDays();
-            $cutoff = $maxAge !== null ? new \DateTimeImmutable("-{$maxAge} days") : null;
-            $log    = $this->authLogRepo->findLatestWithSwitchInfoByMac($mac, $cutoff);
-
-            if ($log === null || $log->getNasIp() === null || $log->getNasPortId() === null) {
-                return $this->json(['error' => 'No switch info found for this address'], Response::HTTP_NOT_FOUND);
-            }
-
-            return ['switch_ip' => $log->getNasIp(), 'port_id' => $log->getNasPortId()];
-        }
-
-        if ($switchIp === '' || $portId === '') {
+        if ($mac === '') {
             return $this->json(
-                ['error' => 'Provide mac, ip, or both switch_ip and port_id'],
+                ['error' => 'Provide mac or ip'],
                 Response::HTTP_UNPROCESSABLE_ENTITY,
             );
         }
 
-        return ['switch_ip' => $switchIp, 'port_id' => $portId];
+        $mac    = $this->normaliseMac($mac);
+        $maxAge = $this->settingRepo->getInstance()->getSwitchInfoMaxAgeDays();
+        $cutoff = $maxAge !== null ? new \DateTimeImmutable("-{$maxAge} days") : null;
+        $log    = $this->authLogRepo->findLatestWithSwitchInfoByMac($mac, $cutoff);
+
+        if ($log === null || $log->getNasIp() === null || $log->getNasPortId() === null) {
+            return $this->json(['error' => 'No switch info found for this address'], Response::HTTP_NOT_FOUND);
+        }
+
+        return ['switch_ip' => $log->getNasIp(), 'port_id' => $log->getNasPortId()];
     }
 
     /** Normalise MAC to lowercase colon-separated format (handles colons, hyphens, bare hex). */

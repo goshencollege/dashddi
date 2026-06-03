@@ -5,7 +5,6 @@ namespace App\Controller;
 use App\Entity\ArubaSwitch;
 use App\Form\ArubaSwitchType;
 use App\Repository\ArubaSwitchRepository;
-use App\Service\ArubaCxService;
 use App\Service\SshKeyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -85,102 +84,4 @@ class ArubaSwitchController extends AbstractController
         return $this->redirectToRoute('aruba_switch_index');
     }
 
-    // ── Interface-page AJAX endpoints ─────────────────────────────────────────
-    // portId passed as query/body param to avoid routing issues with "1/1/5" slashes.
-
-    #[Route('/port-status', name: 'aruba_switch_port_status', methods: ['GET'])]
-    public function portStatus(Request $request, ArubaSwitchRepository $repo, ArubaCxService $cx): JsonResponse
-    {
-        $creds  = $repo->getInstance();
-        $portId = trim((string) $request->query->get('portId', ''));
-        $ip     = trim((string) $request->query->get('switchIp', ''));
-
-        if ($creds === null) {
-            return $this->json(['clients' => [], 'raw' => '', 'via' => 'none', 'error' => 'No Aruba CX credentials configured']);
-        }
-        if ($portId === '' || $ip === '') {
-            return $this->json(['clients' => [], 'raw' => '', 'via' => 'none', 'error' => 'Missing portId or switchIp']);
-        }
-
-        try {
-            return $this->json($cx->getPortInfo($creds, $ip, $portId));
-        } catch (\Throwable $e) {
-            return $this->json(['clients' => [], 'raw' => '', 'via' => 'none', 'error' => $e->getMessage()]);
-        }
-    }
-
-    #[Route('/port-reauthenticate', name: 'aruba_switch_port_reauthenticate', methods: ['POST'])]
-    public function portReauthenticate(Request $request, ArubaSwitchRepository $repo, ArubaCxService $cx): JsonResponse
-    {
-        if (!$this->isCsrfTokenValid('bounce_port', $request->request->get('_token'))) {
-            return $this->json(['success' => false, 'error' => 'Invalid CSRF token'], 403);
-        }
-
-        $creds  = $repo->getInstance();
-        $portId = trim((string) $request->request->get('portId', ''));
-        $ip     = trim((string) $request->request->get('switchIp', ''));
-
-        if ($creds === null) {
-            return $this->json(['success' => false, 'error' => 'No Aruba CX credentials configured']);
-        }
-        if ($portId === '' || $ip === '') {
-            return $this->json(['success' => false, 'error' => 'Missing portId or switchIp']);
-        }
-
-        try {
-            return $this->json($cx->reauthenticatePort($creds, $ip, $portId));
-        } catch (\Throwable $e) {
-            return $this->json(['success' => false, 'error' => $e->getMessage()]);
-        }
-    }
-
-    #[Route('/port-bounce', name: 'aruba_switch_port_bounce', methods: ['POST'])]
-    public function portBounce(Request $request, ArubaSwitchRepository $repo, ArubaCxService $cx): JsonResponse
-    {
-        if (!$this->isCsrfTokenValid('bounce_port', $request->request->get('_token'))) {
-            return $this->json(['success' => false, 'error' => 'Invalid CSRF token'], 403);
-        }
-
-        $creds  = $repo->getInstance();
-        $portId = trim((string) $request->request->get('portId', ''));
-        $ip     = trim((string) $request->request->get('switchIp', ''));
-
-        if ($creds === null) {
-            return $this->json(['success' => false, 'error' => 'No Aruba CX credentials configured']);
-        }
-        if ($portId === '' || $ip === '') {
-            return $this->json(['success' => false, 'error' => 'Missing portId or switchIp']);
-        }
-
-        try {
-            return $this->json($cx->bouncePort($creds, $ip, $portId));
-        } catch (\Throwable $e) {
-            return $this->json(['success' => false, 'error' => $e->getMessage()]);
-        }
-    }
-
-    #[Route('/port-poe-bounce', name: 'aruba_switch_port_poe_bounce', methods: ['POST'])]
-    public function portPoeBounce(Request $request, ArubaSwitchRepository $repo, ArubaCxService $cx): JsonResponse
-    {
-        if (!$this->isCsrfTokenValid('bounce_port', $request->request->get('_token'))) {
-            return $this->json(['success' => false, 'error' => 'Invalid CSRF token'], 403);
-        }
-
-        $creds  = $repo->getInstance();
-        $portId = trim((string) $request->request->get('portId', ''));
-        $ip     = trim((string) $request->request->get('switchIp', ''));
-
-        if ($creds === null) {
-            return $this->json(['success' => false, 'error' => 'No Aruba CX credentials configured']);
-        }
-        if ($portId === '' || $ip === '') {
-            return $this->json(['success' => false, 'error' => 'Missing portId or switchIp']);
-        }
-
-        try {
-            return $this->json($cx->poeBouncePort($creds, $ip, $portId));
-        } catch (\Throwable $e) {
-            return $this->json(['success' => false, 'error' => $e->getMessage()]);
-        }
-    }
 }
