@@ -4,6 +4,7 @@ namespace App\Form;
 
 use App\Entity\DhcpServer;
 use Symfony\Component\Form\AbstractType;
+use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Form\Extension\Core\Type\PasswordType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
@@ -29,6 +30,14 @@ class DhcpServerType extends AbstractType
             ->add('remotePath', TextType::class, [
                 'label' => 'Remote Path',
                 'attr'  => ['placeholder' => '/etc/kea'],
+            ])
+            ->add('versionScope', ChoiceType::class, [
+                'label'   => 'Push Versions',
+                'choices' => [
+                    'Both IPv4 and IPv6' => 'both',
+                    'IPv4 only'          => 'v4',
+                    'IPv6 only'          => 'v6',
+                ],
             ])
             ->add('controlUrl', TextType::class, [
                 'label'    => 'Control Agent URL',

@@ -49,6 +49,9 @@ class DhcpServer
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $controlPassword = null;
 
+    #[ORM\Column(length: 4)]
+    private string $versionScope = 'both';
+
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $description = null;
 
@@ -80,6 +83,9 @@ class DhcpServer
 
     public function getControlPassword(): ?string { return $this->controlPassword; }
     public function setControlPassword(?string $controlPassword): static { $this->controlPassword = $controlPassword ?: null; return $this; }
+
+    public function getVersionScope(): string { return $this->versionScope; }
+    public function setVersionScope(string $versionScope): static { $this->versionScope = $versionScope; return $this; }
 
     public function getDescription(): ?string { return $this->description; }
     public function setDescription(?string $description): static { $this->description = $description; return $this; }
