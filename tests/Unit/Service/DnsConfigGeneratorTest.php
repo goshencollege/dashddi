@@ -2,17 +2,21 @@
 
 namespace App\Tests\Unit\Service;
 
+use App\Entity\Domain;
+use App\Entity\DnsServer;
 use App\Entity\DnsView;
 use App\Entity\Subnet;
 use App\Entity\SubnetRecord;
 use App\Enum\RecordType;
+use App\Enum\TsigAlgorithm;
 use App\Repository\DnsAclRepository;
 use App\Repository\DnssecPolicyRepository;
 use App\Repository\DomainRepository;
 use App\Repository\SubnetRepository;
 use App\Service\DnsConfigGenerator;
-use App\Service\FcrdnsChecker;
 use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\ORM\Query;
+use Doctrine\ORM\QueryBuilder;
 use PHPUnit\Framework\TestCase;
 
 class DnsConfigGeneratorTest extends TestCase
@@ -26,7 +30,6 @@ class DnsConfigGeneratorTest extends TestCase
             $this->createStub(SubnetRepository::class),
             $this->createStub(DnssecPolicyRepository::class),
             $this->createStub(DnsAclRepository::class),
-            $this->createStub(FcrdnsChecker::class),
         );
     }
 
@@ -165,5 +168,130 @@ class DnsConfigGeneratorTest extends TestCase
             '@ IN NS ns2.example.com.',
             $this->generator->generateReverseZoneFile($subnet, '10.0.0.0/24', $view)
         );
+    }
+
+    // ── generateViewsConf DDNS ────────────────────────────────────────────────
+
+    public function testTsigKeyBlockEmittedWhenDdnsConfigured(): void
+    {
+        $server = $this->makeServerWithDdns('bind-primary', TsigAlgorithm::HmacSha256, 'secret==');
+        $gen    = $this->makeViewsConfGenerator($server, [], []);
+
+        $output = $gen->generateViewsConf($server);
+
+        $this->assertStringContainsString('key "ddns-bind-primary" {', $output);
+        $this->assertStringContainsString('algorithm hmac-sha256;', $output);
+        $this->assertStringContainsString('secret "secret==";', $output);
+    }
+
+    public function testTsigKeyBlockOmittedWhenNoDdns(): void
+    {
+        $server = (new DnsServer())->setName('ns1')->setHostname('10.0.0.1');
+        $gen    = $this->makeViewsConfGenerator($server, [], []);
+
+        $output = $gen->generateViewsConf($server);
+
+        $this->assertStringNotContainsString('key "', $output);
+    }
+
+    public function testAllowUpdateAddedToForwardZoneWhenDdnsEnabled(): void
+    {
+        $server = $this->makeServerWithDdns('ns1', TsigAlgorithm::HmacSha256, 'secret');
+        $view   = $this->makeView(1);
+        $server->addView($view);
+
+        $domain = (new Domain())
+            ->setName('example.com')
+            ->setDdnsEnabled(true)
+            ->setDdnsDnsServer($server);
+
+        $gen    = $this->makeViewsConfGenerator($server, [$domain], []);
+        $output = $gen->generateViewsConf($server);
+
+        $this->assertStringContainsString('allow-update { key "ddns-ns1"; };', $output);
+    }
+
+    public function testAllowUpdateOmittedWhenDomainDdnsDisabled(): void
+    {
+        $server = $this->makeServerWithDdns('ns1', TsigAlgorithm::HmacSha256, 'secret');
+        $view   = $this->makeView(1);
+        $server->addView($view);
+
+        $domain = (new Domain())
+            ->setName('example.com')
+            ->setDdnsEnabled(false)
+            ->setDdnsDnsServer($server);
+
+        $gen    = $this->makeViewsConfGenerator($server, [$domain], []);
+        $output = $gen->generateViewsConf($server);
+
+        $this->assertStringNotContainsString('allow-update', $output);
+    }
+
+    public function testAllowUpdateAddedToReverseZoneWhenDdnsEnabled(): void
+    {
+        $server = $this->makeServerWithDdns('ns1', TsigAlgorithm::HmacSha256, 'secret');
+        $view   = $this->makeView(1);
+        $server->addView($view);
+
+        $domain = (new Domain())
+            ->setName('example.com')
+            ->setDdnsEnabled(true)
+            ->setDdnsDnsServer($server);
+        $subnet = (new Subnet())
+            ->setIpv4Cidr('192.168.1.0/24')
+            ->setDdnsDomain($domain);
+
+        $gen    = $this->makeViewsConfGenerator($server, [], [$subnet]);
+        $output = $gen->generateViewsConf($server);
+
+        $this->assertStringContainsString('1.168.192.in-addr.arpa', $output);
+        $this->assertStringContainsString('allow-update { key "ddns-ns1"; };', $output);
+    }
+
+    // ── generateViewsConf helpers ─────────────────────────────────────────────
+
+    private function makeServerWithDdns(string $name, TsigAlgorithm $algo, string $secret): DnsServer
+    {
+        return (new DnsServer())
+            ->setName($name)
+            ->setHostname('10.0.0.1')
+            ->setDdnsAlgorithm($algo)
+            ->setDdnsSecret($secret);
+    }
+
+    private function makeViewsConfGenerator(DnsServer $server, array $domains, array $subnets): DnsConfigGenerator
+    {
+        $domainQuery = $this->createStub(Query::class);
+        $domainQuery->method('getResult')->willReturn($domains);
+        $domainQb = $this->createStub(QueryBuilder::class);
+        $domainQb->method('join')->willReturnSelf();
+        $domainQb->method('where')->willReturnSelf();
+        $domainQb->method('setParameter')->willReturnSelf();
+        $domainQb->method('orderBy')->willReturnSelf();
+        $domainQb->method('getQuery')->willReturn($domainQuery);
+
+        $subnetQuery = $this->createStub(Query::class);
+        $subnetQuery->method('getResult')->willReturn($subnets);
+        $subnetQb = $this->createStub(QueryBuilder::class);
+        $subnetQb->method('join')->willReturnSelf();
+        $subnetQb->method('where')->willReturnSelf();
+        $subnetQb->method('setParameter')->willReturnSelf();
+        $subnetQb->method('orderBy')->willReturnSelf();
+        $subnetQb->method('getQuery')->willReturn($subnetQuery);
+
+        $domainRepo = $this->createStub(DomainRepository::class);
+        $domainRepo->method('createQueryBuilder')->willReturn($domainQb);
+
+        $subnetRepo = $this->createStub(SubnetRepository::class);
+        $subnetRepo->method('createQueryBuilder')->willReturn($subnetQb);
+
+        $policyRepo = $this->createStub(DnssecPolicyRepository::class);
+        $policyRepo->method('findBy')->willReturn([]);
+
+        $aclRepo = $this->createStub(DnsAclRepository::class);
+        $aclRepo->method('findBy')->willReturn([]);
+
+        return new DnsConfigGenerator($domainRepo, $subnetRepo, $policyRepo, $aclRepo);
     }
 }
