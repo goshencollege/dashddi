@@ -31,6 +31,7 @@ class DnsDeployService
         $results    = ['views' => [], 'conf' => null, 'reload' => null];
         $zonePath   = rtrim($server->getRemoteZonePath(), '/');
         $keyDirBase = $server->getKeyDirectory() ? rtrim($server->getKeyDirectory(), '/') : null;
+        $bindUser   = $server->getBindUser();
         $hasDomains = false;
 
         $isSecondary = $server->isSecondary();
@@ -49,7 +50,9 @@ class DnsDeployService
                 foreach ($domains as $domain) {
                     $hasDomains = true;
                     if ($keyDirBase && $domain->getDnssecPolicy()) {
-                        $sftp->exec('mkdir -p ' . escapeshellarg($keyDirBase . '/' . $domain->getName()));
+                        $dir = $keyDirBase . '/' . $domain->getName();
+                        $sftp->exec('mkdir -p ' . escapeshellarg($dir));
+                        $sftp->exec('chown ' . escapeshellarg($bindUser . ':' . $bindUser) . ' ' . escapeshellarg($dir));
                     }
                     $remotePath  = $zonePath . '/' . $viewName . '/' . $domain->getName() . '.zone';
                     $displayFile = $viewName . '/' . $domain->getName() . '.zone';
@@ -66,7 +69,9 @@ class DnsDeployService
                         $hasDomains  = true;
                         $zoneName    = $this->generator->reverseZoneName($cidr);
                         if ($keyDirBase && $subnet->getDnssecPolicy()) {
-                            $sftp->exec('mkdir -p ' . escapeshellarg($keyDirBase . '/' . $zoneName));
+                            $dir = $keyDirBase . '/' . $zoneName;
+                            $sftp->exec('mkdir -p ' . escapeshellarg($dir));
+                            $sftp->exec('chown ' . escapeshellarg($bindUser . ':' . $bindUser) . ' ' . escapeshellarg($dir));
                         }
                         $remotePath  = $zonePath . '/' . $viewName . '/' . $zoneName . '.zone';
                         $displayFile = $viewName . '/' . $zoneName . '.zone';

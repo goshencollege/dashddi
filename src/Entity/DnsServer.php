@@ -56,6 +56,9 @@ class DnsServer
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $description = null;
 
+    #[ORM\Column(length: 64)]
+    private string $bindUser = 'bind';
+
     #[ORM\Column(length: 32, enumType: TsigAlgorithm::class, nullable: true)]
     private ?TsigAlgorithm $ddnsAlgorithm = null;
 
@@ -104,6 +107,9 @@ class DnsServer
 
     public function getDescription(): ?string { return $this->description; }
     public function setDescription(?string $description): static { $this->description = $description; return $this; }
+
+    public function getBindUser(): string { return $this->bindUser; }
+    public function setBindUser(string $v): static { $this->bindUser = $v; return $this; }
 
     public function getDdnsAlgorithm(): ?TsigAlgorithm { return $this->ddnsAlgorithm; }
     public function setDdnsAlgorithm(?TsigAlgorithm $v): static { $this->ddnsAlgorithm = $v; return $this; }
