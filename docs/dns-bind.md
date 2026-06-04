@@ -36,6 +36,21 @@ DashDDI generates an Ed25519 SSH key pair per server. To authorize DashDDI:
 2. Add it to `~/.ssh/authorized_keys` (or the configured user's home) on the BIND server.
 3. Ensure the SSH user has write access to the remote zone path and can run `rndc`.
 
+### Zone Directory Permissions
+
+DashDDI uploads zone files via SFTP as the configured SSH user, so the zone directories are owned by that user. BIND needs write access to those directories to create and update journal (`.jnl`) files for dynamic DNS zones. If BIND cannot write the journal file it will return SERVFAIL on all DNS UPDATE requests.
+
+The recommended approach is to add the BIND service user to the SSH user's primary group. Since DashDDI creates directories with group-write permissions, BIND will be able to write journal files without any ownership changes:
+
+```bash
+usermod -aG <ssh-user> bind
+systemctl restart named
+```
+
+#### AppArmor (Debian/Ubuntu)
+
+The default AppArmor profile for BIND only permits writes under `/var/lib/bind/` and `/var/cache/bind/`. If you are running BIND on Debian or Ubuntu, set the **Remote Zone Path** to `/var/lib/bind/zones` (or a subdirectory of `/var/lib/bind/`) rather than `/etc/bind/zones`. Deploying to `/etc/bind/` will result in SERVFAIL on dynamic updates even if file ownership is correct.
+
 ### named.conf Include
 
 DashDDI deploys all ACLs, views, and zone stanzas into a single file (`dashddi.conf`) in the configured remote zone path. Add one line to your BIND `named.conf` to load it:

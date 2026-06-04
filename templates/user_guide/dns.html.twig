@@ -129,6 +129,11 @@
         <div class="alert alert-info py-2 small mt-3 mb-0">
             <i class="bi bi-lightbulb me-1"></i>The TSIG secret is stored encrypted in DashDDI but appears in plaintext in the deployed config files on the server. Restrict read permissions on <code>dashddi.conf</code> and <code>kea-dhcp-ddns.conf</code> to the bind/kea service users.
         </div>
+        <div class="alert alert-info mt-3 mb-0 small">
+            <i class="bi bi-info-circle me-1"></i><strong>Dynamic updates require BIND to have write access to the zone directory</strong> so it can maintain journal (<code>.jnl</code>) files. If BIND returns SERVFAIL on DNS UPDATE requests, check directory ownership. Because DashDDI deploys via SFTP as the SSH user, zone directories are owned by that user — add the BIND service user to the SSH user's group so it can write journal files:
+            <pre class="mb-0 mt-2 bg-body-secondary rounded p-2">usermod -aG &lt;ssh-user&gt; bind &amp;&amp; systemctl restart named</pre>
+            On Debian/Ubuntu, AppArmor restricts BIND writes to <code>/var/lib/bind/</code> — set <strong>Remote Zone Path</strong> to a path under <code>/var/lib/bind/</code> rather than <code>/etc/bind/</code>.
+        </div>
     </div>
 </div>
 
@@ -141,7 +146,7 @@
             <li><strong>Scheduled</strong> — configure a cron schedule for the DNS push task under <strong>Other Settings → Scheduler</strong></li>
         </ol>
         <p class="mt-2 mb-0">The push connects to the DNS server via SSH using the generated SSH key pair, uploads zone files, and reloads BIND. Results are logged in <strong>Servers → Push Logs</strong>.</p>
-        <p class="mt-2 mb-0 text-muted small">For initial BIND server configuration — SSH key installation, <code>named.conf</code> include directives, and zone file layout — see the <a href="{{ path('user_guide_integrations') }}#dns-bind">DNS/BIND integration guide</a>.</p>
+        <p class="mt-2 mb-0 text-muted small">For initial BIND server configuration — SSH key installation, <code>named.conf</code> include directives, zone file layout, and zone directory permissions — see the <a href="{{ path('user_guide_integrations') }}#dns-bind">DNS/BIND integration guide</a>.</p>
     </div>
 </div>
 
