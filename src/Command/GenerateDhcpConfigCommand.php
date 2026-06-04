@@ -80,7 +80,7 @@ class GenerateDhcpConfigCommand extends Command
             $this->em->flush();
 
             foreach ($results as $type => $result) {
-                $label = match ($type) { 'dhcp4' => 'DHCPv4', 'dhcp6' => 'DHCPv6', default => 'DDNS' };
+                $label = match ($type) { 'dhcp4' => 'DHCPv4', 'dhcp6' => 'DHCPv6', 'global4' => 'Global Reservations (v4)', 'global6' => 'Global Reservations (v6)', default => 'DDNS' };
 
                 if ($result['success']) {
                     $reloadNote = '';

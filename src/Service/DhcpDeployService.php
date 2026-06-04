@@ -22,10 +22,20 @@ class DhcpDeployService
         }
 
         $files = [
-            'dhcp4' => $outputDir . '/subnets4.json',
-            'dhcp6' => $outputDir . '/subnets6.json',
+            'global4' => $outputDir . '/global-reservations4.json',
+            'global6' => $outputDir . '/global-reservations6.json',
+            'dhcp4'   => $outputDir . '/subnets4.json',
+            'dhcp6'   => $outputDir . '/subnets6.json',
         ];
 
+        file_put_contents(
+            $files['global4'],
+            json_encode($this->generator->generateGlobalReservations4Config(), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . "\n"
+        );
+        file_put_contents(
+            $files['global6'],
+            json_encode($this->generator->generateGlobalReservations6Config(), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . "\n"
+        );
         file_put_contents(
             $files['dhcp4'],
             json_encode($this->generator->generateDhcp4Config(), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . "\n"
@@ -40,18 +50,38 @@ class DhcpDeployService
 
     public function deployToServer(DhcpServer $server, bool $reload = true): array
     {
-        $sftp  = $this->getSftp($server);
-        $scope = $server->getVersionScope();
+        $sftp     = $this->getSftp($server);
+        $scope    = $server->getVersionScope();
+        $allFiles = $this->generateFiles(sys_get_temp_dir() . '/dhcp');
+        $results  = [];
+
+        // Upload global reservation files first — no reload needed, the subnet reload below covers them
+        $globalTypes = match ($scope) {
+            'v4'    => ['global4'],
+            'v6'    => ['global6'],
+            default => ['global4', 'global6'],
+        };
+        foreach ($globalTypes as $type) {
+            $localFile  = $allFiles[$type];
+            $remotePath = rtrim($server->getRemotePath(), '/') . '/' . basename($localFile);
+            $ok = $sftp->put($remotePath, (string) file_get_contents($localFile));
+            $results[$type] = [
+                'success' => $ok,
+                'output'  => $ok ? '' : 'SFTP upload failed: ' . $sftp->getLastSFTPError(),
+                'file'    => basename($localFile),
+                'reload'  => null,
+            ];
+        }
+
         $files = array_filter(
-            $this->generateFiles(sys_get_temp_dir() . '/dhcp'),
+            $allFiles,
             fn($type) => match ($scope) {
                 'v4'    => $type === 'dhcp4',
                 'v6'    => $type === 'dhcp6',
-                default => true,
+                default => in_array($type, ['dhcp4', 'dhcp6']),
             },
             ARRAY_FILTER_USE_KEY,
         );
-        $results = [];
 
         foreach ($files as $type => $localFile) {
             $remotePath = rtrim($server->getRemotePath(), '/') . '/' . basename($localFile);

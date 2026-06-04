@@ -38,22 +38,27 @@ DashDDI generates an Ed25519 SSH key pair per server. To authorize DashDDI:
 
 ## Generated Configuration
 
-### `subnets4.json` (DHCPv4)
+### `subnets4.json` / `subnets6.json`
 
-For each subnet with an IPv4 CIDR, DashDDI emits a subnet block containing:
+For each deployable subnet (non-container, with an IPv4 or IPv6 CIDR respectively), DashDDI emits a subnet block containing:
 
-- **Pools:** all address blocks on the subnet marked as Dynamic (IPv4)
-- **Router option:** the subnet's gateway IP (if set)
-- **Reservations:** all non-deleted interfaces with a MAC address, mapping `hw-address` → `ip-address` (and optionally `hostname`)
+- **Pools:** all Dynamic address blocks on the subnet
+- **Router option** (IPv4 only): the subnet's gateway IP (if set)
+- **Reservations:** all non-deleted interfaces with a static IP and a valid MAC, mapping `hw-address` → `ip-address` (and optionally `hostname`)
 
-### `subnets6.json` (DHCPv6)
+### `global-reservations4.json` / `global-reservations6.json`
 
-For each subnet with an IPv6 CIDR, DashDDI emits a subnet block containing:
+A flat JSON array of hostname-only reservations for devices whose address will come from the pool. DashDDI includes an interface here when it:
 
-- **Pools:** all address blocks marked as Dynamic (IPv6)
-- **Reservations:** all non-deleted interfaces with an IPv6 address and valid MAC, mapping `hw-address` → `ip-addresses` array
+- Has a non-zero MAC address
+- Has **no** static IPv4 (or IPv6) address assigned
+- Has a name entry in any DDNS-enabled domain
 
-Interfaces with the all-zeros MAC (`00:00:00:00:00:00`) are excluded from reservations.
+The `hostname` field is the DNS label from that name entry (e.g., `mylaptop`). Kea appends the subnet's `ddns-qualifying-suffix` at lease time.
+
+Because these reservations are global rather than per-subnet, they match regardless of which subnet the device DHCPs from — useful for devices pre-registered before their final network location is known.
+
+Interfaces with the all-zeros MAC (`00:00:00:00:00:00`) are excluded from all reservations.
 
 ## Kea Control Agent
 
@@ -115,6 +120,42 @@ DashDDI generates a D2 config that includes:
 The D2 daemon listens on `127.0.0.1:53001` and communicates with the Kea DHCPv4/v6 server via a named socket at `/var/run/kea/kea-ddns-ctrl-socket`.
 
 > **Note:** D2 requires a literal IP address for DNS servers — not a hostname. DashDDI resolves the DNS server's hostname automatically using the system resolver when generating the config.
+
+### DDNS hostnames for dynamic clients
+
+When a subnet has a DDNS domain assigned, DashDDI emits the following DDNS settings in the subnet block:
+
+```json
+"ddns-send-updates": true,
+"ddns-update-on-renew": true,
+"ddns-qualifying-suffix": "dyn.example.com.",
+"ddns-replace-client-name": "always"
+```
+
+`ddns-replace-client-name: always` means Kea ignores the hostname the DHCP client sends and always uses the hostname from DashDDI's reservation instead. Devices with no reservation at all receive an auto-generated hostname.
+
+Hostname mappings for dynamic clients are stored in `global-reservations4.json` (and `global-reservations6.json`), which Kea includes at the global level. This means the hostname follows the device regardless of which subnet it DHCPs from — a device pre-registered before its building is known will still get the correct DDNS name.
+
+**One-time Kea configuration required:**
+
+Add `reservations-global: true` to `kea-dhcp4.conf` and include the global reservations file:
+
+```json
+{
+    "Dhcp4": {
+        "reservations-global": true,
+        "reservations": <?include "global-reservations4.json"?>,
+        ...
+    }
+}
+```
+
+**To register a dynamic device with a known hostname:**
+
+1. Open the host record in DashDDI and add an interface with the device's MAC address. Leave the IP address blank — the address will come from the pool.
+2. On that interface, add a name entry in any DDNS-enabled domain (e.g., name `mylaptop` in `dyn.example.com`).
+3. Redeploy the DHCP config. The device's MAC + label will appear in `global-reservations4.json`.
+4. When the device next gets a lease on any DDNS-enabled subnet, Kea registers `mylaptop.dyn.example.com` in DNS.
 
 ## Console Command
 
