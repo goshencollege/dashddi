@@ -65,7 +65,7 @@ class DhcpDdnsConfigGenerator
                 'port'            => 53001,
                 'control-socket'  => [
                     'socket-type' => 'unix',
-                    'socket-name' => '/run/kea/kea-ddns-ctrl-socket',
+                    'socket-name' => '/var/run/kea/kea-ddns-ctrl-socket',
                 ],
                 'tsig-keys'    => array_values($tsigKeys),
                 'forward-ddns' => ['ddns-domains' => $forwardDomains],
