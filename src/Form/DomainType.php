@@ -75,12 +75,15 @@ class DomainType extends AbstractType
                 'required' => false,
             ])
             ->add('ddnsDnsServer', EntityType::class, [
-                'class'        => DnsServer::class,
-                'choice_label' => 'name',
-                'placeholder'  => '— None —',
-                'required'     => false,
-                'label'        => 'DDNS Server',
-                'help'         => 'The DNS server that will accept dynamic updates for this zone. Must have a DDNS algorithm configured.',
+                'class'         => DnsServer::class,
+                'choice_label'  => 'name',
+                'placeholder'   => '— None —',
+                'required'      => false,
+                'label'         => 'DDNS Server',
+                'help'          => 'Only servers with a DDNS algorithm configured are listed.',
+                'query_builder' => fn($repo) => $repo->createQueryBuilder('s')
+                    ->where('s.ddnsAlgorithm IS NOT NULL')
+                    ->orderBy('s.name', 'ASC'),
             ]);
     }
 

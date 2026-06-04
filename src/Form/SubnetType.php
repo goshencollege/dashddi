@@ -135,12 +135,15 @@ class SubnetType extends AbstractType
                 'required' => false,
             ])
             ->add('ddnsDnsServer', EntityType::class, [
-                'class'        => DnsServer::class,
-                'choice_label' => 'name',
-                'placeholder'  => '— None —',
-                'required'     => false,
-                'label'        => 'DDNS Server',
-                'help'         => 'The DNS server that will accept PTR record updates for this subnet\'s reverse zone.',
+                'class'         => DnsServer::class,
+                'choice_label'  => 'name',
+                'placeholder'   => '— None —',
+                'required'      => false,
+                'label'         => 'DDNS Server',
+                'help'          => 'Only servers with a DDNS algorithm configured are listed.',
+                'query_builder' => fn($repo) => $repo->createQueryBuilder('s')
+                    ->where('s.ddnsAlgorithm IS NOT NULL')
+                    ->orderBy('s.name', 'ASC'),
             ])
             ->add('ddnsQualifyingSuffix', TextType::class, [
                 'label'    => 'DDNS Qualifying Suffix',
