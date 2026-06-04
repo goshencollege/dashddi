@@ -67,6 +67,14 @@
             </div>
         </div>
     {% endif %}
+    {% if subnet.ddnsDomain %}
+        <div class="col-auto">
+            <div class="card px-3 py-2 text-center">
+                <div class="small text-muted">DDNS Domain</div>
+                <strong>{{ subnet.ddnsDomain.name }}</strong>
+            </div>
+        </div>
+    {% endif %}
     {% if subnet.tags is not empty %}
         <div class="col-12">
             <div>
