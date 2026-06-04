@@ -198,6 +198,8 @@ curl -s -X POST https://dashddi.example.com/api/dhcp/lease \
   }"
 ```
 
+> **TLS note:** The script runs as the `_kea` user, which typically does not have access to your organisation's CA bundle. If DashDDI uses a self-signed certificate or an internal CA that is not in the system trust store, `curl` will fail with a certificate verification error. Add `-k` to the `curl` invocation to skip verification, or use `--cacert /path/to/ca.crt` to trust a specific CA without disabling verification entirely.
+
 In `kea-dhcp4.conf`:
 ```json
 "hooks-libraries": [

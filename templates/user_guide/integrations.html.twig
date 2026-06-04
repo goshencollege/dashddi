@@ -206,6 +206,9 @@ curl -s -X POST https://dashddi.example.com/api/dhcp/lease \
     \"expire\": $LEASES4_AT0_CLTT
   }"</code></pre>
         <p class="mb-3">Replace <code>dashddi.example.com</code> with your DashDDI hostname and <code>&lt;YOUR_API_TOKEN&gt;</code> with the token from step 1. The script must reside under <code>/usr/share/kea/scripts/</code> — some versions of the <code>run_script</code> hook reject scripts placed elsewhere (e.g. <code>/etc/kea</code>).</p>
+        <div class="alert alert-warning py-2 small mb-3">
+            <strong>TLS note:</strong> The script runs as the <code>_kea</code> user, which typically does not have access to your organisation's CA bundle. If DashDDI uses a self-signed certificate or an internal CA that is not in the system trust store, <code>curl</code> will fail silently and leases will not be recorded. Add <code>-k</code> to the <code>curl</code> invocation to skip certificate verification, or use <code>--cacert /path/to/ca.crt</code> to trust a specific CA without disabling verification entirely.
+        </div>
 
         <p><strong>Step 3 — Add the hook to <code>kea-dhcp4.conf</code></strong></p>
         <p>Add the <code>run_script</code> hook to the <code>hooks-libraries</code> array in your Kea DHCPv4 configuration:</p>
