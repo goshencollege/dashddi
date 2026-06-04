@@ -38,7 +38,11 @@ class DhcpDdnsConfigGenerator
             ];
         }
 
-        foreach ($this->subnetRepo->findBy(['ddnsEnabled' => true]) as $subnet) {
+        $ddnsSubnets = $this->subnetRepo->createQueryBuilder('s')
+            ->join('s.ddnsDomain', 'd')
+            ->getQuery()->getResult();
+
+        foreach ($ddnsSubnets as $subnet) {
             $server = $subnet->getDdnsDnsServer();
             if (!$server || !$server->getDdnsAlgorithm() || !$server->getDdnsSecret()) {
                 continue;

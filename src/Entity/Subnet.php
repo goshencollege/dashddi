@@ -3,6 +3,7 @@
 namespace App\Entity;
 
 use App\Entity\Trait\AuditableTrait;
+use App\Entity\Domain;
 use App\Entity\DnssecPolicy;
 use App\Repository\AddressBlockRepository;
 use App\Repository\SubnetRepository;
@@ -116,17 +117,9 @@ class Subnet
     #[ORM\Column(options: ['default' => false])]
     private bool $isContainer = false;
 
-    #[ORM\Column(options: ['default' => false])]
-    private bool $ddnsEnabled = false;
-
-    #[ORM\ManyToOne(targetEntity: DnsServer::class)]
+    #[ORM\ManyToOne(targetEntity: Domain::class)]
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
-    private ?DnsServer $ddnsDnsServer = null;
-
-    /** Qualifying suffix appended to dynamic client hostnames before DDNS registration (e.g. "goshen.edu."). */
-    #[ORM\Column(length: 255, nullable: true)]
-    #[Assert\Length(max: 255)]
-    private ?string $ddnsQualifyingSuffix = null;
+    private ?Domain $ddnsDomain = null;
 
     public function __construct()
     {
@@ -194,14 +187,12 @@ class Subnet
     public function isContainer(): bool { return $this->isContainer; }
     public function setIsContainer(bool $isContainer): static { $this->isContainer = $isContainer; return $this; }
 
-    public function isDdnsEnabled(): bool { return $this->ddnsEnabled; }
-    public function setDdnsEnabled(bool $v): static { $this->ddnsEnabled = $v; return $this; }
+    public function getDdnsDomain(): ?Domain { return $this->ddnsDomain; }
+    public function setDdnsDomain(?Domain $v): static { $this->ddnsDomain = $v; return $this; }
 
-    public function getDdnsDnsServer(): ?DnsServer { return $this->ddnsDnsServer; }
-    public function setDdnsDnsServer(?DnsServer $v): static { $this->ddnsDnsServer = $v; return $this; }
-
-    public function getDdnsQualifyingSuffix(): ?string { return $this->ddnsQualifyingSuffix; }
-    public function setDdnsQualifyingSuffix(?string $v): static { $this->ddnsQualifyingSuffix = $v ?: null; return $this; }
+    public function isDdnsEnabled(): bool { return $this->ddnsDomain !== null; }
+    public function getDdnsDnsServer(): ?DnsServer { return $this->ddnsDomain?->getDdnsDnsServer(); }
+    public function getDdnsQualifyingSuffix(): ?string { return $this->ddnsDomain?->getName(); }
 
     public function getTags(): Collection { return $this->tags; }
 
