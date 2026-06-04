@@ -50,13 +50,13 @@ class EncryptedFieldSubscriber
     {
         $entity = $args->getObject();
 
-        if (!isset(self::FIELDS[get_class($entity)])) {
+        if (!isset(self::FIELDS[$this->entityClass($entity)])) {
             return;
         }
 
         if ($this->encryptEntity($entity)) {
             $em       = $args->getObjectManager();
-            $metadata = $em->getClassMetadata(get_class($entity));
+            $metadata = $em->getClassMetadata($this->entityClass($entity));
             $em->getUnitOfWork()->recomputeSingleEntityChangeSet($metadata, $entity);
         }
     }
@@ -71,10 +71,19 @@ class EncryptedFieldSubscriber
         $this->decryptEntity($args->getObject());
     }
 
+    private function entityClass(object $entity): string
+    {
+        // Doctrine lazy proxies extend the real entity class; get_class() returns the proxy
+        // class name which does not appear in FIELDS. Unwrap one level to get the real name.
+        return $entity instanceof \Doctrine\Persistence\Proxy
+            ? (get_parent_class($entity) ?: get_class($entity))
+            : get_class($entity);
+    }
+
     /** Encrypts all sensitive fields on the entity. Returns true if any field was changed. */
     private function encryptEntity(object $entity): bool
     {
-        $fields = self::FIELDS[get_class($entity)] ?? [];
+        $fields = self::FIELDS[$this->entityClass($entity)] ?? [];
         $changed = false;
 
         foreach ($fields as $property) {
@@ -93,7 +102,7 @@ class EncryptedFieldSubscriber
 
     private function decryptEntity(object $entity): void
     {
-        $fields = self::FIELDS[get_class($entity)] ?? [];
+        $fields = self::FIELDS[$this->entityClass($entity)] ?? [];
 
         foreach ($fields as $property) {
             $getter = 'get' . ucfirst($property);
