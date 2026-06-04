@@ -34,6 +34,7 @@
                         <th>Queue</th>
                         <th>Created</th>
                         <th>Claimed At</th>
+                        <th></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -43,6 +44,14 @@
                         <td><span class="badge bg-secondary">{{ row.queue_name }}</span></td>
                         <td class="text-nowrap text-muted small">{{ row.created_at|date('M j, g:i a', tz) }}</td>
                         <td class="text-nowrap text-muted small">{{ row.delivered_at ? row.delivered_at|date('M j, g:i a', tz) : '—' }}</td>
+                        <td class="text-end pe-3">
+                            <form method="post" action="{{ path('worker_queue_discard', {id: row.id}) }}" class="d-inline" onsubmit="return confirm('Discard this stuck message? Only do this if the worker is no longer processing it.')">
+                                <input type="hidden" name="_token" value="{{ csrf_token('wq_discard_' ~ row.id) }}">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">
+                                    <i class="bi bi-x-lg me-1"></i>Discard
+                                </button>
+                            </form>
+                        </td>
                     </tr>
                 {% endfor %}
                 </tbody>
