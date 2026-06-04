@@ -4,6 +4,7 @@ namespace App\Form;
 
 use App\Entity\DhcpServer;
 use Symfony\Component\Form\AbstractType;
+use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Form\Extension\Core\Type\PasswordType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
@@ -58,6 +59,11 @@ class DhcpServerType extends AbstractType
             ->add('description', TextareaType::class, [
                 'required' => false,
                 'attr'     => ['rows' => 2, 'placeholder' => 'Optional notes'],
+            ])
+            ->add('ddnsEnabled', CheckboxType::class, [
+                'label'    => 'Deploy kea-dhcp-ddns.conf (Dynamic DNS)',
+                'required' => false,
+                'help'     => 'Generates and deploys kea-dhcp-ddns.conf to this server. Requires at least one subnet with a DDNS domain configured.',
             ]);
     }
 

@@ -38,6 +38,14 @@
                     </div>
                 {% endfor %}
 
+                <hr class="my-3">
+                <h6 class="text-muted mb-3"><i class="bi bi-arrow-repeat me-1"></i>Dynamic DNS (DDNS)</h6>
+                <div class="mb-3 form-check">
+                    {{ form_widget(form.ddnsEnabled, {attr: {class: 'form-check-input'}}) }}
+                    {{ form_label(form.ddnsEnabled, null, {label_attr: {class: 'form-check-label'}}) }}
+                    <div class="form-text">{{ form_help(form.ddnsEnabled) }}</div>
+                </div>
+
                 <div class="d-flex gap-2 mt-4">
                     <button type="submit" class="btn btn-primary">
                         <i class="bi bi-check-lg me-1"></i>Save
