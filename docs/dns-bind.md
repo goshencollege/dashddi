@@ -26,8 +26,7 @@ Add a DNS server under **Settings → DNS Servers**. The fields are:
 | Server Type | `primary` or `secondary` |
 | Primary Hostname | For secondary servers: the IP/hostname of the primary BIND server (used in `primaries` directives) |
 | Views | Which DNS views this server serves |
-| DDNS Algorithm | TSIG algorithm for authenticating DNS UPDATE packets from Kea. Choose from HMAC-MD5, HMAC-SHA1, HMAC-SHA256 (recommended), etc. |
-| DDNS Secret | The base64-encoded TSIG key secret shared between Kea and BIND. Stored encrypted. |
+| DDNS Algorithm | TSIG algorithm for authenticating DNS UPDATE packets from Kea. Choose from HMAC-MD5, HMAC-SHA1, HMAC-SHA256 (recommended), etc. When an algorithm is selected, DashDDI automatically generates a random base64-encoded secret and stores it encrypted. Clearing the algorithm removes the secret. |
 
 ### SSH Key Setup
 
@@ -75,7 +74,7 @@ DashDDI can configure BIND to accept authenticated DNS UPDATE packets from Kea's
 ### Configuration overview
 
 **On the DNS server record:**
-- Set **DDNS Algorithm** and **DDNS Secret** to define the TSIG key. DashDDI derives the key name automatically from the server's display name (e.g. a server named `ns1` gets key name `ddns-ns1`).
+- Select a **DDNS Algorithm**. DashDDI immediately generates a random secret and stores it encrypted — there is no separate secret field. The TSIG key name is derived from the server's display name (e.g. a server named `ns1` gets key name `ddns-ns1`).
 
 **On the domain:**
 - Check **DDNS Enabled** and select the **DDNS DNS Server** (must be a primary server with a TSIG key configured). This makes Kea forward-register hostnames in this zone.
