@@ -61,6 +61,7 @@ class DhcpConfigGenerator
 
             if ($subnet->getDdnsQualifyingSuffix()) {
                 $block['ddns-send-updates']        = true;
+                $block['ddns-update-on-renew']     = true;
                 $block['ddns-qualifying-suffix']   = rtrim($subnet->getDdnsQualifyingSuffix(), '.') . '.';
                 $block['ddns-replace-client-name'] = 'when-not-present';
             }
@@ -115,6 +116,7 @@ class DhcpConfigGenerator
 
             if ($subnet->getDdnsQualifyingSuffix()) {
                 $block['ddns-send-updates']        = true;
+                $block['ddns-update-on-renew']     = true;
                 $block['ddns-qualifying-suffix']   = rtrim($subnet->getDdnsQualifyingSuffix(), '.') . '.';
                 $block['ddns-replace-client-name'] = 'when-not-present';
             }
