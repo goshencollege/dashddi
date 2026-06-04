@@ -386,8 +386,12 @@ class DnsConfigGenerator
 
     private function ipv6ReverseZoneName(string $address, int $prefix): string
     {
-        $nibbles     = str_split(bin2hex(inet_pton($address)));
-        $nibbleCount = (int)ceil($prefix / 4);
+        $packed = inet_pton($address);
+        if ($packed === false) {
+            throw new \InvalidArgumentException("Invalid IPv6 address: {$address}");
+        }
+        $nibbles     = str_split(bin2hex($packed));
+        $nibbleCount = max(1, (int)ceil($prefix / 4));
         return implode('.', array_reverse(array_slice($nibbles, 0, $nibbleCount))) . '.ip6.arpa';
     }
 
@@ -401,7 +405,11 @@ class DnsConfigGenerator
 
     private function ipv6PtrLabel(string $address, int $prefix): string
     {
-        $nibbles     = str_split(bin2hex(inet_pton($address)));
+        $packed = inet_pton($address);
+        if ($packed === false) {
+            throw new \InvalidArgumentException("Invalid IPv6 address: {$address}");
+        }
+        $nibbles     = str_split(bin2hex($packed));
         $nibbleCount = (int)ceil($prefix / 4);
         return implode('.', array_reverse(array_slice($nibbles, $nibbleCount)));
     }

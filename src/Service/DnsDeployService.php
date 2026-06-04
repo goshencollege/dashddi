@@ -66,8 +66,17 @@ class DnsDeployService
 
                 foreach ($subnets as $subnet) {
                     foreach (array_filter([$subnet->getIpv4Cidr(), $subnet->getIpv6Cidr()]) as $cidr) {
-                        $hasDomains  = true;
-                        $zoneName    = $this->generator->reverseZoneName($cidr);
+                        $hasDomains = true;
+                        try {
+                            $zoneName = $this->generator->reverseZoneName($cidr);
+                        } catch (\InvalidArgumentException $e) {
+                            $viewResult['zones'][$cidr] = [
+                                'success' => false,
+                                'file'    => $cidr,
+                                'output'  => 'Skipped: ' . $e->getMessage(),
+                            ];
+                            continue;
+                        }
                         if ($keyDirBase && $subnet->getDnssecPolicy()) {
                             $dir = $keyDirBase . '/' . $zoneName;
                             $sftp->exec('mkdir -p ' . escapeshellarg($dir));
