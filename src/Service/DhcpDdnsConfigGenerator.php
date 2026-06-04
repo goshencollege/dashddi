@@ -61,8 +61,12 @@ class DhcpDdnsConfigGenerator
 
         return [
             'DhcpDdns' => [
-                'ip-address'   => '127.0.0.1',
-                'port'         => 53001,
+                'ip-address'      => '127.0.0.1',
+                'port'            => 53001,
+                'control-socket'  => [
+                    'socket-type' => 'unix',
+                    'socket-name' => '/run/kea/kea-ddns-ctrl-socket',
+                ],
                 'tsig-keys'    => array_values($tsigKeys),
                 'forward-ddns' => ['ddns-domains' => $forwardDomains],
                 'reverse-ddns' => ['ddns-domains' => $reverseDomains],
