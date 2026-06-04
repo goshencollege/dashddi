@@ -4,6 +4,7 @@ namespace App\Service;
 
 use App\Entity\DhcpServer;
 use phpseclib3\Net\SFTP;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 class DhcpDeployService
 {
@@ -11,6 +12,7 @@ class DhcpDeployService
         private readonly DhcpConfigGenerator     $generator,
         private readonly DhcpDdnsConfigGenerator $ddnsGenerator,
         private readonly SshKeyService           $sshKeys,
+        private readonly HttpClientInterface     $httpClient,
     ) {}
 
     public function generateFiles(string $outputDir): array
@@ -171,26 +173,20 @@ class DhcpDeployService
 
     private function controlRequest(string $controlUrl, string $command, string $service, ?string $user, ?string $password): array
     {
-        $url     = rtrim($controlUrl, '/');
-        $payload = json_encode(['command' => $command, 'service' => [$service]]);
+        $url = rtrim($controlUrl, '/');
 
-        $headers = "Content-Type: application/json\r\nContent-Length: " . strlen($payload);
+        $options = [
+            'json'    => ['command' => $command, 'service' => [$service]],
+            'timeout' => 10,
+        ];
         if ($user !== null) {
-            $headers .= "\r\nAuthorization: Basic " . base64_encode($user . ':' . ($password ?? ''));
+            $options['auth_basic'] = [$user, $password ?? ''];
         }
 
-        $context = stream_context_create([
-            'http' => [
-                'method'        => 'POST',
-                'header'        => $headers,
-                'content'       => $payload,
-                'timeout'       => 10,
-                'ignore_errors' => true,
-            ],
-        ]);
-
-        $body = @file_get_contents($url, false, $context);
-        if ($body === false) {
+        try {
+            $response = $this->httpClient->request('POST', $url, $options);
+            $body     = $response->getContent(false);
+        } catch (\Throwable) {
             return ['success' => false, 'response' => 'Could not connect to DHCP Control Agent'];
         }
 

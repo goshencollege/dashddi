@@ -11,6 +11,7 @@ use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
+use Symfony\Component\Validator\Constraints\Url;
 
 class DhcpServerType extends AbstractType
 {
@@ -41,9 +42,10 @@ class DhcpServerType extends AbstractType
                 ],
             ])
             ->add('controlUrl', TextType::class, [
-                'label'    => 'Control Agent URL',
-                'required' => false,
-                'attr'     => ['placeholder' => 'http://192.168.1.1:8000'],
+                'label'       => 'Control Agent URL',
+                'required'    => false,
+                'attr'        => ['placeholder' => 'http://192.168.1.1:8000'],
+                'constraints' => [new Url(protocols: ['http', 'https'])],
             ])
             ->add('controlUser', TextType::class, [
                 'label'    => 'Control Agent User',
