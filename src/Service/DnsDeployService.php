@@ -27,9 +27,11 @@ class DnsDeployService
      */
     public function deployToServer(DnsServer $server): array
     {
-        $sftp      = $this->getSftp($server);
-        $results   = ['views' => [], 'conf' => null, 'reload' => null];
-        $zonePath  = rtrim($server->getRemoteZonePath(), '/');
+        $sftp       = $this->getSftp($server);
+        $results    = ['views' => [], 'conf' => null, 'reload' => null];
+        $zonePath   = rtrim($server->getRemoteZonePath(), '/');
+        $keyDirBase = $server->getKeyDirectory() ? rtrim($server->getKeyDirectory(), '/') : null;
+        $bindUser   = $server->getBindUser();
         $hasDomains = false;
 
         $isSecondary = $server->isSecondary();
@@ -47,6 +49,11 @@ class DnsDeployService
             if (!$isSecondary) {
                 foreach ($domains as $domain) {
                     $hasDomains = true;
+                    if ($keyDirBase && $domain->getDnssecPolicy()) {
+                        $dir = $keyDirBase . '/' . $domain->getName();
+                        $sftp->exec('mkdir -p ' . escapeshellarg($dir));
+                        $sftp->exec('chown ' . escapeshellarg($bindUser . ':' . $bindUser) . ' ' . escapeshellarg($dir));
+                    }
                     $remotePath  = $zonePath . '/' . $viewName . '/' . $domain->getName() . '.zone';
                     $displayFile = $viewName . '/' . $domain->getName() . '.zone';
                     $ok = $sftp->put($remotePath, $this->generator->generateZoneFile($domain, $view));
@@ -61,6 +68,11 @@ class DnsDeployService
                     foreach (array_filter([$subnet->getIpv4Cidr(), $subnet->getIpv6Cidr()]) as $cidr) {
                         $hasDomains  = true;
                         $zoneName    = $this->generator->reverseZoneName($cidr);
+                        if ($keyDirBase && $subnet->getDnssecPolicy()) {
+                            $dir = $keyDirBase . '/' . $zoneName;
+                            $sftp->exec('mkdir -p ' . escapeshellarg($dir));
+                            $sftp->exec('chown ' . escapeshellarg($bindUser . ':' . $bindUser) . ' ' . escapeshellarg($dir));
+                        }
                         $remotePath  = $zonePath . '/' . $viewName . '/' . $zoneName . '.zone';
                         $displayFile = $viewName . '/' . $zoneName . '.zone';
                         $ok = $sftp->put($remotePath, $this->generator->generateReverseZoneFile($subnet, $cidr, $view));

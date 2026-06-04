@@ -62,6 +62,12 @@ class DnsServerType extends AbstractType
                 'required' => false,
                 'attr'     => ['placeholder' => 'e.g. /etc/bind/keys'],
             ])
+            ->add('bindUser', TextType::class, [
+                'label'      => 'BIND Service User',
+                'attr'       => ['placeholder' => 'bind'],
+                'empty_data' => 'bind',
+                'help'       => 'OS user that runs BIND. Key directories are chowned to this user after creation.',
+            ])
             ->add('views', EntityType::class, [
                 'class'        => DnsView::class,
                 'choices'      => $this->viewRepo->findBy([], ['name' => 'ASC']),

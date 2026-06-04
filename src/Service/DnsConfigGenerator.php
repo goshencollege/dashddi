@@ -306,12 +306,10 @@ class DnsConfigGenerator
                     $lines[] = '        file "' . $file . '";';
                     if ($domain->getDnssecPolicy()) {
                         $lines[] = '        dnssec-policy "' . $domain->getDnssecPolicy()->getName() . '";';
-                    }
-                    if ($keyDirBase) {
-                        $lines[] = '        key-directory "' . $keyDirBase . '/' . $domain->getName() . '";';
-                    }
-                    if ($domain->getDnssecPolicy() && $keyDirBase) {
-                        $lines[] = '        inline-signing yes;';
+                        if ($keyDirBase) {
+                            $lines[] = '        key-directory "' . $keyDirBase . '/' . $domain->getName() . '";';
+                            $lines[] = '        inline-signing yes;';
+                        }
                     }
                     if ($domain->isDdnsEnabled()
                         && $domain->getDdnsDnsServer()?->getId() === $server->getId()
@@ -339,12 +337,10 @@ class DnsConfigGenerator
                         $lines[] = '        file "' . $file . '";';
                         if ($subnet->getDnssecPolicy()) {
                             $lines[] = '        dnssec-policy "' . $subnet->getDnssecPolicy()->getName() . '";';
-                        }
-                        if ($keyDirBase) {
-                            $lines[] = '        key-directory "' . $keyDirBase . '/' . $zoneName . '";';
-                        }
-                        if ($subnet->getDnssecPolicy() && $keyDirBase) {
-                            $lines[] = '        inline-signing yes;';
+                            if ($keyDirBase) {
+                                $lines[] = '        key-directory "' . $keyDirBase . '/' . $zoneName . '";';
+                                $lines[] = '        inline-signing yes;';
+                            }
                         }
                         if ($subnet->isDdnsEnabled()
                             && $subnet->getDdnsDnsServer()?->getId() === $server->getId()
