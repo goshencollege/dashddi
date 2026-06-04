@@ -67,7 +67,7 @@ class DhcpDeployService
             $ok = $sftp->put($remotePath, (string) file_get_contents($localFile));
             $result = [
                 'success' => $ok,
-                'output'  => $ok ? '' : 'SFTP upload failed',
+                'output'  => $ok ? '' : 'SFTP upload failed: ' . $sftp->getLastSFTPError(),
                 'file'    => basename($localFile),
                 'reload'  => null,
             ];
@@ -119,20 +119,12 @@ class DhcpDeployService
             json_encode($this->ddnsGenerator->generateConfig(), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n"
         );
 
-        $remotePath    = rtrim($server->getRemotePath(), '/') . '/kea-dhcp-ddns.conf';
-        $backupContent = null;
-
-        if ($reload && $server->getControlUrl()) {
-            $downloaded = $sftp->get($remotePath);
-            if ($downloaded !== false) {
-                $backupContent = $downloaded;
-            }
-        }
+        $remotePath = rtrim($server->getRemotePath(), '/') . '/kea-dhcp-ddns.conf';
 
         $ok     = $sftp->put($remotePath, (string) file_get_contents($localFile));
         $result = [
             'success' => $ok,
-            'output'  => $ok ? '' : 'SFTP upload failed',
+            'output'  => $ok ? '' : 'SFTP upload failed: ' . $sftp->getLastSFTPError(),
             'file'    => 'kea-dhcp-ddns.conf',
             'reload'  => null,
         ];
@@ -141,22 +133,13 @@ class DhcpDeployService
             return $result;
         }
 
-        $reloadResult          = $this->controlCommand('config-reload', 'd2', $server);
+        $reloadResult     = $this->controlCommand('config-reload', 'd2', $server);
         $result['reload'] = [
             'success'  => $reloadResult['success'],
             'response' => $reloadResult['response'],
             'stage'    => 'config-reload',
             'restored' => false,
         ];
-
-        if (!$reloadResult['success'] && $backupContent !== null) {
-            $restored = $sftp->put($remotePath, $backupContent);
-            if ($restored) {
-                $this->controlCommand('config-reload', 'd2', $server);
-            }
-            $result['reload']['restored']      = $restored;
-            $result['reload']['restore_error'] = $restored ? null : 'SFTP restore failed';
-        }
 
         return $result;
     }
