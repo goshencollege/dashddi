@@ -116,6 +116,18 @@ class Subnet
     #[ORM\Column(options: ['default' => false])]
     private bool $isContainer = false;
 
+    #[ORM\Column(options: ['default' => false])]
+    private bool $ddnsEnabled = false;
+
+    #[ORM\ManyToOne(targetEntity: DnsServer::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?DnsServer $ddnsDnsServer = null;
+
+    /** Qualifying suffix appended to dynamic client hostnames before DDNS registration (e.g. "goshen.edu."). */
+    #[ORM\Column(length: 255, nullable: true)]
+    #[Assert\Length(max: 255)]
+    private ?string $ddnsQualifyingSuffix = null;
+
     public function __construct()
     {
         $this->ipAddresses = new ArrayCollection();
@@ -181,6 +193,15 @@ class Subnet
 
     public function isContainer(): bool { return $this->isContainer; }
     public function setIsContainer(bool $isContainer): static { $this->isContainer = $isContainer; return $this; }
+
+    public function isDdnsEnabled(): bool { return $this->ddnsEnabled; }
+    public function setDdnsEnabled(bool $v): static { $this->ddnsEnabled = $v; return $this; }
+
+    public function getDdnsDnsServer(): ?DnsServer { return $this->ddnsDnsServer; }
+    public function setDdnsDnsServer(?DnsServer $v): static { $this->ddnsDnsServer = $v; return $this; }
+
+    public function getDdnsQualifyingSuffix(): ?string { return $this->ddnsQualifyingSuffix; }
+    public function setDdnsQualifyingSuffix(?string $v): static { $this->ddnsQualifyingSuffix = $v ?: null; return $this; }
 
     public function getTags(): Collection { return $this->tags; }
 

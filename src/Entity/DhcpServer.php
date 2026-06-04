@@ -55,6 +55,9 @@ class DhcpServer
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $description = null;
 
+    #[ORM\Column(options: ['default' => false])]
+    private bool $ddnsEnabled = false;
+
     public function getId(): ?int { return $this->id; }
 
     public function getName(): string { return $this->name; }
@@ -89,4 +92,7 @@ class DhcpServer
 
     public function getDescription(): ?string { return $this->description; }
     public function setDescription(?string $description): static { $this->description = $description; return $this; }
+
+    public function isDdnsEnabled(): bool { return $this->ddnsEnabled; }
+    public function setDdnsEnabled(bool $v): static { $this->ddnsEnabled = $v; return $this; }
 }

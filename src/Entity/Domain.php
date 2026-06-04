@@ -64,6 +64,13 @@ class Domain
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
     private ?DnssecPolicy $dnssecPolicy = null;
 
+    #[ORM\Column(options: ['default' => false])]
+    private bool $ddnsEnabled = false;
+
+    #[ORM\ManyToOne(targetEntity: DnsServer::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?DnsServer $ddnsDnsServer = null;
+
     #[ORM\OneToMany(targetEntity: DomainRecord::class, mappedBy: 'domain', cascade: ['persist', 'remove'], orphanRemoval: true)]
     #[ORM\OrderBy(['hostname' => 'ASC'])]
     private Collection $records;
@@ -110,6 +117,12 @@ class Domain
 
     public function getDnssecPolicy(): ?DnssecPolicy { return $this->dnssecPolicy; }
     public function setDnssecPolicy(?DnssecPolicy $v): static { $this->dnssecPolicy = $v; return $this; }
+
+    public function isDdnsEnabled(): bool { return $this->ddnsEnabled; }
+    public function setDdnsEnabled(bool $v): static { $this->ddnsEnabled = $v; return $this; }
+
+    public function getDdnsDnsServer(): ?DnsServer { return $this->ddnsDnsServer; }
+    public function setDdnsDnsServer(?DnsServer $v): static { $this->ddnsDnsServer = $v; return $this; }
 
     public function getRecords(): Collection { return $this->records; }
     public function getInterfaceNames(): Collection { return $this->interfaceNames; }

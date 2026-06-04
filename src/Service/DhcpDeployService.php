@@ -8,8 +8,9 @@ use phpseclib3\Net\SFTP;
 class DhcpDeployService
 {
     public function __construct(
-        private readonly DhcpConfigGenerator $generator,
-        private readonly SshKeyService $sshKeys,
+        private readonly DhcpConfigGenerator     $generator,
+        private readonly DhcpDdnsConfigGenerator $ddnsGenerator,
+        private readonly SshKeyService           $sshKeys,
     ) {}
 
     public function generateFiles(string $outputDir): array
@@ -99,7 +100,65 @@ class DhcpDeployService
             $results[$type] = $result;
         }
 
+        if ($server->isDdnsEnabled()) {
+            $results['ddns'] = $this->deployDdnsConfig($sftp, $server, $reload);
+        }
+
         return $results;
+    }
+
+    private function deployDdnsConfig(SFTP $sftp, DhcpServer $server, bool $reload): array
+    {
+        $tmpDir    = sys_get_temp_dir() . '/dhcp';
+        $localFile = $tmpDir . '/kea-dhcp-ddns.conf';
+        if (!is_dir($tmpDir)) {
+            mkdir($tmpDir, 0755, true);
+        }
+        file_put_contents(
+            $localFile,
+            json_encode($this->ddnsGenerator->generateConfig(), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n"
+        );
+
+        $remotePath    = rtrim($server->getRemotePath(), '/') . '/kea-dhcp-ddns.conf';
+        $backupContent = null;
+
+        if ($reload && $server->getControlUrl()) {
+            $downloaded = $sftp->get($remotePath);
+            if ($downloaded !== false) {
+                $backupContent = $downloaded;
+            }
+        }
+
+        $ok     = $sftp->put($remotePath, (string) file_get_contents($localFile));
+        $result = [
+            'success' => $ok,
+            'output'  => $ok ? '' : 'SFTP upload failed',
+            'file'    => 'kea-dhcp-ddns.conf',
+            'reload'  => null,
+        ];
+
+        if (!$result['success'] || !$reload || !$server->getControlUrl()) {
+            return $result;
+        }
+
+        $reloadResult          = $this->controlCommand('config-reload', 'd2', $server);
+        $result['reload'] = [
+            'success'  => $reloadResult['success'],
+            'response' => $reloadResult['response'],
+            'stage'    => 'config-reload',
+            'restored' => false,
+        ];
+
+        if (!$reloadResult['success'] && $backupContent !== null) {
+            $restored = $sftp->put($remotePath, $backupContent);
+            if ($restored) {
+                $this->controlCommand('config-reload', 'd2', $server);
+            }
+            $result['reload']['restored']      = $restored;
+            $result['reload']['restore_error'] = $restored ? null : 'SFTP restore failed';
+        }
+
+        return $result;
     }
 
     public function reloadDhcp(string $controlUrl, string $service, ?string $user = null, ?string $password = null): array

@@ -3,6 +3,7 @@
 namespace App\Form;
 
 use App\Entity\AddressBlock;
+use App\Entity\DnsServer;
 use App\Entity\DnsView;
 use App\Entity\DnssecPolicy;
 use App\Entity\Subnet;
@@ -128,6 +129,24 @@ class SubnetType extends AbstractType
                 'required' => false,
                 'attr'     => ['placeholder' => 'e.g. 90 — leave blank to keep forever'],
                 'help'     => 'Automatically delete lease log entries older than this many days.',
+            ])
+            ->add('ddnsEnabled', CheckboxType::class, [
+                'label'    => 'Enable DDNS for reverse zone (allow-update in BIND)',
+                'required' => false,
+            ])
+            ->add('ddnsDnsServer', EntityType::class, [
+                'class'        => DnsServer::class,
+                'choice_label' => 'name',
+                'placeholder'  => '— None —',
+                'required'     => false,
+                'label'        => 'DDNS Server',
+                'help'         => 'The DNS server that will accept PTR record updates for this subnet\'s reverse zone.',
+            ])
+            ->add('ddnsQualifyingSuffix', TextType::class, [
+                'label'    => 'DDNS Qualifying Suffix',
+                'required' => false,
+                'attr'     => ['placeholder' => 'e.g. goshen.edu'],
+                'help'     => 'Domain appended to dynamic client hostnames before DDNS registration. Enables ddns-send-updates for this subnet in the Kea config.',
             ]);
 
         if ($options['embed_blocks']) {

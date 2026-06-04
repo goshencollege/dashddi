@@ -252,6 +252,15 @@ class DnsConfigGenerator
             $lines[] = '';
         }
 
+        // Emit a TSIG key block if this server has DDNS configured.
+        if ($server->getDdnsAlgorithm() && $server->getDdnsSecret()) {
+            $lines[] = 'key "' . $server->getDdnsKeyName() . '" {';
+            $lines[] = '    algorithm ' . $server->getDdnsAlgorithm()->bindName() . ';';
+            $lines[] = '    secret "' . $server->getDdnsSecret() . '";';
+            $lines[] = '};';
+            $lines[] = '';
+        }
+
         foreach ($server->getViews() as $view) {
             $domains = $this->domainsForView($view);
             $subnets = $this->subnetsForView($view);
@@ -305,6 +314,12 @@ class DnsConfigGenerator
                     if ($domain->getDnssecPolicy() && $keyDirBase) {
                         $lines[] = '        inline-signing yes;';
                     }
+                    if ($domain->isDdnsEnabled()
+                        && $domain->getDdnsDnsServer()?->getId() === $server->getId()
+                        && $server->getDdnsAlgorithm()
+                    ) {
+                        $lines[] = '        allow-update { key "' . $server->getDdnsKeyName() . '"; };';
+                    }
                 }
                 $lines[] = '    };';
             }
@@ -331,6 +346,12 @@ class DnsConfigGenerator
                         }
                         if ($subnet->getDnssecPolicy() && $keyDirBase) {
                             $lines[] = '        inline-signing yes;';
+                        }
+                        if ($subnet->isDdnsEnabled()
+                            && $subnet->getDdnsDnsServer()?->getId() === $server->getId()
+                            && $server->getDdnsAlgorithm()
+                        ) {
+                            $lines[] = '        allow-update { key "' . $server->getDdnsKeyName() . '"; };';
                         }
                     }
                     $lines[] = '    };';
