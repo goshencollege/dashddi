@@ -2,6 +2,7 @@
 
 namespace App\Service;
 
+use App\Entity\NetworkInterface;
 use App\Enum\BlockType;
 use App\Repository\SubnetRepository;
 
@@ -63,7 +64,7 @@ class DhcpConfigGenerator
                 $block['ddns-send-updates']        = true;
                 $block['ddns-update-on-renew']     = true;
                 $block['ddns-qualifying-suffix']   = rtrim($subnet->getDdnsQualifyingSuffix(), '.') . '.';
-                $block['ddns-replace-client-name'] = 'when-not-present';
+                $block['ddns-replace-client-name'] = 'always';
             }
 
             $subnet4[] = $block;
@@ -102,7 +103,7 @@ class DhcpConfigGenerator
                     continue;
                 }
                 $res = [
-                    'hw-address' => $iface->getMacAddress(),
+                    'hw-address'   => $iface->getMacAddress(),
                     'ip-addresses' => [$iface->getIpv6Address()->getAddress()],
                 ];
                 if ($hostname = $iface->getPrimaryName()) {
@@ -118,12 +119,64 @@ class DhcpConfigGenerator
                 $block['ddns-send-updates']        = true;
                 $block['ddns-update-on-renew']     = true;
                 $block['ddns-qualifying-suffix']   = rtrim($subnet->getDdnsQualifyingSuffix(), '.') . '.';
-                $block['ddns-replace-client-name'] = 'when-not-present';
+                $block['ddns-replace-client-name'] = 'always';
             }
 
             $subnet6[] = $block;
         }
 
         return $subnet6;
+    }
+
+    public function generateGlobalReservations4Config(): array
+    {
+        $reservations = [];
+
+        foreach ($this->subnetRepository->findAll() as $subnet) {
+            foreach ($subnet->getInterfaces() as $iface) {
+                if ($iface->isDeleted() || $iface->getIpAddress() || $iface->getMacAddress() === '00:00:00:00:00:00') {
+                    continue;
+                }
+                if ($label = $this->findAnyDdnsLabel($iface)) {
+                    $reservations[] = [
+                        'hw-address' => $iface->getMacAddress(),
+                        'hostname'   => $label,
+                    ];
+                }
+            }
+        }
+
+        return $reservations;
+    }
+
+    public function generateGlobalReservations6Config(): array
+    {
+        $reservations = [];
+
+        foreach ($this->subnetRepository->findAll() as $subnet) {
+            foreach ($subnet->getInterfaces() as $iface) {
+                if ($iface->isDeleted() || $iface->getIpv6Address() || $iface->getMacAddress() === '00:00:00:00:00:00') {
+                    continue;
+                }
+                if ($label = $this->findAnyDdnsLabel($iface)) {
+                    $reservations[] = [
+                        'hw-address' => $iface->getMacAddress(),
+                        'hostname'   => $label,
+                    ];
+                }
+            }
+        }
+
+        return $reservations;
+    }
+
+    private function findAnyDdnsLabel(NetworkInterface $iface): ?string
+    {
+        foreach ($iface->getNames() as $name) {
+            if ($name->getDomain()?->isDdnsEnabled()) {
+                return $name->getName();
+            }
+        }
+        return null;
     }
 }

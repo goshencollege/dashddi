@@ -138,19 +138,20 @@
 
         <hr class="my-3">
         <h6>Generated configuration</h6>
-        <p class="mb-1"><strong><code>subnets4.json</code> (DHCPv4)</strong> — for each subnet with an IPv4 CIDR:</p>
+        <p class="mb-1"><strong><code>subnets4.json</code> / <code>subnets6.json</code></strong> — for each deployable (non-container) subnet:</p>
         <ul class="mb-2">
             <li><strong>Pools</strong> — all Dynamic address blocks on the subnet</li>
-            <li><strong>Router option</strong> — the subnet's gateway IP (if set)</li>
-            <li><strong>Reservations</strong> — all non-deleted interfaces with a MAC address, mapping <code>hw-address</code> → <code>ip-address</code></li>
+            <li><strong>Router option</strong> (IPv4 only) — the subnet's gateway IP (if set)</li>
+            <li><strong>Reservations</strong> — non-deleted interfaces with a static IP and valid MAC, mapping <code>hw-address</code> → <code>ip-address</code> (and optionally <code>hostname</code>)</li>
         </ul>
-        <p class="mb-1"><strong><code>subnets6.json</code> (DHCPv6)</strong> — for each subnet with an IPv6 CIDR:</p>
-        <ul class="mb-3">
-            <li><strong>Pools</strong> — all Dynamic address blocks (IPv6) on the subnet</li>
-            <li><strong>Reservations</strong> — all non-deleted interfaces with an IPv6 address, mapping <code>hw-address</code> → <code>ip-addresses</code></li>
+        <p class="mb-1"><strong><code>global-reservations4.json</code> / <code>global-reservations6.json</code></strong> — flat arrays of hostname-only reservations for dynamic clients:</p>
+        <ul class="mb-2">
+            <li>Includes every non-deleted interface that has a valid MAC, <strong>no</strong> static IP, and a name entry in any DDNS-enabled domain</li>
+            <li>The <code>hostname</code> is the DNS label from that name entry (e.g. <code>mylaptop</code>); Kea appends the subnet's <code>ddns-qualifying-suffix</code> at lease time</li>
+            <li>Global reservations match regardless of which subnet the device DHCPs from — useful for devices pre-registered before their location is known</li>
         </ul>
         <p class="mb-1"><strong><code>kea-dhcp-ddns.conf</code></strong> — generated and deployed alongside the subnet files when <strong>DDNS Enabled</strong> is checked. Contains TSIG key blocks, forward DDNS domain entries, and reverse DDNS domain entries for the Kea D2 daemon (see Dynamic DNS below).</p>
-        <p class="text-muted small mb-3">Interfaces with the all-zeros MAC (<code>00:00:00:00:00:00</code>) are excluded from reservations.</p>
+        <p class="text-muted small mb-3">Interfaces with the all-zeros MAC (<code>00:00:00:00:00:00</code>) are excluded from all reservations.</p>
 
         <hr class="my-3">
         <h6>Console command</h6>
@@ -179,9 +180,23 @@
         <p><strong>What DashDDI generates</strong></p>
         <p class="mb-3">When it deploys DHCP config with DDNS enabled, DashDDI also uploads <code>kea-dhcp-ddns.conf</code> containing TSIG key blocks (one per configured DNS server), forward DDNS domain entries (one per DDNS-enabled domain), and reverse DDNS domain entries (one per subnet with a DDNS domain assigned). DashDDI resolves DNS server hostnames to IP addresses automatically — D2 requires literal IPs, not hostnames.</p>
 
-        <div class="alert alert-info py-2 small mb-0">
+        <div class="alert alert-info py-2 small mb-3">
             <i class="bi bi-lightbulb me-1"></i>The TSIG secret appears in plaintext in the deployed <code>kea-dhcp-ddns.conf</code> and <code>dashddi.conf</code> — this is inherent to the TSIG protocol. Restrict read permissions on both files to the <code>kea</code> and <code>bind</code> service users.
         </div>
+
+        <p><strong>DDNS hostnames for dynamic clients</strong></p>
+        <p>When a subnet has a DDNS domain assigned, DashDDI sets <code>ddns-replace-client-name: always</code> in the subnet block, so Kea always uses the hostname from DashDDI's reservation rather than whatever the client reports. Hostname mappings are stored in <code>global-reservations4.json</code> at the Kea global level, so they apply on any subnet — a device pre-registered before its final building is known will still get the right DNS name wherever it connects.</p>
+        <p><strong>One-time Kea configuration:</strong> add <code>"reservations-global": true</code> to <code>kea-dhcp4.conf</code> and include the global reservations file:</p>
+        <pre class="bg-body-secondary rounded p-3 small mb-3"><code>"reservations-global": true,
+"reservations": &lt;?include "global-reservations4.json"?&gt;</code></pre>
+        <p>To give a dynamic device a predictable DNS name:</p>
+        <ol class="mb-3">
+            <li>Add an interface for the device with its MAC address. Leave the IP address blank.</li>
+            <li>On that interface, add a name entry in any DDNS-enabled domain (e.g. name <code>mylaptop</code> in <code>dyn.example.com</code>).</li>
+            <li>Redeploy — the device's MAC + label will appear in <code>global-reservations4.json</code>.</li>
+            <li>When the device next gets a lease on any DDNS-enabled subnet, Kea registers <code>mylaptop.dyn.example.com</code> in DNS.</li>
+        </ol>
+        <p class="text-muted small mb-0">Devices with no reservation receive an auto-generated hostname. Devices with a static IP reservation use their primary interface name for DDNS as usual.</p>
 
         <hr class="my-3">
         <h6 id="kea-lease-notifications">Configuring Kea to send lease notifications</h6>
