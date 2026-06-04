@@ -387,7 +387,7 @@ class DnsConfigGenerator
     private function ipv6ReverseZoneName(string $address, int $prefix): string
     {
         $nibbles     = str_split(bin2hex(inet_pton($address)));
-        $nibbleCount = (int)ceil($prefix / 4);
+        $nibbleCount = max(1, (int)ceil($prefix / 4));
         return implode('.', array_reverse(array_slice($nibbles, 0, $nibbleCount))) . '.ip6.arpa';
     }
 
