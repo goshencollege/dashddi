@@ -34,7 +34,7 @@ class DhcpDdnsConfigGenerator
             $forwardDomains[] = [
                 'name'        => rtrim($domain->getName(), '.') . '.',
                 'key-name'    => $server->getDdnsKeyName(),
-                'dns-servers' => [['ip-address' => $server->getHostname(), 'port' => 53]],
+                'dns-servers' => [['ip-address' => $this->resolveIp($server->getHostname()), 'port' => 53]],
             ];
         }
 
@@ -55,7 +55,7 @@ class DhcpDdnsConfigGenerator
             $reverseDomains[] = [
                 'name'        => rtrim($reverseZone, '.') . '.',
                 'key-name'    => $server->getDdnsKeyName(),
-                'dns-servers' => [['ip-address' => $server->getHostname(), 'port' => 53]],
+                'dns-servers' => [['ip-address' => $this->resolveIp($server->getHostname()), 'port' => 53]],
             ];
         }
 
@@ -77,6 +77,13 @@ class DhcpDdnsConfigGenerator
                 ]],
             ],
         ];
+    }
+
+    private function resolveIp(string $hostname): string
+    {
+        // D2 requires a literal IP — gethostbyname() returns the input unchanged if already an IP
+        $ip = gethostbyname($hostname);
+        return $ip !== $hostname ? $ip : $hostname;
     }
 
     private function collectKey(array &$collected, DnsServer $server): void
