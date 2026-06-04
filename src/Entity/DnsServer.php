@@ -3,6 +3,7 @@
 namespace App\Entity;
 
 use App\Entity\Trait\AuditableTrait;
+use App\Enum\TsigAlgorithm;
 use App\Repository\DnsServerRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -55,6 +56,12 @@ class DnsServer
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $description = null;
 
+    #[ORM\Column(length: 32, enumType: TsigAlgorithm::class, nullable: true)]
+    private ?TsigAlgorithm $ddnsAlgorithm = null;
+
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $ddnsSecret = null;
+
     #[ORM\ManyToMany(targetEntity: DnsView::class)]
     #[ORM\JoinTable(name: 'dns_server_dns_view')]
     private Collection $views;
@@ -97,6 +104,18 @@ class DnsServer
 
     public function getDescription(): ?string { return $this->description; }
     public function setDescription(?string $description): static { $this->description = $description; return $this; }
+
+    public function getDdnsAlgorithm(): ?TsigAlgorithm { return $this->ddnsAlgorithm; }
+    public function setDdnsAlgorithm(?TsigAlgorithm $v): static { $this->ddnsAlgorithm = $v; return $this; }
+
+    public function getDdnsSecret(): ?string { return $this->ddnsSecret; }
+    public function setDdnsSecret(?string $v): static { $this->ddnsSecret = $v; return $this; }
+
+    /** TSIG key name used in BIND and Kea D2 configs, derived from the server name. */
+    public function getDdnsKeyName(): string
+    {
+        return 'ddns-' . preg_replace('/[^a-z0-9]+/', '-', strtolower($this->name));
+    }
 
     public function getViews(): Collection { return $this->views; }
 

@@ -5,6 +5,7 @@ namespace App\Form;
 use App\Entity\AddressBlock;
 use App\Entity\DnsView;
 use App\Entity\DnssecPolicy;
+use App\Entity\Domain;
 use App\Entity\Subnet;
 use App\Entity\Tag;
 use App\Entity\Vrf;
@@ -128,6 +129,19 @@ class SubnetType extends AbstractType
                 'required' => false,
                 'attr'     => ['placeholder' => 'e.g. 90 — leave blank to keep forever'],
                 'help'     => 'Automatically delete lease log entries older than this many days.',
+            ])
+            ->add('ddnsDomain', EntityType::class, [
+                'class'         => Domain::class,
+                'choice_label'  => 'name',
+                'placeholder'   => '— None (DDNS disabled) —',
+                'required'      => false,
+                'label'         => 'DDNS Domain',
+                'help'          => 'Dynamic DNS updates for this subnet will be sent to the selected domain\'s DNS server. Only domains with DDNS enabled and a server configured are listed.',
+                'query_builder' => fn($repo) => $repo->createQueryBuilder('d')
+                    ->join('d.ddnsDnsServer', 's')
+                    ->where('d.ddnsEnabled = true')
+                    ->andWhere('s.ddnsAlgorithm IS NOT NULL')
+                    ->orderBy('d.name', 'ASC'),
             ]);
 
         if ($options['embed_blocks']) {

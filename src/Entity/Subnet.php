@@ -3,6 +3,7 @@
 namespace App\Entity;
 
 use App\Entity\Trait\AuditableTrait;
+use App\Entity\Domain;
 use App\Entity\DnssecPolicy;
 use App\Repository\AddressBlockRepository;
 use App\Repository\SubnetRepository;
@@ -116,6 +117,10 @@ class Subnet
     #[ORM\Column(options: ['default' => false])]
     private bool $isContainer = false;
 
+    #[ORM\ManyToOne(targetEntity: Domain::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?Domain $ddnsDomain = null;
+
     public function __construct()
     {
         $this->ipAddresses = new ArrayCollection();
@@ -181,6 +186,13 @@ class Subnet
 
     public function isContainer(): bool { return $this->isContainer; }
     public function setIsContainer(bool $isContainer): static { $this->isContainer = $isContainer; return $this; }
+
+    public function getDdnsDomain(): ?Domain { return $this->ddnsDomain; }
+    public function setDdnsDomain(?Domain $v): static { $this->ddnsDomain = $v; return $this; }
+
+    public function isDdnsEnabled(): bool { return $this->ddnsDomain !== null; }
+    public function getDdnsDnsServer(): ?DnsServer { return $this->ddnsDomain?->getDdnsDnsServer(); }
+    public function getDdnsQualifyingSuffix(): ?string { return $this->ddnsDomain?->getName(); }
 
     public function getTags(): Collection { return $this->tags; }
 

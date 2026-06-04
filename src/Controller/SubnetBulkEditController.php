@@ -59,6 +59,7 @@ class SubnetBulkEditController extends AbstractController
             $applyViews         = !empty($post['apply_views']);
             $applyDnssec        = !empty($post['apply_dnssecPolicy']);
             $applyRetention     = !empty($post['apply_leaseRetentionDays']);
+            $applyDdnsDomain    = !empty($post['apply_ddnsDomain']);
 
             $tagsMode  = $post['tags_mode']  ?? 'replace';
             $viewsMode = $post['views_mode'] ?? 'replace';
@@ -131,6 +132,9 @@ class SubnetBulkEditController extends AbstractController
                 }
                 if ($applyRetention) {
                     $subnet->setLeaseRetentionDays($data['leaseRetentionDays']);
+                }
+                if ($applyDdnsDomain) {
+                    $subnet->setDdnsDomain($data['ddnsDomain']);
                 }
             }
 

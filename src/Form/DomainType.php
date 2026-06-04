@@ -2,10 +2,12 @@
 
 namespace App\Form;
 
+use App\Entity\DnsServer;
 use App\Entity\DnsView;
 use App\Entity\DnssecPolicy;
 use App\Entity\Domain;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
+use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\IntegerType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
@@ -67,6 +69,21 @@ class DomainType extends AbstractType
                 'placeholder'  => '— None —',
                 'required'     => false,
                 'label'        => 'DNSSEC Policy',
+            ])
+            ->add('ddnsEnabled', CheckboxType::class, [
+                'label'    => 'Enable DDNS (allow dynamic updates from Kea)',
+                'required' => false,
+            ])
+            ->add('ddnsDnsServer', EntityType::class, [
+                'class'         => DnsServer::class,
+                'choice_label'  => 'name',
+                'placeholder'   => '— None —',
+                'required'      => false,
+                'label'         => 'DDNS Server',
+                'help'          => 'Only servers with a DDNS algorithm configured are listed.',
+                'query_builder' => fn($repo) => $repo->createQueryBuilder('s')
+                    ->where('s.ddnsAlgorithm IS NOT NULL')
+                    ->orderBy('s.name', 'ASC'),
             ]);
     }
 

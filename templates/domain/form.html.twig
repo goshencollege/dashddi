@@ -86,6 +86,21 @@
                     </div>
                     {{ form_errors(form.dnssecPolicy) }}
                 </div>
+                <hr class="my-3">
+                <h6 class="text-muted mb-3"><i class="bi bi-arrow-repeat me-1"></i>Dynamic DNS (DDNS)</h6>
+                <div class="mb-3 form-check">
+                    {{ form_widget(form.ddnsEnabled, {attr: {class: 'form-check-input'}}) }}
+                    {{ form_label(form.ddnsEnabled, null, {label_attr: {class: 'form-check-label'}}) }}
+                </div>
+                <div class="mb-4">
+                    {{ form_label(form.ddnsDnsServer) }}
+                    {{ form_widget(form.ddnsDnsServer, {attr: {class: 'form-select'}}) }}
+                    {{ form_help(form.ddnsDnsServer) }}
+                    {{ form_errors(form.ddnsDnsServer) }}
+                    <div class="form-text">
+                        Configure DDNS algorithm on the <a href="{{ path('servers_index') }}">DNS server</a>.
+                    </div>
+                </div>
                 <div class="d-flex justify-content-between">
                     <a href="{{ path('domain_index') }}" class="btn btn-outline-secondary">Cancel</a>
                     <button type="submit" class="btn btn-primary">

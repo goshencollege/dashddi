@@ -37,6 +37,7 @@ class DnsServerController extends AbstractController
         if ($form->isSubmitted() && $form->isValid()) {
             $keys = $this->sshKeys->generateKeyPair();
             $server->setSshPrivateKey($keys['private'])->setSshPublicKey($keys['public']);
+            $this->syncDdnsSecret($server);
             $em->persist($server);
             $em->flush();
             $this->addFlash('success', 'DNS server "' . $server->getName() . '" added. Add the SSH public key below to authorized_keys on the server.');
@@ -58,6 +59,7 @@ class DnsServerController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
+            $this->syncDdnsSecret($server);
             $em->flush();
             $this->addFlash('success', 'DNS server updated.');
             return $this->redirectToRoute('dns_server_edit', ['id' => $server->getId()]);
@@ -128,5 +130,14 @@ class DnsServerController extends AbstractController
         }
 
         return $this->json(['queued' => true, 'count' => count($servers)], 202);
+    }
+
+    private function syncDdnsSecret(\App\Entity\DnsServer $server): void
+    {
+        if ($server->getDdnsAlgorithm() && !$server->getDdnsSecret()) {
+            $server->setDdnsSecret(base64_encode(random_bytes(32)));
+        } elseif (!$server->getDdnsAlgorithm()) {
+            $server->setDdnsSecret(null);
+        }
     }
 }

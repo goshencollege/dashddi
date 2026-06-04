@@ -4,12 +4,15 @@ namespace App\Service;
 
 use App\Entity\DhcpServer;
 use phpseclib3\Net\SFTP;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 class DhcpDeployService
 {
     public function __construct(
-        private readonly DhcpConfigGenerator $generator,
-        private readonly SshKeyService $sshKeys,
+        private readonly DhcpConfigGenerator     $generator,
+        private readonly DhcpDdnsConfigGenerator $ddnsGenerator,
+        private readonly SshKeyService           $sshKeys,
+        private readonly HttpClientInterface     $httpClient,
     ) {}
 
     public function generateFiles(string $outputDir): array
@@ -66,7 +69,7 @@ class DhcpDeployService
             $ok = $sftp->put($remotePath, (string) file_get_contents($localFile));
             $result = [
                 'success' => $ok,
-                'output'  => $ok ? '' : 'SFTP upload failed',
+                'output'  => $ok ? '' : 'SFTP upload failed: ' . $sftp->getLastSFTPError(),
                 'file'    => basename($localFile),
                 'reload'  => null,
             ];
@@ -99,7 +102,48 @@ class DhcpDeployService
             $results[$type] = $result;
         }
 
+        if ($server->isDdnsEnabled()) {
+            $results['ddns'] = $this->deployDdnsConfig($sftp, $server, $reload);
+        }
+
         return $results;
+    }
+
+    private function deployDdnsConfig(SFTP $sftp, DhcpServer $server, bool $reload): array
+    {
+        $tmpDir    = sys_get_temp_dir() . '/dhcp';
+        $localFile = $tmpDir . '/kea-dhcp-ddns.conf';
+        if (!is_dir($tmpDir)) {
+            mkdir($tmpDir, 0755, true);
+        }
+        file_put_contents(
+            $localFile,
+            json_encode($this->ddnsGenerator->generateConfig(), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n"
+        );
+
+        $remotePath = rtrim($server->getRemotePath(), '/') . '/kea-dhcp-ddns.conf';
+
+        $ok     = $sftp->put($remotePath, (string) file_get_contents($localFile));
+        $result = [
+            'success' => $ok,
+            'output'  => $ok ? '' : 'SFTP upload failed: ' . $sftp->getLastSFTPError(),
+            'file'    => 'kea-dhcp-ddns.conf',
+            'reload'  => null,
+        ];
+
+        if (!$result['success'] || !$reload || !$server->getControlUrl()) {
+            return $result;
+        }
+
+        $reloadResult     = $this->controlCommand('config-reload', 'd2', $server);
+        $result['reload'] = [
+            'success'  => $reloadResult['success'],
+            'response' => $reloadResult['response'],
+            'stage'    => 'config-reload',
+            'restored' => false,
+        ];
+
+        return $result;
     }
 
     public function reloadDhcp(string $controlUrl, string $service, ?string $user = null, ?string $password = null): array
@@ -129,26 +173,20 @@ class DhcpDeployService
 
     private function controlRequest(string $controlUrl, string $command, string $service, ?string $user, ?string $password): array
     {
-        $url     = rtrim($controlUrl, '/');
-        $payload = json_encode(['command' => $command, 'service' => [$service]]);
+        $url = rtrim($controlUrl, '/');
 
-        $headers = "Content-Type: application/json\r\nContent-Length: " . strlen($payload);
+        $options = [
+            'json'    => ['command' => $command, 'service' => [$service]],
+            'timeout' => 10,
+        ];
         if ($user !== null) {
-            $headers .= "\r\nAuthorization: Basic " . base64_encode($user . ':' . ($password ?? ''));
+            $options['auth_basic'] = [$user, $password ?? ''];
         }
 
-        $context = stream_context_create([
-            'http' => [
-                'method'        => 'POST',
-                'header'        => $headers,
-                'content'       => $payload,
-                'timeout'       => 10,
-                'ignore_errors' => true,
-            ],
-        ]);
-
-        $body = @file_get_contents($url, false, $context);
-        if ($body === false) {
+        try {
+            $response = $this->httpClient->request('POST', $url, $options);
+            $body     = $response->getContent(false);
+        } catch (\Throwable) {
             return ['success' => false, 'response' => 'Could not connect to DHCP Control Agent'];
         }
 

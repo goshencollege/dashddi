@@ -13,7 +13,7 @@
         .navbar-brand { font-weight: 600; letter-spacing: .5px; }
         .table-hover tbody tr:hover { background-color: rgba(13,110,253,.05); }
         .ip-address { font-family: monospace; }
-        thead { background-color: var(--bs-tertiary-bg); }
+        thead, .table-section-header { background-color: var(--bs-tertiary-bg); }
         tr.row-deleted { --bs-table-bg: rgba(var(--bs-warning-rgb), 0.15); }
         .theme-swatch {
             display: inline-block; width: 13px; height: 13px;
@@ -25,7 +25,7 @@
         [data-theme="purple"] .navbar {
             background-color: #3b0764 !important;
         }
-        [data-theme="purple"] thead {
+        [data-theme="purple"] thead, [data-theme="purple"] .table-section-header {
             background-color: #4c1d95 !important;
         }
         [data-theme="purple"] {
@@ -65,7 +65,7 @@
         [data-theme="green"] .navbar {
             background-color: #064e3b !important;
         }
-        [data-theme="green"] thead {
+        [data-theme="green"] thead, [data-theme="green"] .table-section-header {
             background-color: #065f46 !important;
         }
         [data-theme="green"] {
@@ -143,10 +143,11 @@
             backdrop-filter: blur(10px);
             box-shadow: 0 4px 30px rgba(0,0,0,.4);
         }
-        [data-theme="rainbow"] thead {
+        [data-theme="rainbow"] thead, [data-theme="rainbow"] .table-section-header {
             background: linear-gradient(90deg, #ff0055, #ff8800, #ffff00, #00ff88, #0088ff, #8800ff) !important;
         }
-        [data-theme="rainbow"] thead th, [data-theme="rainbow"] thead td {
+        [data-theme="rainbow"] thead th, [data-theme="rainbow"] thead td,
+        [data-theme="rainbow"] .table-section-header th, [data-theme="rainbow"] .table-section-header td {
             color: #fff !important;
             text-shadow: 0 1px 4px rgba(0,0,0,.8);
         }

@@ -41,6 +41,7 @@ class DhcpServer
     private ?string $sshPublicKey = null;
 
     #[ORM\Column(length: 255, nullable: true)]
+    #[Assert\Url(protocols: ['http', 'https'], requireTld: false)]
     private ?string $controlUrl = null;
 
     #[ORM\Column(length: 128, nullable: true)]
@@ -54,6 +55,9 @@ class DhcpServer
 
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $description = null;
+
+    #[ORM\Column(options: ['default' => false])]
+    private bool $ddnsEnabled = false;
 
     public function getId(): ?int { return $this->id; }
 
@@ -89,4 +93,7 @@ class DhcpServer
 
     public function getDescription(): ?string { return $this->description; }
     public function setDescription(?string $description): static { $this->description = $description; return $this; }
+
+    public function isDdnsEnabled(): bool { return $this->ddnsEnabled; }
+    public function setDdnsEnabled(bool $v): static { $this->ddnsEnabled = $v; return $this; }
 }

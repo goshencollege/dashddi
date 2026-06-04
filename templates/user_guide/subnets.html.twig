@@ -88,6 +88,12 @@
             <dd class="col-sm-9">Apply a DNSSEC policy for inline zone signing of records in this subnet. Policies are defined under <strong>DNS → DNSSEC Policies</strong>.</dd>
         </dl>
 
+        <h6 class="mt-4">Dynamic DNS (DDNS)</h6>
+        <dl class="row mb-0">
+            <dt class="col-sm-3">DDNS Domain</dt>
+            <dd class="col-sm-9">Select a DDNS-enabled domain to allow Kea to dynamically update the reverse zone for this subnet. Only domains with a DDNS DNS server and TSIG key configured appear in this list. Leave blank to disable DDNS for this subnet. Can also be set in bulk from the subnet list using <strong>Bulk Edit</strong>.</dd>
+        </dl>
+
         <h6 class="mt-4">DHCP Lease Log</h6>
         <dl class="row mb-0">
             <dt class="col-sm-3">Lease Retention</dt>
@@ -104,7 +110,7 @@
     <div class="card-body">
         <p>Click a subnet name to open its detail page. This shows:</p>
         <ul>
-            <li><strong>Summary bar</strong> — VRF, gateway, VLAN, DNS views, and tags at a glance</li>
+            <li><strong>Summary bar</strong> — VRF, gateway, VLAN, DNS views, DDNS domain, and tags at a glance</li>
             <li><strong>DNS Records</strong> — records attached directly to the subnet (e.g. reverse-zone SOA/NS records)</li>
             <li><strong>Address Blocks</strong> — reserved or fixed IP ranges within the subnet</li>
             <li><strong>IPv4 / IPv6 Allocations</strong> — every IP address assigned to an interface in this subnet, with a link to the interface and host. Shows the next available address and count of free addresses.</li>

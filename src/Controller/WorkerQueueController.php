@@ -112,6 +112,27 @@ class WorkerQueueController extends AbstractController
         return $this->redirectToRoute('worker_queue');
     }
 
+    #[Route('/{id}/discard', name: 'worker_queue_discard', methods: ['POST'])]
+    public function discard(int $id, Request $request, Connection $conn): Response
+    {
+        if (!$this->isCsrfTokenValid('wq_discard_' . $id, $request->request->get('_token'))) {
+            $this->addFlash('danger', 'Invalid CSRF token.');
+            return $this->redirectToRoute('worker_queue');
+        }
+
+        $affected = $conn->executeStatement(
+            "DELETE FROM messenger_messages
+             WHERE id = ? AND queue_name NOT IN ('failed_priority', 'failed_bulk') AND delivered_at IS NOT NULL",
+            [$id]
+        );
+
+        $this->addFlash(
+            $affected ? 'success' : 'warning',
+            $affected ? 'Stuck message discarded.' : 'Message not found or not in running state.'
+        );
+        return $this->redirectToRoute('worker_queue');
+    }
+
     #[Route('/{id}/cancel', name: 'worker_queue_cancel', methods: ['POST'])]
     public function cancel(int $id, Request $request, Connection $conn): Response
     {

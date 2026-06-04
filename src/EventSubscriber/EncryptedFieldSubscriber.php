@@ -30,7 +30,7 @@ class EncryptedFieldSubscriber
         BackupSetting::class    => ['backupPassword'],
         ClearpassServer::class  => ['clientSecret'],
         DhcpServer::class       => ['sshPrivateKey', 'controlPassword'],
-        DnsServer::class        => ['sshPrivateKey'],
+        DnsServer::class        => ['sshPrivateKey', 'ddnsSecret'],
         SnipeItServer::class    => ['apiKey'],
     ];
 

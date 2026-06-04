@@ -70,7 +70,7 @@
         <tbody>
 
         {# ── General ──────────────────────────────────────────── #}
-        <tr class="table-secondary">
+        <tr class="table-section-header">
             <td colspan="4" class="small text-uppercase text-muted fw-semibold py-2 ps-3">General</td>
         </tr>
 
@@ -114,7 +114,7 @@
         </tr>
 
         {# ── Reverse Zone SOA ─────────────────────────────────── #}
-        <tr class="table-secondary">
+        <tr class="table-section-header">
             <td colspan="4" class="small text-uppercase text-muted fw-semibold py-2 ps-3">Reverse Zone SOA</td>
         </tr>
 
@@ -185,7 +185,7 @@
         </tr>
 
         {# ── DNS Views ─────────────────────────────────────────── #}
-        <tr class="table-secondary">
+        <tr class="table-section-header">
             <td colspan="4" class="small text-uppercase text-muted fw-semibold py-2 ps-3">DNS</td>
         </tr>
 
@@ -208,7 +208,7 @@
         </tr>
 
         {# ── DNSSEC ────────────────────────────────────────────── #}
-        <tr class="table-secondary">
+        <tr class="table-section-header">
             <td colspan="4" class="small text-uppercase text-muted fw-semibold py-2 ps-3">
                 <i class="bi bi-shield-check me-1"></i>DNSSEC
             </td>
@@ -227,7 +227,7 @@
         </tr>
 
         {# ── DHCP Lease Log ────────────────────────────────────── #}
-        <tr class="table-secondary">
+        <tr class="table-section-header">
             <td colspan="4" class="small text-uppercase text-muted fw-semibold py-2 ps-3">
                 <i class="bi bi-journal-text me-1"></i>DHCP Lease Log
             </td>
@@ -241,6 +241,25 @@
             <td>
                 {{ form_widget(form.leaseRetentionDays, {attr: {class: 'form-control form-control-sm', style: 'max-width:10rem'}}) }}
                 <div class="form-text">Leave blank to keep lease logs forever.</div>
+            </td>
+            <td></td>
+        </tr>
+
+        {# ── DDNS ──────────────────────────────────────────────── #}
+        <tr class="table-section-header">
+            <td colspan="4" class="small text-uppercase text-muted fw-semibold py-2 ps-3">
+                <i class="bi bi-arrow-repeat me-1"></i>Dynamic DNS (DDNS)
+            </td>
+        </tr>
+
+        <tr class="bulk-row inactive" data-field="ddnsDomain">
+            <td class="text-center ps-2">
+                <input type="checkbox" class="form-check-input apply-checkbox" name="apply_ddnsDomain" id="apply_ddnsDomain">
+            </td>
+            <td><label for="apply_ddnsDomain" class="form-label fw-semibold mb-0 cursor-pointer">DDNS Domain</label></td>
+            <td>
+                {{ form_widget(form.ddnsDomain, {attr: {class: 'form-select form-select-sm', style: 'max-width:24rem'}}) }}
+                <div class="form-text">Select "— None —" to disable DDNS on all selected subnets.</div>
             </td>
             <td></td>
         </tr>

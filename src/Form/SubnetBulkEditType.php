@@ -4,6 +4,7 @@ namespace App\Form;
 
 use App\Entity\DnsView;
 use App\Entity\DnssecPolicy;
+use App\Entity\Domain;
 use App\Entity\Tag;
 use App\Repository\DnsViewRepository;
 use App\Repository\TagRepository;
@@ -96,6 +97,18 @@ class SubnetBulkEditType extends AbstractType
                 'label'    => 'DHCP Lease Retention (days)',
                 'required' => false,
                 'attr'     => ['placeholder' => 'e.g. 90'],
+            ])
+            ->add('ddnsDomain', EntityType::class, [
+                'class'         => Domain::class,
+                'choice_label'  => 'name',
+                'placeholder'   => '— None (DDNS disabled) —',
+                'required'      => false,
+                'label'         => 'DDNS Domain',
+                'query_builder' => fn($repo) => $repo->createQueryBuilder('d')
+                    ->join('d.ddnsDnsServer', 's')
+                    ->where('d.ddnsEnabled = true')
+                    ->andWhere('s.ddnsAlgorithm IS NOT NULL')
+                    ->orderBy('d.name', 'ASC'),
             ]);
     }
 

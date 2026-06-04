@@ -4,11 +4,13 @@ namespace App\Form;
 
 use App\Entity\DnsServer;
 use App\Entity\DnsView;
+use App\Enum\TsigAlgorithm;
 use App\Repository\DnsServerRepository;
 use App\Repository\DnsViewRepository;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
+use Symfony\Component\Form\Extension\Core\Type\EnumType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
@@ -73,6 +75,14 @@ class DnsServerType extends AbstractType
             ->add('description', TextareaType::class, [
                 'required' => false,
                 'attr'     => ['rows' => 2],
+            ])
+            ->add('ddnsAlgorithm', EnumType::class, [
+                'class'        => TsigAlgorithm::class,
+                'choice_label' => fn(TsigAlgorithm $a) => $a->label(),
+                'placeholder'  => '— Disabled —',
+                'required'     => false,
+                'label'        => 'DDNS Algorithm',
+                'help'         => 'Selecting an algorithm enables DDNS and generates a TSIG key for this server. The key is written into the generated BIND and Kea D2 configs automatically.',
             ]);
     }
 

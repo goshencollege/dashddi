@@ -59,6 +59,12 @@ class DhcpConfigGenerator
                 $block['reservations'] = $reservations;
             }
 
+            if ($subnet->getDdnsQualifyingSuffix()) {
+                $block['ddns-send-updates']        = true;
+                $block['ddns-qualifying-suffix']   = rtrim($subnet->getDdnsQualifyingSuffix(), '.') . '.';
+                $block['ddns-replace-client-name'] = 'when-not-present';
+            }
+
             $subnet4[] = $block;
         }
 
@@ -105,6 +111,12 @@ class DhcpConfigGenerator
             }
             if ($reservations) {
                 $block['reservations'] = $reservations;
+            }
+
+            if ($subnet->getDdnsQualifyingSuffix()) {
+                $block['ddns-send-updates']        = true;
+                $block['ddns-qualifying-suffix']   = rtrim($subnet->getDdnsQualifyingSuffix(), '.') . '.';
+                $block['ddns-replace-client-name'] = 'when-not-present';
             }
 
             $subnet6[] = $block;

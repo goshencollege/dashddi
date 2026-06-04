@@ -4,12 +4,14 @@ namespace App\Form;
 
 use App\Entity\DhcpServer;
 use Symfony\Component\Form\AbstractType;
+use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Form\Extension\Core\Type\PasswordType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
+use Symfony\Component\Validator\Constraints\Url;
 
 class DhcpServerType extends AbstractType
 {
@@ -40,9 +42,10 @@ class DhcpServerType extends AbstractType
                 ],
             ])
             ->add('controlUrl', TextType::class, [
-                'label'    => 'Control Agent URL',
-                'required' => false,
-                'attr'     => ['placeholder' => 'http://192.168.1.1:8000'],
+                'label'       => 'Control Agent URL',
+                'required'    => false,
+                'attr'        => ['placeholder' => 'http://192.168.1.1:8000'],
+                'constraints' => [new Url(protocols: ['http', 'https'], requireTld: false)],
             ])
             ->add('controlUser', TextType::class, [
                 'label'    => 'Control Agent User',
@@ -58,6 +61,11 @@ class DhcpServerType extends AbstractType
             ->add('description', TextareaType::class, [
                 'required' => false,
                 'attr'     => ['rows' => 2, 'placeholder' => 'Optional notes'],
+            ])
+            ->add('ddnsEnabled', CheckboxType::class, [
+                'label'    => 'Deploy kea-dhcp-ddns.conf (Dynamic DNS)',
+                'required' => false,
+                'help'     => 'Generates and deploys kea-dhcp-ddns.conf to this server. Requires at least one subnet with a DDNS domain configured.',
             ]);
     }
 
