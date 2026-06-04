@@ -41,7 +41,7 @@ class DhcpServer
     private ?string $sshPublicKey = null;
 
     #[ORM\Column(length: 255, nullable: true)]
-    #[Assert\Url(protocols: ['http', 'https'])]
+    #[Assert\Url(protocols: ['http', 'https'], requireTld: false)]
     private ?string $controlUrl = null;
 
     #[ORM\Column(length: 128, nullable: true)]

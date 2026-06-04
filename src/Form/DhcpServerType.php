@@ -45,7 +45,7 @@ class DhcpServerType extends AbstractType
                 'label'       => 'Control Agent URL',
                 'required'    => false,
                 'attr'        => ['placeholder' => 'http://192.168.1.1:8000'],
-                'constraints' => [new Url(protocols: ['http', 'https'])],
+                'constraints' => [new Url(protocols: ['http', 'https'], requireTld: false)],
             ])
             ->add('controlUser', TextType::class, [
                 'label'    => 'Control Agent User',
