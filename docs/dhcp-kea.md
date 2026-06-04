@@ -26,6 +26,7 @@ Add a DHCP server under **Settings → DHCP Servers**. The fields are:
 | Control URL | HTTP(S) URL of the Kea Control Agent (e.g., `http://localhost:8000`). Required for config reload. |
 | Control User | Basic auth username for the Control Agent (optional) |
 | Control Password | Basic auth password for the Control Agent (optional) |
+| DDNS Enabled | When checked, DashDDI also generates and deploys `kea-dhcp-ddns.conf` for the Kea D2 daemon (see Dynamic DNS below). |
 
 ### SSH Key Setup
 
@@ -65,6 +66,55 @@ When a Control URL is configured, DashDDI will:
    - Attempt another reload to return Kea to its previous working state.
 
 The result (success/failure, whether a restore occurred) is recorded in the Push Log.
+
+## Dynamic DNS (DDNS)
+
+DashDDI can generate a `kea-dhcp-ddns.conf` file for Kea's D2 (DHCP-DDNS) daemon, which causes Kea to dynamically update BIND forward and reverse zones as leases are granted.
+
+### How it works
+
+1. You configure a **TSIG key** on a DNS server (algorithm + secret).
+2. You enable **DDNS** on a domain and point it at that DNS server.
+3. You assign a **DDNS Domain** to each subnet whose reverse zone should also receive dynamic updates.
+4. When DashDDI pushes DHCP config with **DDNS Enabled** checked on the DHCP server, it also generates and uploads `kea-dhcp-ddns.conf` alongside the regular subnet files.
+5. The Kea D2 daemon picks up the config and sends authenticated DNS UPDATE packets to BIND.
+
+### Enabling DDNS on a DHCP Server
+
+Check **Dynamic DNS (DDNS)** on the DHCP server record. When this is enabled, DashDDI:
+
+- Generates `kea-dhcp-ddns.conf` containing forward and reverse domain entries for every domain / subnet with DDNS configured.
+- Deploys the file to the same remote path as the subnet config.
+- Signals the D2 daemon to reload via the Control Agent.
+
+### Prerequisites on the Kea server
+
+1. Install the `kea-dhcp-ddns-server` package (it ships separately from `kea-dhcp4-server`).
+2. Enable the `run_script` or `ddns` hook in `kea-dhcp4.conf` so Kea sends DNS updates to D2.
+3. Expose D2 to the Control Agent — add a `d2` service entry in `kea-ctrl-agent.conf`:
+
+```json
+"control-sockets": {
+    "d2": {
+        "socket-type": "unix",
+        "socket-name": "/var/run/kea/kea-ddns-ctrl-socket"
+    }
+}
+```
+
+4. Ensure `/var/run/kea/` is writable by the kea user.
+
+### Generated `kea-dhcp-ddns.conf`
+
+DashDDI generates a D2 config that includes:
+
+- **TSIG key blocks** — one per DNS server that has DDNS configured (algorithm + secret)
+- **Forward DDNS domains** — one entry per domain with DDNS enabled, pointing at the DNS server IP
+- **Reverse DDNS domains** — one entry per subnet whose DDNS domain resolves to a configured DNS server
+
+The D2 daemon listens on `127.0.0.1:53001` and communicates with the Kea DHCPv4/v6 server via a named socket at `/var/run/kea/kea-ddns-ctrl-socket`.
+
+> **Note:** D2 requires a literal IP address for DNS servers — not a hostname. DashDDI resolves the DNS server's hostname automatically using the system resolver when generating the config.
 
 ## Console Command
 

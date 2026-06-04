@@ -40,6 +40,8 @@
             <dd class="col-sm-9">Path on the remote server where DashDDI should write the generated Kea config file.</dd>
             <dt class="col-sm-3">Reload Command</dt>
             <dd class="col-sm-9">Shell command to reload Kea after the config is uploaded, e.g. <code>sudo systemctl reload kea-dhcp4</code>.</dd>
+            <dt class="col-sm-3">DDNS Enabled</dt>
+            <dd class="col-sm-9">When checked, DashDDI generates and deploys a <code>kea-dhcp-ddns.conf</code> file for Kea's D2 daemon in addition to the regular subnet config files. Requires DDNS to be configured on at least one DNS server and domain (see the DNS guide).</dd>
         </dl>
         <p class="mt-3 mb-0 text-muted small">For SSH key installation, generated config file layout, and the Kea reload command, see the <a href="{{ path('user_guide_integrations') }}#dhcp-kea">DHCP/Kea integration guide</a>.</p>
     </div>
@@ -71,6 +73,22 @@
             <li><strong>Scheduled</strong> — set up a cron-based push in <strong>Other Settings → Scheduler</strong></li>
         </ol>
         <p class="mt-2 mb-0">The push uploads the config file to the configured path on the DHCP server, then runs the reload command. Execution output is visible in <strong>Servers → Push Logs</strong>.</p>
+    </div>
+</div>
+
+<div class="card mb-4" id="ddns">
+    <div class="card-header fw-semibold"><i class="bi bi-arrow-repeat me-1"></i>Dynamic DNS (DDNS)</div>
+    <div class="card-body">
+        <p>When DDNS is enabled, Kea's D2 daemon automatically registers hostnames in BIND as leases are granted, keeping forward and reverse DNS in sync with DHCP allocations.</p>
+        <p>To enable DDNS on a DHCP server:</p>
+        <ol class="mb-2">
+            <li>Configure a <strong>TSIG key</strong> (algorithm + secret) on the target DNS server.</li>
+            <li>Enable <strong>DDNS</strong> on a domain and point it at that DNS server.</li>
+            <li>Set <strong>DDNS Domain</strong> on each subnet whose reverse zone should receive dynamic updates.</li>
+            <li>Check <strong>DDNS Enabled</strong> on this DHCP server and push config.</li>
+        </ol>
+        <p>DashDDI generates <code>kea-dhcp-ddns.conf</code> from the configured domains and subnets and deploys it alongside the regular subnet files. The file contains TSIG key definitions and forward/reverse zone entries for the Kea D2 daemon.</p>
+        <p class="mb-0 text-muted small">The Kea D2 daemon is a separate package (<code>kea-dhcp-ddns-server</code>) and requires a matching entry in <code>kea-ctrl-agent.conf</code>. See the <a href="{{ path('user_guide_integrations') }}#dhcp-kea">DHCP/Kea integration guide</a> for full setup details.</p>
     </div>
 </div>
 
@@ -108,6 +126,7 @@
             <a href="#dhcp-servers" class="list-group-item list-group-item-action py-1">DHCP Servers</a>
             <a href="#config-generation" class="list-group-item list-group-item-action py-1">Config Generation</a>
             <a href="#push-dhcp" class="list-group-item list-group-item-action py-1">Pushing Config</a>
+            <a href="#ddns" class="list-group-item list-group-item-action py-1">Dynamic DNS (DDNS)</a>
             <a href="#leases" class="list-group-item list-group-item-action py-1">DHCP Leases</a>
             <a href="#clearpass-auth-logs" class="list-group-item list-group-item-action py-1">Auth Logs</a>
         </div>
