@@ -149,6 +149,7 @@
             <li><strong>Pools</strong> — all Dynamic address blocks (IPv6) on the subnet</li>
             <li><strong>Reservations</strong> — all non-deleted interfaces with an IPv6 address, mapping <code>hw-address</code> → <code>ip-addresses</code></li>
         </ul>
+        <p class="mb-1"><strong><code>kea-dhcp-ddns.conf</code></strong> — generated and deployed alongside the subnet files when <strong>DDNS Enabled</strong> is checked. Contains TSIG key blocks, forward DDNS domain entries, and reverse DDNS domain entries for the Kea D2 daemon (see Dynamic DNS below).</p>
         <p class="text-muted small mb-3">Interfaces with the all-zeros MAC (<code>00:00:00:00:00:00</code>) are excluded from reservations.</p>
 
         <hr class="my-3">
@@ -168,10 +169,6 @@
         <p><strong>Expose D2 to the Kea Control Agent</strong></p>
         <p>Add a <code>d2</code> socket entry to <code>kea-ctrl-agent.conf</code> so DashDDI can signal D2 to reload after deploying <code>kea-dhcp-ddns.conf</code>:</p>
         <pre class="bg-body-secondary rounded p-3 small mb-3"><code>"control-sockets": {
-    "dhcp4": {
-        "socket-type": "unix",
-        "socket-name": "/var/run/kea/kea-dhcp4-ctrl-socket"
-    },
     "d2": {
         "socket-type": "unix",
         "socket-name": "/var/run/kea/kea-ddns-ctrl-socket"
