@@ -45,6 +45,7 @@ class DnsDeployService
 
             $mkdirOut = $sftp->exec('mkdir -p ' . escapeshellarg($zonePath . '/' . $viewName));
             $viewResult['mkdir'] = ['success' => $sftp->getExitStatus() === 0, 'output' => trim((string) $mkdirOut)];
+            $sftp->exec('chown -R ' . escapeshellarg($bindUser . ':' . $bindUser) . ' ' . escapeshellarg($zonePath . '/' . $viewName));
 
             if (!$isSecondary) {
                 foreach ($domains as $domain) {
