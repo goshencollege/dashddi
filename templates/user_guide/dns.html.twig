@@ -124,7 +124,7 @@
         <p>On each subnet whose reverse zone should accept dynamic updates, set <strong>DDNS Domain</strong> to the domain configured above. The reverse zone for that subnet will receive a matching <code>allow-update</code> directive.</p>
 
         <h6 class="mt-3">Step 4 — Enable DDNS on the DHCP server</h6>
-        <p>Check <strong>DDNS Enabled</strong> on the DHCP server record. This causes DashDDI to generate and deploy <code>kea-dhcp-ddns.conf</code> alongside the regular subnet config files. See the <a href="{{ path('user_guide_integrations') }}#dhcp-kea">DHCP/Kea integration guide</a> for the required Kea D2 package and Control Agent setup.</p>
+        <p>Check <strong>DDNS Enabled</strong> on the DHCP server record. This causes DashDDI to generate and deploy <code>kea-dhcp-ddns.conf</code> alongside the regular subnet config files. See the <a href="{{ path('user_guide_integrations') }}#kea-ddns">DHCP/Kea integration guide → Dynamic DNS</a> for the required Kea D2 package and Control Agent setup.</p>
 
         <div class="alert alert-info py-2 small mt-3 mb-0">
             <i class="bi bi-lightbulb me-1"></i>The TSIG secret is stored encrypted in DashDDI but appears in plaintext in the deployed config files on the server. Restrict read permissions on <code>dashddi.conf</code> and <code>kea-dhcp-ddns.conf</code> to the bind/kea service users.

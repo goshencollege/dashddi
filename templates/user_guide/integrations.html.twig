@@ -123,6 +123,7 @@
                     <tr><td>Control URL</td><td>HTTP(S) URL of the Kea Control Agent (e.g. <code>http://localhost:8000</code>). Required for config reload.</td></tr>
                     <tr><td>Control User</td><td>Basic auth username for the Control Agent (optional)</td></tr>
                     <tr><td>Control Password</td><td>Basic auth password for the Control Agent (optional)</td></tr>
+                    <tr><td>DDNS Enabled</td><td>When checked, DashDDI also generates and deploys <code>kea-dhcp-ddns.conf</code> for Kea's D2 daemon alongside the regular subnet files (see Dynamic DNS below)</td></tr>
                 </tbody>
             </table>
         </div>
@@ -154,6 +155,36 @@
         <h6>Console command</h6>
         <pre class="bg-body-secondary rounded p-3 small mb-1"><code>docker compose exec app bin/console app:dhcp:generate-config [--output-dir=/tmp/dhcp] [--reload]</code></pre>
         <p class="text-muted small mb-3">Use <code>--output-dir</code> to write files locally for inspection without uploading. Add <code>--reload</code> to trigger a Kea Control Agent reload after deploy. Results are logged in <strong>Servers → Push Logs</strong>.</p>
+
+        <hr class="my-3">
+        <h6 id="kea-ddns">Dynamic DNS (D2 daemon)</h6>
+        <p>When <strong>DDNS Enabled</strong> is checked on a DHCP server, DashDDI generates and deploys <code>kea-dhcp-ddns.conf</code> alongside the regular subnet files. This file configures Kea's D2 daemon to send authenticated DNS UPDATE packets to BIND as leases are granted, keeping forward and reverse DNS in sync with DHCP allocations.</p>
+        <p>See the <a href="{{ path('user_guide_dns') }}#ddns">DNS guide → Dynamic DNS</a> for the full four-step setup (TSIG key on DNS server → DDNS domain → subnet DDNS domain → DHCP server enabled).</p>
+
+        <p><strong>Install the D2 package on the Kea server</strong></p>
+        <p class="mb-3">The D2 daemon ships as a separate package. Install it alongside <code>kea-dhcp4-server</code>:</p>
+        <pre class="bg-body-secondary rounded p-3 small mb-3"><code>apt install kea-dhcp-ddns-server</code></pre>
+
+        <p><strong>Expose D2 to the Kea Control Agent</strong></p>
+        <p>Add a <code>d2</code> socket entry to <code>kea-ctrl-agent.conf</code> so DashDDI can signal D2 to reload after deploying <code>kea-dhcp-ddns.conf</code>:</p>
+        <pre class="bg-body-secondary rounded p-3 small mb-3"><code>"control-sockets": {
+    "dhcp4": {
+        "socket-type": "unix",
+        "socket-name": "/var/run/kea/kea-dhcp4-ctrl-socket"
+    },
+    "d2": {
+        "socket-type": "unix",
+        "socket-name": "/var/run/kea/kea-ddns-ctrl-socket"
+    }
+}</code></pre>
+        <p class="mb-3">Ensure <code>/var/run/kea/</code> is writable by the kea user. After editing, restart the Control Agent (<code>sudo systemctl restart kea-ctrl-agent</code>) and start the D2 daemon (<code>sudo systemctl enable --now kea-dhcp-ddns</code>).</p>
+
+        <p><strong>What DashDDI generates</strong></p>
+        <p class="mb-3">When it deploys DHCP config with DDNS enabled, DashDDI also uploads <code>kea-dhcp-ddns.conf</code> containing TSIG key blocks (one per configured DNS server), forward DDNS domain entries (one per DDNS-enabled domain), and reverse DDNS domain entries (one per subnet with a DDNS domain assigned). DashDDI resolves DNS server hostnames to IP addresses automatically — D2 requires literal IPs, not hostnames.</p>
+
+        <div class="alert alert-info py-2 small mb-0">
+            <i class="bi bi-lightbulb me-1"></i>The TSIG secret appears in plaintext in the deployed <code>kea-dhcp-ddns.conf</code> and <code>dashddi.conf</code> — this is inherent to the TSIG protocol. Restrict read permissions on both files to the <code>kea</code> and <code>bind</code> service users.
+        </div>
 
         <hr class="my-3">
         <h6 id="kea-lease-notifications">Configuring Kea to send lease notifications</h6>
@@ -409,6 +440,7 @@ curl -s -X POST https://dashddi.example.com/api/dhcp/lease \
             <a href="#overview" class="list-group-item list-group-item-action py-1">Overview</a>
             <a href="#dns-integration" class="list-group-item list-group-item-action py-1">DNS / BIND</a>
             <a href="#dhcp-integration" class="list-group-item list-group-item-action py-1">DHCP / Kea</a>
+            <a href="#kea-ddns" class="list-group-item list-group-item-action py-1 ps-4">↳ Dynamic DNS (D2)</a>
             <a href="#kea-lease-notifications" class="list-group-item list-group-item-action py-1 ps-4">↳ Lease notifications</a>
             <a href="#clearpass" class="list-group-item list-group-item-action py-1">ClearPass</a>
             <a href="#snipeit" class="list-group-item list-group-item-action py-1">Snipe-IT</a>
