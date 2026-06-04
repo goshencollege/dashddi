@@ -29,10 +29,13 @@
                     <div class="form-text text-muted">Zone data is pulled from this server via AXFR. Zone files are <strong>not</strong> pushed to secondary servers.</div>
                 </div>
 
-                {% for field in ['name', 'hostname', 'sshUser', 'remoteZonePath', 'keyDirectory'] %}
+                {% for field in ['name', 'hostname', 'sshUser', 'remoteZonePath', 'keyDirectory', 'bindUser'] %}
                     <div class="mb-3">
                         {{ form_label(form[field], null, {label_attr: {class: 'form-label fw-semibold'}}) }}
                         {{ form_widget(form[field], {attr: {class: 'form-control' ~ (form[field].vars.errors|length ? ' is-invalid' : '')}}) }}
+                        {% if form[field].vars.help is defined and form[field].vars.help %}
+                            <div class="form-text">{{ form_help(form[field]) }}</div>
+                        {% endif %}
                         {{ form_errors(form[field]) }}
                     </div>
                 {% endfor %}
