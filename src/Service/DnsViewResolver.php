@@ -35,7 +35,7 @@ class DnsViewResolver
     public function isDomainUsable(Domain $domain, ?Subnet $subnet): bool
     {
         if ($domain->getViews()->isEmpty()) {
-            return false;
+            return true;
         }
         if ($subnet === null || $subnet->getViews()->isEmpty()) {
             return true;
@@ -45,10 +45,8 @@ class DnsViewResolver
 
     public function unusableDomainReason(Domain $domain, ?Subnet $subnet): string
     {
-        if ($domain->getViews()->isEmpty()) {
-            return 'Domain has no views configured';
-        }
         if ($subnet !== null && !$subnet->getViews()->isEmpty()
+            && !$domain->getViews()->isEmpty()
             && count($this->availableViewsFor($domain, $subnet)) === 0
         ) {
             return 'No views in common with this subnet';

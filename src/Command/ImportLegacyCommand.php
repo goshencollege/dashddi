@@ -69,7 +69,7 @@ class ImportLegacyCommand extends Command
             $buildings = $this->importBuildings($pdo, $io, $dryRun);
 
             $io->section('Domains');
-            $domains = $this->importDomains($pdo, $io, $dryRun);
+            [$domains, $gcDomain, $dynDomain] = $this->importDomains($pdo, $io, $dryRun);
 
             $io->section('VRFs');
             $vrfs = $this->seedVrfs($io, $dryRun);
@@ -78,13 +78,13 @@ class ImportLegacyCommand extends Command
             $subnets = $this->importSubnets($pdo, $io, $dryRun, $domains, $vrfs);
 
             $io->section('DNS Views');
-            $this->setupDnsViews($io, $dryRun, $domains, $subnets);
+            $this->setupDnsViews($io, $dryRun, $domains, $subnets, $dynDomain);
 
             $io->section('Tags');
             $tags = $this->importTags($pdo, $io, $dryRun);
 
             $io->section('Hosts');
-            $this->importHosts($pdo, $io, $dryRun, $buildings, $domains, $subnets, $tags);
+            $this->importHosts($pdo, $io, $dryRun, $buildings, $domains, $subnets, $tags, $gcDomain, $dynDomain);
 
             $io->section('Seed Data');
             $this->seedLocalData($io, $dryRun, $vrfs);
@@ -110,7 +110,7 @@ class ImportLegacyCommand extends Command
         return Command::SUCCESS;
     }
 
-    private function setupDnsViews(SymfonyStyle $io, bool $dryRun, array $domains, array $subnets): void
+    private function setupDnsViews(SymfonyStyle $io, bool $dryRun, array $domains, array $subnets, Domain $dynDomain): void
     {
         $internal = new DnsView();
         $internal->setName('internal');
@@ -130,6 +130,8 @@ class ImportLegacyCommand extends Command
                 $domain->addView($external);
             }
         }
+
+        $dynDomain->addView($internal);
 
         foreach ($subnets as $subnet) {
             $cidr       = $subnet->getIpv4Cidr();
@@ -254,7 +256,7 @@ class ImportLegacyCommand extends Command
     // Domains (zones)
     // -------------------------------------------------------------------------
 
-    /** @return array<int, Domain> keyed by legacy zID */
+    /** @return array{0: array<int, Domain>, 1: Domain} */
     private function importDomains(\PDO $pdo, SymfonyStyle $io, bool $dryRun): array
     {
         $map = [];
@@ -270,13 +272,29 @@ class ImportLegacyCommand extends Command
             }
         }
 
+        $gcDomain = new Domain();
+        $gcDomain->setName('gc.goshen.edu');
+        $gcDomain->setSoaNameserver('dns1.goshen.edu');
+        $gcDomain->setSoaEmail('hostmaster@goshen.edu');
+        if (!$dryRun) {
+            $this->em->persist($gcDomain);
+        }
+
+        $dynDomain = new Domain();
+        $dynDomain->setName('dyn.goshen.edu');
+        $dynDomain->setSoaNameserver('dns1.goshen.edu');
+        $dynDomain->setSoaEmail('hostmaster@goshen.edu');
+        if (!$dryRun) {
+            $this->em->persist($dynDomain);
+        }
+
         if (!$dryRun) {
             $this->em->flush();
         }
 
-        $io->writeln(sprintf('  %d domains', count($map)));
+        $io->writeln(sprintf('  %d domains + gc.goshen.edu (no views) + dyn.goshen.edu (internal)', count($map)));
 
-        return $map;
+        return [$map, $gcDomain, $dynDomain];
     }
 
     // -------------------------------------------------------------------------
@@ -503,6 +521,8 @@ class ImportLegacyCommand extends Command
         array $domains,
         array $subnets,
         array $tags,
+        Domain $gcDomain,
+        Domain $dynDomain,
     ): void {
         // nID → zID for domain resolution
         $subnetZones = [];
@@ -522,7 +542,7 @@ class ImportLegacyCommand extends Command
         $skipped = 0;
 
         $stmt = $pdo->query(
-            'SELECT hID, name, ip, hw, bID, room, nID, cID, dID, ipv6 FROM host ORDER BY hID'
+            'SELECT hID, name, ip, hw, bID, room, nID, cID, dID, ipv6, revgc FROM host ORDER BY hID'
         );
 
         while ($row = $stmt->fetch()) {
@@ -588,14 +608,25 @@ class ImportLegacyCommand extends Command
             $hasIp = $iface->getIpAddress() !== null || $iface->getIpv6Address() !== null;
             $sharedViews = $this->intersectViews($domain, $subnet);
 
-            if ($hasIp) {
+            if ($row['revgc']) {
+                $canonicalDomain = $gcDomain;
+                $canonicalViews  = [];
+            } elseif (!$hasIp) {
+                $canonicalDomain = $dynDomain;
+                $canonicalViews  = $this->intersectViews($dynDomain, $subnet);
+            } else {
+                $canonicalDomain = $domain;
+                $canonicalViews  = $sharedViews;
+            }
+
+            if ($hasIp || !$row['revgc']) {
                 // Canonical name from host.name
                 if ($this->isValidDnsLabel($row['name'])) {
                     $canonical = new InterfaceName();
                     $canonical->setName($row['name']);
-                    $canonical->setDomain($domain);
+                    $canonical->setDomain($canonicalDomain);
                     $canonical->setIsCanonical(true);
-                    foreach ($sharedViews as $view) {
+                    foreach ($canonicalViews as $view) {
                         $canonical->addView($view);
                     }
                     $iface->addName($canonical);
@@ -603,7 +634,9 @@ class ImportLegacyCommand extends Command
                         $this->em->persist($canonical);
                     }
                 }
+            }
 
+            if ($hasIp) {
                 // Non-canonical names from alias table
                 foreach ($aliasMap[$hid] ?? [] as $aliasName) {
                     if (!$this->isValidDnsLabel($aliasName)) {

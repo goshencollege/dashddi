@@ -99,10 +99,18 @@ class DnsViewResolverTest extends TestCase
         $this->assertCount(2, $result);
     }
 
-    public function testIsDomainUsableReturnsFalseWhenDomainHasNoViews(): void
+    public function testIsDomainUsableReturnsTrueWhenDomainHasNoViews(): void
     {
         $domain = new Domain();
-        $this->assertFalse($this->resolver->isDomainUsable($domain, null));
+        $this->assertTrue($this->resolver->isDomainUsable($domain, null));
+    }
+
+    public function testIsDomainUsableReturnsTrueWhenDomainHasNoViewsAndSubnetHasViews(): void
+    {
+        $domain = new Domain();
+        $subnet = new Subnet();
+        $subnet->addView($this->makeView(1));
+        $this->assertTrue($this->resolver->isDomainUsable($domain, $subnet));
     }
 
     public function testIsDomainUsableReturnsTrueWhenNoSubnetConstraint(): void
@@ -131,13 +139,10 @@ class DnsViewResolverTest extends TestCase
         $this->assertFalse($this->resolver->isDomainUsable($domain, $subnet));
     }
 
-    public function testUnusableDomainReasonNoDomainViews(): void
+    public function testUnusableDomainReasonEmptyWhenDomainHasNoViews(): void
     {
         $domain = new Domain();
-        $this->assertSame(
-            'Domain has no views configured',
-            $this->resolver->unusableDomainReason($domain, null)
-        );
+        $this->assertSame('', $this->resolver->unusableDomainReason($domain, null));
     }
 
     public function testUnusableDomainReasonNoCommonViews(): void
