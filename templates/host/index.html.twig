@@ -24,6 +24,8 @@
 .host-tree-table .tree-toggle:hover { color: var(--bs-body-color); }
 .host-tree-table .iface-row { --bs-table-bg: var(--tree-iface-bg); }
 .host-tree-table .iface-name-cell { padding-left: 2rem !important; }
+.host-tree-table td:nth-child(3) { white-space: nowrap; }
+.host-tree-table td:nth-last-child(2) { white-space: nowrap; }
 .host-tree-table .iface-row > td:nth-child(2) { padding-left: 2rem !important; }
 /* Group box: left/right borders run continuously through every row in the group */
 .host-tree-table .host-row > td:first-child,
@@ -254,19 +256,19 @@
                     <thead>
                         <tr>
                             <th class="toggle-cell"></th>
-                            <th class="ps-2">
+                            <th class="ps-2" style="width:1%">
                                 <div class="d-flex gap-2 align-items-center">
                                     <input type="checkbox" class="form-check-input" id="select-all-hosts" title="Select all hosts on this page">
                                     <input type="checkbox" class="form-check-input" id="select-all-ifaces" title="Select all interfaces on this page">
                                 </div>
                             </th>
-                            <th style="min-width:13rem">Name</th>
+                            <th style="min-width:13rem; width:1%">Name</th>
                             <th>Tags</th>
                             <th>Subnet</th>
                             <th>IPv4</th>
                             <th>IPv6</th>
                             <th>DNS Names</th>
-                            <th>Last Modified</th>
+                            <th style="width:1%; white-space:nowrap">Last Modified</th>
                             <th class="text-end">Actions</th>
                         </tr>
                     </thead>
