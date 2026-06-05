@@ -17,6 +17,8 @@
     --tree-row-hover:     rgba(255,255,255,.22);
 }
 .host-tree-table td, .host-tree-table th { padding-top: 0.3rem; padding-bottom: 0.3rem; }
+.host-tree-table thead th { position: sticky; top: 0; z-index: 2; background-color: var(--bs-body-bg); }
+.host-tree-table thead th::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; border-bottom: 2px solid var(--bs-border-color); }
 .host-tree-table .toggle-cell { width: 1.75rem; padding-right: 0; text-align: center; }
 .host-tree-table .tree-toggle { border: none; background: none; padding: 0; line-height: 1; color: #6c757d; }
 .host-tree-table .tree-toggle:hover { color: var(--bs-body-color); }
