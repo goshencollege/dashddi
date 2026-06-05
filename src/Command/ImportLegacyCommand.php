@@ -781,12 +781,12 @@ class ImportLegacyCommand extends Command
             ['name' => "192's",                   'ipv4' => '192.168.0.0/16',    'ipv6' => '2001:18e8:408::/56',    'vlan' => null, 'gateway' => null,            'container' => true],
             ['name' => 'vlan44',                  'ipv4' => null,                'ipv6' => null,                    'vlan' => 44,   'gateway' => null,            'container' => false],
             ['name' => 'Siemens EMS',             'ipv4' => '192.168.253.0/24',  'ipv6' => null,                    'vlan' => null, 'gateway' => null,            'container' => false],
-            ['name' => 'Valpo',                   'ipv4' => '192.168.59.0/24',   'ipv6' => '2001:18e8:408:3b::/64',   'vlan' => null, 'gateway' => null,            'container' => false],
-            ['name' => 'iLO',                     'ipv4' => '192.168.61.0/24',   'ipv6' => '2001:18e8:408:3d::/64',   'vlan' => 61,   'gateway' => null,            'container' => false],
-            ['name' => 'EMP_INST',                'ipv4' => '192.168.112.0/22',  'ipv6' => '2001:18e8:408:70::/64',   'vlan' => 112,  'gateway' => null,            'container' => false],
-            ['name' => 'EMP_BYOD',                'ipv4' => '192.168.116.0/22',  'ipv6' => '2001:18e8:408:74::/64',   'vlan' => 116,  'gateway' => null,            'container' => false],
-            ['name' => 'EMP_JENZ',                'ipv4' => '192.168.121.0/24',  'ipv6' => '2001:18e8:408:79::/64', 'vlan' => 121,  'gateway' => null,            'container' => false],
-            ['name' => 'WIFI_128',                'ipv4' => '192.168.128.0/19',  'ipv6' => '2001:18e8:408:80::/64', 'vlan' => 128,  'gateway' => null,            'container' => false],
+            ['name' => 'Valpo',                   'ipv4' => '192.168.59.0/24',   'ipv6' => '2001:18e8:408:3b::/64', 'vlan' => null, 'gateway' => null,            'container' => false],
+            ['name' => 'iLO',                     'ipv4' => '192.168.61.0/24',   'ipv6' => '2001:18e8:408:3d::/64', 'vlan' => 61,   'gateway' => null,            'container' => false],
+            ['name' => 'EMP_INST',                'ipv4' => '192.168.112.0/22',  'ipv6' => '2001:18e8:408:70::/64', 'vlan' => 112,  'gateway' => null,            'container' => false],
+            ['name' => 'EMP_BYOD',                'ipv4' => '192.168.116.0/22',  'ipv6' => '2001:18e8:408:74::/64', 'vlan' => 116,  'gateway' => null,            'container' => false],
+            ['name' => 'EMP_JENZ',                'ipv4' => '192.168.121.0/24',  'ipv6' => '2001:18e8:408:79::/64', 'vlan' => 121,  'gateway' => null,            'container' => false, 'vrf' => 'corporate'],
+            ['name' => 'WIFI_128',                'ipv4' => '192.168.128.0/19',  'ipv6' => '2001:18e8:408:80::/64', 'vlan' => 128,  'gateway' => null,            'container' => false, 'vrf' => 'student'],
         ];
 
         $datacenterCidrs = [
@@ -803,7 +803,7 @@ class ImportLegacyCommand extends Command
             $subnet->setVlan($def['vlan']);
             $subnet->setGateway($def['gateway']);
             $subnet->setIsContainer($def['container']);
-            $vrf = in_array($def['ipv4'], $datacenterCidrs, true) ? $vrfs['datacenter'] : $vrfs['corporate'];
+            $vrf = isset($def['vrf']) ? $vrfs[$def['vrf']] : (in_array($def['ipv4'], $datacenterCidrs, true) ? $vrfs['datacenter'] : $vrfs['corporate']);
             $subnet->setVrf($vrf);
             $seedSubnets[$def['name']] = $subnet;
             if (!$dryRun) {
@@ -869,6 +869,7 @@ class ImportLegacyCommand extends Command
         $server->setApiKey($apiKey ?: null);
         $server->setVerifyTls(false);
         $server->setMacCustomFields('MAC Address, MAC Address 2, MAC Address 3, MAC Address 4, MAC Address 5, Wireless MAC');
+        $server->setVlanOverrideCustomField('VLAN ID');
 
         if (!$dryRun) {
             $this->em->persist($server);
@@ -883,6 +884,10 @@ class ImportLegacyCommand extends Command
             return $seedSubnets[$name]
                 ?? $this->em->getRepository(Subnet::class)->findOneBy(['name' => $name]);
         };
+
+        $wifi160 = $subnetByName('WiFi 128/160');
+        $wifi160?->setIpv4Cidr('192.168.160.0/19');
+        $server->setDefaultSubnet($wifi160);
 
         $categoryMaps = [
             [39, '25',                            null],
