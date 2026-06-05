@@ -453,6 +453,29 @@
             {% if app.user %}
             <ul class="navbar-nav ms-auto align-items-center">
                 <li class="nav-item dropdown me-2">
+                    <button class="btn btn-sm btn-outline-warning dropdown-toggle" data-bs-toggle="dropdown"
+                            aria-expanded="false" title="Quick Actions" id="quick-actions-btn">
+                        <i class="bi bi-lightning-charge-fill"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><h6 class="dropdown-header">Quick Actions</h6></li>
+                        <li>
+                            <button class="dropdown-item quick-action-btn"
+                                    data-endpoint="{{ path('snipe_it_server_pull') }}"
+                                    data-success="Pull queued — syncing Snipe-IT assets in the background.">
+                                <i class="bi bi-box-arrow-in-down me-1"></i>Pull Snipe-IT Assets
+                            </button>
+                        </li>
+                        <li>
+                            <button class="dropdown-item quick-action-btn"
+                                    data-endpoint="{{ path('clearpass_server_pull_logs') }}"
+                                    data-success="Pull queued — importing ClearPass auth logs in the background.">
+                                <i class="bi bi-shield-lock me-1"></i>Pull ClearPass Auth Logs
+                            </button>
+                        </li>
+                    </ul>
+                </li>
+                <li class="nav-item dropdown me-2">
                     <button class="btn btn-sm btn-outline-light dropdown-toggle" data-bs-toggle="dropdown"
                             aria-expanded="false" title="Change theme" id="theme-picker">
                         <i class="bi bi-palette2"></i>
@@ -526,6 +549,8 @@
         </div>
     </div>
 </nav>
+
+<div class="toast-container position-fixed bottom-0 end-0 p-3" id="quick-action-toasts" style="z-index:1100"></div>
 
 <div class="{% block container_class %}container-fluid{% endblock %} mb-5">
     {% for label, messages in app.flashes %}
@@ -647,5 +672,45 @@
 </script>
 {% endif %}
 {% block scripts %}{% endblock %}
+{% if app.user %}
+<script>
+(function () {
+    function showToast(message, type) {
+        var container = document.getElementById('quick-action-toasts');
+        var id = 'qa-toast-' + Date.now();
+        var bg = type === 'error' ? 'text-bg-danger' : 'text-bg-success';
+        container.insertAdjacentHTML('beforeend',
+            '<div id="' + id + '" class="toast align-items-center ' + bg + ' border-0" role="alert" aria-live="assertive">' +
+            '<div class="d-flex"><div class="toast-body">' + message + '</div>' +
+            '<button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div></div>');
+        var el = document.getElementById(id);
+        var toast = new bootstrap.Toast(el, { delay: 5000 });
+        toast.show();
+        el.addEventListener('hidden.bs.toast', function () { el.remove(); });
+    }
+
+    document.querySelectorAll('.quick-action-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var endpoint = this.dataset.endpoint;
+            var successMsg = this.dataset.success;
+            btn.disabled = true;
+            fetch(endpoint, { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (data.error) {
+                        showToast('<i class="bi bi-exclamation-triangle-fill me-2"></i>' + data.error, 'error');
+                    } else {
+                        showToast('<i class="bi bi-check-circle-fill me-2"></i>' + successMsg, 'success');
+                    }
+                })
+                .catch(function (err) {
+                    showToast('<i class="bi bi-exclamation-triangle-fill me-2"></i>Request failed: ' + err, 'error');
+                })
+                .finally(function () { btn.disabled = false; });
+        });
+    });
+})();
+</script>
+{% endif %}
 </body>
 </html>
