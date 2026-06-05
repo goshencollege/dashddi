@@ -194,7 +194,7 @@ class SnipeItSyncService
                             usort($hosts, fn($a, $b) => $b->getInterfaces()->count() <=> $a->getInterfaces()->count());
                             $host = $hosts[0];
                             $this->mergeHosts($host, array_slice($hosts, 1));
-                            $this->adoptHost($host, $normalizedMacs, $snipeTag, $categorySubnetIdMap, $categoryId, $categoryName, $overrideSubnetId, $defaultSubnetId);
+                            $this->adoptHost($host, $macAliasMap, $snipeTag, $categorySubnetIdMap, $categoryId, $categoryName, $overrideSubnetId, $defaultSubnetId);
                             $adoptedHostIds[$host->getId()] = true;
                             $adopted = true;
                         } elseif (count($conflictHosts) === 1) {
@@ -209,7 +209,7 @@ class SnipeItSyncService
                             $adoptedHostIds[$hostId] = true;
                             // Adopt the pre-existing DashDDI host instead of creating a new one
                             $adopted = true;
-                            $this->adoptHost($host, $normalizedMacs, $snipeTag, $categorySubnetIdMap, $categoryId, $categoryName, $overrideSubnetId, $defaultSubnetId);
+                            $this->adoptHost($host, $macAliasMap, $snipeTag, $categorySubnetIdMap, $categoryId, $categoryName, $overrideSubnetId, $defaultSubnetId);
                         } else {
                             $host = $this->createHost($assetName, $macAliasMap, $snipeTag, $result['errors'], $categorySubnetIdMap, $categoryId, $categoryName, $overrideSubnetId, $defaultSubnetId);
                             if ($host === null) {
@@ -358,7 +358,7 @@ class SnipeItSyncService
      * Does not change the host's name. Assigns a default subnet to interfaces that
      * have none, based on the category→subnet mapping.
      */
-    private function adoptHost(Host $host, array $normalizedMacs, Tag $snipeTag, array $categorySubnetIdMap, int $categoryId, string $categoryName, ?int $overrideSubnetId = null, ?int $defaultSubnetId = null): void
+    private function adoptHost(Host $host, array $macAliasMap, Tag $snipeTag, array $categorySubnetIdMap, int $categoryId, string $categoryName, ?int $overrideSubnetId = null, ?int $defaultSubnetId = null): void
     {
         $host->addTag($snipeTag);
         if ($categoryName !== '') {
@@ -377,7 +377,7 @@ class SnipeItSyncService
             $this->assignSubnetIfMissing($existingIface, $categorySubnetIdMap, $categoryId, $overrideSubnetId, $defaultSubnetId);
         }
 
-        foreach ($normalizedMacs as $mac) {
+        foreach ($macAliasMap as $mac => $alias) {
             if (in_array($mac, $existingMacs, true)) {
                 continue;
             }
@@ -389,6 +389,9 @@ class SnipeItSyncService
             $iface = new NetworkInterface();
             $iface->setMacAddress($mac);
             $iface->setHost($host);
+            if ($alias !== '' && $iface->getName() === null) {
+                $iface->setName($alias);
+            }
             $this->assignSubnetIfMissing($iface, $categorySubnetIdMap, $categoryId, $overrideSubnetId, $defaultSubnetId);
             $this->em->persist($iface);
         }
