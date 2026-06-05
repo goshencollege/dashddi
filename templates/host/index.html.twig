@@ -241,8 +241,11 @@
                     <thead>
                         <tr>
                             <th class="toggle-cell"></th>
-                            <th class="ps-2" style="width:2.25rem">
-                                <input type="checkbox" class="form-check-input" id="select-all-hosts" title="Select all hosts on this page">
+                            <th class="ps-2">
+                                <div class="d-flex gap-2 align-items-center">
+                                    <input type="checkbox" class="form-check-input" id="select-all-hosts" title="Select all hosts on this page">
+                                    <input type="checkbox" class="form-check-input" id="select-all-ifaces" title="Select all interfaces on this page">
+                                </div>
                             </th>
                             <th style="min-width:13rem">Name</th>
                             <th>Tags</th>
@@ -604,6 +607,12 @@ function updateIfaceToolbar() {
     document.getElementById('iface-bulk-bar').classList.toggle('d-none', count === 0);
     document.getElementById('iface-selected-count').textContent =
         count + ' interface' + (count !== 1 ? 's' : '') + ' selected';
+    const all = document.querySelectorAll('.bulk-iface-cb');
+    const sa  = document.getElementById('select-all-ifaces');
+    if (sa) {
+        sa.checked       = all.length > 0 && count === all.length;
+        sa.indeterminate = count > 0 && count < all.length;
+    }
 }
 
 document.addEventListener('change', function (e) {
@@ -619,6 +628,12 @@ document.addEventListener('change', function (e) {
             e.target.checked ? hostSelected.add(cb.value) : hostSelected.delete(cb.value);
         });
         updateHostToolbar();
+    } else if (e.target.id === 'select-all-ifaces') {
+        document.querySelectorAll('.bulk-iface-cb').forEach(cb => {
+            cb.checked = e.target.checked;
+            e.target.checked ? ifaceSelected.add(cb.value) : ifaceSelected.delete(cb.value);
+        });
+        updateIfaceToolbar();
     }
 });
 
