@@ -236,17 +236,20 @@ class HostController extends AbstractController
         }
 
         if ($action === 'add-tag' || $action === 'remove-tag') {
-            $tagId = (int) ($data['tagId'] ?? 0);
-            $tag   = $tagId ? $tagRepo->find($tagId) : null;
-            if (!$tag) {
-                return $this->json(['error' => 'Tag not found'], 404);
+            $tagIds = array_values(array_filter(array_map('intval', (array) ($data['tagIds'] ?? [])), fn($id) => $id > 0));
+            $tags   = $tagIds ? $tagRepo->findBy(['id' => $tagIds]) : [];
+            if (empty($tags)) {
+                return $this->json(['error' => 'No valid tags selected'], 400);
             }
             foreach ($hosts as $host) {
-                $action === 'add-tag' ? $host->addTag($tag) : $host->removeTag($tag);
+                foreach ($tags as $tag) {
+                    $action === 'add-tag' ? $host->addTag($tag) : $host->removeTag($tag);
+                }
             }
             $em->flush();
-            $verb = $action === 'add-tag' ? 'added to' : 'removed from';
-            return $this->json(['message' => 'Tag "' . $tag->getName() . '" ' . $verb . ' ' . count($hosts) . ' host(s).']);
+            $verb      = $action === 'add-tag' ? 'added to' : 'removed from';
+            $tagNames  = implode(', ', array_map(fn($t) => '"' . $t->getName() . '"', $tags));
+            return $this->json(['message' => $tagNames . ' ' . $verb . ' ' . count($hosts) . ' host(s).']);
         }
 
         return $this->json(['error' => 'Unknown action'], 400);
