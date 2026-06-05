@@ -347,7 +347,7 @@ curl -s -X POST https://dashddi.example.com/api/dhcp/lease \
                     <tr><td>Name</td><td>Display label for this connection</td></tr>
                     <tr><td>API URL</td><td>Base URL of the Snipe-IT API (e.g. <code>https://snipeit.example.com/api/v1</code>)</td></tr>
                     <tr><td>API Key</td><td>Snipe-IT API token — generate one under your user profile in Snipe-IT (<strong>Profile → API Keys → Create</strong>). Read-only access is sufficient.</td></tr>
-                    <tr><td>MAC Custom Fields</td><td>Comma-separated list of Snipe-IT custom field names that contain MAC addresses (e.g. <code>MAC Address,Secondary MAC</code>). Multiple values in a single field can be separated by newlines, semicolons, or commas.</td></tr>
+                    <tr><td>MAC Custom Fields</td><td>Comma-separated Snipe-IT custom field names that contain MAC addresses. Append <code>:alias</code> to control the interface name in DashDDI (e.g. <code>MAC Address, WiFi MAC Address:wifi, Management MAC:mgmt</code>). Without an alias, a short name is derived automatically. Multiple MAC values in a single field can be separated by newlines, semicolons, or commas.</td></tr>
                     <tr><td>Verify TLS</td><td>Whether to validate Snipe-IT's TLS certificate. Disable if using a self-signed cert.</td></tr>
                 </tbody>
             </table>
@@ -369,7 +369,7 @@ curl -s -X POST https://dashddi.example.com/api/dhcp/lease \
                     <tr><td>Asset MAC not known to DashDDI</td><td>Creates a new Host and NetworkInterface. Tags the host with <code>snipeit</code>.</td></tr>
                     <tr><td>Asset matches an existing unlinked host</td><td>Adopts the host (links it to the asset, preserves the existing name).</td></tr>
                     <tr><td>Multiple existing hosts each match one of the asset's MACs</td><td>Merges them into a single host linked to the asset.</td></tr>
-                    <tr><td>Subsequent sync runs</td><td>Updates host name to match asset name (unless manually changed since last sync); soft-deletes interfaces whose MACs no longer appear; restores interfaces whose MACs reappear.</td></tr>
+                    <tr><td>Subsequent sync runs</td><td>Updates host name to match asset name (unless manually changed since last sync); soft-deletes interfaces whose MACs no longer appear; restores interfaces whose MACs reappear; backfills interface names that are still unset.</td></tr>
                     <tr><td>Asset archived/deleted — adopted host</td><td>Removes the <code>snipeit</code> tag and unlinks the asset; host is preserved.</td></tr>
                     <tr><td>Asset archived/deleted — sync-created host</td><td>Soft-deletes the host and its interfaces.</td></tr>
                 </tbody>

@@ -87,6 +87,51 @@ class SnipeItServer
         return array_filter(array_map('trim', explode(',', $this->macCustomFields)));
     }
 
+    /**
+     * Returns field definitions as [['field' => displayName, 'alias' => shortName], ...].
+     * Each entry in macCustomFields may be "Field Name" or "Field Name:alias".
+     * When no alias is given, one is derived automatically.
+     */
+    public function getMacFieldDefinitions(): array
+    {
+        $defs = [];
+        $index = 0;
+        foreach ($this->getMacCustomFieldNames() as $entry) {
+            if (str_contains($entry, ':')) {
+                [$field, $alias] = explode(':', $entry, 2);
+                $field = trim($field);
+                $alias = trim($alias);
+            } else {
+                $field = $entry;
+                $alias = '';
+            }
+            if ($alias === '') {
+                $alias = self::deriveFieldAlias($field, $index);
+            }
+            $defs[] = ['field' => $field, 'alias' => $alias];
+            $index++;
+        }
+        return $defs;
+    }
+
+    private static function deriveFieldAlias(string $fieldName, int $index): string
+    {
+        $s = strtolower(trim($fieldName));
+        foreach ([' mac address', ' mac addr', ' mac', ' address'] as $suffix) {
+            if (str_ends_with($s, $suffix)) {
+                $s = substr($s, 0, -strlen($suffix));
+                break;
+            }
+        }
+        $s = trim($s);
+        $s = (string) preg_replace('/[^a-z0-9]+/', '-', $s);
+        $s = trim($s, '-');
+        if ($s === '') {
+            return $index === 0 ? 'mac' : 'mac' . ($index + 1);
+        }
+        return substr($s, 0, 15);
+    }
+
     public function getVlanOverrideCustomField(): ?string { return $this->vlanOverrideCustomField; }
     public function setVlanOverrideCustomField(?string $v): static { $this->vlanOverrideCustomField = $v ?: null; return $this; }
 

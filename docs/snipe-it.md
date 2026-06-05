@@ -18,7 +18,7 @@ Add a Snipe-IT connection under **Settings → Snipe-IT Servers**. The fields ar
 | Name | Display name for this connection |
 | API URL | Base URL of the Snipe-IT API (e.g., `https://snipeit.example.com/api/v1`) |
 | API Key | Snipe-IT API token. Generate one in Snipe-IT under your user profile → API. |
-| MAC Custom Fields | Comma-separated list of Snipe-IT custom field names that contain MAC addresses (e.g., `MAC Address,Secondary MAC`) |
+| MAC Custom Fields | Comma-separated Snipe-IT custom field names that contain MAC addresses. Optionally append `:alias` to each name to control the interface name in DashDDI (e.g., `MAC Address, WiFi MAC Address:wifi, Management MAC:mgmt`). |
 | Verify TLS | Whether to validate Snipe-IT's TLS certificate (default: on) |
 
 ### API Token
@@ -30,6 +30,18 @@ In Snipe-IT: **Profile → API Keys → Create**. The token is used as a Bearer 
 Snipe-IT does not have a built-in MAC address field. You must create one (or more) custom fields in Snipe-IT and add them to your asset fieldsets. Enter the exact field names (as they appear in Snipe-IT) in the **MAC Custom Fields** setting, comma-separated.
 
 DashDDI handles multiple MAC addresses in a single field — values can be separated by newlines, semicolons, or commas within the field value.
+
+#### Interface Names
+
+Each imported network interface is named after the Snipe-IT field it came from. You can control this name by appending `:alias` to the field entry:
+
+```
+MAC Address, WiFi MAC Address:wifi, Management MAC:mgmt
+```
+
+Without an explicit alias, DashDDI derives a short name automatically by stripping common noise words ("mac address", "mac", "address") from the end of the field name and slugifying the result — for example, "WiFi MAC Address" becomes `wifi` and "Primary MAC" becomes `primary`.
+
+Interfaces that already have a name (set manually or by a previous sync) are never overwritten. Interfaces with no name are backfilled on the next sync.
 
 ## Category → Subnet Mapping
 
@@ -52,6 +64,7 @@ If several existing unlinked hosts each match one of the asset's MACs, DashDDI m
 - Host names are updated to match the Snipe-IT asset name (unless the name was manually changed after the last sync).
 - Interfaces whose MACs no longer appear in the asset are soft-deleted.
 - Interfaces whose MACs reappear (e.g., re-added in Snipe-IT) are restored.
+- Interfaces with no name are backfilled with the alias derived from the source field.
 
 ### When an Asset Is Archived or Deleted in Snipe-IT
 - **Adopted hosts** (pre-existing before the sync): the `snipeit` tag is removed and the link is deleted. The host is preserved in DashDDI.
