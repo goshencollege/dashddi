@@ -568,6 +568,7 @@ class SnipeItSyncService
     /**
      * Builds [vlanId => subnetId] from all subnets that have a VLAN ID set.
      * When multiple subnets share a VLAN, picks the most generic (shortest prefix = widest CIDR).
+     * Subnets with no CIDR at all are treated as most generic (prefix -1) and preferred over any prefix length.
      * Ties in prefix length are broken by lowest DB ID; a warning is appended to $warnings.
      *
      * @param string[] $warnings
@@ -601,7 +602,7 @@ class SnipeItSyncService
     {
         $cidr = $subnet->getIpv4Cidr() ?? $subnet->getIpv6Cidr();
         if ($cidr === null) {
-            return PHP_INT_MAX;
+            return -1;
         }
         return (int) substr($cidr, strpos($cidr, '/') + 1);
     }
