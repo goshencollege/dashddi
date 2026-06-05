@@ -872,7 +872,7 @@ class ImportLegacyCommand extends Command
         $server->setApiUrl('https://snipe.goshen.edu');
         $server->setApiKey($apiKey ?: null);
         $server->setVerifyTls(false);
-        $server->setMacCustomFields('MAC Address, MAC Address 2, MAC Address 3, MAC Address 4, MAC Address 5, Wireless MAC');
+        $server->setMacCustomFields('MAC Address:mac1, MAC Address 2:mac2, MAC Address 3:mac3, MAC Address 4:mac4, MAC Address 5:mac5, Wireless MAC:wifi');
         $server->setVlanOverrideCustomField('VLAN ID');
 
         if (!$dryRun) {
