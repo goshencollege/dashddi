@@ -210,30 +210,31 @@
     {# ── Tree view: hosts with collapsible interface sub-rows ── #}
     <div class="list-scroll-card">
         <div class="card">
-            <div id="host-bulk-bar" class="card-header d-none py-1">
+            <div id="bulk-bar" class="card-header d-none py-1">
                 <div class="d-flex align-items-center gap-2">
-                    <span id="host-selected-count" class="text-muted small">0 hosts selected</span>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" id="host-add-tag-btn">
-                        <i class="bi bi-tag me-1"></i>Add Tag
-                    </button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" id="host-remove-tag-btn">
-                        <i class="bi bi-tag me-1"></i>Remove Tag
-                    </button>
-                    <button type="button" class="btn btn-sm btn-outline-danger ms-auto" id="host-delete-btn">
-                        <i class="bi bi-trash me-1"></i>Delete Selected
-                    </button>
-                </div>
-            </div>
-            <div id="iface-bulk-bar" class="card-header d-none py-1">
-                <div class="d-flex align-items-center gap-2">
-                    <span id="iface-selected-count" class="text-muted small">0 interfaces selected</span>
-                    <button type="button" class="btn btn-sm btn-outline-secondary ms-auto" id="iface-edit-btn"
-                            data-bs-toggle="modal" data-bs-target="#bulk-iface-edit-modal">
-                        <i class="bi bi-pencil me-1"></i>Edit Selected
-                    </button>
-                    <button type="button" class="btn btn-sm btn-outline-danger" id="iface-delete-btn">
-                        <i class="bi bi-trash me-1"></i>Delete Selected
-                    </button>
+                    <div id="host-bulk-section" class="d-none d-flex align-items-center gap-2">
+                        <span id="host-selected-count" class="text-muted small">0 hosts selected</span>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="host-add-tag-btn">
+                            <i class="bi bi-tag me-1"></i>Add Tag
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="host-remove-tag-btn">
+                            <i class="bi bi-tag me-1"></i>Remove Tag
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-danger" id="host-delete-btn">
+                            <i class="bi bi-trash me-1"></i>Delete Selected Hosts
+                        </button>
+                    </div>
+                    <div id="bulk-bar-separator" class="vr d-none mx-2"></div>
+                    <div id="iface-bulk-section" class="d-none d-flex align-items-center gap-2">
+                        <span id="iface-selected-count" class="text-muted small">0 interfaces selected</span>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="iface-edit-btn"
+                                data-bs-toggle="modal" data-bs-target="#bulk-iface-edit-modal">
+                            <i class="bi bi-pencil me-1"></i>Edit Selected Interfaces
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-danger" id="iface-delete-btn">
+                            <i class="bi bi-trash me-1"></i>Delete Selected Interfaces
+                        </button>
+                    </div>
                 </div>
             </div>
             <div class="table-responsive">
@@ -589,31 +590,33 @@ treeTable?.addEventListener('mouseleave', function () {
 const hostSelected = new Set();
 const ifaceSelected = new Set();
 
-function updateHostToolbar() {
-    const count = hostSelected.size;
-    document.getElementById('host-bulk-bar').classList.toggle('d-none', count === 0);
+function updateBulkBar() {
+    const hCount = hostSelected.size;
+    const iCount = ifaceSelected.size;
+    document.getElementById('bulk-bar').classList.toggle('d-none', hCount === 0 && iCount === 0);
+    document.getElementById('host-bulk-section').classList.toggle('d-none', hCount === 0);
+    document.getElementById('iface-bulk-section').classList.toggle('d-none', iCount === 0);
+    document.getElementById('bulk-bar-separator').classList.toggle('d-none', hCount === 0 || iCount === 0);
     document.getElementById('host-selected-count').textContent =
-        count + ' host' + (count !== 1 ? 's' : '') + ' selected';
-    const all = document.querySelectorAll('.bulk-host-cb');
-    const sa  = document.getElementById('select-all-hosts');
-    if (sa) {
-        sa.checked       = all.length > 0 && count === all.length;
-        sa.indeterminate = count > 0 && count < all.length;
+        hCount + ' host' + (hCount !== 1 ? 's' : '') + ' selected';
+    document.getElementById('iface-selected-count').textContent =
+        iCount + ' interface' + (iCount !== 1 ? 's' : '') + ' selected';
+    const allHosts = document.querySelectorAll('.bulk-host-cb');
+    const saHosts  = document.getElementById('select-all-hosts');
+    if (saHosts) {
+        saHosts.checked       = allHosts.length > 0 && hCount === allHosts.length;
+        saHosts.indeterminate = hCount > 0 && hCount < allHosts.length;
+    }
+    const allIfaces = document.querySelectorAll('.bulk-iface-cb');
+    const saIfaces  = document.getElementById('select-all-ifaces');
+    if (saIfaces) {
+        saIfaces.checked       = allIfaces.length > 0 && iCount === allIfaces.length;
+        saIfaces.indeterminate = iCount > 0 && iCount < allIfaces.length;
     }
 }
 
-function updateIfaceToolbar() {
-    const count = ifaceSelected.size;
-    document.getElementById('iface-bulk-bar').classList.toggle('d-none', count === 0);
-    document.getElementById('iface-selected-count').textContent =
-        count + ' interface' + (count !== 1 ? 's' : '') + ' selected';
-    const all = document.querySelectorAll('.bulk-iface-cb');
-    const sa  = document.getElementById('select-all-ifaces');
-    if (sa) {
-        sa.checked       = all.length > 0 && count === all.length;
-        sa.indeterminate = count > 0 && count < all.length;
-    }
-}
+function updateHostToolbar() { updateBulkBar(); }
+function updateIfaceToolbar() { updateBulkBar(); }
 
 document.addEventListener('change', function (e) {
     if (e.target.matches('.bulk-host-cb')) {
