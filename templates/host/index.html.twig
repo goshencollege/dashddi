@@ -301,17 +301,13 @@
                                         <span class="text-muted small ms-1 fst-italic">· No interfaces</span>
                                     {% endif %}
                                 </td>
-                                <td>
+                                <td colspan="5">
                                     {% for tag in host.tags %}
                                         <span class="badge bg-secondary me-1">{{ tag.name }}</span>
                                     {% else %}
                                         <span class="text-muted">—</span>
                                     {% endfor %}
                                 </td>
-                                <td></td>
-                                <td></td>
-                                <td></td>
-                                <td></td>
                                 <td class="text-muted small">
                                     {{ host.updatedAt|date('Y-m-d H:i') }}
                                     {% if host.updatedBy %}<br><span class="text-muted">{{ host.updatedBy }}</span>{% endif %}
