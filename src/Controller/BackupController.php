@@ -104,7 +104,8 @@ class BackupController extends AbstractController
         $tmpPath = $uploadedFile->move('/tmp', uniqid('dashddi_restore_', true) . $extension)->getPathname();
 
         $consolePath = $this->getParameter('kernel.project_dir') . '/bin/console';
-        $args        = ['php', $consolePath, 'app:database:restore', $tmpPath, '--no-interaction'];
+        $keyFile     = tempnam('/tmp', 'dashddi_key_');
+        $args        = ['php', $consolePath, 'app:database:restore', $tmpPath, '--no-interaction', '--key-output-file', $keyFile];
 
         $process = new Process($args);
         $process->setTimeout(600);
@@ -117,8 +118,9 @@ class BackupController extends AbstractController
 
         if ($process->isSuccessful()) {
             $this->addFlash('success', 'Database restored successfully. Migrations have been applied.');
-            $this->flashEmbeddedKey($process->getOutput());
+            $this->flashEmbeddedKeyFromFile($keyFile);
         } else {
+            @unlink($keyFile);
             $this->addFlash('danger', 'Restore failed: ' . trim($process->getErrorOutput() ?: $process->getOutput()));
         }
 
@@ -156,7 +158,8 @@ class BackupController extends AbstractController
         }
 
         $consolePath = $this->getParameter('kernel.project_dir') . '/bin/console';
-        $args        = ['php', $consolePath, 'app:database:restore', $filePath, '--no-interaction'];
+        $keyFile     = tempnam('/tmp', 'dashddi_key_');
+        $args        = ['php', $consolePath, 'app:database:restore', $filePath, '--no-interaction', '--key-output-file', $keyFile];
 
         $process = new Process($args);
         $process->setTimeout(600);
@@ -167,14 +170,16 @@ class BackupController extends AbstractController
 
         if ($process->isSuccessful()) {
             $this->addFlash('success', "Database restored from {$filename}. Migrations have been applied.");
-            $this->flashEmbeddedKey($process->getOutput());
+            $this->flashEmbeddedKeyFromFile($keyFile);
         } elseif ($isEncrypted && str_contains($process->getOutput(), 'WRONG_BACKUP_PASSWORD')) {
+            @unlink($keyFile);
             $this->addFlash('danger',
                 "The saved backup password does not match the password used to encrypt \"{$filename}\". " .
                 'This can happen if the password was changed after the backup was created. ' .
                 'To restore this backup, download it and use the "Restore from Uploaded File" form where you can enter the original password manually.'
             );
         } else {
+            @unlink($keyFile);
             $this->addFlash('danger', 'Restore failed: ' . trim($process->getErrorOutput() ?: $process->getOutput()));
         }
 
@@ -233,11 +238,15 @@ class BackupController extends AbstractController
 
     // -------------------------------------------------------------------------
 
-    /** Parses subprocess output for an embedded key notice and adds a flash if found. */
-    private function flashEmbeddedKey(string $processOutput): void
+    /** Reads the embedded key written by the restore command and flashes it, then deletes the file. */
+    private function flashEmbeddedKeyFromFile(string $keyFile): void
     {
-        if (preg_match('/^EMBEDDED_KEY:(\S+)/m', $processOutput, $m)) {
-            $this->addFlash('encryption_key_notice', $m[1]);
+        if (file_exists($keyFile)) {
+            $key = trim((string) file_get_contents($keyFile));
+            @unlink($keyFile);
+            if ($key !== '') {
+                $this->addFlash('encryption_key_notice', $key);
+            }
         }
     }
 

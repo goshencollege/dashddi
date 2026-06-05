@@ -36,6 +36,7 @@ class DatabaseRestoreCommand extends Command
             ->addOption('cifs-user', null, InputOption::VALUE_REQUIRED, 'CIFS username')
             ->addOption('cifs-password', null, InputOption::VALUE_REQUIRED, 'CIFS password')
             ->addOption('skip-migrations', null, InputOption::VALUE_NONE, 'Skip running doctrine migrations after restore')
+            ->addOption('key-output-file', null, InputOption::VALUE_REQUIRED, 'Write embedded APP_ENCRYPTION_KEY to this file instead of stdout')
         ;
     }
 
@@ -162,18 +163,21 @@ class DatabaseRestoreCommand extends Command
         // -- Report embedded encryption key -----------------------------------
         $embeddedKey = $this->extractEmbeddedKey($sql);
         if ($embeddedKey !== null) {
-            // Prefix lets the web controller parse this line from stdout.
-            $io->writeln("EMBEDDED_KEY:{$embeddedKey}");
-            $io->warning([
-                'This backup contains an embedded APP_ENCRYPTION_KEY.',
-                'Encrypted database fields will only work if the application uses this key.',
-                '',
-                "Key: {$embeddedKey}",
-                '',
-                'Add or update this line in .env.local, then restart the app container:',
-                "  APP_ENCRYPTION_KEY={$embeddedKey}",
-                '  docker compose restart app',
-            ]);
+            $keyOutputFile = $input->getOption('key-output-file');
+            if ($keyOutputFile !== null) {
+                file_put_contents($keyOutputFile, $embeddedKey);
+            } else {
+                $io->warning([
+                    'This backup contains an embedded APP_ENCRYPTION_KEY.',
+                    'Encrypted database fields will only work if the application uses this key.',
+                    '',
+                    "Key: {$embeddedKey}",
+                    '',
+                    'Add or update this line in .env.local, then restart the app container:',
+                    "  APP_ENCRYPTION_KEY={$embeddedKey}",
+                    '  docker compose restart app',
+                ]);
+            }
         }
 
         // -- Run migrations ----------------------------------------------------
