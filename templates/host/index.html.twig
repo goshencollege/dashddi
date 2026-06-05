@@ -235,6 +235,9 @@
                             <i class="bi bi-trash me-1"></i>Delete Selected Interfaces
                         </button>
                     </div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary ms-auto" id="bulk-clear-btn">
+                        <i class="bi bi-x-lg me-1"></i>Clear Selections
+                    </button>
                 </div>
             </div>
             <div class="table-responsive">
@@ -677,6 +680,15 @@ document.getElementById('host-delete-btn')?.addEventListener('click', async func
     });
     const data = await resp.json();
     if (resp.ok) { location.reload(); } else { alert(data.error ?? 'Error'); }
+});
+
+// --- Clear all selections ---
+document.getElementById('bulk-clear-btn')?.addEventListener('click', function () {
+    hostSelected.clear();
+    ifaceSelected.clear();
+    document.querySelectorAll('.bulk-host-cb, .bulk-iface-cb').forEach(cb => cb.checked = false);
+    lastCheckedCb = null;
+    updateBulkBar();
 });
 
 // --- Bulk interface delete ---
