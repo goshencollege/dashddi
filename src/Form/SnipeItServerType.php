@@ -35,8 +35,8 @@ class SnipeItServerType extends AbstractType
             ])
             ->add('macCustomFields', TextType::class, [
                 'label' => 'MAC Address Custom Field Names',
-                'attr'  => ['placeholder' => 'MAC Address, Secondary MAC, MAC 2'],
-                'help'  => 'Comma-separated display names of the Snipe-IT custom fields that store MAC addresses.',
+                'attr'  => ['placeholder' => 'MAC Address, WiFi MAC Address:wifi, Management MAC:mgmt'],
+                'help'  => 'Comma-separated Snipe-IT custom field display names. Optionally append :alias to set a short interface name (e.g. "WiFi MAC Address:wifi"). Without an alias, one is derived automatically.',
             ])
             ->add('vlanOverrideCustomField', TextType::class, [
                 'label'    => 'VLAN Override Custom Field Name',

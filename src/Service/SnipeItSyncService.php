@@ -43,7 +43,7 @@ class SnipeItSyncService
 
         // Cache scalar values before any em->clear() detaches $server
         $serverId            = $server->getId();
-        $macFieldNames       = $server->getMacCustomFieldNames();
+        $macFieldDefs        = $server->getMacFieldDefinitions();
         $vlanOverrideField   = $server->getVlanOverrideCustomField();
         $defaultSubnetId     = $server->getDefaultSubnet()?->getId();
 
@@ -88,8 +88,8 @@ class SnipeItSyncService
                     continue;
                 }
 
-                $macs = $this->extractMacs($asset, $macFieldNames);
-                if (empty($macs)) {
+                $macAliasMap = $this->extractMacs($asset, $macFieldDefs);
+                if (empty($macAliasMap)) {
                     $result['skipped']++;
                     continue;
                 }
@@ -122,7 +122,7 @@ class SnipeItSyncService
 
                 try {
                     if ($link !== null) {
-                        $kept = $this->updateHost($link, $assetName, $assetTagStr, $macs, $result['errors'], $categorySubnetIdMap, $categoryId, $categoryName, $overrideSubnetId, $defaultSubnetId);
+                        $kept = $this->updateHost($link, $assetName, $assetTagStr, $macAliasMap, $result['errors'], $categorySubnetIdMap, $categoryId, $categoryName, $overrideSubnetId, $defaultSubnetId);
                         if (!$kept) {
                             // soft-delete done inside updateHost; delete only the link row
                             $link->getHost()->setSnipeItAssetLink(null);
@@ -139,7 +139,7 @@ class SnipeItSyncService
                         }
                     } else {
                         // No existing link — check if any of these MACs already belong to a DashDDI host
-                        $normalizedMacs = array_values(array_unique(array_map([$this, 'normalizeMac'], $macs)));
+                        $normalizedMacs = array_keys($macAliasMap);
                         $conflictHosts  = [];
                         foreach ($normalizedMacs as $mac) {
                             $iface = $this->ifaceRepo->findActiveByMac($mac);
@@ -211,7 +211,7 @@ class SnipeItSyncService
                             $adopted = true;
                             $this->adoptHost($host, $normalizedMacs, $snipeTag, $categorySubnetIdMap, $categoryId, $categoryName, $overrideSubnetId, $defaultSubnetId);
                         } else {
-                            $host = $this->createHost($assetName, $macs, $snipeTag, $result['errors'], $categorySubnetIdMap, $categoryId, $categoryName, $overrideSubnetId, $defaultSubnetId);
+                            $host = $this->createHost($assetName, $macAliasMap, $snipeTag, $result['errors'], $categorySubnetIdMap, $categoryId, $categoryName, $overrideSubnetId, $defaultSubnetId);
                             if ($host === null) {
                                 $result['skipped']++;
                                 continue;
@@ -395,7 +395,7 @@ class SnipeItSyncService
     }
 
     /** Returns null if no interfaces could be created (all MACs already assigned elsewhere). */
-    private function createHost(string $name, array $macs, Tag $snipeTag, array &$errors, array $categorySubnetIdMap, int $categoryId, string $categoryName, ?int $overrideSubnetId = null, ?int $defaultSubnetId = null): ?Host
+    private function createHost(string $name, array $macAliasMap, Tag $snipeTag, array &$errors, array $categorySubnetIdMap, int $categoryId, string $categoryName, ?int $overrideSubnetId = null, ?int $defaultSubnetId = null): ?Host
     {
         $host = new Host();
         $host->setName($name);
@@ -405,14 +405,15 @@ class SnipeItSyncService
         }
 
         $added = 0;
-        foreach ($macs as $mac) {
-            $existing = $this->ifaceRepo->findActiveByMac($this->normalizeMac($mac));
+        foreach ($macAliasMap as $mac => $alias) {
+            $existing = $this->ifaceRepo->findActiveByMac($mac);
             if ($existing !== null) {
                 $errors[] = sprintf('MAC %s already assigned to another host — skipped for asset "%s".', $mac, $name);
                 continue;
             }
             $iface = new NetworkInterface();
             $iface->setMacAddress($mac);
+            $iface->setName($alias);
             $iface->setHost($host);
             $this->assignSubnetIfMissing($iface, $categorySubnetIdMap, $categoryId, $overrideSubnetId, $defaultSubnetId);
             $this->em->persist($iface);
@@ -432,7 +433,7 @@ class SnipeItSyncService
      * Preserves the DashDDI host name when it has been customised or adopted (differs from the
      * previously stored Snipe name); otherwise updates it to track renames in Snipe-IT.
      */
-    private function updateHost(SnipeItAssetLink $link, string $name, string $assetTagStr, array $macs, array &$errors, array $categorySubnetIdMap, int $categoryId, string $categoryName, ?int $overrideSubnetId = null, ?int $defaultSubnetId = null): bool
+    private function updateHost(SnipeItAssetLink $link, string $name, string $assetTagStr, array $macAliasMap, array &$errors, array $categorySubnetIdMap, int $categoryId, string $categoryName, ?int $overrideSubnetId = null, ?int $defaultSubnetId = null): bool
     {
         $host = $link->getHost();
 
@@ -460,7 +461,7 @@ class SnipeItSyncService
             $host->addTag($this->ensureTag('snipeit:' . $categoryName));
         }
 
-        $normalizedMacs = array_map([$this, 'normalizeMac'], $macs);
+        $normalizedMacs = array_keys($macAliasMap);
 
         // Soft-delete interfaces whose MACs are no longer in the asset
         foreach ($host->getInterfaces() as $iface) {
@@ -524,6 +525,7 @@ class SnipeItSyncService
             }
             $iface = new NetworkInterface();
             $iface->setMacAddress($mac);
+            $iface->setName($macAliasMap[$mac]);
             $iface->setHost($host);
             $this->assignSubnetIfMissing($iface, $categorySubnetIdMap, $categoryId, $overrideSubnetId, $defaultSubnetId);
             $this->em->persist($iface);
@@ -630,12 +632,13 @@ class SnipeItSyncService
         return !in_array($statusMeta, ['deployable', 'deployed'], true);
     }
 
-    private function extractMacs(array $asset, array $fieldNames): array
+    /** Returns [normalizedMac => alias]. First-seen field wins when a MAC appears in multiple fields. */
+    private function extractMacs(array $asset, array $fieldDefs): array
     {
         $macs = [];
         $customFields = $asset['custom_fields'] ?? [];
 
-        foreach ($fieldNames as $fieldName) {
+        foreach ($fieldDefs as ['field' => $fieldName, 'alias' => $alias]) {
             $value = trim((string) ($customFields[$fieldName]['value'] ?? ''));
             if ($value === '') {
                 continue;
@@ -644,12 +647,15 @@ class SnipeItSyncService
             foreach (preg_split('/[\s,;]+/', $value) as $candidate) {
                 $candidate = trim($candidate);
                 if ($candidate !== '' && $this->isValidMac($candidate)) {
-                    $macs[] = $candidate;
+                    $normalized = $this->normalizeMac($candidate);
+                    if (!isset($macs[$normalized])) {
+                        $macs[$normalized] = $alias;
+                    }
                 }
             }
         }
 
-        return array_values(array_unique($macs));
+        return $macs;
     }
 
     private function isValidMac(string $mac): bool
