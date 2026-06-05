@@ -60,7 +60,7 @@ class SubnetApiController extends AbstractController
         $subnet = new Subnet();
         $this->applyFields($subnet, $data, $vrfRepo, $tagRepo, $viewRepo);
 
-        if ($error = $this->validateCidrs($subnet)) {
+        if ($error = $this->validateCidrs($subnet, $repo)) {
             return $this->json(['error' => $error], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
@@ -87,7 +87,7 @@ class SubnetApiController extends AbstractController
 
         $this->applyFields($subnet, $data, $vrfRepo, $tagRepo, $viewRepo, patch: true);
 
-        if ($error = $this->validateCidrs($subnet)) {
+        if ($error = $this->validateCidrs($subnet, $repo)) {
             return $this->json(['error' => $error], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
@@ -145,11 +145,20 @@ class SubnetApiController extends AbstractController
         }
     }
 
-    private function validateCidrs(Subnet $subnet): ?string
+    private function validateCidrs(Subnet $subnet, SubnetRepository $repo): ?string
     {
-        if ($subnet->getIpv4Cidr() === null && $subnet->getIpv6Cidr() === null) {
-            return null; // both nullable; rely on entity constraints
+        if ($subnet->isContainer()) {
+            return null;
         }
+
+        $excludeId = $subnet->getId();
+
+        foreach ([4 => $subnet->getIpv4Cidr(), 6 => $subnet->getIpv6Cidr()] as $version => $cidr) {
+            if ($cidr && ($overlap = $repo->findTerminalCidrOverlap($cidr, $excludeId))) {
+                return sprintf('IPv%d CIDR %s overlaps with terminal subnet "%s".', $version, $cidr, $overlap->getName());
+            }
+        }
+
         return null;
     }
 
