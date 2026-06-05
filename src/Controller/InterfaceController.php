@@ -390,13 +390,18 @@ class InterfaceController extends AbstractController
 
             if (!$subnet?->isContainer()) {
                 if ($ipv4Mode !== 'keep') {
-                    if (!$subnetChanged) {
-                        $this->ipManager->releaseIpv4($iface);
-                    }
-                    if ($ipv4Mode === 'auto' && $subnet?->getIpv4Cidr()) {
-                        $ip = $this->ipManager->findNextAvailableIpv4($subnet);
-                        if ($ip) {
-                            $this->ipManager->assignIpv4($iface, $ip);
+                    $hasIpv4 = !$subnetChanged && $iface->getIpAddress() !== null;
+                    if ($ipv4Mode === 'auto' && $hasIpv4) {
+                        // already has a valid IP in this subnet — leave it
+                    } else {
+                        if (!$subnetChanged) {
+                            $this->ipManager->releaseIpv4($iface);
+                        }
+                        if ($ipv4Mode === 'auto' && $subnet?->getIpv4Cidr()) {
+                            $ip = $this->ipManager->findNextAvailableIpv4($subnet);
+                            if ($ip) {
+                                $this->ipManager->assignIpv4($iface, $ip);
+                            }
                         }
                     }
                 }
@@ -421,9 +426,11 @@ class InterfaceController extends AbstractController
                     }
                 }
             }
-        }
 
-        $em->flush();
+            // Flush per interface so each assigned IP is visible to findNextAvailable*
+            // on the next iteration — the DB query bypasses Doctrine's identity map.
+            $em->flush();
+        }
         return $this->json(['message' => $count . ' interface(s) updated.']);
     }
 
