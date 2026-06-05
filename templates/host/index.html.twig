@@ -43,6 +43,7 @@
 .host-tree-table .group-hovered > td { background-color: var(--tree-group-hover) !important; }
 .host-tree-table .row-hovered > td   { background-color: var(--tree-row-hover)   !important; }
 </style>
+{{ include('_tom_select_dark.html.twig') }}
 {% endblock %}
 
 {# Renders Bootstrap pagination controls and a result-count footer line. #}
@@ -442,7 +443,7 @@
             </div>
             <div class="modal-body">
                 <label class="form-label" for="bulk-tag-select">Tag</label>
-                <select id="bulk-tag-select" class="form-select" placeholder="Search tags…"></select>
+                <select id="bulk-tag-select" class="form-select" placeholder="Search tags…" multiple></select>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -531,6 +532,8 @@
         </div>
     </div>
 </div>
+
+{% endblock %}
 
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
@@ -795,14 +798,22 @@ if (bulkTagModalEl) {
         valueField: 'value',
         labelField: 'text',
         searchField: 'text',
-        maxOptions: 20,
+        preload: true,
         plugins: ['remove_button'],
+        persist: false,
         load(query, callback) {
             fetch('/api/tags?q=' + encodeURIComponent(query))
                 .then(r => r.json()).then(callback).catch(() => callback());
         },
-        onInitialize() {
-            fetch('/api/tags').then(r => r.json()).then(tags => this.addOptions(tags));
+        create(input, callback) {
+            fetch('/api/tags', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: input }),
+            })
+                .then(r => r.json().then(data => ({ ok: r.ok, data })))
+                .then(({ ok, data }) => { ok ? callback(data) : callback(); })
+                .catch(() => callback());
         },
     });
 
@@ -823,15 +834,15 @@ if (bulkTagModalEl) {
     });
 
     document.getElementById('bulk-tag-submit')?.addEventListener('click', async function () {
-        const tagId = bulkTagSelect.getValue();
-        if (!tagId) { alert('Please select a tag.'); return; }
+        const tagIds = bulkTagSelect.getValue();
+        if (!tagIds.length) { alert('Please select at least one tag.'); return; }
         const resp = await fetch('{{ path('host_bulk') }}', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 action: bulkTagAction,
                 ids: [...hostSelected],
-                tagId,
+                tagIds,
                 _token: '{{ csrf_token('bulk_hosts') }}',
             }),
         });
@@ -842,4 +853,3 @@ if (bulkTagModalEl) {
 }
 </script>
 {% endblock scripts %}
-{% endblock content %}
