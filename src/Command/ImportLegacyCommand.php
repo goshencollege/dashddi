@@ -789,6 +789,8 @@ class ImportLegacyCommand extends Command
             ['name' => 'EMP_BYOD',                'ipv4' => '192.168.116.0/22',  'ipv6' => '2001:18e8:408:74::/64', 'vlan' => 116,  'gateway' => null,            'container' => false],
             ['name' => 'EMP_JENZ',                'ipv4' => '192.168.121.0/24',  'ipv6' => '2001:18e8:408:79::/64', 'vlan' => 121,  'gateway' => null,            'container' => false, 'vrf' => 'corporate'],
             ['name' => 'WIFI_128',                'ipv4' => '192.168.128.0/19',  'ipv6' => '2001:18e8:408:80::/64', 'vlan' => 128,  'gateway' => null,            'container' => false, 'vrf' => 'student'],
+            ['name' => 'temp9253',                'ipv4' => null,                'ipv6' => null,                    'vlan' => 9253, 'gateway' => null,            'container' => false],
+            ['name' => 'temp9144',                'ipv4' => null,                'ipv6' => null,                    'vlan' => 9144, 'gateway' => null,            'container' => false],
         ];
 
         $datacenterCidrs = [
