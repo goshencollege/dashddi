@@ -117,8 +117,12 @@ class DnsServerController extends AbstractController
     }
 
     #[Route('/push', name: 'dns_server_push', methods: ['POST'])]
-    public function push(DnsServerRepository $repo, MessageBusInterface $bus): JsonResponse
+    public function push(Request $request, DnsServerRepository $repo, MessageBusInterface $bus): JsonResponse
     {
+        if (!$this->isCsrfTokenValid('dns_push', $request->headers->get('X-CSRF-Token') ?? $request->request->get('_token'))) {
+            return $this->json(['error' => 'Invalid CSRF token.'], 403);
+        }
+
         $servers = $repo->findBy([], ['name' => 'ASC']);
 
         if (empty($servers)) {

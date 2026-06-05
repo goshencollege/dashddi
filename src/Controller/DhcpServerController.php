@@ -119,8 +119,12 @@ class DhcpServerController extends AbstractController
     }
 
     #[Route('/push', name: 'dhcp_server_push', methods: ['POST'])]
-    public function push(DhcpServerRepository $repo, MessageBusInterface $bus): JsonResponse
+    public function push(Request $request, DhcpServerRepository $repo, MessageBusInterface $bus): JsonResponse
     {
+        if (!$this->isCsrfTokenValid('dhcp_push', $request->headers->get('X-CSRF-Token') ?? $request->request->get('_token'))) {
+            return $this->json(['error' => 'Invalid CSRF token.'], 403);
+        }
+
         $servers = $repo->findBy([], ['name' => 'ASC']);
 
         if (empty($servers)) {

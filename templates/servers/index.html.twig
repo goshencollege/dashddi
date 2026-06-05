@@ -398,7 +398,7 @@
 {% block scripts %}
 <script>
 (function () {
-    function bindPushButton(btnId, resultsId, endpoint) {
+    function bindPushButton(btnId, resultsId, endpoint, csrfToken) {
         const btn     = document.getElementById(btnId);
         const results = document.getElementById(resultsId);
         if (!btn) return;
@@ -411,7 +411,7 @@
 
             fetch(endpoint, {
                 method: 'POST',
-                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-Token': csrfToken },
             })
             .then(r => r.json())
             .then(data => {
@@ -434,7 +434,7 @@
         });
     }
 
-    function bindPullButton(btnId, resultsId, endpoint, resetLabel) {
+    function bindPullButton(btnId, resultsId, endpoint, resetLabel, csrfToken) {
         resetLabel = resetLabel || '<i class="bi bi-cloud-download me-1"></i>Pull Now';
         const btn     = document.getElementById(btnId);
         const results = document.getElementById(resultsId);
@@ -448,7 +448,7 @@
 
             fetch(endpoint, {
                 method: 'POST',
-                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-Token': csrfToken },
             })
             .then(r => r.json())
             .then(data => {
@@ -471,11 +471,11 @@
         });
     }
 
-    bindPullButton('clearpass-pull-logs-btn', 'clearpass-pull-logs-results', '{{ path('clearpass_server_pull_logs') }}', '<i class="bi bi-cloud-download me-1"></i>Pull Auth Logs');
-    bindPushButton('clearpass-push-btn', 'clearpass-push-results', '{{ path('clearpass_server_push') }}');
-    bindPushButton('dhcp-push-btn',     'dhcp-push-results',     '{{ path('dhcp_server_push') }}');
-    bindPushButton('dns-push-btn',      'dns-push-results',      '{{ path('dns_server_push') }}');
-    bindPullButton('snipeit-pull-btn',  'snipeit-pull-results',  '{{ path('snipe_it_server_pull') }}');
+    bindPullButton('clearpass-pull-logs-btn', 'clearpass-pull-logs-results', '{{ path('clearpass_server_pull_logs') }}', '<i class="bi bi-cloud-download me-1"></i>Pull Auth Logs', '{{ csrf_token('clearpass_pull_logs') }}');
+    bindPushButton('clearpass-push-btn', 'clearpass-push-results', '{{ path('clearpass_server_push') }}', '{{ csrf_token('clearpass_push') }}');
+    bindPushButton('dhcp-push-btn',     'dhcp-push-results',     '{{ path('dhcp_server_push') }}',     '{{ csrf_token('dhcp_push') }}');
+    bindPushButton('dns-push-btn',      'dns-push-results',      '{{ path('dns_server_push') }}',      '{{ csrf_token('dns_push') }}');
+    bindPullButton('snipeit-pull-btn',  'snipeit-pull-results',  '{{ path('snipe_it_server_pull') }}',  null, '{{ csrf_token('snipeit_pull') }}');
 })();
 </script>
 {% endblock %}

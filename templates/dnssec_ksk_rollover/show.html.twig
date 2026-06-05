@@ -89,6 +89,7 @@
                         </div>
                         <form method="post" action="{{ path('ksk_rollover_advance', {id: rollover.id}) }}">
                             <input type="hidden" name="action" value="dnskey_propagated">
+                            <input type="hidden" name="_token" value="{{ csrf_token('ksk_rollover_advance_' ~ rollover.id) }}">
                             <button class="btn btn-sm btn-primary">
                                 <i class="bi bi-check me-1"></i>DNSKEY Propagated — Proceed to DS Update
                             </button>
@@ -118,6 +119,7 @@
                         </div>
                         <form method="post" action="{{ path('ksk_rollover_advance', {id: rollover.id}) }}">
                             <input type="hidden" name="action" value="ds_submitted">
+                            <input type="hidden" name="_token" value="{{ csrf_token('ksk_rollover_advance_' ~ rollover.id) }}">
                             <button class="btn btn-sm btn-primary">
                                 <i class="bi bi-check me-1"></i>DS Submitted — Waiting for Propagation
                             </button>
@@ -151,6 +153,7 @@
                         <form method="post" action="{{ path('ksk_rollover_advance', {id: rollover.id}) }}"
                               onsubmit="return confirm('This will run dnssec-settime on the old KSK and rndc sign. Continue?')">
                             <input type="hidden" name="action" value="retire_old_key">
+                            <input type="hidden" name="_token" value="{{ csrf_token('ksk_rollover_advance_' ~ rollover.id) }}">
                             <button class="btn btn-sm btn-warning text-dark">
                                 <i class="bi bi-key me-1"></i>DS Propagated — Retire Old KSK
                             </button>
@@ -180,6 +183,7 @@
                         </div>
                         <form method="post" action="{{ path('ksk_rollover_advance', {id: rollover.id}) }}">
                             <input type="hidden" name="action" value="complete">
+                            <input type="hidden" name="_token" value="{{ csrf_token('ksk_rollover_advance_' ~ rollover.id) }}">
                             <button class="btn btn-sm btn-success">
                                 <i class="bi bi-check-circle me-1"></i>Old DS Removed — Mark Complete
                             </button>
@@ -209,6 +213,7 @@
     <form method="post" action="{{ path('ksk_rollover_advance', {id: rollover.id}) }}"
           onsubmit="return confirm('Mark this rollover as failed?')">
         <input type="hidden" name="action" value="fail">
+        <input type="hidden" name="_token" value="{{ csrf_token('ksk_rollover_advance_' ~ rollover.id) }}">
         <button class="btn btn-sm btn-outline-danger">
             <i class="bi bi-x-circle me-1"></i>Mark as Failed
         </button>

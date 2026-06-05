@@ -90,8 +90,12 @@ class ClearpassServerController extends AbstractController
     }
 
     #[Route('/pull-logs', name: 'clearpass_server_pull_logs', methods: ['POST'])]
-    public function pullLogs(ClearpassServerRepository $repo, MessageBusInterface $bus): JsonResponse
+    public function pullLogs(Request $request, ClearpassServerRepository $repo, MessageBusInterface $bus): JsonResponse
     {
+        if (!$this->isCsrfTokenValid('clearpass_pull_logs', $request->headers->get('X-CSRF-Token') ?? $request->request->get('_token'))) {
+            return $this->json(['error' => 'Invalid CSRF token.'], 403);
+        }
+
         $servers = $repo->findBy([], ['name' => 'ASC']);
 
         if (empty($servers)) {
@@ -104,8 +108,12 @@ class ClearpassServerController extends AbstractController
     }
 
     #[Route('/push', name: 'clearpass_server_push', methods: ['POST'])]
-    public function push(ClearpassServerRepository $repo, MessageBusInterface $bus): JsonResponse
+    public function push(Request $request, ClearpassServerRepository $repo, MessageBusInterface $bus): JsonResponse
     {
+        if (!$this->isCsrfTokenValid('clearpass_push', $request->headers->get('X-CSRF-Token') ?? $request->request->get('_token'))) {
+            return $this->json(['error' => 'Invalid CSRF token.'], 403);
+        }
+
         $servers = $repo->findBy([], ['name' => 'ASC']);
 
         if (empty($servers)) {

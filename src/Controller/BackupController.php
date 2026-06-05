@@ -100,7 +100,8 @@ class BackupController extends AbstractController
             return $this->redirectToRoute('backup_index');
         }
 
-        $tmpPath = $uploadedFile->move('/tmp', $origName)->getPathname();
+        $extension = str_ends_with($origName, '.sql.enc') ? '.sql.enc' : '.sql';
+        $tmpPath = $uploadedFile->move('/tmp', uniqid('dashddi_restore_', true) . $extension)->getPathname();
 
         $consolePath = $this->getParameter('kernel.project_dir') . '/bin/console';
         $args        = ['php', $consolePath, 'app:database:restore', $tmpPath, '--no-interaction'];
