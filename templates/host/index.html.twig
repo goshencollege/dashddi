@@ -309,8 +309,7 @@
                                     {% endfor %}
                                 </td>
                                 <td class="text-muted small">
-                                    {{ host.updatedAt|date('Y-m-d H:i') }}
-                                    {% if host.updatedBy %}<br><span class="text-muted">{{ host.updatedBy }}</span>{% endif %}
+                                    {{ host.updatedAt|date('Y-m-d') }}{% if host.updatedBy %} · {{ host.updatedBy }}{% endif %}
                                 </td>
                                 <td class="text-end">
                                     <div class="d-flex gap-1 justify-content-end align-items-center">
@@ -393,8 +392,7 @@
                                         {% endif %}
                                     </td>
                                     <td class="text-muted small">
-                                        {{ iface.updatedAt|date('Y-m-d H:i') }}
-                                        {% if iface.updatedBy %}<br><span class="text-muted">{{ iface.updatedBy }}</span>{% endif %}
+                                        {{ iface.updatedAt|date('Y-m-d') }}{% if iface.updatedBy %} · {{ iface.updatedBy }}{% endif %}
                                     </td>
                                     <td class="text-end">
                                         <div class="d-flex gap-1 justify-content-end align-items-center">
