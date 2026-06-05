@@ -47,6 +47,7 @@ class SubnetApiController extends AbstractController
     public function create(
         Request $request,
         EntityManagerInterface $em,
+        SubnetRepository $repo,
         VrfRepository $vrfRepo,
         TagRepository $tagRepo,
         DnsViewRepository $viewRepo,
@@ -75,6 +76,7 @@ class SubnetApiController extends AbstractController
         Request $request,
         Subnet $subnet,
         EntityManagerInterface $em,
+        SubnetRepository $repo,
         VrfRepository $vrfRepo,
         TagRepository $tagRepo,
         DnsViewRepository $viewRepo,
