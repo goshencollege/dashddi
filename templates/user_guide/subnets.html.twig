@@ -47,9 +47,9 @@
             <dt class="col-sm-3">Is Container</dt>
             <dd class="col-sm-9">Mark this subnet as a supernet (container) that holds smaller subnets. Container subnets don't have individual IP allocations and don't appear in DHCP config. When checked, the Lease Retention field is hidden.</dd>
             <dt class="col-sm-3">IPv4 CIDR</dt>
-            <dd class="col-sm-9">The IPv4 address range in CIDR notation, e.g. <code>10.1.2.0/24</code>. Leave blank for IPv6-only subnets.</dd>
+            <dd class="col-sm-9">The IPv4 address range in CIDR notation, e.g. <code>10.1.2.0/24</code>. Leave blank for IPv6-only subnets. <strong>Terminal subnets (non-container) may not have an IPv4 CIDR that overlaps another terminal subnet's IPv4 CIDR</strong> — overlapping terminal CIDRs would cause conflicts on DHCP servers. Container subnets are exempt from this check.</dd>
             <dt class="col-sm-3">IPv6 CIDR</dt>
-            <dd class="col-sm-9">The IPv6 address range, e.g. <code>2001:db8:1::/48</code>. Leave blank for IPv4-only subnets.</dd>
+            <dd class="col-sm-9">The IPv6 address range, e.g. <code>2001:db8:1::/48</code>. Leave blank for IPv4-only subnets. The same non-overlap rule applies to IPv6: terminal subnets may not share or overlap another terminal subnet's IPv6 CIDR.</dd>
             <dt class="col-sm-3">Gateway</dt>
             <dd class="col-sm-9">The default gateway IP address for this subnet (used in DHCP config generation).</dd>
             <dt class="col-sm-3">VLAN</dt>
@@ -101,7 +101,7 @@
         </dl>
 
         <h6 class="mt-4">Initial Address Blocks</h6>
-        <p class="mb-0">When creating a new subnet, the form includes optional inline fields to define a <strong>Reserved Block</strong> and a <strong>Fixed Block</strong> immediately — saving a trip to a separate form after saving. Enter a start IP, end IP, and optional label for each block you want to create. Leave the fields blank to skip. Additional blocks can always be added later from the subnet detail page.</p>
+        <p class="mb-0">When creating a new subnet, the form includes optional inline fields to define a <strong>Reserved Block</strong> and a <strong>Fixed Block</strong> immediately — saving a trip to a separate form after saving. Enter a start IP, end IP, and optional label for each block you want to create. Leave the fields blank to skip. The two inline blocks may not overlap each other. Additional blocks can always be added later from the subnet detail page.</p>
     </div>
 </div>
 
@@ -150,6 +150,9 @@
             <li><strong>Auto-assign</strong> — When Fixed blocks exist on the subnet, the next available IP is drawn exclusively from Fixed blocks, in order. If no Fixed blocks are defined, auto-assign falls back to the full subnet CIDR range.</li>
             <li><strong>Manual entry</strong> — When Fixed or Reserved blocks exist on the subnet, a manually entered IP must fall within one of those blocks (either Fixed or Reserved). Dynamic blocks are ignored for this check. If no Fixed or Reserved blocks are defined, the IP just needs to be within the subnet CIDR.</li>
         </ul>
+
+        <h6>Non-overlap rule</h6>
+        <p>No two address blocks within the same subnet may overlap. DashDDI enforces this on create and edit — if the new or edited block's IP range intersects any existing block in the subnet the save will be rejected with an error indicating which block conflicts. This applies to all three block types (Fixed, Dynamic, and Reserved).</p>
 
         <p class="mb-0">Each block has a start IP, end IP, and an optional label.</p>
     </div>
