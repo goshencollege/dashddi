@@ -820,7 +820,7 @@ class ImportLegacyCommand extends Command
         $io->writeln(sprintf('  %d additional subnets', count($seedSubnets)));
 
         // Address blocks for subnets that need them
-        foreach (['Siemens EMS', 'Valpo', 'iLO', 'EMP_INST', 'EMP_BYOD', 'EMP_JENZ', 'WIFI_128'] as $subnetName) {
+        foreach (['Siemens EMS', 'Valpo', 'iLO', 'EMP_INST', 'EMP_BYOD', 'EMP_JENZ', 'WIFI_128', 'WL Laerdal', 'UN Special'] as $subnetName) {
             $subnet = $seedSubnets[$subnetName];
             $cidr   = $subnet->getIpv4Cidr();
             [$networkIp, $prefixLen] = explode('/', $cidr);
