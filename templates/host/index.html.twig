@@ -17,8 +17,10 @@
     --tree-row-hover:     rgba(255,255,255,.22);
 }
 .host-tree-table td, .host-tree-table th { padding-top: 0.3rem; padding-bottom: 0.3rem; }
-.host-tree-table thead th { position: sticky; top: 0; z-index: 2; background-color: var(--bs-body-bg); }
+.host-tree-table thead th { position: sticky; top: 0; z-index: 2; background-color: var(--bs-body-bg); padding-top: 0.46rem; padding-bottom: 0.46rem; }
 .host-tree-table thead th::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; border-bottom: 2px solid var(--bs-border-color); }
+.host-tree-table thead th:first-child { border-left: 1px solid var(--bs-border-color); }
+.host-tree-table thead th:last-child  { border-right: 1px solid var(--bs-border-color); }
 .host-tree-table .toggle-cell { width: 1.75rem; padding-right: 0; text-align: center; }
 .host-tree-table .tree-toggle { border: none; background: none; padding: 0; line-height: 1; color: #6c757d; }
 .host-tree-table .tree-toggle:hover { color: var(--bs-body-color); }
@@ -32,10 +34,11 @@
 .host-tree-table .iface-row > td:first-child { border-left: 1px solid var(--bs-border-color); }
 .host-tree-table .host-row > td:last-child,
 .host-tree-table .iface-row > td:last-child { border-right: 1px solid var(--bs-border-color); }
-/* Top edge of each group; thicker line between consecutive groups */
+/* Top edge of each group; thicker line between consecutive groups; none on first row (header provides it) */
 .host-tree-table .host-row > td { border-top: 1px solid var(--bs-border-color); }
 .host-tree-table .host-row + .host-row > td,
 .host-tree-table .iface-row + .host-row > td { border-top: 2px solid var(--bs-border-color); }
+.host-tree-table tbody tr:first-child > td { border-top: none; }
 /* Group hover (JS-managed; !important overrides Bootstrap's --bs-table-bg mechanism) */
 .host-tree-table .group-hovered > td { background-color: var(--tree-group-hover) !important; }
 .host-tree-table .row-hovered > td   { background-color: var(--tree-row-hover)   !important; }
