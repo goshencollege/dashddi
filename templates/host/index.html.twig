@@ -5,12 +5,35 @@
 {% block stylesheets %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css">
 <style>
+/* Theme-aware custom properties (dark covers: dark, purple, green, rainbow) */
+.host-tree-table {
+    --tree-iface-bg:      rgba(0,0,0,.025);
+    --tree-group-hover:   rgba(0,0,0,.1);
+    --tree-row-hover:     rgba(0,0,0,.18);
+}
+[data-bs-theme="dark"] .host-tree-table {
+    --tree-iface-bg:      rgba(255,255,255,.025);
+    --tree-group-hover:   rgba(255,255,255,.12);
+    --tree-row-hover:     rgba(255,255,255,.22);
+}
 .host-tree-table td, .host-tree-table th { padding-top: 0.3rem; padding-bottom: 0.3rem; }
 .host-tree-table .toggle-cell { width: 1.75rem; padding-right: 0; text-align: center; }
 .host-tree-table .tree-toggle { border: none; background: none; padding: 0; line-height: 1; color: #6c757d; }
-.host-tree-table .tree-toggle:hover { color: #343a40; }
-.host-tree-table .iface-row { --bs-table-bg: rgba(0,0,0,.025); }
+.host-tree-table .tree-toggle:hover { color: var(--bs-body-color); }
+.host-tree-table .iface-row { --bs-table-bg: var(--tree-iface-bg); }
 .host-tree-table .iface-name-cell { padding-left: 2rem !important; }
+/* Group box: left/right borders run continuously through every row in the group */
+.host-tree-table .host-row > td:first-child,
+.host-tree-table .iface-row > td:first-child { border-left: 1px solid var(--bs-border-color); }
+.host-tree-table .host-row > td:last-child,
+.host-tree-table .iface-row > td:last-child { border-right: 1px solid var(--bs-border-color); }
+/* Top edge of each group; thicker line between consecutive groups */
+.host-tree-table .host-row > td { border-top: 1px solid var(--bs-border-color); }
+.host-tree-table .host-row + .host-row > td,
+.host-tree-table .iface-row + .host-row > td { border-top: 2px solid var(--bs-border-color); }
+/* Group hover (JS-managed; !important overrides Bootstrap's --bs-table-bg mechanism) */
+.host-tree-table .group-hovered > td { background-color: var(--tree-group-hover) !important; }
+.host-tree-table .row-hovered > td   { background-color: var(--tree-row-hover)   !important; }
 </style>
 {% endblock %}
 
@@ -213,7 +236,7 @@
                 </div>
             </div>
             <div class="table-responsive">
-                <table class="table table-hover mb-0 host-tree-table">
+                <table class="table mb-0 host-tree-table">
                     <thead>
                         <tr>
                             <th class="toggle-cell"></th>
@@ -252,13 +275,13 @@
                                     {% endif %}
                                     {% set snipeLink = host.snipeItAssetLink %}
                                     {% if snipeLink and snipeLink.snipeAssetName != host.name %}
-                                        <div class="text-muted small"><i class="bi bi-box-seam me-1"></i>{{ snipeLink.snipeAssetName }}</div>
+                                        <span class="text-muted small ms-1">· <i class="bi bi-box-seam me-1"></i>{{ snipeLink.snipeAssetName }}</span>
                                     {% endif %}
                                     {% if host.location %}
-                                        <div class="text-muted small">{{ host.location }}</div>
+                                        <span class="text-muted small ms-1">· {{ host.location }}</span>
                                     {% endif %}
                                     {% if host.interfaces is empty %}
-                                        <div class="text-muted small fst-italic">No interfaces</div>
+                                        <span class="text-muted small ms-1 fst-italic">· No interfaces</span>
                                     {% endif %}
                                 </td>
                                 <td>
@@ -526,6 +549,37 @@ document.addEventListener('click', function (e) {
 });
 
 applyCollapseState();
+
+// --- Group hover ---
+let hoveredGroupId = null;
+const treeTable = document.querySelector('.host-tree-table');
+
+treeTable?.addEventListener('mouseover', function (e) {
+    const row = e.target.closest('tr.host-row, tr.iface-row');
+    if (!row) return;
+    const id = row.dataset.hostId || row.dataset.parentHost;
+    if (!id) return;
+
+    if (id !== hoveredGroupId) {
+        treeTable.querySelectorAll('.group-hovered, .row-hovered')
+            .forEach(r => r.classList.remove('group-hovered', 'row-hovered'));
+        treeTable.querySelector(`.host-row[data-host-id="${id}"]`)
+            ?.classList.add('group-hovered');
+        treeTable.querySelectorAll(`.iface-row[data-parent-host="${id}"]`)
+            .forEach(r => r.classList.add('group-hovered'));
+        hoveredGroupId = id;
+    }
+
+    treeTable.querySelectorAll('.row-hovered')
+        .forEach(r => { r.classList.remove('row-hovered'); r.classList.add('group-hovered'); });
+    row.classList.replace('group-hovered', 'row-hovered');
+});
+
+treeTable?.addEventListener('mouseleave', function () {
+    treeTable.querySelectorAll('.group-hovered, .row-hovered')
+        .forEach(r => r.classList.remove('group-hovered', 'row-hovered'));
+    hoveredGroupId = null;
+});
 
 // --- Bulk selection ---
 const hostSelected = new Set();
