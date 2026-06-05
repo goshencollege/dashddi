@@ -640,6 +640,32 @@ document.addEventListener('change', function (e) {
     }
 });
 
+// --- Shift-select range (hosts and interfaces independently) ---
+let lastCheckedCb = null;
+
+document.addEventListener('click', function (e) {
+    const cb = e.target;
+    if (!cb.matches('.bulk-host-cb, .bulk-iface-cb')) return;
+
+    const isHost = cb.matches('.bulk-host-cb');
+    const selector = isHost ? '.bulk-host-cb' : '.bulk-iface-cb';
+    const selectedSet = isHost ? hostSelected : ifaceSelected;
+
+    if (e.shiftKey && lastCheckedCb && lastCheckedCb.matches(selector)) {
+        const all = [...document.querySelectorAll(selector)];
+        const a = all.indexOf(lastCheckedCb);
+        const b = all.indexOf(cb);
+        const [lo, hi] = a < b ? [a, b] : [b, a];
+        all.slice(lo, hi + 1).forEach(box => {
+            box.checked = cb.checked;
+            cb.checked ? selectedSet.add(box.value) : selectedSet.delete(box.value);
+        });
+        updateBulkBar();
+    }
+
+    lastCheckedCb = cb;
+});
+
 // --- Bulk host delete ---
 document.getElementById('host-delete-btn')?.addEventListener('click', async function () {
     const count = hostSelected.size;
