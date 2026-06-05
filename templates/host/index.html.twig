@@ -349,10 +349,11 @@
                                             <div class="fw-semibold">
                                                 <a href="{{ path('interface_show', {id: iface.id}) }}" class="text-decoration-none">{{ iface.name }}</a>
                                             </div>
+                                        {% else %}
+                                            <div class="font-monospace text-muted">
+                                                <a href="{{ path('interface_show', {id: iface.id}) }}" class="text-decoration-none text-muted">{{ iface.macAddress }}</a>
+                                            </div>
                                         {% endif %}
-                                        <div class="font-monospace text-muted">
-                                            <a href="{{ path('interface_show', {id: iface.id}) }}" class="text-decoration-none text-muted">{{ iface.macAddress }}</a>
-                                        </div>
                                         {% if iface.deleted %}
                                             <span class="badge text-bg-warning mt-1">Interface deleted</span>
                                         {% endif %}
