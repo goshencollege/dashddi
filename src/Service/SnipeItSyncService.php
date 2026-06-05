@@ -470,12 +470,15 @@ class SnipeItSyncService
             }
         }
 
-        // Assign default subnet to existing active interfaces that don't have one
+        // Assign default subnet and backfill missing names on existing active interfaces
         foreach ($host->getInterfaces() as $iface) {
             if ($iface->isDeleted()) {
                 continue;
             }
             $this->assignSubnetIfMissing($iface, $categorySubnetIdMap, $categoryId, $overrideSubnetId, $defaultSubnetId);
+            if ($iface->getName() === null && isset($macAliasMap[$iface->getMacAddress()])) {
+                $iface->setName($macAliasMap[$iface->getMacAddress()]);
+            }
         }
 
         // Add new interfaces for MACs not yet on this host (restore soft-deleted ones if possible)
@@ -492,6 +495,9 @@ class SnipeItSyncService
             foreach ($host->getInterfaces() as $existing) {
                 if ($existing->isDeleted() && $existing->getMacAddress() === $mac) {
                     $existing->restore();
+                    if ($existing->getName() === null) {
+                        $existing->setName($macAliasMap[$mac]);
+                    }
                     $this->assignSubnetIfMissing($existing, $categorySubnetIdMap, $categoryId, $overrideSubnetId, $defaultSubnetId);
                     $existingMacs[] = $mac;
                     continue 2;
