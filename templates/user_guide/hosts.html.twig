@@ -32,14 +32,14 @@
 <div class="card mb-4" id="host-list">
     <div class="card-header fw-semibold"><i class="bi bi-list-ul me-1"></i>The Host List</div>
     <div class="card-body">
-        <p>The Hosts page (<strong>Hosts</strong> in the top nav) shows all active hosts. You can switch between two display modes using the toggle in the top-right:</p>
-        <dl class="row mb-0">
-            <dt class="col-sm-3">By Host</dt>
-            <dd class="col-sm-9">One row per host. Shows all IP addresses and DNS names assigned to any interface on that host. Best for locating a specific device by name.</dd>
-            <dt class="col-sm-3">By Interface</dt>
-            <dd class="col-sm-9">One row per network interface. Shows the subnet, MAC address, and individual IP for each interface. Best for viewing MAC-to-IP mappings or troubleshooting specific ports.</dd>
-        </dl>
-        <p class="mb-0 mt-3 text-muted small">Your view mode preference is saved automatically per user.</p>
+        <p>The Hosts page (<strong>Hosts</strong> in the top nav) shows all active hosts in a <strong>collapsible tree view</strong>. Each host is a parent row, and its network interfaces appear as indented sub-rows directly beneath it.</p>
+        <ul>
+            <li>Hosts are <strong>expanded by default</strong>. Click the chevron (<i class="bi bi-chevron-down"></i>) on any host row to collapse its interfaces.</li>
+            <li>Use the <strong>Collapse All</strong> and <strong>Expand All</strong> buttons (top-right of the action bar) to collapse or expand every host at once.</li>
+            <li>Collapse state is <strong>saved in your browser</strong> and persists across page navigations.</li>
+        </ul>
+        <p>Each host row shows the host name, optional location and Snipe-IT asset label, tags, last-modified date, and action buttons. Interface sub-rows show the interface name (with MAC address in parentheses), subnet, IPv4, IPv6, and DNS names.</p>
+        <p class="mb-0 text-muted small">Interfaces without a name display the MAC address as their identifier.</p>
     </div>
 </div>
 
@@ -144,13 +144,32 @@
 <div class="card mb-4" id="bulk">
     <div class="card-header fw-semibold"><i class="bi bi-check2-square me-1"></i>Bulk Operations</div>
     <div class="card-body">
-        <p>In the host list, check the boxes on the left side of any rows to select them. A toolbar appears at the top of the table with these actions:</p>
-        <ul class="mb-0">
-            <li><strong>Add Tag</strong> — apply a tag to all selected hosts at once</li>
-            <li><strong>Remove Tag</strong> — remove a tag from all selected hosts</li>
-            <li><strong>Delete Selected</strong> — soft-delete all selected hosts (they go to the deleted hosts view and are purged later)</li>
+        <p>The action bar above the table is always visible and combines controls for both host and interface selections.</p>
+
+        <h6>Selecting rows</h6>
+        <ul>
+            <li>Check the checkbox on any <strong>host row</strong> to select that host, or on any <strong>interface sub-row</strong> to select that interface.</li>
+            <li>Use the <strong>host select-all</strong> checkbox in the header to select every host on the current page, and the <strong>interface select-all</strong> checkbox to select every interface on the current page.</li>
+            <li><strong>Shift-click</strong> a checkbox to select a range — hold Shift and click a second checkbox of the same type (host or interface) to select everything between them. Shift-clicking across types does nothing.</li>
+            <li>Click <strong>Clear Selections</strong> to deselect everything at once.</li>
         </ul>
-        <p class="mt-2 mb-0 text-muted small">Use the header checkbox to select all hosts on the current page. Bulk operations apply only to the selected rows, not the entire search result.</p>
+
+        <h6>Host bulk actions</h6>
+        <p>Appear in the action bar when one or more hosts are selected:</p>
+        <ul>
+            <li><strong>Add Tag</strong> — apply one or more tags to all selected hosts. You can also create a new tag from this modal.</li>
+            <li><strong>Remove Tag</strong> — remove one or more tags from all selected hosts.</li>
+            <li><strong>Delete Selected Hosts</strong> — soft-delete all selected hosts and their interfaces.</li>
+        </ul>
+
+        <h6>Interface bulk actions</h6>
+        <p>Appear in the action bar when one or more interfaces are selected:</p>
+        <ul>
+            <li><strong>Edit Selected Interfaces</strong> — opens a modal to reassign subnet and/or auto-assign new IPv4/IPv6 addresses across all selected interfaces at once. If an interface already has a valid IPv4 in the target subnet, it is left unchanged; IPv6 auto-assign (EUI-64 or last-octet) always recalculates.</li>
+            <li><strong>Delete Selected Interfaces</strong> — soft-delete all selected interfaces.</li>
+        </ul>
+
+        <p class="mb-0 text-muted small">Bulk operations apply only to the selected rows on the current page, not the entire search result.</p>
     </div>
 </div>
 
