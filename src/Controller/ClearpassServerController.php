@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\ClearpassServer;
 use App\Form\ClearpassServerType;
+use App\Message\PullClearpassLogsMessage;
 use App\Message\PushClearpassAllMessage;
 use App\Message\PushClearpassMessage;
 use App\Repository\ClearpassServerRepository;
@@ -86,6 +87,20 @@ class ClearpassServerController extends AbstractController
             $this->addFlash('success', 'ClearPass server deleted.');
         }
         return $this->redirectToRoute('clearpass_server_index');
+    }
+
+    #[Route('/pull-logs', name: 'clearpass_server_pull_logs', methods: ['POST'])]
+    public function pullLogs(ClearpassServerRepository $repo, MessageBusInterface $bus): JsonResponse
+    {
+        $servers = $repo->findBy([], ['name' => 'ASC']);
+
+        if (empty($servers)) {
+            return $this->json(['error' => 'No ClearPass servers configured.'], 400);
+        }
+
+        $bus->dispatch(new PullClearpassLogsMessage(), [new DeduplicateStamp('pull_clearpass_logs', ttl: 3600)]);
+
+        return $this->json(['queued' => true, 'count' => count($servers)], 202);
     }
 
     #[Route('/push', name: 'clearpass_server_push', methods: ['POST'])]
