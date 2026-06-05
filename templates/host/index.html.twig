@@ -332,7 +332,11 @@
             <div id="iface-bulk-bar" class="card-header d-none py-2">
                 <div class="d-flex align-items-center gap-2">
                     <span id="iface-selected-count" class="text-muted small">0 interfaces selected</span>
-                    <button type="button" class="btn btn-sm btn-outline-danger ms-auto" id="iface-delete-btn">
+                    <button type="button" class="btn btn-sm btn-outline-secondary ms-auto" id="iface-edit-btn"
+                            data-bs-toggle="modal" data-bs-target="#bulk-iface-edit-modal">
+                        <i class="bi bi-pencil me-1"></i>Edit Selected
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-danger" id="iface-delete-btn">
                         <i class="bi bi-trash me-1"></i>Delete Selected
                     </button>
                 </div>
@@ -527,6 +531,86 @@
     </div>
 </div>
 
+{# Bulk edit interfaces modal #}
+<div class="modal fade" id="bulk-iface-edit-modal" tabindex="-1" aria-labelledby="bulk-iface-edit-modal-label" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="bulk-iface-edit-modal-label">Bulk Edit Interfaces</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small mb-3">Changes apply to all selected interfaces. Fields left at "Keep current" are unchanged.</p>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold" for="bulk-iface-subnet">Subnet</label>
+                    <select id="bulk-iface-subnet" class="form-select">
+                        <option value="">— Keep current subnet —</option>
+                        {% for subnet in subnets %}
+                            <option value="{{ subnet.id }}">{{ subnet.name }}{% if subnet.ipv4Cidr %} ({{ subnet.ipv4Cidr }}){% endif %}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="card h-100">
+                            <div class="card-header fw-semibold"><i class="bi bi-4-square me-1"></i>IPv4 Assignment</div>
+                            <div class="card-body" id="bulk-ipv4-options">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="bulk_ipv4" id="bulk_ipv4_keep" value="keep" checked>
+                                    <label class="form-check-label" for="bulk_ipv4_keep">Keep current assignment</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="bulk_ipv4" id="bulk_ipv4_none" value="none">
+                                    <label class="form-check-label" for="bulk_ipv4_none">Remove IPv4 address</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="bulk_ipv4" id="bulk_ipv4_auto" value="auto">
+                                    <label class="form-check-label" for="bulk_ipv4_auto">Auto-assign next available</label>
+                                </div>
+                            </div>
+                            <p id="bulk-ipv4-container-notice" class="text-muted small px-3 pb-2 mb-0" style="display:none">
+                                IP assignment is not available for container subnets.
+                            </p>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card h-100">
+                            <div class="card-header fw-semibold"><i class="bi bi-6-square me-1"></i>IPv6 Assignment</div>
+                            <div class="card-body" id="bulk-ipv6-options">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="bulk_ipv6" id="bulk_ipv6_keep" value="keep" checked>
+                                    <label class="form-check-label" for="bulk_ipv6_keep">Keep current assignment</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="bulk_ipv6" id="bulk_ipv6_none" value="none">
+                                    <label class="form-check-label" for="bulk_ipv6_none">Remove IPv6 address</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="bulk_ipv6" id="bulk_ipv6_auto" value="auto">
+                                    <label class="form-check-label" for="bulk_ipv6_auto">Auto-assign (EUI-64 from MAC)</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="bulk_ipv6" id="bulk_ipv6_auto_v4" value="auto_v4">
+                                    <label class="form-check-label" for="bulk_ipv6_auto_v4">Auto-assign (last IPv4 octet)</label>
+                                </div>
+                            </div>
+                            <p id="bulk-ipv6-container-notice" class="text-muted small px-3 pb-2 mb-0" style="display:none">
+                                IP assignment is not available for container subnets.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-sm btn-primary" id="bulk-iface-edit-submit">
+                    <i class="bi bi-check-lg me-1"></i>Apply Changes
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
 <script>
@@ -622,6 +706,66 @@ document.getElementById('iface-delete-btn')?.addEventListener('click', async fun
     const data = await resp.json();
     if (resp.ok) { location.reload(); } else { alert(data.error ?? 'Error'); }
 });
+
+// --- Bulk interface edit modal ---
+(function () {
+    const containerSubnetIds = new Set({{ containerSubnetIds|default([])|json_encode }});
+    const subnetSelect = document.getElementById('bulk-iface-subnet');
+
+    function setBulkContainerMode(isContainer) {
+        ['ipv4', 'ipv6'].forEach(prefix => {
+            const options = document.getElementById('bulk-' + prefix + '-options');
+            const notice  = document.getElementById('bulk-' + prefix + '-container-notice');
+            if (options) options.style.display = isContainer ? 'none' : '';
+            if (notice)  notice.style.display  = isContainer ? '' : 'none';
+        });
+        if (isContainer) {
+            document.getElementById('bulk_ipv4_keep').checked = true;
+            document.getElementById('bulk_ipv6_keep').checked = true;
+        }
+    }
+
+    if (subnetSelect) {
+        subnetSelect.addEventListener('change', function () {
+            const val = parseInt(this.value, 10);
+            setBulkContainerMode(val && containerSubnetIds.has(val));
+        });
+    }
+
+    document.getElementById('bulk-iface-edit-submit')?.addEventListener('click', async function () {
+        const subnetId     = subnetSelect?.value || '';
+        const ipv4Mode     = document.querySelector('input[name="bulk_ipv4"]:checked')?.value ?? 'keep';
+        const ipv6Mode     = document.querySelector('input[name="bulk_ipv6"]:checked')?.value ?? 'keep';
+        const count        = ifaceSelected.size;
+
+        const resp = await fetch('{{ path('interface_bulk') }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'edit',
+                ids: [...ifaceSelected],
+                _token: '{{ csrf_token('bulk_interfaces') }}',
+                subnet_id: subnetId || null,
+                ipv4Assignment: ipv4Mode,
+                ipv6Assignment: ipv6Mode,
+            }),
+        });
+        const data = await resp.json();
+        if (resp.ok) {
+            location.reload();
+        } else {
+            alert(data.error ?? 'Error updating interfaces');
+        }
+    });
+
+    // Reset modal state when it opens
+    document.getElementById('bulk-iface-edit-modal')?.addEventListener('show.bs.modal', function () {
+        if (subnetSelect) subnetSelect.value = '';
+        document.getElementById('bulk_ipv4_keep').checked = true;
+        document.getElementById('bulk_ipv6_keep').checked = true;
+        setBulkContainerMode(false);
+    });
+})();
 
 // --- Tag modal (add / remove on selected hosts) ---
 const bulkTagModalEl = document.getElementById('bulk-tag-modal');

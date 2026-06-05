@@ -123,18 +123,21 @@ class HostController extends AbstractController
 
         $totalPages = max(1, (int) ceil($total / self::PER_PAGE));
 
+        $containerSubnetIds = array_map(fn($s) => $s->getId(), $subnetRepo->findBy(['isContainer' => true]));
+
         return $this->render('host/index.html.twig', [
-            'hosts'        => $hosts,
-            'query'        => $query,
-            'criteria'     => $criteria,
-            'isAdvanced'   => $isAdvanced,
-            'showDeleted'  => $showDeleted,
-            'subnets'      => $subnetRepo->findBy([], ['name' => 'ASC']),
-            'buildings'    => $buildingRepo->findBy([], ['name' => 'ASC']),
-            'tags'         => $tagRepo->findBy([], ['name' => 'ASC']),
-            'hostViewMode' => $hostViewMode,
-            'lease_map'    => $leaseRepo->findLatestByMacs($macs),
-            'pagination'   => [
+            'hosts'              => $hosts,
+            'query'              => $query,
+            'criteria'           => $criteria,
+            'isAdvanced'         => $isAdvanced,
+            'showDeleted'        => $showDeleted,
+            'subnets'            => $subnetRepo->findBy([], ['name' => 'ASC']),
+            'buildings'          => $buildingRepo->findBy([], ['name' => 'ASC']),
+            'tags'               => $tagRepo->findBy([], ['name' => 'ASC']),
+            'hostViewMode'       => $hostViewMode,
+            'lease_map'          => $leaseRepo->findLatestByMacs($macs),
+            'containerSubnetIds' => $containerSubnetIds,
+            'pagination'         => [
                 'page'       => $page,
                 'per_page'   => self::PER_PAGE,
                 'total'      => $total,
