@@ -4,6 +4,45 @@
 
 {% block stylesheets %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css">
+<style>
+/* Theme-aware custom properties (dark covers: dark, purple, green, rainbow) */
+.host-tree-table {
+    --tree-iface-bg:      rgba(0,0,0,.025);
+    --tree-group-hover:   rgba(0,0,0,.1);
+    --tree-row-hover:     rgba(0,0,0,.18);
+}
+[data-bs-theme="dark"] .host-tree-table {
+    --tree-iface-bg:      rgba(255,255,255,.025);
+    --tree-group-hover:   rgba(255,255,255,.12);
+    --tree-row-hover:     rgba(255,255,255,.22);
+}
+.host-tree-table td, .host-tree-table th { padding-top: 0.3rem; padding-bottom: 0.3rem; }
+.host-tree-table thead th { position: sticky; top: 0; z-index: 2; background-color: var(--bs-body-bg); padding-top: 0.46rem; padding-bottom: 0.46rem; }
+.host-tree-table thead th::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; border-bottom: 2px solid var(--bs-border-color); }
+.host-tree-table thead th:first-child { border-left: 1px solid var(--bs-border-color); }
+.host-tree-table thead th:last-child  { border-right: 1px solid var(--bs-border-color); }
+.host-tree-table .toggle-cell { width: 1.75rem; padding-right: 0; text-align: center; }
+.host-tree-table .tree-toggle { border: none; background: none; padding: 0; line-height: 1; color: #6c757d; }
+.host-tree-table .tree-toggle:hover { color: var(--bs-body-color); }
+.host-tree-table .iface-row { --bs-table-bg: var(--tree-iface-bg); }
+.host-tree-table .iface-name-cell { padding-left: 2rem !important; }
+.host-tree-table td:nth-child(3) { white-space: nowrap; }
+.host-tree-table td:nth-last-child(2) { white-space: nowrap; }
+.host-tree-table .iface-row > td:nth-child(2) { padding-left: 2rem !important; }
+/* Group box: left/right borders run continuously through every row in the group */
+.host-tree-table .host-row > td:first-child,
+.host-tree-table .iface-row > td:first-child { border-left: 1px solid var(--bs-border-color); }
+.host-tree-table .host-row > td:last-child,
+.host-tree-table .iface-row > td:last-child { border-right: 1px solid var(--bs-border-color); }
+/* Top edge of each group; thicker line between consecutive groups; none on first row (header provides it) */
+.host-tree-table .host-row > td { border-top: 1px solid var(--bs-border-color); }
+.host-tree-table .host-row + .host-row > td,
+.host-tree-table .iface-row + .host-row > td { border-top: 2px solid var(--bs-border-color); }
+.host-tree-table tbody tr:first-child > td { border-top: none; }
+/* Group hover (JS-managed; !important overrides Bootstrap's --bs-table-bg mechanism) */
+.host-tree-table .group-hovered > td { background-color: var(--tree-group-hover) !important; }
+.host-tree-table .row-hovered > td   { background-color: var(--tree-row-hover)   !important; }
+</style>
 {% endblock %}
 
 {# Renders Bootstrap pagination controls and a result-count footer line. #}
@@ -57,16 +96,6 @@
     <h1 class="h3 mb-0"><i class="bi bi-pc-display me-2"></i>Hosts</h1>
     <div class="d-flex align-items-center gap-2">
         <a href="{{ path('user_guide_hosts') }}" class="btn btn-sm btn-outline-secondary" title="User Guide" target="_blank"><i class="bi bi-question-circle"></i></a>
-        {% if not showDeleted %}
-        <div class="btn-group btn-group-sm" role="group" id="view-mode-toggle" aria-label="View mode">
-            <button type="button" class="btn btn-outline-secondary{{ hostViewMode == 'host' ? ' active' }}" data-mode="host">
-                <i class="bi bi-pc-display me-1"></i>By Host
-            </button>
-            <button type="button" class="btn btn-outline-secondary{{ hostViewMode == 'interface' ? ' active' }}" data-mode="interface">
-                <i class="bi bi-hdd-network me-1"></i>By Interface
-            </button>
-        </div>
-        {% endif %}
         <a href="{{ path('host_index', showDeleted ? {} : {deleted: 1}) }}"
            class="btn btn-sm {{ showDeleted ? 'btn-warning' : 'btn-outline-secondary' }}">
             <i class="bi bi-trash me-1"></i>{{ showDeleted ? 'Show Active' : 'Deleted' }}
@@ -185,43 +214,78 @@
     </div>
 {% else %}
 
-    {# ── By Host view ── #}
-    <div id="view-host" class="list-scroll-card {{ hostViewMode == 'host' ? '' : 'd-none' }}">
+    {# ── Tree view: hosts with collapsible interface sub-rows ── #}
+    <div class="list-scroll-card">
         <div class="card">
-            <div id="host-bulk-bar" class="card-header d-none py-2">
+            <div id="bulk-bar" class="card-header py-1">
                 <div class="d-flex align-items-center gap-2">
-                    <span id="host-selected-count" class="text-muted small">0 hosts selected</span>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" id="host-add-tag-btn">
-                        <i class="bi bi-tag me-1"></i>Add Tag
+                    <div id="host-bulk-section" class="d-none d-flex align-items-center gap-2">
+                        <span id="host-selected-count" class="text-muted small">0 hosts selected</span>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="host-add-tag-btn">
+                            <i class="bi bi-tag me-1"></i>Add Tag
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="host-remove-tag-btn">
+                            <i class="bi bi-tag me-1"></i>Remove Tag
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-danger" id="host-delete-btn">
+                            <i class="bi bi-trash me-1"></i>Delete Selected Hosts
+                        </button>
+                    </div>
+                    <div id="bulk-bar-separator" class="vr d-none mx-2"></div>
+                    <div id="iface-bulk-section" class="d-none d-flex align-items-center gap-2">
+                        <span id="iface-selected-count" class="text-muted small">0 interfaces selected</span>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="iface-edit-btn"
+                                data-bs-toggle="modal" data-bs-target="#bulk-iface-edit-modal">
+                            <i class="bi bi-pencil me-1"></i>Edit Selected Interfaces
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-danger" id="iface-delete-btn">
+                            <i class="bi bi-trash me-1"></i>Delete Selected Interfaces
+                        </button>
+                    </div>
+                    <div class="flex-grow-1"></div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary d-none" id="bulk-clear-btn">
+                        <i class="bi bi-x-lg me-1"></i>Clear Selections
                     </button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" id="host-remove-tag-btn">
-                        <i class="bi bi-tag me-1"></i>Remove Tag
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="expand-all-btn">
+                        <i class="bi bi-arrows-expand me-1"></i>Expand All
                     </button>
-                    <button type="button" class="btn btn-sm btn-outline-danger ms-auto" id="host-delete-btn">
-                        <i class="bi bi-trash me-1"></i>Delete Selected
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="collapse-all-btn">
+                        <i class="bi bi-arrows-collapse me-1"></i>Collapse All
                     </button>
                 </div>
             </div>
             <div class="table-responsive">
-                <table class="table table-hover mb-0">
+                <table class="table mb-0 host-tree-table">
                     <thead>
                         <tr>
-                            <th class="ps-3" style="width:2.25rem">
-                                <input type="checkbox" class="form-check-input" id="select-all-hosts" title="Select all on this page">
+                            <th class="toggle-cell"></th>
+                            <th class="ps-2" style="width:1%">
+                                <div class="d-flex gap-2 align-items-center">
+                                    <input type="checkbox" class="form-check-input" id="select-all-hosts" title="Select all hosts on this page">
+                                    <input type="checkbox" class="form-check-input" id="select-all-ifaces" title="Select all interfaces on this page">
+                                </div>
                             </th>
-                            <th style="min-width: 13rem">Name</th>
+                            <th style="min-width:13rem; width:1%">Name</th>
                             <th>Tags</th>
+                            <th>Subnet</th>
                             <th>IPv4</th>
                             <th>IPv6</th>
                             <th>DNS Names</th>
-                            <th>Last Modified</th>
+                            <th style="width:1%; white-space:nowrap">Last Modified</th>
                             <th class="text-end">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for host in hosts %}
-                            <tr class="{{ host.deleted ? 'row-deleted' : '' }}">
-                                <td class="ps-3">
+                            <tr class="host-row{{ host.deleted ? ' row-deleted' : '' }}" data-host-id="{{ host.id }}">
+                                <td class="toggle-cell">
+                                    {% if host.interfaces is not empty %}
+                                    <button type="button" class="tree-toggle" data-host="{{ host.id }}" aria-label="Toggle interfaces">
+                                        <i class="bi bi-chevron-down"></i>
+                                    </button>
+                                    {% endif %}
+                                </td>
+                                <td class="ps-2">
                                     <input type="checkbox" class="form-check-input bulk-host-cb" value="{{ host.id }}">
                                 </td>
                                 <td>
@@ -233,66 +297,24 @@
                                     {% endif %}
                                     {% set snipeLink = host.snipeItAssetLink %}
                                     {% if snipeLink and snipeLink.snipeAssetName != host.name %}
-                                        <div class="text-muted small"><i class="bi bi-box-seam me-1"></i>{{ snipeLink.snipeAssetName }}</div>
+                                        <span class="text-muted small ms-1">· <i class="bi bi-box-seam me-1"></i>{{ snipeLink.snipeAssetName }}</span>
                                     {% endif %}
                                     {% if host.location %}
-                                        <div class="text-muted small">{{ host.location }}</div>
+                                        <span class="text-muted small ms-1">· {{ host.location }}</span>
+                                    {% endif %}
+                                    {% if host.interfaces is empty %}
+                                        <span class="text-muted small ms-1 fst-italic">· No interfaces</span>
                                     {% endif %}
                                 </td>
-                                <td>
+                                <td colspan="5">
                                     {% for tag in host.tags %}
                                         <span class="badge bg-secondary me-1">{{ tag.name }}</span>
                                     {% else %}
                                         <span class="text-muted">—</span>
                                     {% endfor %}
                                 </td>
-                                <td class="ip-address small">
-                                    {% set any_ip = false %}
-                                    {% for iface in host.interfaces %}
-                                        {% set lease = lease_map[iface.macAddress] ?? null %}
-                                        {% set static_ip = iface.ipAddress ? iface.ipAddress.address : null %}
-                                        {% set lease_ip = lease ? lease.ipAddress : null %}
-                                        {% if static_ip %}
-                                            {% set any_ip = true %}
-                                            <div>{{ static_ip }}{% if lease_ip and lease_ip != static_ip %} <span class="text-muted">({{ lease_ip }})</span>{% endif %}</div>
-                                        {% elseif lease_ip %}
-                                            {% set any_ip = true %}
-                                            <div class="text-muted">({{ lease_ip }})</div>
-                                        {% endif %}
-                                    {% endfor %}
-                                    {% if not any_ip %}<span class="text-muted">—</span>{% endif %}
-                                </td>
-                                <td class="ip-address small">
-                                    {% set ipv6s = [] %}
-                                    {% for iface in host.interfaces %}
-                                        {% if iface.ipv6Address %}
-                                            {% set ipv6s = ipv6s|merge([iface.ipv6Address.address]) %}
-                                        {% endif %}
-                                    {% endfor %}
-                                    {% if ipv6s is empty %}
-                                        <span class="text-muted">—</span>
-                                    {% else %}
-                                        {% for ip in ipv6s %}<div>{{ ip }}</div>{% endfor %}
-                                    {% endif %}
-                                </td>
-                                <td class="small font-monospace">
-                                    {% set fqdns = [] %}
-                                    {% for iface in host.interfaces %}
-                                        {% for iname in iface.names %}
-                                            {% if iname.domain %}
-                                                {% set fqdns = fqdns|merge([iname.fullyQualifiedName]) %}
-                                            {% endif %}
-                                        {% endfor %}
-                                    {% endfor %}
-                                    {% if fqdns is empty %}
-                                        <span class="text-muted">—</span>
-                                    {% else %}
-                                        {% for fqdn in fqdns %}<div>{{ fqdn }}</div>{% endfor %}
-                                    {% endif %}
-                                </td>
                                 <td class="text-muted small">
-                                    {{ host.updatedAt|date('Y-m-d H:i') }}
-                                    {% if host.updatedBy %}<br><span class="text-muted">{{ host.updatedBy }}</span>{% endif %}
+                                    {{ host.updatedAt|date('Y-m-d') }}{% if host.updatedBy %} · {{ host.updatedBy }}{% endif %}
                                 </td>
                                 <td class="text-end">
                                     <div class="d-flex gap-1 justify-content-end align-items-center">
@@ -318,90 +340,28 @@
                                     </div>
                                 </td>
                             </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            {{ _self.pager(pagination) }}
-        </div>
-    </div>
-
-    {# ── By Interface view ── #}
-    <div id="view-interface" class="list-scroll-card {{ hostViewMode == 'interface' ? '' : 'd-none' }}">
-        <div class="card">
-            <div id="iface-bulk-bar" class="card-header d-none py-2">
-                <div class="d-flex align-items-center gap-2">
-                    <span id="iface-selected-count" class="text-muted small">0 interfaces selected</span>
-                    <button type="button" class="btn btn-sm btn-outline-secondary ms-auto" id="iface-edit-btn"
-                            data-bs-toggle="modal" data-bs-target="#bulk-iface-edit-modal">
-                        <i class="bi bi-pencil me-1"></i>Edit Selected
-                    </button>
-                    <button type="button" class="btn btn-sm btn-outline-danger" id="iface-delete-btn">
-                        <i class="bi bi-trash me-1"></i>Delete Selected
-                    </button>
-                </div>
-            </div>
-            <div class="table-responsive">
-                <table class="table table-hover mb-0">
-                    <thead>
-                        <tr>
-                            <th class="ps-3" style="width:2.25rem">
-                                <input type="checkbox" class="form-check-input" id="select-all-ifaces" title="Select all on this page">
-                            </th>
-                            <th style="min-width: 11rem">Host</th>
-                            <th>Tags</th>
-                            <th style="min-width: 10rem">Interface</th>
-                            <th>Subnet</th>
-                            <th>IPv4</th>
-                            <th>IPv6</th>
-                            <th>DNS Names</th>
-                            <th>Last Modified</th>
-                            <th class="text-end">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for host in hosts %}
                             {% for iface in host.interfaces %}
                                 {% set row_deleted = iface.deleted or host.deleted %}
-                                <tr class="{{ row_deleted ? 'row-deleted' : '' }}">
-                                    <td class="ps-3">
+                                <tr class="iface-row{{ row_deleted ? ' row-deleted' : '' }}" data-parent-host="{{ host.id }}">
+                                    <td class="toggle-cell"></td>
+                                    <td class="ps-2">
                                         <input type="checkbox" class="form-check-input bulk-iface-cb" value="{{ iface.id }}">
                                     </td>
-                                    <td>
-                                        <a href="{{ path('host_show', {id: host.id}) }}" class="fw-semibold text-decoration-none">
-                                            {{ host.name }}
-                                        </a>
-                                        {% if host.deleted %}
-                                            <span class="badge text-bg-warning ms-1">Deleted</span>
-                                        {% endif %}
-                                        {% set snipeLink = host.snipeItAssetLink %}
-                                        {% if snipeLink and snipeLink.snipeAssetName != host.name %}
-                                            <div class="text-muted small"><i class="bi bi-box-seam me-1"></i>{{ snipeLink.snipeAssetName }}</div>
-                                        {% endif %}
-                                        {% if host.location %}
-                                            <div class="text-muted small">{{ host.location }}</div>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% for tag in host.tags %}
-                                            <span class="badge bg-secondary me-1">{{ tag.name }}</span>
-                                        {% else %}
-                                            <span class="text-muted">—</span>
-                                        {% endfor %}
-                                    </td>
-                                    <td class="small">
+                                    <td class="iface-name-cell small">
                                         {% if iface.name %}
                                             <div class="fw-semibold">
                                                 <a href="{{ path('interface_show', {id: iface.id}) }}" class="text-decoration-none">{{ iface.name }}</a>
                                             </div>
+                                        {% else %}
+                                            <div class="font-monospace text-muted">
+                                                <a href="{{ path('interface_show', {id: iface.id}) }}" class="text-decoration-none text-muted">{{ iface.macAddress }}</a>
+                                            </div>
                                         {% endif %}
-                                        <div class="font-monospace text-muted">
-                                            <a href="{{ path('interface_show', {id: iface.id}) }}" class="text-decoration-none text-muted">{{ iface.macAddress }}</a>
-                                        </div>
                                         {% if iface.deleted %}
                                             <span class="badge text-bg-warning mt-1">Interface deleted</span>
                                         {% endif %}
                                     </td>
+                                    <td></td>
                                     <td class="small">{{ iface.subnet ? iface.subnet.name : '—' }}</td>
                                     <td class="ip-address small">
                                         {% set lease = lease_map[iface.macAddress] ?? null %}
@@ -438,8 +398,7 @@
                                         {% endif %}
                                     </td>
                                     <td class="text-muted small">
-                                        {{ iface.updatedAt|date('Y-m-d H:i') }}
-                                        {% if iface.updatedBy %}<br><span class="text-muted">{{ iface.updatedBy }}</span>{% endif %}
+                                        {{ iface.updatedAt|date('Y-m-d') }}{% if iface.updatedBy %} · {{ iface.updatedBy }}{% endif %}
                                     </td>
                                     <td class="text-end">
                                         <div class="d-flex gap-1 justify-content-end align-items-center">
@@ -462,44 +421,6 @@
                                                     </button>
                                                 </form>
                                             {% endif %}
-                                        </div>
-                                    </td>
-                                </tr>
-                            {% else %}
-                                <tr>
-                                    <td class="ps-3"></td>
-                                    <td>
-                                        <a href="{{ path('host_show', {id: host.id}) }}" class="fw-semibold text-decoration-none">
-                                            {{ host.name }}
-                                        </a>
-                                        {% if host.location %}
-                                            <div class="text-muted small">{{ host.location }}</div>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% for tag in host.tags %}
-                                            <span class="badge bg-secondary me-1">{{ tag.name }}</span>
-                                        {% else %}
-                                            <span class="text-muted">—</span>
-                                        {% endfor %}
-                                    </td>
-                                    <td colspan="6" class="text-muted small fst-italic">No interfaces</td>
-                                    <td class="text-muted small">
-                                        {{ host.updatedAt|date('Y-m-d H:i') }}
-                                        {% if host.updatedBy %}<br><span class="text-muted">{{ host.updatedBy }}</span>{% endif %}
-                                    </td>
-                                    <td class="text-end">
-                                        <div class="d-flex gap-1 justify-content-end align-items-center">
-                                            <a href="{{ path('host_edit', {id: host.id}) }}" class="btn btn-sm btn-outline-secondary">
-                                                <i class="bi bi-pencil"></i>
-                                            </a>
-                                            <form method="post" action="{{ path('host_delete', {id: host.id}) }}"
-                                                  onsubmit="return confirm('Delete host {{ host.name|e('js') }}?')">
-                                                <input type="hidden" name="_token" value="{{ csrf_token('delete_host_' ~ host.id) }}">
-                                                <button type="submit" class="btn btn-sm btn-outline-danger">
-                                                    <i class="bi bi-trash"></i>
-                                                </button>
-                                            </form>
                                         </div>
                                     </td>
                                 </tr>
@@ -618,50 +539,109 @@
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
 <script>
-// --- View mode toggle ---
-document.getElementById('view-mode-toggle')?.addEventListener('click', function (e) {
-    const btn = e.target.closest('[data-mode]');
-    if (!btn) return;
-    const mode = btn.dataset.mode;
-    this.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('active', b === btn));
-    document.getElementById('view-host').classList.toggle('d-none', mode !== 'host');
-    document.getElementById('view-interface').classList.toggle('d-none', mode !== 'interface');
-    fetch('/api/preference/host-view-mode', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode }),
+// --- Tree expand/collapse (persisted in localStorage; default: expanded) ---
+const collapsedHosts = new Set(
+    JSON.parse(localStorage.getItem('host-tree-collapsed') || '[]')
+);
+
+function applyCollapseState() {
+    document.querySelectorAll('.host-row').forEach(row => {
+        const id = row.dataset.hostId;
+        const collapsed = collapsedHosts.has(id);
+        const icon = row.querySelector('.tree-toggle i');
+        if (icon) icon.className = collapsed ? 'bi bi-chevron-right' : 'bi bi-chevron-down';
+        document.querySelectorAll(`.iface-row[data-parent-host="${id}"]`).forEach(r => {
+            r.classList.toggle('d-none', collapsed);
+        });
     });
+}
+
+document.addEventListener('click', function (e) {
+    const btn = e.target.closest('.tree-toggle');
+    if (!btn) return;
+    const id = btn.dataset.host;
+    collapsedHosts.has(id) ? collapsedHosts.delete(id) : collapsedHosts.add(id);
+    localStorage.setItem('host-tree-collapsed', JSON.stringify([...collapsedHosts]));
+    applyCollapseState();
+});
+
+applyCollapseState();
+
+document.getElementById('expand-all-btn')?.addEventListener('click', function () {
+    collapsedHosts.clear();
+    localStorage.setItem('host-tree-collapsed', '[]');
+    applyCollapseState();
+});
+
+document.getElementById('collapse-all-btn')?.addEventListener('click', function () {
+    document.querySelectorAll('.host-row[data-host-id]').forEach(r => collapsedHosts.add(r.dataset.hostId));
+    localStorage.setItem('host-tree-collapsed', JSON.stringify([...collapsedHosts]));
+    applyCollapseState();
+});
+
+// --- Group hover ---
+let hoveredGroupId = null;
+const treeTable = document.querySelector('.host-tree-table');
+
+treeTable?.addEventListener('mouseover', function (e) {
+    const row = e.target.closest('tr.host-row, tr.iface-row');
+    if (!row) return;
+    const id = row.dataset.hostId || row.dataset.parentHost;
+    if (!id) return;
+
+    if (id !== hoveredGroupId) {
+        treeTable.querySelectorAll('.group-hovered, .row-hovered')
+            .forEach(r => r.classList.remove('group-hovered', 'row-hovered'));
+        treeTable.querySelector(`.host-row[data-host-id="${id}"]`)
+            ?.classList.add('group-hovered');
+        treeTable.querySelectorAll(`.iface-row[data-parent-host="${id}"]`)
+            .forEach(r => r.classList.add('group-hovered'));
+        hoveredGroupId = id;
+    }
+
+    treeTable.querySelectorAll('.row-hovered')
+        .forEach(r => { r.classList.remove('row-hovered'); r.classList.add('group-hovered'); });
+    row.classList.replace('group-hovered', 'row-hovered');
+});
+
+treeTable?.addEventListener('mouseleave', function () {
+    treeTable.querySelectorAll('.group-hovered, .row-hovered')
+        .forEach(r => r.classList.remove('group-hovered', 'row-hovered'));
+    hoveredGroupId = null;
 });
 
 // --- Bulk selection ---
 const hostSelected = new Set();
 const ifaceSelected = new Set();
 
-function updateHostToolbar() {
-    const count = hostSelected.size;
-    document.getElementById('host-bulk-bar').classList.toggle('d-none', count === 0);
+function updateBulkBar() {
+    const hCount = hostSelected.size;
+    const iCount = ifaceSelected.size;
+    const any = hCount > 0 || iCount > 0;
+    document.getElementById('host-bulk-section').classList.toggle('d-none', hCount === 0);
+    document.getElementById('iface-bulk-section').classList.toggle('d-none', iCount === 0);
+    document.getElementById('bulk-bar-separator').classList.toggle('d-none', hCount === 0 || iCount === 0);
+    document.getElementById('bulk-clear-btn').classList.toggle('d-none', !any);
     document.getElementById('host-selected-count').textContent =
-        count + ' host' + (count !== 1 ? 's' : '') + ' selected';
-    const all = document.querySelectorAll('.bulk-host-cb');
-    const sa  = document.getElementById('select-all-hosts');
-    if (sa) {
-        sa.checked       = all.length > 0 && count === all.length;
-        sa.indeterminate = count > 0 && count < all.length;
+        hCount + ' host' + (hCount !== 1 ? 's' : '') + ' selected';
+    document.getElementById('iface-selected-count').textContent =
+        iCount + ' interface' + (iCount !== 1 ? 's' : '') + ' selected';
+    const allHosts = document.querySelectorAll('.bulk-host-cb');
+    const saHosts  = document.getElementById('select-all-hosts');
+    if (saHosts) {
+        saHosts.checked       = allHosts.length > 0 && hCount === allHosts.length;
+        saHosts.indeterminate = hCount > 0 && hCount < allHosts.length;
+    }
+    const allIfaces = document.querySelectorAll('.bulk-iface-cb');
+    const saIfaces  = document.getElementById('select-all-ifaces');
+    if (saIfaces) {
+        saIfaces.checked       = allIfaces.length > 0 && iCount === allIfaces.length;
+        saIfaces.indeterminate = iCount > 0 && iCount < allIfaces.length;
     }
 }
 
-function updateIfaceToolbar() {
-    const count = ifaceSelected.size;
-    document.getElementById('iface-bulk-bar').classList.toggle('d-none', count === 0);
-    document.getElementById('iface-selected-count').textContent =
-        count + ' interface' + (count !== 1 ? 's' : '') + ' selected';
-    const all = document.querySelectorAll('.bulk-iface-cb');
-    const sa  = document.getElementById('select-all-ifaces');
-    if (sa) {
-        sa.checked       = all.length > 0 && count === all.length;
-        sa.indeterminate = count > 0 && count < all.length;
-    }
-}
+function updateHostToolbar() { updateBulkBar(); }
+function updateIfaceToolbar() { updateBulkBar(); }
 
 document.addEventListener('change', function (e) {
     if (e.target.matches('.bulk-host-cb')) {
@@ -685,6 +665,32 @@ document.addEventListener('change', function (e) {
     }
 });
 
+// --- Shift-select range (hosts and interfaces independently) ---
+let lastCheckedCb = null;
+
+document.addEventListener('click', function (e) {
+    const cb = e.target;
+    if (!cb.matches('.bulk-host-cb, .bulk-iface-cb')) return;
+
+    const isHost = cb.matches('.bulk-host-cb');
+    const selector = isHost ? '.bulk-host-cb' : '.bulk-iface-cb';
+    const selectedSet = isHost ? hostSelected : ifaceSelected;
+
+    if (e.shiftKey && lastCheckedCb && lastCheckedCb.matches(selector)) {
+        const all = [...document.querySelectorAll(selector)];
+        const a = all.indexOf(lastCheckedCb);
+        const b = all.indexOf(cb);
+        const [lo, hi] = a < b ? [a, b] : [b, a];
+        all.slice(lo, hi + 1).forEach(box => {
+            box.checked = cb.checked;
+            cb.checked ? selectedSet.add(box.value) : selectedSet.delete(box.value);
+        });
+        updateBulkBar();
+    }
+
+    lastCheckedCb = cb;
+});
+
 // --- Bulk host delete ---
 document.getElementById('host-delete-btn')?.addEventListener('click', async function () {
     const count = hostSelected.size;
@@ -696,6 +702,15 @@ document.getElementById('host-delete-btn')?.addEventListener('click', async func
     });
     const data = await resp.json();
     if (resp.ok) { location.reload(); } else { alert(data.error ?? 'Error'); }
+});
+
+// --- Clear all selections ---
+document.getElementById('bulk-clear-btn')?.addEventListener('click', function () {
+    hostSelected.clear();
+    ifaceSelected.clear();
+    document.querySelectorAll('.bulk-host-cb, .bulk-iface-cb').forEach(cb => cb.checked = false);
+    lastCheckedCb = null;
+    updateBulkBar();
 });
 
 // --- Bulk interface delete ---
