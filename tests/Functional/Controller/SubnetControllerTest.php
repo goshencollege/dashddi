@@ -76,4 +76,58 @@ class SubnetControllerTest extends AppWebTestCase
         );
         $this->assertResponseRedirects();
     }
+
+    // -------------------------------------------------------------------------
+    // Terminal subnet overlap validation
+    // -------------------------------------------------------------------------
+
+    public function testCreateTerminalSubnetBlockedByIpv4Overlap(): void
+    {
+        $existing = (new Subnet())->setName('Existing')->setIpv4Cidr('10.1.0.0/24');
+        $this->em->persist($existing);
+        $this->em->flush();
+
+        $crawler = $this->client->request('GET', '/subnets/new');
+        $this->client->submit($crawler->filter('form')->form(), [
+            'subnet[name]'     => 'Conflicting',
+            'subnet[ipv4Cidr]' => '10.1.0.0/24',
+        ]);
+
+        $this->assertResponseStatusCodeSame(200);
+        $this->assertStringContainsString('overlaps', $this->client->getResponse()->getContent());
+    }
+
+    public function testEditTerminalSubnetBlockedByIpv4Overlap(): void
+    {
+        $existing = (new Subnet())->setName('Existing')->setIpv4Cidr('10.2.0.0/24');
+        $this->em->persist($existing);
+        $target = (new Subnet())->setName('Target')->setIpv4Cidr('10.3.0.0/24');
+        $this->em->persist($target);
+        $this->em->flush();
+
+        $crawler = $this->client->request('GET', "/subnets/{$target->getId()}/edit");
+        $this->client->submit($crawler->filter('form')->form(), [
+            'subnet[name]'     => 'Target',
+            'subnet[ipv4Cidr]' => '10.2.0.0/24',
+        ]);
+
+        $this->assertResponseStatusCodeSame(200);
+        $this->assertStringContainsString('overlaps', $this->client->getResponse()->getContent());
+    }
+
+    public function testCreateWithOverlappingInlineBlocksIsBlocked(): void
+    {
+        $crawler = $this->client->request('GET', '/subnets/new');
+        $this->client->submit($crawler->filter('form')->form(), [
+            'subnet[name]'                  => 'Block Overlap Subnet',
+            'subnet[ipv4Cidr]'              => '10.4.0.0/24',
+            'subnet[reservedBlock][startIp]' => '10.4.0.10',
+            'subnet[reservedBlock][endIp]'   => '10.4.0.50',
+            'subnet[fixedBlock][startIp]'    => '10.4.0.40',
+            'subnet[fixedBlock][endIp]'      => '10.4.0.60',
+        ]);
+
+        $this->assertResponseStatusCodeSame(200);
+        $this->assertStringContainsString('overlap', $this->client->getResponse()->getContent());
+    }
 }

@@ -7,9 +7,12 @@ use App\Tests\Functional\AppWebTestCase;
 
 class SubnetApiControllerTest extends AppWebTestCase
 {
-    private function makeSubnet(string $name): Subnet
+    private function makeSubnet(string $name, string $ipv4Cidr = '10.99.0.0/24', bool $isContainer = false, ?string $ipv6Cidr = null): Subnet
     {
-        $subnet = (new Subnet())->setName($name)->setIpv4Cidr('10.99.0.0/24');
+        $subnet = (new Subnet())->setName($name)->setIpv4Cidr($ipv4Cidr)->setIsContainer($isContainer);
+        if ($ipv6Cidr !== null) {
+            $subnet->setIpv6Cidr($ipv6Cidr);
+        }
         $this->em->persist($subnet);
         $this->em->flush();
         return $subnet;
@@ -71,5 +74,73 @@ class SubnetApiControllerTest extends AppWebTestCase
         $subnet = $this->makeSubnet('Delete Subnet');
         $this->apiRequest('DELETE', "/api/subnets/{$subnet->getId()}");
         $this->assertSame(204, $this->client->getResponse()->getStatusCode());
+    }
+
+    // -------------------------------------------------------------------------
+    // Terminal subnet overlap validation
+    // -------------------------------------------------------------------------
+
+    public function testCreateTerminalSubnetBlockedByIpv4Overlap(): void
+    {
+        $this->makeSubnet('Existing', '10.1.0.0/24');
+
+        $this->apiRequest('POST', '/api/subnets', ['name' => 'Conflicting', 'ipv4_cidr' => '10.1.0.0/24']);
+        $this->assertSame(422, $this->client->getResponse()->getStatusCode());
+    }
+
+    public function testCreateTerminalSubnetBlockedWhenContainedWithinExisting(): void
+    {
+        $this->makeSubnet('Existing', '10.2.0.0/22');
+
+        // 10.2.1.0/24 is fully contained within 10.2.0.0/22 — should be blocked
+        $this->apiRequest('POST', '/api/subnets', ['name' => 'Contained', 'ipv4_cidr' => '10.2.1.0/24']);
+        $this->assertSame(422, $this->client->getResponse()->getStatusCode());
+    }
+
+    public function testCreateTerminalSubnetBlockedByIpv6Overlap(): void
+    {
+        $subnet = (new Subnet())->setName('Existing V6')->setIpv6Cidr('2001:db8::/48');
+        $this->em->persist($subnet);
+        $this->em->flush();
+
+        $this->apiRequest('POST', '/api/subnets', ['name' => 'Conflicting V6', 'ipv6_cidr' => '2001:db8::/48']);
+        $this->assertSame(422, $this->client->getResponse()->getStatusCode());
+    }
+
+    public function testUpdateTerminalSubnetBlockedByIpv4Overlap(): void
+    {
+        $this->makeSubnet('Subnet A', '10.3.0.0/24');
+        $b = $this->makeSubnet('Subnet B', '10.4.0.0/24');
+
+        $this->apiRequest('PATCH', "/api/subnets/{$b->getId()}", ['ipv4_cidr' => '10.3.0.0/24']);
+        $this->assertSame(422, $this->client->getResponse()->getStatusCode());
+    }
+
+    public function testUpdateTerminalSubnetToItsOwnCidrIsAllowed(): void
+    {
+        $subnet = $this->makeSubnet('Self', '10.5.0.0/24');
+
+        $this->apiRequest('PATCH', "/api/subnets/{$subnet->getId()}", ['ipv4_cidr' => '10.5.0.0/24']);
+        $this->assertSame(200, $this->client->getResponse()->getStatusCode());
+    }
+
+    public function testContainerSubnetAllowedToOverlapTerminalSubnet(): void
+    {
+        $this->makeSubnet('Terminal', '10.6.0.0/24');
+
+        $this->apiRequest('POST', '/api/subnets', [
+            'name'         => 'Container',
+            'ipv4_cidr'    => '10.6.0.0/24',
+            'is_container' => true,
+        ]);
+        $this->assertSame(201, $this->client->getResponse()->getStatusCode());
+    }
+
+    public function testTerminalSubnetAllowedWhenOnlyContainerOverlaps(): void
+    {
+        $this->makeSubnet('Container', '10.7.0.0/24', isContainer: true);
+
+        $this->apiRequest('POST', '/api/subnets', ['name' => 'Terminal', 'ipv4_cidr' => '10.7.0.0/24']);
+        $this->assertSame(201, $this->client->getResponse()->getStatusCode());
     }
 }

@@ -239,6 +239,38 @@ class SubnetRepository extends ServiceEntityRepository
     // -------------------------------------------------------------------------
 
     /**
+     * Return the first terminal subnet whose CIDR overlaps $cidr, excluding $excludeId.
+     * Only checks terminal subnets (isContainer = false); container subnets are ignored.
+     */
+    public function findTerminalCidrOverlap(string $cidr, ?int $excludeId = null): ?Subnet
+    {
+        $range = Factory::parseRangeString($cidr);
+        if (!$range) {
+            return null;
+        }
+
+        $qb = $this->createQueryBuilder('s')
+            ->where('s.isContainer = false');
+        if ($excludeId !== null) {
+            $qb->andWhere('s.id != :id')->setParameter('id', $excludeId);
+        }
+
+        foreach ($qb->getQuery()->getResult() as $terminal) {
+            foreach (array_filter([$terminal->getIpv4Cidr(), $terminal->getIpv6Cidr()]) as $otherCidr) {
+                $other = Factory::parseRangeString($otherCidr);
+                if (!$other) {
+                    continue;
+                }
+                if ($range->contains($other->getStartAddress()) || $other->contains($range->getStartAddress())) {
+                    return $terminal;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Build a flat list of ['subnet' => Subnet, 'depth' => int] for tree display.
      * $version: 'ipv4' or 'ipv6'
      * Container subnets act as parents; parent is chosen by most-specific CIDR containment.

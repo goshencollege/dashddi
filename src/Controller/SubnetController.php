@@ -154,7 +154,7 @@ class SubnetController extends AbstractController
     }
 
     #[Route('/new', name: 'subnet_new', methods: ['GET', 'POST'])]
-    public function new(Request $request, EntityManagerInterface $em, AppSettingRepository $settingRepo): Response
+    public function new(Request $request, EntityManagerInterface $em, AppSettingRepository $settingRepo, SubnetRepository $subnetRepo): Response
     {
         $subnet = new Subnet();
         $defaultDays = $settingRepo->getInstance()?->getDefaultNewSubnetLeaseRetentionDays();
@@ -165,21 +165,42 @@ class SubnetController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            $em->persist($subnet);
-
             $errors = [];
-            foreach (['reservedBlock' => BlockType::Reserved, 'fixedBlock' => BlockType::Fixed] as $field => $type) {
-                $block = $form->get($field)->getData();
-                if ($block->getStartIp() === '' || $block->getEndIp() === '') {
-                    continue;
+
+            if (!$subnet->isContainer()) {
+                foreach ([4 => $subnet->getIpv4Cidr(), 6 => $subnet->getIpv6Cidr()] as $version => $cidr) {
+                    if ($cidr && ($overlap = $subnetRepo->findTerminalCidrOverlap($cidr))) {
+                        $errors[] = sprintf('IPv%d CIDR %s overlaps with terminal subnet "%s".', $version, $cidr, $overlap->getName());
+                    }
                 }
-                $block->setSubnet($subnet);
-                $block->setType($type);
-                $error = $this->validateBlock($block, $subnet);
-                if ($error) {
-                    $errors[] = $error;
-                } else {
-                    $em->persist($block);
+            }
+
+            if (empty($errors)) {
+                $em->persist($subnet);
+
+                $validBlocks = [];
+                foreach (['reservedBlock' => BlockType::Reserved, 'fixedBlock' => BlockType::Fixed] as $field => $type) {
+                    $block = $form->get($field)->getData();
+                    if ($block->getStartIp() === '' || $block->getEndIp() === '') {
+                        continue;
+                    }
+                    $block->setSubnet($subnet);
+                    $block->setType($type);
+                    $error = $this->validateBlock($block, $subnet);
+                    if ($error) {
+                        $errors[] = $error;
+                    } else {
+                        $validBlocks[] = $block;
+                        $em->persist($block);
+                    }
+                }
+
+                if (count($validBlocks) === 2 && $this->blocksOverlap($validBlocks[0], $validBlocks[1])) {
+                    $errors[] = sprintf(
+                        'The two address blocks overlap (%s–%s and %s–%s).',
+                        $validBlocks[0]->getStartIp(), $validBlocks[0]->getEndIp(),
+                        $validBlocks[1]->getStartIp(), $validBlocks[1]->getEndIp(),
+                    );
                 }
             }
 
@@ -225,12 +246,26 @@ class SubnetController extends AbstractController
     }
 
     #[Route('/{id}/edit', name: 'subnet_edit', methods: ['GET', 'POST'])]
-    public function edit(Request $request, Subnet $subnet, EntityManagerInterface $em): Response
+    public function edit(Request $request, Subnet $subnet, EntityManagerInterface $em, SubnetRepository $subnetRepo): Response
     {
         $form = $this->createForm(SubnetType::class, $subnet);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
+            if (!$subnet->isContainer()) {
+                foreach ([4 => $subnet->getIpv4Cidr(), 6 => $subnet->getIpv6Cidr()] as $version => $cidr) {
+                    if ($cidr && ($overlap = $subnetRepo->findTerminalCidrOverlap($cidr, $subnet->getId()))) {
+                        $this->addFlash('danger', sprintf('IPv%d CIDR %s overlaps with terminal subnet "%s".', $version, $cidr, $overlap->getName()));
+                        return $this->render('subnet/form.html.twig', [
+                            'form'         => $form,
+                            'subnet'       => $subnet,
+                            'title'        => 'Edit Subnet: ' . $subnet->getName(),
+                            'embed_blocks' => false,
+                        ]);
+                    }
+                }
+            }
+
             $em->flush();
             $this->addFlash('success', 'Subnet updated.');
             return $this->redirectToRoute('subnet_show', ['id' => $subnet->getId()]);
@@ -272,6 +307,24 @@ class SubnetController extends AbstractController
         }
 
         return null;
+    }
+
+    private function blocksOverlap(AddressBlock $a, AddressBlock $b): bool
+    {
+        $startA = Factory::parseAddressString($a->getStartIp());
+        $endA   = Factory::parseAddressString($a->getEndIp());
+        $startB = Factory::parseAddressString($b->getStartIp());
+        $endB   = Factory::parseAddressString($b->getEndIp());
+
+        if (!$startA || !$endA || !$startB || !$endB) {
+            return false;
+        }
+        if ($startA->getAddressType() !== $startB->getAddressType()) {
+            return false;
+        }
+
+        return $startA->getComparableString() <= $endB->getComparableString()
+            && $startB->getComparableString() <= $endA->getComparableString();
     }
 
     #[Route('/{id}/delete', name: 'subnet_delete', methods: ['POST'])]

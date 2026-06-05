@@ -27,7 +27,7 @@ make db-shell    # MySQL shell
 make reset       # wipe volumes, rebuild, migrate, load fixtures (full reset)
 make cert        # generate a self-signed SSL cert in docker/ssl/
 make test-setup  # create/migrate/seed the ipam_test database (run once before first test run)
-make test        # run the full test suite (91 unit + 91 functional)
+make test        # run the full test suite (91 unit + 113 functional)
 ```
 
 The PHP container is named `app`. For commands not in the Makefile:
@@ -98,7 +98,7 @@ make migrate
 
 ## Test suite
 
-182 tests total: 91 unit tests (`tests/Unit/`) and 91 functional tests (`tests/Functional/`).
+204 tests total: 91 unit tests (`tests/Unit/`) and 113 functional tests (`tests/Functional/`).
 
 ```bash
 make test-setup  # first-time only: creates ipam_test DB, runs migrations, loads fixtures
@@ -135,6 +135,10 @@ tests/Functional/
 | `Service/ReservedTagPrefixServiceTest` | prefix matching (case-insensitive), no-match, getPrefixes |
 | `Service/DnsViewResolverTest` | view intersection, null domain/subnet, isDomainUsable, reason strings |
 | `Service/SshKeyServiceTest` | Ed25519 key-pair generation, public-key extraction |
+| `Api/SubnetApiControllerTest` | subnet CRUD, terminal CIDR overlap (IPv4, IPv6, containment, self-edit, container exemption) |
+| `Api/AddressBlockApiControllerTest` | block CRUD, intra-subnet overlap (exact, partial, contained, adjacent, cross-subnet, self-edit) |
+| `Controller/SubnetControllerTest` | subnet web CRUD, terminal CIDR overlap via form, inline block mutual overlap |
+| `Controller/AddressBlockControllerTest` | block web CRUD, intra-subnet overlap via form |
 | `Service/IpAddressManagerTest` | available IPv4/IPv6 ranges, limit, allocation exclusion, EUI-64, IPv6-from-IPv4 |
 | `Service/BindZoneFileParserTest` | A/AAAA/CNAME/MX/NS/TXT records, $ORIGIN/$TTL directives, comments, multi-line parens, inherited names |
 | `Service/PushScopeServiceTest` | affectsDhcp entity types, clearpassMacsFor (iface/IP/IPv6/unrelated) |
