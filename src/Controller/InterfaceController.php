@@ -421,9 +421,11 @@ class InterfaceController extends AbstractController
                     }
                 }
             }
-        }
 
-        $em->flush();
+            // Flush per interface so each assigned IP is visible to findNextAvailable*
+            // on the next iteration — the DB query bypasses Doctrine's identity map.
+            $em->flush();
+        }
         return $this->json(['message' => $count . ' interface(s) updated.']);
     }
 
