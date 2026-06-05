@@ -202,6 +202,10 @@ class InterfaceController extends AbstractController
             return $this->json(['message' => $count . ' interface(s) deleted.']);
         }
 
+        if ($action === 'edit') {
+            return $this->bulkEdit($data, $ids, $ifaceRepo, $em);
+        }
+
         return $this->json(['error' => 'Unknown action'], 400);
     }
 
@@ -354,6 +358,73 @@ class InterfaceController extends AbstractController
         }, $domains);
 
         return $this->json($result);
+    }
+
+    private function bulkEdit(array $data, array $ids, NetworkInterfaceRepository $ifaceRepo, EntityManagerInterface $em): JsonResponse
+    {
+        $ipv4Mode  = $data['ipv4Assignment'] ?? 'keep';
+        $ipv6Mode  = $data['ipv6Assignment'] ?? 'keep';
+        $subnetId  = isset($data['subnet_id']) && $data['subnet_id'] !== '' ? (int) $data['subnet_id'] : null;
+
+        $newSubnet = null;
+        if ($subnetId !== null) {
+            $newSubnet = $em->find(Subnet::class, $subnetId);
+            if (!$newSubnet) {
+                return $this->json(['error' => 'Subnet not found'], 400);
+            }
+        }
+
+        $interfaces = $ifaceRepo->findBy(['id' => $ids]);
+        $count      = count($interfaces);
+
+        foreach ($interfaces as $iface) {
+            $subnetChanged = false;
+            if ($newSubnet !== null && $newSubnet !== $iface->getSubnet()) {
+                $this->ipManager->releaseIpv4($iface);
+                $this->ipManager->releaseIpv6($iface);
+                $iface->setSubnet($newSubnet);
+                $subnetChanged = true;
+            }
+
+            $subnet = $iface->getSubnet();
+
+            if (!$subnet?->isContainer()) {
+                if ($ipv4Mode !== 'keep') {
+                    if (!$subnetChanged) {
+                        $this->ipManager->releaseIpv4($iface);
+                    }
+                    if ($ipv4Mode === 'auto' && $subnet?->getIpv4Cidr()) {
+                        $ip = $this->ipManager->findNextAvailableIpv4($subnet);
+                        if ($ip) {
+                            $this->ipManager->assignIpv4($iface, $ip);
+                        }
+                    }
+                }
+
+                if ($ipv6Mode !== 'keep') {
+                    if (!$subnetChanged) {
+                        $this->ipManager->releaseIpv6($iface);
+                    }
+                    if ($ipv6Mode === 'auto' && $subnet?->getIpv6Cidr()) {
+                        $ip = $this->ipManager->findNextAvailableIpv6($subnet, $iface->getMacAddress());
+                        if ($ip) {
+                            $this->ipManager->assignIpv6($iface, $ip);
+                        }
+                    } elseif ($ipv6Mode === 'auto_v4' && $subnet?->getIpv6Cidr()) {
+                        $ipv4 = $iface->getIpAddress()?->getAddress();
+                        if ($ipv4) {
+                            $ip = $this->ipManager->findIpv6FromIpv4($subnet, $ipv4);
+                            if ($ip) {
+                                $this->ipManager->assignIpv6($iface, $ip);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        $em->flush();
+        return $this->json(['message' => $count . ' interface(s) updated.']);
     }
 
     private function checkCanonical(InterfaceName $name, NetworkInterface $interface): ?string
