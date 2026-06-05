@@ -187,8 +187,12 @@ class SnipeItServerController extends AbstractController
     }
 
     #[Route('/pull', name: 'snipe_it_server_pull', methods: ['POST'])]
-    public function pull(SnipeItServerRepository $repo, MessageBusInterface $bus): JsonResponse
+    public function pull(Request $request, SnipeItServerRepository $repo, MessageBusInterface $bus): JsonResponse
     {
+        if (!$this->isCsrfTokenValid('snipeit_pull', $request->headers->get('X-CSRF-Token') ?? $request->request->get('_token'))) {
+            return $this->json(['error' => 'Invalid CSRF token.'], 403);
+        }
+
         $servers = $repo->findBy([], ['name' => 'ASC']);
 
         if (empty($servers)) {

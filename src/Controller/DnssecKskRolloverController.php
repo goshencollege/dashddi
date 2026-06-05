@@ -148,6 +148,11 @@ class DnssecKskRolloverController extends AbstractController
     #[Route('/{id}/advance', name: 'ksk_rollover_advance', methods: ['POST'])]
     public function advance(Request $request, DnssecKskRollover $rollover, EntityManagerInterface $em, KskRolloverService $svc): Response
     {
+        if (!$this->isCsrfTokenValid('ksk_rollover_advance_' . $rollover->getId(), $request->request->get('_token'))) {
+            $this->addFlash('danger', 'Invalid CSRF token.');
+            return $this->redirectToRoute('ksk_rollover_show', ['id' => $rollover->getId()]);
+        }
+
         $action = $request->request->get('action');
 
         try {
