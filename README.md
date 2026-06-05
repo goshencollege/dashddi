@@ -4,7 +4,7 @@ DashDDI is a web-based DNS, DHCP, and IP Address Management (IPAM) system. It pr
 
 ## Features
 
-- **IP Address Management** — Track subnets (IPv4/IPv6), address blocks, VLANs, VRFs, hosts, and network interfaces; bulk delete or bulk edit (reassign subnet, auto-assign IPv4/IPv6) interfaces from the By Interface view
+- **IP Address Management** — Track subnets (IPv4/IPv6), address blocks, VLANs, VRFs, hosts, and network interfaces; collapsible tree view with bulk delete, bulk tag, and bulk edit (reassign subnet, auto-assign IPv4/IPv6) for both hosts and interfaces
 - **DNS Management** — Manage domains, DNS records, views, DNSSEC policies, and KSK rollover; generate and deploy BIND zone files
 - **DHCP Management** — Configure DHCP servers, generate Kea DHCP configs, and track leases
 - **Scheduled Tasks** — Cron-based task execution (evaluated in configured timezone)
