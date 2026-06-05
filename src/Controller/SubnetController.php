@@ -178,6 +178,7 @@ class SubnetController extends AbstractController
             if (empty($errors)) {
                 $em->persist($subnet);
 
+                $validBlocks = [];
                 foreach (['reservedBlock' => BlockType::Reserved, 'fixedBlock' => BlockType::Fixed] as $field => $type) {
                     $block = $form->get($field)->getData();
                     if ($block->getStartIp() === '' || $block->getEndIp() === '') {
@@ -189,8 +190,17 @@ class SubnetController extends AbstractController
                     if ($error) {
                         $errors[] = $error;
                     } else {
+                        $validBlocks[] = $block;
                         $em->persist($block);
                     }
+                }
+
+                if (count($validBlocks) === 2 && $this->blocksOverlap($validBlocks[0], $validBlocks[1])) {
+                    $errors[] = sprintf(
+                        'The two address blocks overlap (%s–%s and %s–%s).',
+                        $validBlocks[0]->getStartIp(), $validBlocks[0]->getEndIp(),
+                        $validBlocks[1]->getStartIp(), $validBlocks[1]->getEndIp(),
+                    );
                 }
             }
 
@@ -297,6 +307,24 @@ class SubnetController extends AbstractController
         }
 
         return null;
+    }
+
+    private function blocksOverlap(AddressBlock $a, AddressBlock $b): bool
+    {
+        $startA = Factory::parseAddressString($a->getStartIp());
+        $endA   = Factory::parseAddressString($a->getEndIp());
+        $startB = Factory::parseAddressString($b->getStartIp());
+        $endB   = Factory::parseAddressString($b->getEndIp());
+
+        if (!$startA || !$endA || !$startB || !$endB) {
+            return false;
+        }
+        if ($startA->getAddressType() !== $startB->getAddressType()) {
+            return false;
+        }
+
+        return $startA->getComparableString() <= $endB->getComparableString()
+            && $startB->getComparableString() <= $endA->getComparableString();
     }
 
     #[Route('/{id}/delete', name: 'subnet_delete', methods: ['POST'])]

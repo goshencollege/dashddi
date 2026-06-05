@@ -44,6 +44,7 @@ class AddressBlockApiController extends AbstractController
         Request $request,
         EntityManagerInterface $em,
         SubnetRepository $subnetRepo,
+        AddressBlockRepository $blockRepo,
     ): JsonResponse {
         $data = json_decode($request->getContent(), true) ?? [];
 
@@ -77,6 +78,10 @@ class AddressBlockApiController extends AbstractController
         $block->setEndIp($data['end_ip']);
         $block->setLabel($data['label'] ?? null);
 
+        if ($error = $this->validateBlock($block, $blockRepo)) {
+            return $this->json(['error' => $error], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
         $em->persist($block);
         $em->flush();
 
@@ -89,6 +94,7 @@ class AddressBlockApiController extends AbstractController
         AddressBlock $addressBlock,
         EntityManagerInterface $em,
         SubnetRepository $subnetRepo,
+        AddressBlockRepository $blockRepo,
     ): JsonResponse {
         $data = json_decode($request->getContent(), true) ?? [];
 
@@ -129,6 +135,10 @@ class AddressBlockApiController extends AbstractController
             $addressBlock->setLabel($data['label']);
         }
 
+        if ($error = $this->validateBlock($addressBlock, $blockRepo)) {
+            return $this->json(['error' => $error], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
         $em->flush();
 
         return $this->json($this->serialize($addressBlock));
@@ -141,6 +151,34 @@ class AddressBlockApiController extends AbstractController
         $em->flush();
 
         return $this->json(null, Response::HTTP_NO_CONTENT);
+    }
+
+    private function validateBlock(AddressBlock $block, AddressBlockRepository $repo): ?string
+    {
+        $subnet = $block->getSubnet();
+        if (!$subnet?->getId()) {
+            return null;
+        }
+
+        $overlap = $repo->findOverlappingBlock(
+            $subnet->getId(),
+            $block->getStartIp(),
+            $block->getEndIp(),
+            $block->getId(),
+        );
+
+        if ($overlap) {
+            $label = $overlap->getLabel() ? " \"{$overlap->getLabel()}\"" : '';
+            return sprintf(
+                'Block overlaps with existing %s block%s (%s–%s).',
+                $overlap->getType()->value,
+                $label,
+                $overlap->getStartIp(),
+                $overlap->getEndIp(),
+            );
+        }
+
+        return null;
     }
 
     private function serialize(AddressBlock $block): array

@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Entity\AddressBlock;
 use App\Entity\Subnet;
 use App\Form\AddressBlockType;
+use App\Repository\AddressBlockRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use IPLib\Factory;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -14,7 +15,10 @@ use Symfony\Component\Routing\Attribute\Route;
 
 class AddressBlockController extends AbstractController
 {
-    public function __construct(private readonly EntityManagerInterface $em) {}
+    public function __construct(
+        private readonly EntityManagerInterface $em,
+        private readonly AddressBlockRepository $blockRepo,
+    ) {}
 
     #[Route('/subnet/{subnetId}/blocks/new', name: 'block_new')]
     public function new(int $subnetId, Request $request): Response
@@ -120,6 +124,23 @@ class AddressBlockController extends AbstractController
 
         if ($startCmp > $endCmp) {
             return 'Start IP must be less than or equal to End IP.';
+        }
+
+        $overlap = $this->blockRepo->findOverlappingBlock(
+            $subnet->getId(),
+            $block->getStartIp(),
+            $block->getEndIp(),
+            $block->getId(),
+        );
+        if ($overlap) {
+            $label = $overlap->getLabel() ? " \"{$overlap->getLabel()}\"" : '';
+            return sprintf(
+                'Block overlaps with existing %s block%s (%s–%s).',
+                $overlap->getType()->value,
+                $label,
+                $overlap->getStartIp(),
+                $overlap->getEndIp(),
+            );
         }
 
         return null;
