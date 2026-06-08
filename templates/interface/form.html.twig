@@ -20,7 +20,7 @@
         {{ form_start(form) }}
 
         {# Name + MAC Address + Subnet #}
-        <div class="row g-3 mb-4">
+        <div class="row g-3 mb-3">
             <div class="col-md-4">
                 {{ form_label(form.name, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
                 {{ form_widget(form.name, {attr: {class: 'form-control' ~ (form.name.vars.errors|length ? ' is-invalid' : '')}}) }}
@@ -35,6 +35,13 @@
                 {{ form_label(form.subnet, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
                 {{ form_widget(form.subnet, {attr: {class: 'form-select'}}) }}
             </div>
+        </div>
+
+        {# Notes #}
+        <div class="mb-4">
+            {{ form_label(form.notes, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+            {{ form_widget(form.notes, {attr: {class: 'form-control' ~ (form.notes.vars.errors|length ? ' is-invalid' : '')}}) }}
+            {{ form_errors(form.notes) }}
         </div>
 
         {# IPv4 + IPv6 Assignment #}
