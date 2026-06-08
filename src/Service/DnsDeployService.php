@@ -57,12 +57,23 @@ class DnsDeployService
                     }
                     $remotePath  = $zonePath . '/' . $viewName . '/' . $domain->getName() . '.zone';
                     $displayFile = $viewName . '/' . $domain->getName() . '.zone';
-                    $ok = $sftp->put($remotePath, $this->generator->generateZoneFile($domain, $view));
-                    $viewResult['zones'][$domain->getName()] = [
-                        'success' => $ok,
-                        'file'    => $displayFile,
-                        'output'  => $ok ? '' : 'SFTP upload failed',
-                    ];
+                    $isDynamic   = $domain->isDdnsEnabled()
+                        && $domain->getDdnsDnsServer()?->getId() === $server->getId()
+                        && $server->getDdnsAlgorithm();
+                    if ($isDynamic && $sftp->file_exists($remotePath)) {
+                        $viewResult['zones'][$domain->getName()] = [
+                            'success' => true,
+                            'file'    => $displayFile,
+                            'output'  => 'Skipped: dynamic zone managed by BIND',
+                        ];
+                    } else {
+                        $ok = $sftp->put($remotePath, $this->generator->generateZoneFile($domain, $view));
+                        $viewResult['zones'][$domain->getName()] = [
+                            'success' => $ok,
+                            'file'    => $displayFile,
+                            'output'  => $ok ? '' : 'SFTP upload failed',
+                        ];
+                    }
                 }
 
                 foreach ($subnets as $subnet) {
@@ -85,12 +96,23 @@ class DnsDeployService
                         }
                         $remotePath  = $zonePath . '/' . $viewName . '/' . $zoneName . '.zone';
                         $displayFile = $viewName . '/' . $zoneName . '.zone';
-                        $ok = $sftp->put($remotePath, $this->generator->generateReverseZoneFile($subnet, $cidr, $view));
-                        $viewResult['zones'][$zoneName] = [
-                            'success' => $ok,
-                            'file'    => $displayFile,
-                            'output'  => $ok ? '' : 'SFTP upload failed',
-                        ];
+                        $isDynamic   = $subnet->isDdnsEnabled()
+                            && $subnet->getDdnsDnsServer()?->getId() === $server->getId()
+                            && $server->getDdnsAlgorithm();
+                        if ($isDynamic && $sftp->file_exists($remotePath)) {
+                            $viewResult['zones'][$zoneName] = [
+                                'success' => true,
+                                'file'    => $displayFile,
+                                'output'  => 'Skipped: dynamic zone managed by BIND',
+                            ];
+                        } else {
+                            $ok = $sftp->put($remotePath, $this->generator->generateReverseZoneFile($subnet, $cidr, $view));
+                            $viewResult['zones'][$zoneName] = [
+                                'success' => $ok,
+                                'file'    => $displayFile,
+                                'output'  => $ok ? '' : 'SFTP upload failed',
+                            ];
+                        }
                     }
                 }
             }
