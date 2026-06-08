@@ -61,10 +61,11 @@ class DnsDeployService
                         && $domain->getDdnsDnsServer()?->getId() === $server->getId()
                         && $server->getDdnsAlgorithm();
                     if ($isDynamic && $sftp->file_exists($remotePath)) {
+                        $nsu = $this->execNsUpdate($this->generator->generateDomainApexNsUpdate($domain, $view), $server, $sftp);
                         $viewResult['zones'][$domain->getName()] = [
-                            'success' => true,
+                            'success' => $nsu['success'],
                             'file'    => $displayFile,
-                            'output'  => 'Skipped: dynamic zone managed by BIND',
+                            'output'  => $nsu['success'] ? 'SOA/NS updated via nsupdate' : ('nsupdate failed: ' . $nsu['output']),
                         ];
                     } else {
                         $ok = $sftp->put($remotePath, $this->generator->generateZoneFile($domain, $view));
@@ -100,10 +101,11 @@ class DnsDeployService
                             && $subnet->getDdnsDnsServer()?->getId() === $server->getId()
                             && $server->getDdnsAlgorithm();
                         if ($isDynamic && $sftp->file_exists($remotePath)) {
+                            $nsu = $this->execNsUpdate($this->generator->generateSubnetApexNsUpdate($subnet, $cidr, $view), $server, $sftp);
                             $viewResult['zones'][$zoneName] = [
-                                'success' => true,
+                                'success' => $nsu['success'],
                                 'file'    => $displayFile,
-                                'output'  => 'Skipped: dynamic zone managed by BIND',
+                                'output'  => $nsu['success'] ? 'SOA/NS updated via nsupdate' : ('nsupdate failed: ' . $nsu['output']),
                             ];
                         } else {
                             $ok = $sftp->put($remotePath, $this->generator->generateReverseZoneFile($subnet, $cidr, $view));
@@ -129,6 +131,15 @@ class DnsDeployService
         }
 
         return $results;
+    }
+
+    private function execNsUpdate(string $script, DnsServer $server, SFTP $sftp): array
+    {
+        $tmpPath = '/tmp/.dashddi-nsu-' . bin2hex(random_bytes(6)) . '.txt';
+        $sftp->put($tmpPath, $script);
+        $yFlag  = $server->getDdnsAlgorithm()->bindName() . ':' . $server->getDdnsKeyName() . ':' . $server->getDdnsSecret();
+        $output = $sftp->exec('nsupdate -y ' . escapeshellarg($yFlag) . ' ' . escapeshellarg($tmpPath) . '; rm -f ' . escapeshellarg($tmpPath));
+        return ['success' => $sftp->getExitStatus() === 0, 'output' => trim((string) $output)];
     }
 
     private function getSftp(DnsServer $server): SFTP
