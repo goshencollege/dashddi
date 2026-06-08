@@ -37,6 +37,9 @@ class Host
     #[Assert\Length(max: 50)]
     private ?string $room = null;
 
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $notes = null;
+
     #[ORM\OneToMany(targetEntity: NetworkInterface::class, mappedBy: 'host', cascade: ['persist', 'remove'], orphanRemoval: true)]
     private Collection $interfaces;
 
@@ -64,6 +67,9 @@ class Host
 
     public function getRoom(): ?string { return $this->room; }
     public function setRoom(?string $room): static { $this->room = $room; return $this; }
+
+    public function getNotes(): ?string { return $this->notes; }
+    public function setNotes(?string $notes): static { $this->notes = $notes; return $this; }
 
     public function getLocation(): ?string
     {

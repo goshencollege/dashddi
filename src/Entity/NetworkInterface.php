@@ -32,6 +32,9 @@ class NetworkInterface
     #[Assert\Length(max: 100)]
     private ?string $name = null;
 
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $notes = null;
+
     #[ORM\Column(length: 17)]
     #[Assert\Regex(
         pattern: '/^([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$/',
@@ -67,6 +70,9 @@ class NetworkInterface
 
     public function getName(): ?string { return $this->name; }
     public function setName(?string $name): static { $this->name = $name; return $this; }
+
+    public function getNotes(): ?string { return $this->notes; }
+    public function setNotes(?string $notes): static { $this->notes = $notes; return $this; }
 
     public function getMacAddress(): string { return $this->macAddress; }
     public function setMacAddress(string $macAddress): static

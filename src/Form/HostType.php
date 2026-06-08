@@ -10,6 +10,7 @@ use App\Repository\TagRepository;
 use App\Service\ReservedTagPrefixService;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
+use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
@@ -35,6 +36,11 @@ class HostType extends AbstractType
                 'required' => false,
                 'label'    => 'Room',
                 'attr'     => ['placeholder' => 'e.g. 024'],
+            ])
+            ->add('notes', TextareaType::class, [
+                'required' => false,
+                'label'    => 'Notes',
+                'attr'     => ['rows' => 4, 'placeholder' => 'Free-text notes about this host'],
             ])
             ->add('tags', EntityType::class, [
                 'class'         => Tag::class,

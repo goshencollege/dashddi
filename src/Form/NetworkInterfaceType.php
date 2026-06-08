@@ -8,6 +8,7 @@ use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Form\Extension\Core\Type\CollectionType;
+use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
@@ -27,6 +28,11 @@ class NetworkInterfaceType extends AbstractType
             : ['No IPv6 address' => 'none', 'Specify IP' => 'select', 'Auto-assign (EUI-64 from MAC)' => 'auto', 'Auto-assign (last IPv4 octet)' => 'auto_v4'];
 
         $builder
+            ->add('notes', TextareaType::class, [
+                'label'    => 'Notes',
+                'required' => false,
+                'attr'     => ['rows' => 3, 'placeholder' => 'Free-text notes about this interface'],
+            ])
             ->add('name', TextType::class, [
                 'label'    => 'Interface Name',
                 'required' => false,

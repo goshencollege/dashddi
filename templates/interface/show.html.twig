@@ -96,6 +96,12 @@
                         <td>{{ switchInfo.nasPortId ?: '—' }}</td>
                     </tr>
                     {% endif %}
+                    {% if interface.notes %}
+                    <tr>
+                        <th class="text-muted fw-normal ps-3">Notes</th>
+                        <td style="white-space:pre-wrap">{{ interface.notes }}</td>
+                    </tr>
+                    {% endif %}
                 </tbody>
             </table>
         </div>
