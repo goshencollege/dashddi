@@ -266,8 +266,16 @@ class DnsConfigGenerator
 
             $lines[] = 'view "' . $view->getName() . '" {';
 
+            $matchClients = $view->getMatchClients();
+            if (!empty($matchClients)) {
+                $loopback = $view->getNsUpdateSourceAddress();
+                if ($loopback !== null && !in_array($loopback, $matchClients, true)) {
+                    array_unshift($matchClients, $loopback);
+                }
+            }
+
             foreach ([
-                'match-clients'  => $view->getMatchClients(),
+                'match-clients'  => $matchClients,
                 'allow-query'    => $view->getAllowQuery(),
                 'allow-transfer' => $view->getAllowTransfer(),
                 'also-notify'    => $view->getAlsoNotify(),
@@ -374,7 +382,7 @@ class DnsConfigGenerator
         $expire     = $domain->getSoaExpire()   ?? 604800;
         $zone       = rtrim($domain->getName(), '.') . '.';
 
-        return $this->buildApexNsUpdate($zone, $nameserver, $email, $ttl, $refresh, $retry, $expire);
+        return $this->buildApexNsUpdate($zone, $nameserver, $email, $ttl, $refresh, $retry, $expire, $view?->getNsUpdateSourceAddress());
     }
 
     /**
@@ -391,7 +399,7 @@ class DnsConfigGenerator
         $expire     = $subnet->getSoaExpire()   ?? 604800;
         $zone       = $this->reverseZoneName($cidr) . '.';
 
-        return $this->buildApexNsUpdate($zone, $nameserver, $email, $ttl, $refresh, $retry, $expire);
+        return $this->buildApexNsUpdate($zone, $nameserver, $email, $ttl, $refresh, $retry, $expire, $view?->getNsUpdateSourceAddress());
     }
 
     public function reverseZoneName(string $cidr): string
@@ -523,11 +531,16 @@ class DnsConfigGenerator
         int $refresh,
         int $retry,
         int $expire,
+        ?string $localAddress = null,
     ): string {
         $serial = time();
         $soa    = implode(' ', [$nameserver, $email, $serial, $refresh, $retry, $expire, $ttl]);
 
-        return implode("\n", [
+        $lines = [];
+        if ($localAddress !== null) {
+            $lines[] = 'local ' . $localAddress;
+        }
+        array_push($lines,
             'server 127.0.0.1',
             'zone ' . $zone,
             'update delete ' . $zone . ' IN NS',
@@ -536,6 +549,8 @@ class DnsConfigGenerator
             'update add ' . $zone . ' ' . $ttl . ' IN SOA ' . $soa,
             'send',
             '',
-        ]);
+        );
+
+        return implode("\n", $lines);
     }
 }

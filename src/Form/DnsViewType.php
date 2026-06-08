@@ -45,7 +45,8 @@ class DnsViewType extends AbstractType
                     'class'       => 'form-control font-monospace',
                 ],
                 'help' => 'Raw BIND statements inserted verbatim inside the view block.',
-            ]);
+            ])
+;
     }
 
     public function configureOptions(OptionsResolver $resolver): void
