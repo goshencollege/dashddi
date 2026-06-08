@@ -40,6 +40,10 @@ class DnsView
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $extraOptions = null;
 
+    #[ORM\Column(length: 45, nullable: true)]
+    #[Assert\Ip(version: 'all')]
+    private ?string $nsUpdateSourceAddress = null;
+
     public function getId(): ?int { return $this->id; }
 
     public function getName(): string { return $this->name; }
@@ -62,6 +66,13 @@ class DnsView
 
     public function getExtraOptions(): ?string { return $this->extraOptions; }
     public function setExtraOptions(?string $extraOptions): static { $this->extraOptions = $extraOptions; return $this; }
+
+    public function getNsUpdateSourceAddress(): ?string
+    {
+        // Compute a stable loopback address from the view ID for nsupdate source routing.
+        // 127.0.0.1 is reserved for the server directive; views start at 127.0.0.2.
+        return ($this->id !== null && $this->id < 254) ? ('127.0.0.' . ($this->id + 1)) : null;
+    }
 
     public function __toString(): string { return $this->name; }
 }

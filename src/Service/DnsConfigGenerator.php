@@ -266,8 +266,16 @@ class DnsConfigGenerator
 
             $lines[] = 'view "' . $view->getName() . '" {';
 
+            $matchClients = $view->getMatchClients();
+            if (!empty($matchClients)) {
+                $loopback = $view->getNsUpdateSourceAddress();
+                if ($loopback !== null && !in_array($loopback, $matchClients, true)) {
+                    array_unshift($matchClients, $loopback);
+                }
+            }
+
             foreach ([
-                'match-clients'  => $view->getMatchClients(),
+                'match-clients'  => $matchClients,
                 'allow-query'    => $view->getAllowQuery(),
                 'allow-transfer' => $view->getAllowTransfer(),
                 'also-notify'    => $view->getAlsoNotify(),
@@ -358,6 +366,40 @@ class DnsConfigGenerator
         }
 
         return implode("\n", $lines);
+    }
+
+    /**
+     * Builds an nsupdate script that replaces the SOA and NS apex records for a forward zone.
+     * Used to propagate SOA/NS changes to dynamic zones without overwriting the zone file.
+     */
+    public function generateDomainApexNsUpdate(Domain $domain, ?DnsView $view = null): string
+    {
+        $ttl        = $domain->getSoaTtl()      ?? 3600;
+        $nameserver = $this->ensureTrailingDot($domain->getSoaNameserver() ?? ('ns1.' . $domain->getName() . '.'));
+        $email      = $this->emailToRname($domain->getSoaEmail() ?? ('hostmaster.' . $domain->getName() . '.'));
+        $refresh    = $domain->getSoaRefresh()  ?? 3600;
+        $retry      = $domain->getSoaRetry()    ?? 900;
+        $expire     = $domain->getSoaExpire()   ?? 604800;
+        $zone       = rtrim($domain->getName(), '.') . '.';
+
+        return $this->buildApexNsUpdate($zone, $nameserver, $email, $ttl, $refresh, $retry, $expire, $view?->getNsUpdateSourceAddress());
+    }
+
+    /**
+     * Builds an nsupdate script that replaces the SOA and NS apex records for a reverse zone.
+     * Used to propagate SOA/NS changes to dynamic zones without overwriting the zone file.
+     */
+    public function generateSubnetApexNsUpdate(Subnet $subnet, string $cidr, ?DnsView $view = null): string
+    {
+        $ttl        = $subnet->getSoaTtl()      ?? 3600;
+        $nameserver = $this->ensureTrailingDot($subnet->getSoaNameserver() ?? $this->defaultNs($view));
+        $email      = $this->emailToRname($subnet->getSoaEmail() ?? $this->defaultEmail($view, false));
+        $refresh    = $subnet->getSoaRefresh()  ?? 3600;
+        $retry      = $subnet->getSoaRetry()    ?? 900;
+        $expire     = $subnet->getSoaExpire()   ?? 604800;
+        $zone       = $this->reverseZoneName($cidr) . '.';
+
+        return $this->buildApexNsUpdate($zone, $nameserver, $email, $ttl, $refresh, $retry, $expire, $view?->getNsUpdateSourceAddress());
     }
 
     public function reverseZoneName(string $cidr): string
@@ -479,5 +521,36 @@ class DnsConfigGenerator
     {
         $rname = str_replace('@', '.', $email);
         return $this->ensureTrailingDot($rname);
+    }
+
+    private function buildApexNsUpdate(
+        string $zone,
+        string $nameserver,
+        string $email,
+        int $ttl,
+        int $refresh,
+        int $retry,
+        int $expire,
+        ?string $localAddress = null,
+    ): string {
+        $serial = time();
+        $soa    = implode(' ', [$nameserver, $email, $serial, $refresh, $retry, $expire, $ttl]);
+
+        $lines = [];
+        if ($localAddress !== null) {
+            $lines[] = 'local ' . $localAddress;
+        }
+        array_push($lines,
+            'server 127.0.0.1',
+            'zone ' . $zone,
+            'update delete ' . $zone . ' IN NS',
+            'update add ' . $zone . ' ' . $ttl . ' IN NS ' . $nameserver,
+            'update delete ' . $zone . ' IN SOA',
+            'update add ' . $zone . ' ' . $ttl . ' IN SOA ' . $soa,
+            'send',
+            '',
+        );
+
+        return implode("\n", $lines);
     }
 }

@@ -32,8 +32,9 @@
         <div class="card mb-3">
             <div class="card-header"><i class="bi bi-shield-lock me-1"></i>Access Control</div>
             <div class="card-body">
+                {% set nsupdate_addr = form.vars.data.nsUpdateSourceAddress %}
                 {% set acl_fields = [
-                    {field: form.matchClients,  id: 'match-clients',  label: 'match-clients',  hint: 'Clients matched to this view (e.g. 192.168.1.0/24, localnets, any)'},
+                    {field: form.matchClients,  id: 'match-clients',  label: 'match-clients',  hint: 'Clients matched to this view (e.g. 192.168.1.0/24, localnets, any)' ~ (nsupdate_addr ? ' — DashDDI will also add ' ~ nsupdate_addr ~ ' so that nsupdate can target this view for dynamic zone SOA/NS updates.' : '')},
                     {field: form.allowQuery,    id: 'allow-query',    label: 'allow-query',    hint: 'Who may query this view (e.g. any, none, 10.0.0.0/8)'},
                     {field: form.allowTransfer, id: 'allow-transfer', label: 'allow-transfer', hint: 'Who may do zone transfers (e.g. none, 10.0.0.1)'},
                     {field: form.alsoNotify,    id: 'also-notify',    label: 'also-notify',    hint: 'Additional servers to notify on zone changes'},
