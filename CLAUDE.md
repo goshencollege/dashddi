@@ -26,7 +26,7 @@ make cc          # clear Symfony cache
 make db-shell    # MySQL shell
 make reset       # wipe volumes, rebuild, migrate, load fixtures (full reset)
 make cert        # generate a self-signed SSL cert in docker/ssl/
-make test-setup  # create/migrate/seed the ipam_test database (run once before first test run)
+make test-setup  # create/migrate/seed the dashddi_test database (run once before first test run)
 make test        # run the full test suite (91 unit + 113 functional)
 ```
 
@@ -101,7 +101,7 @@ make migrate
 204 tests total: 91 unit tests (`tests/Unit/`) and 113 functional tests (`tests/Functional/`).
 
 ```bash
-make test-setup  # first-time only: creates ipam_test DB, runs migrations, loads fixtures
+make test-setup  # first-time only: creates dashddi_test DB, runs migrations, loads fixtures
 make test        # run all 182 tests
 ```
 
@@ -122,7 +122,7 @@ tests/Functional/
 
 ### How functional tests work
 
-- Each test is wrapped in a DBAL transaction that is rolled back in `tearDown`, so the `ipam_test` database stays clean between tests — no fixture reloads needed between runs.
+- Each test is wrapped in a DBAL transaction that is rolled back in `tearDown`, so the `dashddi_test` database stays clean between tests — no fixture reloads needed between runs.
 - A fake SAML user is injected via `KernelBrowser::loginUser()` so every request is authenticated.
 - `KernelBrowser::disableReboot()` keeps one kernel and one DBAL connection for the whole test, which is required for the transaction isolation to work.
 - Stateless CSRF (`SameOriginCsrfTokenManager`) is satisfied by setting `Sec-Fetch-Site: same-origin` on all test requests.

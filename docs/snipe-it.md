@@ -1,6 +1,6 @@
 # Snipe-IT Integration
 
-DashDDI can pull asset data from [Snipe-IT](https://snipeitapp.com/) and automatically create or update host and interface records. This keeps your IPAM data in sync with your asset inventory without manual data entry.
+DashDDI can pull asset data from [Snipe-IT](https://snipeitapp.com/) and automatically create or update host and interface records. This keeps your DashDDI data in sync with your asset inventory without manual data entry.
 
 ## How It Works
 
