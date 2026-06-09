@@ -4,6 +4,8 @@ namespace App\Command;
 
 use App\Entity\AddressBlock;
 use App\Entity\Building;
+use App\Entity\DnsAcl;
+use App\Entity\DnssecPolicy;
 use App\Entity\DnsView;
 use App\Entity\Domain;
 use App\Entity\DomainRecord;
@@ -77,6 +79,12 @@ class ImportLegacyCommand extends Command
             $io->section('Subnets');
             $subnets = $this->importSubnets($pdo, $io, $dryRun, $domains, $vrfs);
 
+            $io->section('DNS ACLs');
+            $this->seedDnsAcls($io, $dryRun);
+
+            $io->section('DNSSEC Policies');
+            $this->seedDnssecPolicies($io, $dryRun);
+
             $io->section('DNS Views');
             $this->setupDnsViews($io, $dryRun, $domains, $subnets, $dynDomain);
 
@@ -112,11 +120,21 @@ class ImportLegacyCommand extends Command
 
     private function setupDnsViews(SymfonyStyle $io, bool $dryRun, array $domains, array $subnets, Domain $dynDomain): void
     {
+        $dmeDenyAddrs = ['208.94.147.135', '208.94.150.198', '63.219.151.12',
+                         '2600:1806:511:209:1eaf::135', '2600:1806:21:200:1eaf::198', '2600:1806:11:99:1eaf::12'];
+
         $internal = new DnsView();
         $internal->setName('internal');
+        $internal->setMatchClients(['servers_private']);
+        $internal->setAllowQuery(['servers_private']);
+        $internal->setAllowTransfer(['servers_private']);
 
         $external = new DnsView();
         $external->setName('external');
+        $external->setMatchClients(['dnsmadeeasy']);
+        $external->setAllowQuery(['dnsmadeeasy']);
+        $external->setAllowTransfer(['dnsmadeeasy']);
+        $external->setAlsoNotify($dmeDenyAddrs);
 
         if (!$dryRun) {
             $this->em->persist($internal);
@@ -149,6 +167,90 @@ class ImportLegacyCommand extends Command
         $io->writeln('  Created views: internal, external');
     }
 
+    private function seedDnsAcls(SymfonyStyle $io, bool $dryRun): void
+    {
+        $acls = [
+            [
+                'name'        => 'dnsmadeeasy',
+                'description' => 'DNSMadeEasy servers',
+                'entries'     => [
+                    '208.94.147.135', '208.94.150.198', '63.219.151.12',
+                    '2600:1806:511:209:1eaf::135', '2600:1806:21:200:1eaf::198', '2600:1806:11:99:1eaf::12',
+                ],
+            ],
+            [
+                'name'        => 'servers_private',
+                'description' => null,
+                'entries'     => ['192.168.60.0/24', '2001:18e8:408:3c::/64'],
+            ],
+        ];
+
+        foreach ($acls as $def) {
+            $acl = new DnsAcl();
+            $acl->setName($def['name']);
+            $acl->setDescription($def['description']);
+            $acl->setEntries($def['entries']);
+            if (!$dryRun) {
+                $this->em->persist($acl);
+            }
+        }
+
+        if (!$dryRun) {
+            $this->em->flush();
+        }
+
+        $io->writeln(sprintf('  Created %d ACLs: %s', count($acls), implode(', ', array_column($acls, 'name'))));
+    }
+
+    private function seedDnssecPolicies(SymfonyStyle $io, bool $dryRun): void
+    {
+        $extraOptions = "parent-ds-ttl P1D;\nparent-propagation-delay PT1H;";
+
+        $policies = [
+            [
+                'name'        => 'gc',
+                'description' => null,
+                'keys'        => [
+                    ['type' => 'ksk', 'lifetime' => null,   'algorithm' => 'ecdsap256sha256'],
+                    ['type' => 'zsk', 'lifetime' => 'P60D', 'algorithm' => 'ecdsap256sha256'],
+                ],
+            ],
+            [
+                'name'        => 'gc_RSASHA512',
+                'description' => 'legacy policy',
+                'keys'        => [
+                    ['type' => 'ksk', 'lifetime' => null,   'algorithm' => 'rsasha512'],
+                    ['type' => 'zsk', 'lifetime' => 'P60D', 'algorithm' => 'rsasha512'],
+                ],
+            ],
+        ];
+
+        foreach ($policies as $def) {
+            $policy = new DnssecPolicy();
+            $policy->setName($def['name']);
+            $policy->setDescription($def['description']);
+            $policy->setDnskeyTtl('PT1H');
+            $policy->setMaxZoneTtl('P1D');
+            $policy->setSignaturesValidity('P14D');
+            $policy->setSignaturesRefresh('P5D');
+            $policy->setPurgeKeys('P90D');
+            $policy->setPublishSafety('PT2H');
+            $policy->setRetireSafety('PT2H');
+            $policy->setNsec3param('0 false 0');
+            $policy->setExtraOptions($extraOptions);
+            $policy->setKeys($def['keys']);
+            if (!$dryRun) {
+                $this->em->persist($policy);
+            }
+        }
+
+        if (!$dryRun) {
+            $this->em->flush();
+        }
+
+        $io->writeln(sprintf('  Created %d policies: %s', count($policies), implode(', ', array_column($policies, 'name'))));
+    }
+
     private function truncateImportedTables(\Doctrine\DBAL\Connection $conn, SymfonyStyle $io): void
     {
         $tables = [
@@ -172,6 +274,8 @@ class ImportLegacyCommand extends Command
             'tag',
             'domain',
             'dns_view',
+            'dns_acl',
+            'dnssec_policy',
             'building',
             'snipe_it_category_subnet_map',
             'snipe_it_server',
@@ -780,14 +884,14 @@ class ImportLegacyCommand extends Command
             ['name' => 'KMC Subnets',             'ipv4' => '10.253.0.0/16',     'ipv6' => null,                    'vlan' => 253,  'gateway' => null,            'container' => true],
             ['name' => "192's",                   'ipv4' => '192.168.0.0/16',    'ipv6' => '2001:18e8:408::/56',    'vlan' => null, 'gateway' => null,            'container' => true],
             ['name' => 'vlan44',                  'ipv4' => null,                'ipv6' => null,                    'vlan' => 44,   'gateway' => null,            'container' => false],
-            ['name' => 'Siemens EMS',             'ipv4' => '192.168.253.0/24',  'ipv6' => null,                    'vlan' => null, 'gateway' => null,            'container' => false],
+            ['name' => 'Siemens EMS',             'ipv4' => '192.168.253.0/24',  'ipv6' => null,                    'vlan' => 40,   'gateway' => null,            'container' => false],
             ['name' => 'WL Laerdal',              'ipv4' => '10.249.5.0/24',     'ipv6' => null,                    'vlan' => 249,  'gateway' => null,            'container' => false],
             ['name' => 'UN Special',              'ipv4' => '10.249.48.0/24',    'ipv6' => null,                    'vlan' => 249,  'gateway' => null,            'container' => false],
             ['name' => 'Valpo',                   'ipv4' => '192.168.59.0/24',   'ipv6' => '2001:18e8:408:3b::/64', 'vlan' => null, 'gateway' => null,            'container' => false],
             ['name' => 'iLO',                     'ipv4' => '192.168.61.0/24',   'ipv6' => '2001:18e8:408:3d::/64', 'vlan' => 61,   'gateway' => null,            'container' => false],
             ['name' => 'EMP_INST',                'ipv4' => '192.168.112.0/22',  'ipv6' => '2001:18e8:408:70::/64', 'vlan' => 112,  'gateway' => null,            'container' => false],
             ['name' => 'EMP_BYOD',                'ipv4' => '192.168.116.0/22',  'ipv6' => '2001:18e8:408:74::/64', 'vlan' => 116,  'gateway' => null,            'container' => false],
-            ['name' => 'EMP_JENZ',                'ipv4' => '192.168.121.0/24',  'ipv6' => '2001:18e8:408:79::/64', 'vlan' => 121,  'gateway' => null,            'container' => false, 'vrf' => 'corporate'],
+            ['name' => 'EMP_JENZ',                'ipv4' => '192.168.121.0/24',  'ipv6' => '2001:18e8:408:79::/64', 'vlan' => 121,  'gateway' => null,            'container' => false],
             ['name' => 'WIFI_128',                'ipv4' => '192.168.128.0/19',  'ipv6' => '2001:18e8:408:80::/64', 'vlan' => 128,  'gateway' => null,            'container' => false, 'vrf' => 'student'],
             ['name' => 'temp9253',                'ipv4' => null,                'ipv6' => null,                    'vlan' => 9253, 'gateway' => null,            'container' => false],
             ['name' => 'temp9144',                'ipv4' => null,                'ipv6' => null,                    'vlan' => 9144, 'gateway' => null,            'container' => false],
