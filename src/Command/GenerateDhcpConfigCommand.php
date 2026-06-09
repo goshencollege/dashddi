@@ -15,7 +15,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 
 #[AsCommand(
     name: 'app:generate-dhcp-config',
-    description: 'Generate and deploy DHCP subnet JSON files from IPAM data',
+    description: 'Generate and deploy DHCP subnet and reservation JSON files from DashDDI data',
 )]
 class GenerateDhcpConfigCommand extends Command
 {

@@ -11,8 +11,8 @@ use phpseclib3\Net\SFTP;
  * All rndc commands run under "sudo" (as root).
  *
  * Required sudoers entries on each DNS server:
- *   ipam ALL=(bind) NOPASSWD: /usr/sbin/dnssec-keygen, /usr/sbin/dnssec-settime, /usr/sbin/dnssec-dsfromkey
- *   ipam ALL=(root) NOPASSWD: /usr/sbin/rndc
+ *   dash ALL=(bind) NOPASSWD: /usr/sbin/dnssec-keygen, /usr/sbin/dnssec-settime, /usr/sbin/dnssec-dsfromkey
+ *   dash ALL=(root) NOPASSWD: /usr/sbin/rndc
  */
 class KskRolloverService
 {

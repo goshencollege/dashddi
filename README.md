@@ -163,11 +163,11 @@ PHP is only available inside the containers — never run `php` or `bin/console`
 The test suite has 204 tests: 91 unit tests and 113 functional (HTTP-level) tests.
 
 ```bash
-make test-setup  # first-time only: create ipam_test DB, run migrations, load fixtures
+make test-setup  # first-time only: create dashddi_test DB, run migrations, load fixtures
 make test        # run all 204 tests
 ```
 
-Functional tests run against a real `ipam_test` MySQL database. Each test is wrapped in a DBAL transaction that is rolled back after the test, so the database stays clean between runs without reloading fixtures.
+Functional tests run against a real `dashddi_test` MySQL database. Each test is wrapped in a DBAL transaction that is rolled back after the test, so the database stays clean between runs without reloading fixtures.
 
 ## Integrations
 

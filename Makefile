@@ -73,8 +73,8 @@ cert:
 	openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
 	  -keyout docker/ssl/key.pem \
 	  -out  docker/ssl/cert.pem \
-	  -subj "/CN=ipam.local" \
-	  -addext "subjectAltName=DNS:ipam.local,DNS:localhost,IP:127.0.0.1"
+	  -subj "/CN=dashddi.local" \
+	  -addext "subjectAltName=DNS:dashddi.local,DNS:localhost,IP:127.0.0.1"
 	$(MAKE) cert-install
 
 cert-install:
