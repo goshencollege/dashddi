@@ -462,6 +462,7 @@
                         <li>
                             <button class="dropdown-item quick-action-btn"
                                     data-endpoint="{{ path('snipe_it_server_pull') }}"
+                                    data-csrf-token="{{ csrf_token('snipeit_pull') }}"
                                     data-success="Pull queued — syncing Snipe-IT assets in the background.">
                                 <i class="bi bi-box-arrow-in-down me-1"></i>Pull Snipe-IT Assets
                             </button>
@@ -469,6 +470,7 @@
                         <li>
                             <button class="dropdown-item quick-action-btn"
                                     data-endpoint="{{ path('clearpass_server_pull_logs') }}"
+                                    data-csrf-token="{{ csrf_token('clearpass_pull_logs') }}"
                                     data-success="Pull queued — importing ClearPass auth logs in the background.">
                                 <i class="bi bi-shield-lock me-1"></i>Pull ClearPass Auth Logs
                             </button>
@@ -694,7 +696,7 @@
             var endpoint = this.dataset.endpoint;
             var successMsg = this.dataset.success;
             btn.disabled = true;
-            fetch(endpoint, { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            fetch(endpoint, { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-Token': btn.dataset.csrfToken } })
                 .then(function (r) { return r.json(); })
                 .then(function (data) {
                     if (data.error) {
