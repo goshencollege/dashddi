@@ -77,6 +77,13 @@
                     </div>
                 </div>
 
+                {# Interface Notes #}
+                <div class="mb-4">
+                    {{ form_label(form.interface.notes, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                    {{ form_widget(form.interface.notes, {attr: {class: 'form-control' ~ (form.interface.notes.vars.errors|length ? ' is-invalid' : '')}}) }}
+                    {{ form_errors(form.interface.notes) }}
+                </div>
+
                 {# IPv4 + IPv6 Assignment #}
                 <div class="row g-3 mb-3">
                     <div class="col-md-6">
