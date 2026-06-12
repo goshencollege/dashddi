@@ -60,13 +60,23 @@ class DnsDeployService
                     $isDynamic   = $domain->isDdnsEnabled()
                         && $domain->getDdnsDnsServer()?->getId() === $server->getId()
                         && $server->getDdnsAlgorithm();
-                    if ($isDynamic && $sftp->file_exists($remotePath)) {
-                        $nsu = $this->execNsUpdate($this->generator->generateDomainApexNsUpdate($domain, $view), $server, $sftp);
-                        $viewResult['zones'][$domain->getName()] = [
-                            'success' => $nsu['success'],
-                            'file'    => $displayFile,
-                            'output'  => $nsu['success'] ? 'SOA/NS updated via nsupdate' : ('nsupdate failed: ' . $nsu['output']),
-                        ];
+                    if ($isDynamic) {
+                        $sftp->exec('test -f ' . escapeshellarg($remotePath));
+                        if ($sftp->getExitStatus() === 0) {
+                            $nsu = $this->execNsUpdate($this->generator->generateDomainApexNsUpdate($domain, $view), $server, $sftp);
+                            $viewResult['zones'][$domain->getName()] = [
+                                'success' => $nsu['success'],
+                                'file'    => $displayFile,
+                                'output'  => $nsu['success'] ? 'SOA/NS updated via nsupdate' : ('nsupdate failed: ' . $nsu['output']),
+                            ];
+                        } else {
+                            $ok = $sftp->put($remotePath, $this->generator->generateZoneFile($domain, $view));
+                            $viewResult['zones'][$domain->getName()] = [
+                                'success' => $ok,
+                                'file'    => $displayFile,
+                                'output'  => $ok ? '' : 'SFTP upload failed',
+                            ];
+                        }
                     } else {
                         $ok = $sftp->put($remotePath, $this->generator->generateZoneFile($domain, $view));
                         $viewResult['zones'][$domain->getName()] = [
@@ -100,13 +110,23 @@ class DnsDeployService
                         $isDynamic   = $subnet->isDdnsEnabled()
                             && $subnet->getDdnsDnsServer()?->getId() === $server->getId()
                             && $server->getDdnsAlgorithm();
-                        if ($isDynamic && $sftp->file_exists($remotePath)) {
-                            $nsu = $this->execNsUpdate($this->generator->generateSubnetApexNsUpdate($subnet, $cidr, $view), $server, $sftp);
-                            $viewResult['zones'][$zoneName] = [
-                                'success' => $nsu['success'],
-                                'file'    => $displayFile,
-                                'output'  => $nsu['success'] ? 'SOA/NS updated via nsupdate' : ('nsupdate failed: ' . $nsu['output']),
-                            ];
+                        if ($isDynamic) {
+                            $sftp->exec('test -f ' . escapeshellarg($remotePath));
+                            if ($sftp->getExitStatus() === 0) {
+                                $nsu = $this->execNsUpdate($this->generator->generateSubnetApexNsUpdate($subnet, $cidr, $view), $server, $sftp);
+                                $viewResult['zones'][$zoneName] = [
+                                    'success' => $nsu['success'],
+                                    'file'    => $displayFile,
+                                    'output'  => $nsu['success'] ? 'SOA/NS updated via nsupdate' : ('nsupdate failed: ' . $nsu['output']),
+                                ];
+                            } else {
+                                $ok = $sftp->put($remotePath, $this->generator->generateReverseZoneFile($subnet, $cidr, $view));
+                                $viewResult['zones'][$zoneName] = [
+                                    'success' => $ok,
+                                    'file'    => $displayFile,
+                                    'output'  => $ok ? '' : 'SFTP upload failed',
+                                ];
+                            }
                         } else {
                             $ok = $sftp->put($remotePath, $this->generator->generateReverseZoneFile($subnet, $cidr, $view));
                             $viewResult['zones'][$zoneName] = [
