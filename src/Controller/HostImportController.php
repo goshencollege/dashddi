@@ -12,6 +12,7 @@ use App\Repository\IpAddressRepository;
 use App\Repository\Ipv6AddressRepository;
 use App\Repository\NetworkInterfaceRepository;
 use App\Repository\SubnetRepository;
+use App\Service\DnsViewResolver;
 use App\Service\HostCsvParser;
 use App\Service\IpAddressManager;
 use Doctrine\ORM\EntityManagerInterface;
@@ -88,6 +89,7 @@ class HostImportController extends AbstractController
         EntityManagerInterface $em,
         SubnetRepository $subnetRepo,
         IpAddressManager $ipManager,
+        DnsViewResolver $viewResolver,
     ): Response {
         if (!$this->isCsrfTokenValid('host_import_confirm', $request->request->get('_token'))) {
             $this->addFlash('danger', 'Invalid CSRF token.');
@@ -188,6 +190,9 @@ class HostImportController extends AbstractController
                         $ifaceName = new InterfaceName();
                         $ifaceName->setName($i['dns_label']);
                         $ifaceName->setDomain($domain);
+                        foreach ($viewResolver->availableViewsFor($domain, $subnet) as $view) {
+                            $ifaceName->addView($view);
+                        }
                         $iface->addName($ifaceName);
                         $em->persist($ifaceName);
                     }
