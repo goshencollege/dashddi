@@ -314,10 +314,11 @@ class HostImportController extends AbstractController
 
             $ifacePreviews = [];
             foreach ($entry['interfaces'] as $iface) {
-                $mac = $iface['mac'];
+                $mac     = $iface['mac'];
+                $isZero  = ($mac === '00:00:00:00:00:00');
 
-                // MAC already seen in this batch
-                if (isset($seenMacs[$mac])) {
+                // Non-zero MACs: check for duplicates within this batch
+                if (!$isZero && isset($seenMacs[$mac])) {
                     $ifacePreviews[] = array_merge($iface, [
                         'status'          => 'conflict',
                         'conflict_reason' => 'MAC ' . $mac . ' appears more than once in this file',
@@ -326,8 +327,8 @@ class HostImportController extends AbstractController
                     continue;
                 }
 
-                // MAC already exists in DB
-                if (isset($ifaceByMac[$mac])) {
+                // Non-zero MACs: check for existing record in DB
+                if (!$isZero && isset($ifaceByMac[$mac])) {
                     $ifacePreviews[] = array_merge($iface, [
                         'status'          => 'existing',
                         'conflict_reason' => null,
@@ -337,8 +338,10 @@ class HostImportController extends AbstractController
                     continue;
                 }
 
-                $seenMacs[$mac] = true;
-                $conflicts      = [];
+                if (!$isZero) {
+                    $seenMacs[$mac] = true;
+                }
+                $conflicts = [];
 
                 if ($iface['ip_address']) {
                     if (isset($usedIpv4[$iface['ip_address']]) || isset($seenIpv4[$iface['ip_address']])) {

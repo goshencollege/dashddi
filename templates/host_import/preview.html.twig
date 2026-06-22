@@ -1,6 +1,14 @@
 {% extends 'base.html.twig' %}
 {% block title %}Host Import Preview{% endblock %}
 
+{% block stylesheets %}
+<style>
+:root                    { --import-iface-bg: rgba(0,0,0,.03); }
+[data-bs-theme="dark"]   { --import-iface-bg: rgba(255,255,255,.04); }
+.import-iface-row        { --bs-table-bg: var(--import-iface-bg); }
+</style>
+{% endblock %}
+
 {% block content %}
 {% set newHosts      = preview.hosts|filter(h => h.status == 'new')|length %}
 {% set existingHosts = preview.hosts|filter(h => h.status == 'existing')|length %}
@@ -88,7 +96,7 @@
                 {# Interface sub-rows #}
                 {% if h.status == 'new' or h.status == 'no_valid_interfaces' %}
                     {% for i in h.interfaces %}
-                    <tr class="table-light {{ i.status != 'new' ? 'text-muted' : '' }}">
+                    <tr class="import-iface-row {{ i.status != 'new' ? 'text-muted' : '' }}">
                         <td class="ps-4 small text-muted" colspan="0"></td>
                         <td colspan="2" class="ps-4 small font-monospace">{{ i.mac }}</td>
                         <td class="small">
