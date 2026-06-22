@@ -252,7 +252,15 @@
             {{ subnet.name }}
         </a>
     </td>
-    <td>{{ subnet.vrf ? subnet.vrf.name : '—' }}</td>
+    <td>
+        {% if subnet.vrf %}
+            {% set vrf_colors = ['primary', 'success', 'info', 'warning', 'danger', 'secondary'] %}
+            {% set vrf_color = vrf_colors[subnet.vrf.id % (vrf_colors|length)] %}
+            <span class="badge bg-{{ vrf_color }}-subtle text-{{ vrf_color }} border border-{{ vrf_color }}-subtle">{{ subnet.vrf.name }}</span>
+        {% else %}
+            —
+        {% endif %}
+    </td>
     <td class="ip-address">{{ subnet.ipv4Cidr ?: '—' }}</td>
     <td class="ip-address small">{{ subnet.ipv6Cidr ?: '—' }}</td>
     <td>{{ subnet.vlan ?: '—' }}</td>
