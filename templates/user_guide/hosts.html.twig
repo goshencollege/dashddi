@@ -173,6 +173,30 @@
     </div>
 </div>
 
+{# CSV Import #}
+<div class="card mb-4" id="csv-import">
+    <div class="card-header fw-semibold"><i class="bi bi-upload me-1"></i>Importing from CSV</div>
+    <div class="card-body">
+        <p>Use <strong>Hosts → Import CSV</strong> to bulk-create hosts and their interfaces from a spreadsheet. The import follows an upload → preview → confirm workflow so you can review changes before anything is written.</p>
+        <h6>CSV format</h6>
+        <p>Each row represents one interface. Rows that share the same <code>hostname</code> are merged into a single host with multiple interfaces. Download the blank template from the import page for the exact column order.</p>
+        <p>Required columns: <code>hostname</code>, <code>mac_address</code>. All other columns are optional.</p>
+        <ul>
+            <li><strong>building</strong> — matched to an existing building by name (case-insensitive); left blank if not found.</li>
+            <li><strong>tags</strong> — semicolon-separated tag names (e.g. <code>tag1;tag2</code>); must match existing tags.</li>
+            <li><strong>subnet</strong> — CIDR notation (e.g. <code>192.168.1.0/24</code>); must match an existing subnet for IPs to be assigned.</li>
+            <li><strong>ip_address</strong> / <strong>ipv6_address</strong> — only assigned when a matching subnet is found.</li>
+        </ul>
+        <h6>Conflict handling</h6>
+        <ul class="mb-0">
+            <li>Rows with a blank or invalid MAC are rejected at parse time with a line-number error.</li>
+            <li>Hosts whose name already exists in the database are skipped.</li>
+            <li>Individual interfaces whose MAC already exists are skipped; the host is still created if it has at least one new interface.</li>
+            <li>Interfaces with an IP that is already assigned (or duplicated within the file) are marked as conflicts and skipped.</li>
+        </ul>
+    </div>
+</div>
+
 {# Soft delete #}
 <div class="card mb-4" id="soft-delete">
     <div class="card-header fw-semibold"><i class="bi bi-trash me-1"></i>Deleted Hosts &amp; Restore</div>
@@ -200,6 +224,7 @@
             <a href="#interfaces" class="list-group-item list-group-item-action py-1">Network Interfaces</a>
             <a href="#leases" class="list-group-item list-group-item-action py-1">DHCP Leases</a>
             <a href="#bulk" class="list-group-item list-group-item-action py-1">Bulk Operations</a>
+            <a href="#csv-import" class="list-group-item list-group-item-action py-1">Importing from CSV</a>
             <a href="#soft-delete" class="list-group-item list-group-item-action py-1">Deleted Hosts</a>
         </div>
     </div>
