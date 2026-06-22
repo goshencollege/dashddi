@@ -98,6 +98,20 @@ class HostImportController extends AbstractController
             return $this->redirectToRoute('host_import');
         }
 
+        // Refuse if the preview still contains any unresolved issues
+        foreach ($preview['hosts'] as $h) {
+            if ($h['status'] !== 'new') {
+                $this->addFlash('danger', 'Import blocked: the preview contains unresolved issues. Fix the CSV and re-upload.');
+                return $this->redirectToRoute('host_import_preview');
+            }
+            foreach ($h['interfaces'] as $i) {
+                if ($i['status'] !== 'new') {
+                    $this->addFlash('danger', 'Import blocked: the preview contains unresolved issues. Fix the CSV and re-upload.');
+                    return $this->redirectToRoute('host_import_preview');
+                }
+            }
+        }
+
         // Pre-load buildings and tags for efficient lookup
         $buildings = [];
         foreach ($em->getRepository(Building::class)->findAll() as $b) {
@@ -109,20 +123,8 @@ class HostImportController extends AbstractController
         }
 
         $hostsCreated = 0;
-        $skipped      = 0;
 
         foreach ($preview['hosts'] as $h) {
-            if ($h['status'] !== 'new') {
-                $skipped++;
-                continue;
-            }
-
-            $newInterfaces = array_filter($h['interfaces'], fn(array $i) => $i['status'] === 'new');
-            if (empty($newInterfaces)) {
-                $skipped++;
-                continue;
-            }
-
             $host = new Host();
             $host->setName($h['hostname']);
             $host->setRoom($h['room'] ?: null);
@@ -144,7 +146,7 @@ class HostImportController extends AbstractController
 
             $em->persist($host);
 
-            foreach ($newInterfaces as $i) {
+            foreach ($h['interfaces'] as $i) {
                 $subnet = null;
                 if ($i['subnet_cidr']) {
                     $isV6   = str_contains($i['subnet_cidr'], ':');
@@ -178,14 +180,10 @@ class HostImportController extends AbstractController
 
         $request->getSession()->remove('host_csv_import');
 
-        if ($hostsCreated > 0) {
-            $this->addFlash('success', sprintf(
-                'Import complete: %d host(s) created. %d skipped.',
-                $hostsCreated, $skipped
-            ));
-        } else {
-            $this->addFlash('info', 'Nothing new to import — all entries already existed or had no valid interfaces.');
-        }
+        $this->addFlash('success', sprintf(
+            'Import complete: %d host(s) created.',
+            $hostsCreated
+        ));
 
         return $this->redirectToRoute('host_index');
     }

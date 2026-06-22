@@ -10,9 +10,21 @@
 {% endblock %}
 
 {% block content %}
-{% set newHosts      = preview.hosts|filter(h => h.status == 'new')|length %}
-{% set existingHosts = preview.hosts|filter(h => h.status == 'existing')|length %}
-{% set noIfaceHosts  = preview.hosts|filter(h => h.status == 'no_valid_interfaces')|length %}
+{% set newHosts = preview.hosts|filter(h => h.status == 'new')|length %}
+
+{# Count every non-new row: host-level and interface-level #}
+{% set issueCount = 0 %}
+{% for h in preview.hosts %}
+    {% if h.status != 'new' %}
+        {% set issueCount = issueCount + 1 %}
+    {% else %}
+        {% for i in h.interfaces %}
+            {% if i.status != 'new' %}
+                {% set issueCount = issueCount + 1 %}
+            {% endif %}
+        {% endfor %}
+    {% endif %}
+{% endfor %}
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1 class="h3 mb-0"><i class="bi bi-list-check me-2"></i>Host Import Preview</h1>
@@ -22,22 +34,25 @@
 </div>
 
 {# Summary banner #}
-<div class="alert {{ newHosts > 0 ? 'alert-info' : 'alert-secondary' }} d-flex align-items-center gap-3 mb-4">
-    <i class="bi bi-clipboard-check fs-4"></i>
+{% if issueCount > 0 %}
+<div class="alert alert-danger d-flex align-items-center gap-3 mb-4">
+    <i class="bi bi-x-circle fs-4"></i>
     <div>
-        {% if newHosts > 0 %}
-            <strong>{{ newHosts }} host{{ newHosts != 1 ? 's' : '' }} ready to import.</strong>
-        {% else %}
-            <strong>Nothing new to import.</strong>
-        {% endif %}
-        {% if existingHosts > 0 %}
-            {{ existingHosts }} skipped — hostname already exists.
-        {% endif %}
-        {% if noIfaceHosts > 0 %}
-            {{ noIfaceHosts }} skipped — all interfaces already exist or have conflicts.
-        {% endif %}
+        <strong>{{ issueCount }} issue{{ issueCount != 1 ? 's' : '' }} must be resolved before importing.</strong>
+        Fix the CSV and re-upload to proceed.
     </div>
 </div>
+{% elseif newHosts > 0 %}
+<div class="alert alert-success d-flex align-items-center gap-3 mb-4">
+    <i class="bi bi-check-circle fs-4"></i>
+    <div><strong>{{ newHosts }} host{{ newHosts != 1 ? 's' : '' }} ready to import.</strong> No issues found.</div>
+</div>
+{% else %}
+<div class="alert alert-secondary d-flex align-items-center gap-3 mb-4">
+    <i class="bi bi-clipboard-check fs-4"></i>
+    <div><strong>Nothing to import.</strong> The file contained no valid entries.</div>
+</div>
+{% endif %}
 
 {# Hosts table #}
 <div class="card mb-4">
@@ -144,7 +159,7 @@
 
 {# Confirm / Cancel #}
 <div class="d-flex gap-2 mt-2">
-    {% if newHosts > 0 %}
+    {% if issueCount == 0 and newHosts > 0 %}
     <form method="post" action="{{ path('host_import_confirm') }}">
         <input type="hidden" name="_token" value="{{ csrf_token('host_import_confirm') }}">
         <button type="submit" class="btn btn-primary">
@@ -153,7 +168,7 @@
     </form>
     {% endif %}
     <a href="{{ path('host_import') }}" class="btn btn-outline-secondary">
-        <i class="bi bi-x-lg me-1"></i>Cancel
+        <i class="bi bi-{{ issueCount > 0 ? 'arrow-repeat' : 'x-lg' }} me-1"></i>{{ issueCount > 0 ? 'Fix &amp; Re-upload' : 'Cancel' }}
     </a>
     <a href="{{ path('host_index') }}" class="btn btn-outline-secondary">
         <i class="bi bi-list me-1"></i>Back to Hosts
