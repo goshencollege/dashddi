@@ -246,7 +246,7 @@ class HostImportController extends AbstractController
                 continue;
             }
             $label = substr($fqdn, 0, strlen($fqdn) - strlen($suffix) - 1);
-            if (preg_match('/^[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?$/', $label)) {
+            if (preg_match('/^[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?)*$/', $label)) {
                 return [$label, $domain->getName()];
             }
         }

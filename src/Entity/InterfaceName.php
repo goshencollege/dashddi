@@ -25,8 +25,8 @@ class InterfaceName
     #[Assert\NotBlank]
     #[Assert\Length(max: 255)]
     #[Assert\Regex(
-        pattern: '/^[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?$/',
-        message: 'Name must be a valid DNS label (letters, digits, hyphens; no leading/trailing hyphen)'
+        pattern: '/^[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?)*$/',
+        message: 'Name must contain only letters, digits, hyphens, and dots; no leading/trailing hyphen or dot'
     )]
     private string $name = '';
 
