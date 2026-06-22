@@ -237,6 +237,24 @@ class HostImportController extends AbstractController
             $tags[strtolower($t->getName())] = $t->getName();
         }
 
+        // Resolve subnet names for all CIDRs referenced in the CSV
+        $allCidrs = [];
+        foreach ($entries as $entry) {
+            foreach ($entry['interfaces'] as $iface) {
+                if ($iface['subnet_cidr']) {
+                    $allCidrs[$iface['subnet_cidr']] = true;
+                }
+            }
+        }
+        $subnetNameByCidr = [];
+        foreach (array_keys($allCidrs) as $cidr) {
+            $isV6   = str_contains($cidr, ':');
+            $subnet = $isV6
+                ? $subnetRepo->findOneBy(['ipv6Cidr' => $cidr])
+                : $subnetRepo->findOneBy(['ipv4Cidr' => $cidr]);
+            $subnetNameByCidr[$cidr] = $subnet?->getName();
+        }
+
         // Collect all MACs from all entries
         $allMacs = [];
         foreach ($entries as $entry) {
@@ -317,9 +335,12 @@ class HostImportController extends AbstractController
                 $mac     = $iface['mac'];
                 $isZero  = ($mac === '00:00:00:00:00:00');
 
+                $subnetName = $iface['subnet_cidr'] ? ($subnetNameByCidr[$iface['subnet_cidr']] ?? null) : null;
+
                 // Non-zero MACs: check for duplicates within this batch
                 if (!$isZero && isset($seenMacs[$mac])) {
                     $ifacePreviews[] = array_merge($iface, [
+                        'subnet_name'     => $subnetName,
                         'status'          => 'conflict',
                         'conflict_reason' => 'MAC ' . $mac . ' appears more than once in this file',
                         'existing_host'   => null,
@@ -330,6 +351,7 @@ class HostImportController extends AbstractController
                 // Non-zero MACs: check for existing record in DB
                 if (!$isZero && isset($ifaceByMac[$mac])) {
                     $ifacePreviews[] = array_merge($iface, [
+                        'subnet_name'     => $subnetName,
                         'status'          => 'existing',
                         'conflict_reason' => null,
                         'existing_host'   => $ifaceByMac[$mac]->getHost()?->getName(),
@@ -359,6 +381,7 @@ class HostImportController extends AbstractController
                 }
 
                 $ifacePreviews[] = array_merge($iface, [
+                    'subnet_name'     => $subnetName,
                     'status'          => $conflicts ? 'conflict' : 'new',
                     'conflict_reason' => $conflicts ? implode('; ', $conflicts) : null,
                     'existing_host'   => null,

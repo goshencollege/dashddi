@@ -97,15 +97,27 @@
                 {% if h.status == 'new' or h.status == 'no_valid_interfaces' %}
                     {% for i in h.interfaces %}
                     <tr class="import-iface-row {{ i.status != 'new' ? 'text-muted' : '' }}">
-                        <td class="ps-4 small text-muted" colspan="0"></td>
-                        <td colspan="2" class="ps-4 small font-monospace">{{ i.mac }}</td>
-                        <td class="small">
+                        <td class="ps-4 small font-monospace">{{ i.mac }}</td>
+                        <td class="small" colspan="2">
                             {% if i.name %}<span class="text-muted">{{ i.name }}</span>{% endif %}
                         </td>
-                        <td class="small ip-address" colspan="1">
+                        <td class="small">
+                            {% if i.subnet_cidr %}
+                                {% if i.subnet_name %}
+                                    {{ i.subnet_name }}
+                                    <span class="text-muted small d-block ip-address">{{ i.subnet_cidr }}</span>
+                                {% else %}
+                                    <span class="ip-address">{{ i.subnet_cidr }}</span>
+                                    <span class="badge bg-warning text-dark ms-1" title="Subnet not found — IP will not be assigned">not found</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="small ip-address">
                             {% if i.ip_address %}{{ i.ip_address }}{% endif %}
                             {% if i.ipv6_address %}<br><span class="text-muted small">{{ i.ipv6_address }}</span>{% endif %}
-                            {% if i.subnet_cidr and not i.ip_address and not i.ipv6_address %}{{ i.subnet_cidr }}{% endif %}
+                            {% if not i.ip_address and not i.ipv6_address %}<span class="text-muted">—</span>{% endif %}
                         </td>
                         <td>
                             {% if i.status == 'new' %}
