@@ -113,7 +113,7 @@
                     {% for i in h.interfaces %}
                     <tr class="import-iface-row {{ i.status != 'new' ? 'text-muted' : '' }}">
                         <td class="ps-4 small font-monospace">{{ i.mac }}</td>
-                        <td class="small" colspan="2">
+                        <td class="small">
                             {% if i.name %}<span class="text-muted">{{ i.name }}</span>{% endif %}
                         </td>
                         <td class="small">
@@ -124,6 +124,18 @@
                                 {% else %}
                                     <span class="ip-address">{{ i.subnet_cidr }}</span>
                                     <span class="badge bg-warning text-dark ms-1" title="Subnet not found — interface will be skipped">not found</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="small">
+                            {% if i.dns_name %}
+                                {% if i.dns_label %}
+                                    <span class="font-monospace">{{ i.dns_label }}</span><span class="text-muted">.{{ i.dns_domain }}</span>
+                                {% else %}
+                                    <span class="ip-address">{{ i.dns_name }}</span>
+                                    <span class="badge bg-warning text-dark ms-1" title="No matching domain found — interface will be skipped">no domain</span>
                                 {% endif %}
                             {% else %}
                                 <span class="text-muted">—</span>

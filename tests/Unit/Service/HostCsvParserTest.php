@@ -28,7 +28,7 @@ class HostCsvParserTest extends TestCase
     {
         $csv = $this->makeCsv([[
             'myhost', 'Main Building', '101', 'Some notes', 'tag1;tag2',
-            'aa:bb:cc:dd:ee:ff', 'eth0', '192.168.1.0/24', '192.168.1.10', '', 'iface note',
+            'aa:bb:cc:dd:ee:ff', 'eth0', '192.168.1.0/24', '192.168.1.10', '', '', 'iface note',
         ]]);
 
         $result = $this->parser->parse($csv);
@@ -78,8 +78,8 @@ class HostCsvParserTest extends TestCase
     public function testRowsWithSameHostnameGroupedIntoOneEntry(): void
     {
         $csv = $this->makeCsv([
-            ['myhost', '', '', '', '', 'aa:bb:cc:dd:ee:01', '', '', '', '', ''],
-            ['myhost', '', '', '', '', 'aa:bb:cc:dd:ee:02', '', '', '', '', ''],
+            ['myhost', '', '', '', '', 'aa:bb:cc:dd:ee:01', '', '', '', '', '', ''],
+            ['myhost', '', '', '', '', 'aa:bb:cc:dd:ee:02', '', '', '', '', '', ''],
         ]);
 
         $result = $this->parser->parse($csv);
@@ -94,7 +94,7 @@ class HostCsvParserTest extends TestCase
     public function testBlankMacAddressRejectedWithLineNumber(): void
     {
         $csv = $this->makeCsv([
-            ['myhost', '', '', '', '', '', '', '', '', '', ''],
+            ['myhost', '', '', '', '', '', '', '', '', '', '', ''],
         ]);
 
         $result = $this->parser->parse($csv);
@@ -107,7 +107,7 @@ class HostCsvParserTest extends TestCase
     public function testInvalidMacAddressRejectedWithLineNumber(): void
     {
         $csv = $this->makeCsv([
-            ['myhost', '', '', '', '', 'not-a-mac', '', '', '', '', ''],
+            ['myhost', '', '', '', '', 'not-a-mac', '', '', '', '', '', ''],
         ]);
 
         $result = $this->parser->parse($csv);
@@ -120,7 +120,7 @@ class HostCsvParserTest extends TestCase
     public function testMacNormalizationDashSeparators(): void
     {
         $csv = $this->makeCsv([
-            ['myhost', '', '', '', '', 'AA-BB-CC-DD-EE-FF', '', '', '', '', ''],
+            ['myhost', '', '', '', '', 'AA-BB-CC-DD-EE-FF', '', '', '', '', '', ''],
         ]);
 
         $result = $this->parser->parse($csv);
@@ -132,7 +132,7 @@ class HostCsvParserTest extends TestCase
     public function testMacNormalizationNoSeparators(): void
     {
         $csv = $this->makeCsv([
-            ['myhost', '', '', '', '', 'aabbccddeeff', '', '', '', '', ''],
+            ['myhost', '', '', '', '', 'aabbccddeeff', '', '', '', '', '', ''],
         ]);
 
         $result = $this->parser->parse($csv);
@@ -144,7 +144,7 @@ class HostCsvParserTest extends TestCase
     public function testMacNormalizationMixedCase(): void
     {
         $csv = $this->makeCsv([
-            ['myhost', '', '', '', '', 'Aa:Bb:Cc:Dd:Ee:Ff', '', '', '', '', ''],
+            ['myhost', '', '', '', '', 'Aa:Bb:Cc:Dd:Ee:Ff', '', '', '', '', '', ''],
         ]);
 
         $result = $this->parser->parse($csv);
@@ -182,8 +182,8 @@ class HostCsvParserTest extends TestCase
     public function testHostLevelDataTakenFromFirstRow(): void
     {
         $csv = $this->makeCsv([
-            ['myhost', 'BuildingA', '100', 'first notes', 'tagA', 'aa:bb:cc:dd:ee:01', '', '', '', '', ''],
-            ['myhost', 'BuildingB', '200', 'second notes', 'tagB', 'aa:bb:cc:dd:ee:02', '', '', '', '', ''],
+            ['myhost', 'BuildingA', '100', 'first notes', 'tagA', 'aa:bb:cc:dd:ee:01', '', '', '', '', '', ''],
+            ['myhost', 'BuildingB', '200', 'second notes', 'tagB', 'aa:bb:cc:dd:ee:02', '', '', '', '', '', ''],
         ]);
 
         $result = $this->parser->parse($csv);
@@ -198,7 +198,7 @@ class HostCsvParserTest extends TestCase
     public function testRowWithMissingHostnameFieldIsSkippedWithError(): void
     {
         $csv = $this->makeCsv([
-            ['', '', '', '', '', 'aa:bb:cc:dd:ee:ff', '', '', '', '', ''],
+            ['', '', '', '', '', 'aa:bb:cc:dd:ee:ff', '', '', '', '', '', ''],
         ]);
 
         $result = $this->parser->parse($csv);
@@ -211,7 +211,7 @@ class HostCsvParserTest extends TestCase
     public function testSemicolonSeparatedTagsParsedCorrectly(): void
     {
         $csv = $this->makeCsv([
-            ['myhost', '', '', '', 'alpha;beta;gamma', 'aa:bb:cc:dd:ee:ff', '', '', '', '', ''],
+            ['myhost', '', '', '', 'alpha;beta;gamma', 'aa:bb:cc:dd:ee:ff', '', '', '', '', '', ''],
         ]);
 
         $result = $this->parser->parse($csv);

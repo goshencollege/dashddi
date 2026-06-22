@@ -8,7 +8,7 @@ class HostCsvParser
 
     public const ALL_HEADERS = [
         'hostname', 'building', 'room', 'host_notes', 'tags',
-        'mac_address', 'interface_name', 'subnet', 'ip_address', 'ipv6_address', 'interface_notes',
+        'mac_address', 'interface_name', 'subnet', 'ip_address', 'ipv6_address', 'dns_name', 'interface_notes',
     ];
 
     /**
@@ -92,6 +92,7 @@ class HostCsvParser
                 'subnet_cidr'  => isset($headerMap['subnet']) ? ($get('subnet') ?: null) : null,
                 'ip_address'   => isset($headerMap['ip_address']) ? ($get('ip_address') ?: null) : null,
                 'ipv6_address' => isset($headerMap['ipv6_address']) ? ($get('ipv6_address') ?: null) : null,
+                'dns_name'     => isset($headerMap['dns_name']) ? ($get('dns_name') ?: null) : null,
                 'notes'        => isset($headerMap['interface_notes']) ? ($get('interface_notes') ?: null) : null,
                 'row'          => $rowNumber,
             ];
@@ -126,7 +127,7 @@ class HostCsvParser
         $headers = implode(',', self::ALL_HEADERS);
         $example = implode(',', [
             'myhost', 'Main Building', '101', 'A sample host', 'tag1;tag2',
-            'aa:bb:cc:dd:ee:ff', 'eth0', '192.168.1.0/24', '192.168.1.10', '', '',
+            'aa:bb:cc:dd:ee:ff', 'eth0', '192.168.1.0/24', '192.168.1.10', '', 'myhost.example.com', '',
         ]);
 
         return $headers . "\n" . $example . "\n";

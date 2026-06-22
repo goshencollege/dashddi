@@ -66,6 +66,7 @@
                         <tr><td><code>subnet</code></td><td><span class="badge bg-secondary">Optional</span></td><td>CIDR notation (e.g. <code>192.168.1.0/24</code>). Must match an existing subnet.</td></tr>
                         <tr><td><code>ip_address</code></td><td><span class="badge bg-secondary">Optional</span></td><td>IPv4 address to assign. Requires <code>subnet</code> to be set and resolvable.</td></tr>
                         <tr><td><code>ipv6_address</code></td><td><span class="badge bg-secondary">Optional</span></td><td>IPv6 address to assign. Requires <code>subnet</code> to be set and resolvable.</td></tr>
+                        <tr><td><code>dns_name</code></td><td><span class="badge bg-secondary">Optional</span></td><td>FQDN for this interface (e.g. <code>myhost.example.com</code>). The longest matching known domain is used to split the label from the domain. Import is blocked if no matching domain is found.</td></tr>
                         <tr><td><code>interface_notes</code></td><td><span class="badge bg-secondary">Optional</span></td><td>Free-form notes for the interface.</td></tr>
                     </tbody>
                 </table>

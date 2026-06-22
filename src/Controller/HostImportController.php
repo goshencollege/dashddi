@@ -3,7 +3,9 @@
 namespace App\Controller;
 
 use App\Entity\Building;
+use App\Entity\Domain;
 use App\Entity\Host;
+use App\Entity\InterfaceName;
 use App\Entity\NetworkInterface;
 use App\Entity\Tag;
 use App\Repository\IpAddressRepository;
@@ -112,6 +114,12 @@ class HostImportController extends AbstractController
             }
         }
 
+        // Pre-load domains for DNS name creation
+        $domains = [];
+        foreach ($em->getRepository(Domain::class)->findAll() as $d) {
+            $domains[strtolower($d->getName())] = $d;
+        }
+
         // Pre-load buildings and tags for efficient lookup
         $buildings = [];
         foreach ($em->getRepository(Building::class)->findAll() as $b) {
@@ -173,6 +181,17 @@ class HostImportController extends AbstractController
                 if ($i['ipv6_address'] && $subnet) {
                     $ipManager->assignIpv6($iface, $i['ipv6_address']);
                 }
+
+                if (!empty($i['dns_label']) && !empty($i['dns_domain'])) {
+                    $domain = $domains[strtolower($i['dns_domain'])] ?? null;
+                    if ($domain) {
+                        $ifaceName = new InterfaceName();
+                        $ifaceName->setName($i['dns_label']);
+                        $ifaceName->setDomain($domain);
+                        $iface->addName($ifaceName);
+                        $em->persist($ifaceName);
+                    }
+                }
             }
 
             $hostsCreated++;
@@ -203,6 +222,34 @@ class HostImportController extends AbstractController
                 'Content-Disposition' => 'attachment; filename="host_import_template.csv"',
             ]
         );
+    }
+
+    // -------------------------------------------------------------------------
+    // FQDN resolver
+    // -------------------------------------------------------------------------
+
+    /**
+     * Given a FQDN and a list of Domain entities sorted longest-name-first,
+     * returns [label, domainName] where label is a valid single DNS label,
+     * or [null, null] if no domain produces a valid match.
+     *
+     * @param  Domain[] $domainsSortedByLength
+     * @return array{string|null, string|null}
+     */
+    private function resolveFqdn(string $fqdn, array $domainsSortedByLength): array
+    {
+        $fqdnLower = strtolower(rtrim($fqdn, '.'));
+        foreach ($domainsSortedByLength as $domain) {
+            $suffix = strtolower($domain->getName());
+            if (!str_ends_with($fqdnLower, '.' . $suffix)) {
+                continue;
+            }
+            $label = substr($fqdn, 0, strlen($fqdn) - strlen($suffix) - 1);
+            if (preg_match('/^[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?$/', $label)) {
+                return [$label, $domain->getName()];
+            }
+        }
+        return [null, null];
     }
 
     // -------------------------------------------------------------------------
@@ -256,6 +303,11 @@ class HostImportController extends AbstractController
                 : $subnetRepo->findOneBy(['ipv4Cidr' => $cidr]);
             $subnetNameByCidr[$cidr] = $subnet?->getName();
         }
+
+        // Load all domains and index by lowercase name for FQDN matching
+        $allDomains = $em->getRepository(Domain::class)->findAll();
+        usort($allDomains, fn(Domain $a, Domain $b) => strlen($b->getName()) - strlen($a->getName()));
+        $domainsSortedByLength = $allDomains; // longest first for best-match
 
         // Collect all MACs from all entries
         $allMacs = [];
@@ -343,6 +395,8 @@ class HostImportController extends AbstractController
                 if (!$isZero && isset($seenMacs[$mac])) {
                     $ifacePreviews[] = array_merge($iface, [
                         'subnet_name'     => $subnetName,
+                        'dns_label'       => null,
+                        'dns_domain'      => null,
                         'status'          => 'conflict',
                         'conflict_reason' => 'MAC ' . $mac . ' appears more than once in this file',
                         'existing_host'   => null,
@@ -354,6 +408,8 @@ class HostImportController extends AbstractController
                 if (!$isZero && isset($ifaceByMac[$mac])) {
                     $ifacePreviews[] = array_merge($iface, [
                         'subnet_name'     => $subnetName,
+                        'dns_label'       => null,
+                        'dns_domain'      => null,
                         'status'          => 'existing',
                         'conflict_reason' => null,
                         'existing_host'   => $ifaceByMac[$mac]->getHost()?->getName(),
@@ -369,6 +425,15 @@ class HostImportController extends AbstractController
 
                 if ($iface['subnet_cidr'] && $subnetName === null) {
                     $conflicts[] = 'Subnet "' . $iface['subnet_cidr'] . '" not found';
+                }
+
+                $dnsLabel  = null;
+                $dnsDomain = null;
+                if ($iface['dns_name']) {
+                    [$dnsLabel, $dnsDomain] = $this->resolveFqdn($iface['dns_name'], $domainsSortedByLength);
+                    if ($dnsLabel === null) {
+                        $conflicts[] = 'DNS name "' . $iface['dns_name'] . '" does not match any known domain';
+                    }
                 }
 
                 if ($iface['ip_address']) {
@@ -388,6 +453,8 @@ class HostImportController extends AbstractController
 
                 $ifacePreviews[] = array_merge($iface, [
                     'subnet_name'     => $subnetName,
+                    'dns_label'       => $dnsLabel,
+                    'dns_domain'      => $dnsDomain,
                     'status'          => $conflicts ? 'conflict' : 'new',
                     'conflict_reason' => $conflicts ? implode('; ', $conflicts) : null,
                     'existing_host'   => null,
