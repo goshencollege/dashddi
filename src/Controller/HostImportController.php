@@ -238,7 +238,8 @@ class HostImportController extends AbstractController
      */
     private function resolveFqdn(string $fqdn, array $domainsSortedByLength): array
     {
-        $fqdnLower = strtolower(rtrim($fqdn, '.'));
+        $fqdn      = rtrim($fqdn, '.');
+        $fqdnLower = strtolower($fqdn);
         foreach ($domainsSortedByLength as $domain) {
             $suffix = strtolower($domain->getName());
             if (!str_ends_with($fqdnLower, '.' . $suffix)) {
