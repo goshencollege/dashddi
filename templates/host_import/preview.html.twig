@@ -88,8 +88,8 @@
                     <td>{{ h.room ?: '—' }}</td>
                     <td>
                         {% for tag in h.tags %}
-                            {% if tag in h.unknown_tags %}
-                                <span class="badge bg-warning text-dark" title="Tag not found — will be skipped">{{ tag }}</span>
+                            {% if tag in h.new_tags %}
+                                <span class="badge bg-info text-dark" title="Tag does not exist yet — will be created">{{ tag }} <i class="bi bi-plus-lg"></i></span>
                             {% else %}
                                 <span class="badge bg-secondary">{{ tag }}</span>
                             {% endif %}

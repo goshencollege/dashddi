@@ -138,10 +138,14 @@ class HostImportController extends AbstractController
             }
 
             foreach ($h['tags'] as $tagName) {
-                $tag = $tags[strtolower($tagName)] ?? null;
-                if ($tag) {
-                    $host->addTag($tag);
+                $key = strtolower($tagName);
+                if (!isset($tags[$key])) {
+                    $newTag = new Tag();
+                    $newTag->setName($tagName);
+                    $em->persist($newTag);
+                    $tags[$key] = $newTag;
                 }
+                $host->addTag($tags[$key]);
             }
 
             $em->persist($host);
@@ -313,7 +317,7 @@ class HostImportController extends AbstractController
                     'notes'           => $entry['notes'],
                     'tags'            => $entry['tags'],
                     'unknown_building' => false,
-                    'unknown_tags'    => [],
+                    'new_tags'         => [],
                     'status'          => 'existing',
                     'interfaces'      => [],
                 ];
@@ -323,7 +327,7 @@ class HostImportController extends AbstractController
             $unknownBuilding = $entry['building_name'] !== null
                 && !isset($buildings[strtolower($entry['building_name'])]);
 
-            $unknownTags = array_values(array_filter(
+            $newTags = array_values(array_filter(
                 $entry['tags'],
                 fn(string $t) => !isset($tags[strtolower($t)])
             ));
@@ -399,7 +403,7 @@ class HostImportController extends AbstractController
                 'notes'            => $entry['notes'],
                 'tags'             => $entry['tags'],
                 'unknown_building' => $unknownBuilding,
-                'unknown_tags'     => $unknownTags,
+                'new_tags'         => $newTags,
                 'status'           => $newIfaceCount > 0 ? 'new' : 'no_valid_interfaces',
                 'interfaces'       => $ifacePreviews,
             ];
