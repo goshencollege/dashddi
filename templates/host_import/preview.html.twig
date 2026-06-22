@@ -108,7 +108,7 @@
                                     <span class="text-muted small d-block ip-address">{{ i.subnet_cidr }}</span>
                                 {% else %}
                                     <span class="ip-address">{{ i.subnet_cidr }}</span>
-                                    <span class="badge bg-warning text-dark ms-1" title="Subnet not found — IP will not be assigned">not found</span>
+                                    <span class="badge bg-warning text-dark ms-1" title="Subnet not found — interface will be skipped">not found</span>
                                 {% endif %}
                             {% else %}
                                 <span class="text-muted">—</span>

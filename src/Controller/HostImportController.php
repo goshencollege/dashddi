@@ -365,6 +365,10 @@ class HostImportController extends AbstractController
                 }
                 $conflicts = [];
 
+                if ($iface['subnet_cidr'] && $subnetName === null) {
+                    $conflicts[] = 'Subnet "' . $iface['subnet_cidr'] . '" not found';
+                }
+
                 if ($iface['ip_address']) {
                     if (isset($usedIpv4[$iface['ip_address']]) || isset($seenIpv4[$iface['ip_address']])) {
                         $conflicts[] = 'IPv4 ' . $iface['ip_address'] . ' already assigned';
