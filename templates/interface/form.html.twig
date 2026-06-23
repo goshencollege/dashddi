@@ -286,10 +286,42 @@
     const modal     = new bootstrap.Modal(modalEl);
     const modalBody = document.getElementById('dns-record-modal-body');
     const modalTitle = document.getElementById('dns-record-modal-title');
-    const addNewUrl  = {{ path('interface_domain_record_new', {id: interface.id})|json_encode|raw }};
+    const addNewUrl       = {{ path('interface_domain_record_new', {id: interface.id})|json_encode|raw }};
+    const availableViewsUrl = {{ path('interface_domain_record_views', {id: interface.id})|json_encode|raw }};
 
     function showSpinner() {
         modalBody.innerHTML = '<div class="text-center py-3"><span class="spinner-border spinner-border-sm"></span></div>';
+    }
+
+    function bindDomainViewsUpdater() {
+        const domainSelect  = modalBody.querySelector('[name="domain_record[domain]"]');
+        const viewsSection  = modalBody.querySelector('#modal-views-section');
+        if (!domainSelect || !viewsSection) return;
+
+        domainSelect.addEventListener('change', async function () {
+            const domainId = domainSelect.value;
+            if (!domainId) {
+                viewsSection.innerHTML = '<p class="text-muted small mb-0">Select a domain first to see available views.</p>';
+                return;
+            }
+            try {
+                const res   = await fetch(availableViewsUrl + '?domain_id=' + encodeURIComponent(domainId));
+                const views = await res.json();
+                if (views.length === 0) {
+                    viewsSection.innerHTML = '<p class="text-muted small mb-0">No views configured for this domain.</p>';
+                } else {
+                    viewsSection.innerHTML = '<div class="d-flex flex-wrap gap-3">' +
+                        views.map(v =>
+                            `<div class="form-check">` +
+                            `<input class="form-check-input" type="checkbox" name="domain_record[views][]" value="${v.id}" id="modal_view_${v.id}">` +
+                            `<label class="form-check-label" for="modal_view_${v.id}">${v.name}</label>` +
+                            `</div>`
+                        ).join('') + '</div>';
+                }
+            } catch {
+                viewsSection.innerHTML = '<p class="text-danger small mb-0">Failed to load views.</p>';
+            }
+        });
     }
 
     async function openModal(url, title) {
@@ -300,6 +332,7 @@
             const res  = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
             const data = await res.json();
             modalBody.innerHTML = data.html;
+            bindDomainViewsUpdater();
         } catch {
             modalBody.innerHTML = '<div class="alert alert-danger mb-0">Failed to load form.</div>';
         }
@@ -333,6 +366,7 @@
                 window.location.reload();
             } else {
                 modalBody.innerHTML = data.html;
+                bindDomainViewsUpdater();
             }
         } catch {
             if (submitBtn) submitBtn.disabled = false;

@@ -60,18 +60,20 @@
 {% if form.views is defined %}
 <div class="mb-3">
     {{ form_label(form.views, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
-    {% if form.views|length > 0 %}
-        <div class="d-flex flex-wrap gap-3">
-            {% for viewWidget in form.views %}
-                <div class="form-check">
-                    {{ form_widget(viewWidget, {attr: {class: 'form-check-input'}}) }}
-                    {{ form_label(viewWidget, null, {label_attr: {class: 'form-check-label'}}) }}
-                </div>
-            {% endfor %}
-        </div>
-    {% else %}
-        <p class="text-muted small mb-0">Select a domain first to see available views.</p>
-    {% endif %}
+    <div id="modal-views-section">
+        {% if form.views|length > 0 %}
+            <div class="d-flex flex-wrap gap-3">
+                {% for viewWidget in form.views %}
+                    <div class="form-check">
+                        {{ form_widget(viewWidget, {attr: {class: 'form-check-input'}}) }}
+                        {{ form_label(viewWidget, null, {label_attr: {class: 'form-check-label'}}) }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p class="text-muted small mb-0">Select a domain first to see available views.</p>
+        {% endif %}
+    </div>
     {{ form_errors(form.views) }}
 </div>
 {% endif %}

@@ -8,9 +8,11 @@ use App\Entity\NetworkInterface;
 use App\Enum\RecordType;
 use App\Form\DomainRecordType;
 use App\Repository\DomainRecordRepository;
+use App\Service\DnsViewResolver;
 use App\Service\FcrdnsChecker;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -21,6 +23,7 @@ class DomainRecordController extends AbstractController
         private readonly EntityManagerInterface $em,
         private readonly FcrdnsChecker          $fcrdnsChecker,
         private readonly DomainRecordRepository $recordRepo,
+        private readonly DnsViewResolver        $viewResolver,
     ) {}
 
     #[Route('/domain/{domainId}/records/new', name: 'domain_record_new')]
@@ -53,6 +56,16 @@ class DomainRecordController extends AbstractController
             'domain' => $domain,
             'record' => $record,
         ]);
+    }
+
+    #[Route('/interfaces/{id}/dns-records/available-views', name: 'interface_domain_record_views', methods: ['GET'])]
+    public function availableViews(NetworkInterface $interface, Request $request): JsonResponse
+    {
+        $domainId = $request->query->getInt('domain_id');
+        $domain   = $domainId ? $this->em->find(Domain::class, $domainId) : null;
+        $views    = $domain ? $this->viewResolver->availableViewsFor($domain, $interface->getSubnet()) : [];
+
+        return $this->json(array_map(fn($v) => ['id' => $v->getId(), 'name' => $v->getName()], $views));
     }
 
     #[Route('/interfaces/{id}/dns-records/new', name: 'interface_domain_record_new', methods: ['GET', 'POST'])]

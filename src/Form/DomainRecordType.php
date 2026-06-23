@@ -8,6 +8,7 @@ use App\Entity\DomainRecord;
 use App\Entity\NetworkInterface;
 use App\Enum\RecordType;
 use App\Repository\DnsViewRepository;
+use App\Repository\DomainRepository;
 use App\Service\DnsViewResolver;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
@@ -26,6 +27,7 @@ class DomainRecordType extends AbstractType
 {
     public function __construct(
         private readonly DnsViewRepository $viewRepo,
+        private readonly DomainRepository  $domainRepo,
         private readonly DnsViewResolver   $viewResolver,
     ) {}
 
@@ -87,6 +89,15 @@ class DomainRecordType extends AbstractType
         $builder->addEventListener(FormEvents::PRE_SET_DATA, function (FormEvent $event) use ($interface) {
             $record = $event->getData();
             $domain = ($record instanceof DomainRecord) ? $record->getDomain() : null;
+            $this->addViewsField($event->getForm(), $domain, $interface);
+        });
+
+        // Rebuild views choices from the submitted domain ID so that submitted
+        // view selections are not silently rejected as invalid choices.
+        $builder->addEventListener(FormEvents::PRE_SUBMIT, function (FormEvent $event) use ($interface) {
+            $data     = $event->getData();
+            $domainId = isset($data['domain']) ? (int) $data['domain'] : null;
+            $domain   = $domainId ? $this->domainRepo->find($domainId) : null;
             $this->addViewsField($event->getForm(), $domain, $interface);
         });
     }
