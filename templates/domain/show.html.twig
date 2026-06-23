@@ -188,7 +188,7 @@
                     <th>Hostname</th>
                     <th>Type</th>
                     <th>Value</th>
-                    <th>Host</th>
+                    <th>Interface</th>
                     <th>TTL</th>
                     <th>Modified</th>
                     <th>Views</th>
@@ -205,7 +205,7 @@
                                 <span class="badge bg-primary ms-1" title="Canonical — used for PTR reverse DNS">PTR</span>
                             {% endif %}
                             {% if iface_deleted %}
-                                <span class="badge bg-warning text-dark ms-1" title="The host owning this interface has been deleted — this record is excluded from DNS pushes">Host deleted</span>
+                                <span class="badge bg-warning text-dark ms-1" title="This interface has been deleted — this record is excluded from DNS pushes">Interface deleted</span>
                             {% endif %}
                         </td>
                         <td><span class="badge bg-secondary">{{ record.type.value }}</span></td>
@@ -223,13 +223,12 @@
                             {% endif %}
                         </td>
                         <td style="white-space:nowrap">
-                            {% if record.networkInterface and record.networkInterface.host %}
-                                <a href="{{ path('host_show', {id: record.networkInterface.host.id}) }}" class="text-decoration-none small{% if iface_deleted %} text-warning-emphasis{% endif %}">
-                                    {{ record.networkInterface.host.name }}
+                            {% if record.networkInterface %}
+                                {% set iface = record.networkInterface %}
+                                <a href="{{ path('interface_show', {id: iface.id}) }}" class="text-decoration-none small{% if iface_deleted %} text-warning-emphasis{% endif %}">
+                                    {% if iface.host %}{{ iface.host.name }}{% else %}<span class="text-muted fst-italic">no host</span>{% endif %}
+                                    <br><span class="font-monospace text-muted">{{ iface.name ?: iface.macAddress }}</span>
                                 </a>
-                                {% if iface_deleted %}
-                                    <span class="text-muted small ms-1">(deleted)</span>
-                                {% endif %}
                             {% else %}
                                 <span class="text-muted">—</span>
                             {% endif %}
