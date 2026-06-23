@@ -1,0 +1,626 @@
+<?php
+
+namespace App\Controller;
+
+use App\Entity\Building;
+use App\Entity\Domain;
+use App\Entity\Host;
+use App\Entity\IpAddress;
+use App\Entity\InterfaceName;
+use App\Entity\Ipv6Address;
+use App\Entity\NetworkInterface;
+use App\Entity\Tag;
+use App\Repository\NetworkInterfaceRepository;
+use App\Repository\SubnetRepository;
+use App\Service\DnsViewResolver;
+use App\Service\HostCsvParser;
+use App\Service\IpAddressManager;
+use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Routing\Attribute\Route;
+
+#[Route('/hosts/import')]
+class HostImportController extends AbstractController
+{
+    #[Route('', name: 'host_import', methods: ['GET', 'POST'])]
+    public function upload(
+        Request $request,
+        HostCsvParser $parser,
+        EntityManagerInterface $em,
+        NetworkInterfaceRepository $interfaceRepo,
+        SubnetRepository $subnetRepo,
+    ): Response {
+        if (!$request->isMethod('POST')) {
+            return $this->render('host_import/upload.html.twig');
+        }
+
+        $file = $request->files->get('csv_file');
+        if (!$file || !$file->isValid()) {
+            $this->addFlash('danger', 'Please select a valid CSV file to upload.');
+            return $this->redirectToRoute('host_import');
+        }
+
+        $content = file_get_contents($file->getPathname());
+        if ($content === false || $content === '') {
+            $this->addFlash('danger', 'The uploaded file appears to be empty.');
+            return $this->redirectToRoute('host_import');
+        }
+
+        $parsed = $parser->parse($content);
+
+        if (!empty($parsed['errors'])) {
+            foreach ($parsed['errors'] as $error) {
+                $this->addFlash('danger', $error);
+            }
+            return $this->redirectToRoute('host_import');
+        }
+
+        if (empty($parsed['entries'])) {
+            $this->addFlash('warning', 'No host entries were found in the uploaded file.');
+            return $this->redirectToRoute('host_import');
+        }
+
+        $preview = $this->buildPreview($parsed['entries'], $em, $interfaceRepo, $subnetRepo);
+
+        $request->getSession()->set('host_csv_import', $preview);
+
+        return $this->redirectToRoute('host_import_preview');
+    }
+
+    #[Route('/preview', name: 'host_import_preview', methods: ['GET'])]
+    public function preview(Request $request): Response
+    {
+        $preview = $request->getSession()->get('host_csv_import');
+        if (!$preview) {
+            $this->addFlash('warning', 'No import data found. Please upload a CSV file first.');
+            return $this->redirectToRoute('host_import');
+        }
+
+        return $this->render('host_import/preview.html.twig', ['preview' => $preview]);
+    }
+
+    #[Route('/confirm', name: 'host_import_confirm', methods: ['POST'])]
+    public function confirm(
+        Request $request,
+        EntityManagerInterface $em,
+        SubnetRepository $subnetRepo,
+        IpAddressManager $ipManager,
+        DnsViewResolver $viewResolver,
+    ): Response {
+        if (!$this->isCsrfTokenValid('host_import_confirm', $request->request->get('_token'))) {
+            $this->addFlash('danger', 'Invalid CSRF token.');
+            return $this->redirectToRoute('host_import_preview');
+        }
+
+        $preview = $request->getSession()->get('host_csv_import');
+        if (!$preview) {
+            $this->addFlash('warning', 'Session expired. Please upload the file again.');
+            return $this->redirectToRoute('host_import');
+        }
+
+        // Refuse if the preview still contains any unresolved issues
+        foreach ($preview['hosts'] as $h) {
+            if ($h['status'] !== 'new') {
+                $this->addFlash('danger', 'Import blocked: the preview contains unresolved issues. Fix the CSV and re-upload.');
+                return $this->redirectToRoute('host_import_preview');
+            }
+            foreach ($h['interfaces'] as $i) {
+                if ($i['status'] !== 'new') {
+                    $this->addFlash('danger', 'Import blocked: the preview contains unresolved issues. Fix the CSV and re-upload.');
+                    return $this->redirectToRoute('host_import_preview');
+                }
+            }
+        }
+
+        // Free any IpAddress/Ipv6Address rows still held by soft-deleted interfaces
+        // so we can reassign those addresses without hitting unique constraint violations.
+        $this->releaseDeletedInterfaceIps($em, $preview['hosts']);
+
+        // Pre-load domains for DNS name creation
+        $domains = [];
+        foreach ($em->getRepository(Domain::class)->findAll() as $d) {
+            $domains[strtolower($d->getName())] = $d;
+        }
+
+        // Pre-load buildings and tags for efficient lookup
+        $buildings = [];
+        foreach ($em->getRepository(Building::class)->findAll() as $b) {
+            $buildings[strtolower($b->getName())] = $b;
+        }
+        $tags = [];
+        foreach ($em->getRepository(Tag::class)->findAll() as $t) {
+            $tags[strtolower($t->getName())] = $t;
+        }
+
+        // Create (or locate) a unique import-date tag for this batch.
+        $importTagName = $this->uniqueImportTagName($em, (new \DateTimeImmutable())->format('Y-m-d'));
+        $importTag     = $tags[strtolower($importTagName)] ?? null;
+        if (!$importTag) {
+            $importTag = new Tag();
+            $importTag->setName($importTagName);
+            $em->persist($importTag);
+            $tags[strtolower($importTagName)] = $importTag;
+        }
+
+        $hostsCreated = 0;
+
+        foreach ($preview['hosts'] as $h) {
+            $host = new Host();
+            $host->setName($h['hostname']);
+            $host->setRoom($h['room'] ?: null);
+            $host->setNotes($h['notes'] ?: null);
+
+            if ($h['building_name']) {
+                $building = $buildings[strtolower($h['building_name'])] ?? null;
+                if ($building) {
+                    $host->setBuilding($building);
+                }
+            }
+
+            foreach ($h['tags'] as $tagName) {
+                $key = strtolower($tagName);
+                if (!isset($tags[$key])) {
+                    $newTag = new Tag();
+                    $newTag->setName($tagName);
+                    $em->persist($newTag);
+                    $tags[$key] = $newTag;
+                }
+                $host->addTag($tags[$key]);
+            }
+            $host->addTag($importTag);
+
+            $em->persist($host);
+
+            foreach ($h['interfaces'] as $i) {
+                $subnet = null;
+                if ($i['subnet_cidr']) {
+                    $isV6   = str_contains($i['subnet_cidr'], ':');
+                    $subnet = $isV6
+                        ? $subnetRepo->findOneBy(['ipv6Cidr' => $i['subnet_cidr']])
+                        : $subnetRepo->findOneBy(['ipv4Cidr' => $i['subnet_cidr']]);
+                }
+
+                $iface = new NetworkInterface();
+                $iface->setMacAddress($i['mac']);
+                $iface->setName($i['name'] ?: null);
+                $iface->setNotes($i['notes'] ?: null);
+                $iface->setSubnet($subnet);
+                $host->addInterface($iface);
+                $em->persist($iface);
+
+                if ($i['ip_address'] && $subnet) {
+                    if ($i['ip_address'] === 'auto') {
+                        $ip = $ipManager->findNextAvailableIpv4($subnet);
+                        if ($ip) { $ipManager->assignIpv4($iface, $ip); }
+                    } else {
+                        $ipManager->assignIpv4($iface, $i['ip_address']);
+                    }
+                }
+                if ($i['ipv6_address'] && $subnet) {
+                    if ($i['ipv6_address'] === 'auto') {
+                        $ip = $ipManager->findNextAvailableIpv6($subnet, $i['mac']);
+                        if ($ip) { $ipManager->assignIpv6($iface, $ip); }
+                    } elseif ($i['ipv6_address'] === 'auto_v4') {
+                        $ipv4 = $iface->getIpAddress()?->getAddress();
+                        if ($ipv4) {
+                            $ip = $ipManager->findIpv6FromIpv4($subnet, $ipv4);
+                            if ($ip) { $ipManager->assignIpv6($iface, $ip); }
+                        }
+                    } else {
+                        $ipManager->assignIpv6($iface, $i['ipv6_address']);
+                    }
+                }
+
+                if (!empty($i['dns_label']) && !empty($i['dns_domain'])) {
+                    $domain = $domains[strtolower($i['dns_domain'])] ?? null;
+                    if ($domain) {
+                        $ifaceName = new InterfaceName();
+                        $ifaceName->setName($i['dns_label']);
+                        $ifaceName->setDomain($domain);
+                        foreach ($viewResolver->availableViewsFor($domain, $subnet) as $view) {
+                            $ifaceName->addView($view);
+                        }
+                        $iface->addName($ifaceName);
+                        $em->persist($ifaceName);
+                    }
+                }
+            }
+
+            $hostsCreated++;
+        }
+
+        if ($hostsCreated > 0) {
+            $em->flush();
+        }
+
+        $request->getSession()->remove('host_csv_import');
+
+        $this->addFlash('success', sprintf(
+            'Import complete: %d host(s) created with tag "%s".',
+            $hostsCreated,
+            $importTagName
+        ));
+
+        return $this->redirectToRoute('host_index');
+    }
+
+    #[Route('/template', name: 'host_import_template', methods: ['GET'])]
+    public function template(HostCsvParser $parser): Response
+    {
+        return new Response(
+            $parser->getTemplateCsvContent(),
+            200,
+            [
+                'Content-Type'        => 'text/csv; charset=UTF-8',
+                'Content-Disposition' => 'attachment; filename="host_import_template.csv"',
+            ]
+        );
+    }
+
+    // -------------------------------------------------------------------------
+    // Import tag helpers
+    // -------------------------------------------------------------------------
+
+    /**
+     * Returns a tag name of the form "import:YYYY-MM-DD" that does not yet
+     * exist, incrementing a numeric suffix on collisions:
+     *   import:2026-06-23, import:2026-06-23-2, import:2026-06-23-3, …
+     */
+    private function uniqueImportTagName(EntityManagerInterface $em, string $date): string
+    {
+        $base    = 'import:' . $date;
+        $tagRepo = $em->getRepository(Tag::class);
+
+        if (!$tagRepo->findOneBy(['name' => $base])) {
+            return $base;
+        }
+
+        $n = 2;
+        while ($tagRepo->findOneBy(['name' => $base . ':' . $n])) {
+            $n++;
+        }
+        return $base . ':' . $n;
+    }
+
+    // -------------------------------------------------------------------------
+    // Soft-delete helpers
+    // -------------------------------------------------------------------------
+
+    /**
+     * Removes IpAddress/Ipv6Address rows still held by soft-deleted interfaces
+     * for any specific addresses in the import, so those addresses can be
+     * re-assigned without hitting the unique constraint on flush.
+     *
+     * @param array $hosts preview['hosts']
+     */
+    private function releaseDeletedInterfaceIps(EntityManagerInterface $em, array $hosts): void
+    {
+        $specificIpv4 = [];
+        $specificIpv6 = [];
+        foreach ($hosts as $h) {
+            foreach ($h['interfaces'] as $i) {
+                if ($i['ip_address'] && $i['ip_address'] !== 'auto') {
+                    $specificIpv4[] = $i['ip_address'];
+                }
+                if ($i['ipv6_address'] && !in_array($i['ipv6_address'], ['auto', 'auto_v4'], true)) {
+                    $specificIpv6[] = $i['ipv6_address'];
+                }
+            }
+        }
+
+        $changed = false;
+
+        if ($specificIpv4) {
+            $existing = $em->createQueryBuilder()
+                ->select('ip')
+                ->from(IpAddress::class, 'ip')
+                ->where('ip.address IN (:addrs)')
+                ->setParameter('addrs', $specificIpv4)
+                ->getQuery()->getResult();
+            foreach ($existing as $ip) {
+                // Null out the FK on the owning (deleted) interface via DQL so
+                // Doctrine does not try to re-persist a stale identity-map entry.
+                $em->createQueryBuilder()
+                    ->update(NetworkInterface::class, 'ni')
+                    ->set('ni.ipAddress', ':null')
+                    ->where('ni.ipAddress = :ip')
+                    ->setParameter('null', null)
+                    ->setParameter('ip', $ip)
+                    ->getQuery()->execute();
+                $em->remove($ip);
+                $changed = true;
+            }
+        }
+
+        if ($specificIpv6) {
+            $existing = $em->createQueryBuilder()
+                ->select('ip')
+                ->from(Ipv6Address::class, 'ip')
+                ->where('ip.address IN (:addrs)')
+                ->setParameter('addrs', $specificIpv6)
+                ->getQuery()->getResult();
+            foreach ($existing as $ip) {
+                $em->createQueryBuilder()
+                    ->update(NetworkInterface::class, 'ni')
+                    ->set('ni.ipv6Address', ':null')
+                    ->where('ni.ipv6Address = :ip')
+                    ->setParameter('null', null)
+                    ->setParameter('ip', $ip)
+                    ->getQuery()->execute();
+                $em->remove($ip);
+                $changed = true;
+            }
+        }
+
+        if ($changed) {
+            $em->flush();
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // FQDN resolver
+    // -------------------------------------------------------------------------
+
+    /**
+     * Given a FQDN and a list of Domain entities sorted longest-name-first,
+     * returns [label, domainName] where label is a valid single DNS label,
+     * or [null, null] if no domain produces a valid match.
+     *
+     * @param  Domain[] $domainsSortedByLength
+     * @return array{string|null, string|null}
+     */
+    private function resolveFqdn(string $fqdn, array $domainsSortedByLength): array
+    {
+        $fqdn      = rtrim($fqdn, '.');
+        $fqdnLower = strtolower($fqdn);
+        foreach ($domainsSortedByLength as $domain) {
+            $suffix = strtolower($domain->getName());
+            if (!str_ends_with($fqdnLower, '.' . $suffix)) {
+                continue;
+            }
+            $label = substr($fqdn, 0, strlen($fqdn) - strlen($suffix) - 1);
+            if (preg_match('/^[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?)*$/', $label)) {
+                return [$label, $domain->getName()];
+            }
+        }
+        return [null, null];
+    }
+
+    // -------------------------------------------------------------------------
+    // Preview builder
+    // -------------------------------------------------------------------------
+
+    private function buildPreview(
+        array $entries,
+        EntityManagerInterface $em,
+        NetworkInterfaceRepository $interfaceRepo,
+        SubnetRepository $subnetRepo,
+    ): array {
+        // Pre-load all existing host names
+        $hostnames    = array_column($entries, 'hostname');
+        $existingRows = $em->createQueryBuilder()
+            ->select('h.name')
+            ->from(Host::class, 'h')
+            ->where('h.name IN (:names)')
+            ->andWhere('h.deletedAt IS NULL')
+            ->setParameter('names', $hostnames)
+            ->getQuery()
+            ->getScalarResult();
+        $existingHostNames = array_flip(array_column($existingRows, 'name'));
+
+        // Pre-load all buildings and tags for resolution
+        $buildings = [];
+        foreach ($em->getRepository(Building::class)->findAll() as $b) {
+            $buildings[strtolower($b->getName())] = $b->getName();
+        }
+        $tags = [];
+        foreach ($em->getRepository(Tag::class)->findAll() as $t) {
+            $tags[strtolower($t->getName())] = $t->getName();
+        }
+
+        // Resolve subnet names for all CIDRs referenced in the CSV
+        $allCidrs = [];
+        foreach ($entries as $entry) {
+            foreach ($entry['interfaces'] as $iface) {
+                if ($iface['subnet_cidr']) {
+                    $allCidrs[$iface['subnet_cidr']] = true;
+                }
+            }
+        }
+        $subnetNameByCidr = [];
+        foreach (array_keys($allCidrs) as $cidr) {
+            $isV6   = str_contains($cidr, ':');
+            $subnet = $isV6
+                ? $subnetRepo->findOneBy(['ipv6Cidr' => $cidr])
+                : $subnetRepo->findOneBy(['ipv4Cidr' => $cidr]);
+            $subnetNameByCidr[$cidr] = $subnet?->getName();
+        }
+
+        // Load all domains and index by lowercase name for FQDN matching
+        $allDomains = $em->getRepository(Domain::class)->findAll();
+        usort($allDomains, fn(Domain $a, Domain $b) => strlen($b->getName()) - strlen($a->getName()));
+        $domainsSortedByLength = $allDomains; // longest first for best-match
+
+        // Collect all MACs from all entries
+        $allMacs = [];
+        foreach ($entries as $entry) {
+            foreach ($entry['interfaces'] as $iface) {
+                if ($iface['mac'] !== '00:00:00:00:00:00') {
+                    $allMacs[] = $iface['mac'];
+                }
+            }
+        }
+        $ifaceByMac = $interfaceRepo->findByMacs(array_values(array_unique($allMacs)));
+
+        // Collect all IPs for conflict detection
+        $allIpv4 = [];
+        $allIpv6 = [];
+        foreach ($entries as $entry) {
+            foreach ($entry['interfaces'] as $iface) {
+                if ($iface['ip_address'] && !in_array($iface['ip_address'], ['auto'], true)) {
+                    $allIpv4[] = $iface['ip_address'];
+                }
+                if ($iface['ipv6_address'] && !in_array($iface['ipv6_address'], ['auto', 'auto_v4'], true)) {
+                    $allIpv6[] = $iface['ipv6_address'];
+                }
+            }
+        }
+
+        // Only count IPs assigned to non-deleted interfaces as conflicts.
+        $usedIpv4 = [];
+        if ($allIpv4) {
+            $rows = $em->createQueryBuilder()
+                ->select('ip.address')
+                ->from(IpAddress::class, 'ip')
+                ->join(NetworkInterface::class, 'ni', 'WITH', 'ni.ipAddress = ip AND ni.deletedAt IS NULL')
+                ->where('ip.address IN (:addrs)')
+                ->setParameter('addrs', array_values(array_unique($allIpv4)))
+                ->getQuery()->getScalarResult();
+            foreach ($rows as $row) {
+                $usedIpv4[$row['address']] = true;
+            }
+        }
+
+        $usedIpv6 = [];
+        if ($allIpv6) {
+            $rows = $em->createQueryBuilder()
+                ->select('ip.address')
+                ->from(Ipv6Address::class, 'ip')
+                ->join(NetworkInterface::class, 'ni', 'WITH', 'ni.ipv6Address = ip AND ni.deletedAt IS NULL')
+                ->where('ip.address IN (:addrs)')
+                ->setParameter('addrs', array_values(array_unique($allIpv6)))
+                ->getQuery()->getScalarResult();
+            foreach ($rows as $row) {
+                $usedIpv6[$row['address']] = true;
+            }
+        }
+
+        $seenIpv4 = [];
+        $seenIpv6 = [];
+        $seenMacs = [];
+
+        $preview = ['hosts' => []];
+
+        foreach ($entries as $entry) {
+            $hostname = $entry['hostname'];
+
+            if (isset($existingHostNames[$hostname])) {
+                $preview['hosts'][] = [
+                    'hostname'        => $hostname,
+                    'building_name'   => $entry['building_name'],
+                    'room'            => $entry['room'],
+                    'notes'           => $entry['notes'],
+                    'tags'            => $entry['tags'],
+                    'unknown_building' => false,
+                    'new_tags'         => [],
+                    'status'          => 'existing',
+                    'interfaces'      => [],
+                ];
+                continue;
+            }
+
+            $unknownBuilding = $entry['building_name'] !== null
+                && !isset($buildings[strtolower($entry['building_name'])]);
+
+            $newTags = array_values(array_filter(
+                $entry['tags'],
+                fn(string $t) => !isset($tags[strtolower($t)])
+            ));
+
+            $ifacePreviews = [];
+            foreach ($entry['interfaces'] as $iface) {
+                $mac     = $iface['mac'];
+                $isZero  = ($mac === '00:00:00:00:00:00');
+
+                $subnetName = $iface['subnet_cidr'] ? ($subnetNameByCidr[$iface['subnet_cidr']] ?? null) : null;
+
+                // Non-zero MACs: check for duplicates within this batch
+                if (!$isZero && isset($seenMacs[$mac])) {
+                    $ifacePreviews[] = array_merge($iface, [
+                        'subnet_name'     => $subnetName,
+                        'dns_label'       => null,
+                        'dns_domain'      => null,
+                        'status'          => 'conflict',
+                        'conflict_reason' => 'MAC ' . $mac . ' appears more than once in this file',
+                        'existing_host'   => null,
+                    ]);
+                    continue;
+                }
+
+                // Non-zero MACs: check for existing record in DB
+                if (!$isZero && isset($ifaceByMac[$mac])) {
+                    $ifacePreviews[] = array_merge($iface, [
+                        'subnet_name'     => $subnetName,
+                        'dns_label'       => null,
+                        'dns_domain'      => null,
+                        'status'          => 'existing',
+                        'conflict_reason' => null,
+                        'existing_host'   => $ifaceByMac[$mac]->getHost()?->getName(),
+                    ]);
+                    $seenMacs[$mac] = true;
+                    continue;
+                }
+
+                if (!$isZero) {
+                    $seenMacs[$mac] = true;
+                }
+                $conflicts = [];
+
+                if ($iface['subnet_cidr'] && $subnetName === null) {
+                    $conflicts[] = 'Subnet "' . $iface['subnet_cidr'] . '" not found';
+                }
+
+                $dnsLabel  = null;
+                $dnsDomain = null;
+                if ($iface['dns_name']) {
+                    [$dnsLabel, $dnsDomain] = $this->resolveFqdn($iface['dns_name'], $domainsSortedByLength);
+                    if ($dnsLabel === null) {
+                        $conflicts[] = 'DNS name "' . $iface['dns_name'] . '" does not match any known domain';
+                    }
+                }
+
+                if ($iface['ip_address'] && $iface['ip_address'] !== 'auto') {
+                    if (isset($usedIpv4[$iface['ip_address']]) || isset($seenIpv4[$iface['ip_address']])) {
+                        $conflicts[] = 'IPv4 ' . $iface['ip_address'] . ' already assigned';
+                    } else {
+                        $seenIpv4[$iface['ip_address']] = true;
+                    }
+                }
+                if ($iface['ipv6_address'] && !in_array($iface['ipv6_address'], ['auto', 'auto_v4'], true)) {
+                    if (isset($usedIpv6[$iface['ipv6_address']]) || isset($seenIpv6[$iface['ipv6_address']])) {
+                        $conflicts[] = 'IPv6 ' . $iface['ipv6_address'] . ' already assigned';
+                    } else {
+                        $seenIpv6[$iface['ipv6_address']] = true;
+                    }
+                }
+
+                $ifacePreviews[] = array_merge($iface, [
+                    'subnet_name'     => $subnetName,
+                    'dns_label'       => $dnsLabel,
+                    'dns_domain'      => $dnsDomain,
+                    'status'          => $conflicts ? 'conflict' : 'new',
+                    'conflict_reason' => $conflicts ? implode('; ', $conflicts) : null,
+                    'existing_host'   => null,
+                ]);
+            }
+
+            $newIfaceCount = count(array_filter($ifacePreviews, fn(array $i) => $i['status'] === 'new'));
+
+            $preview['hosts'][] = [
+                'hostname'         => $hostname,
+                'building_name'    => $entry['building_name'],
+                'room'             => $entry['room'],
+                'notes'            => $entry['notes'],
+                'tags'             => $entry['tags'],
+                'unknown_building' => $unknownBuilding,
+                'new_tags'         => $newTags,
+                'status'           => $newIfaceCount > 0 ? 'new' : 'no_valid_interfaces',
+                'interfaces'       => $ifacePreviews,
+            ];
+        }
+
+        return $preview;
+    }
+}

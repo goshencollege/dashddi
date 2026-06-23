@@ -1,0 +1,199 @@
+{% extends 'base.html.twig' %}
+{% block title %}Host Import Preview{% endblock %}
+
+{% block stylesheets %}
+<style>
+:root                    { --import-iface-bg: rgba(0,0,0,.03); }
+[data-bs-theme="dark"]   { --import-iface-bg: rgba(255,255,255,.04); }
+.import-iface-row        { --bs-table-bg: var(--import-iface-bg); }
+</style>
+{% endblock %}
+
+{% block content %}
+{% set newHosts = preview.hosts|filter(h => h.status == 'new')|length %}
+
+{# Count every non-new row: host-level and interface-level #}
+{% set issueCount = 0 %}
+{% for h in preview.hosts %}
+    {% if h.status != 'new' %}
+        {% set issueCount = issueCount + 1 %}
+    {% else %}
+        {% for i in h.interfaces %}
+            {% if i.status != 'new' %}
+                {% set issueCount = issueCount + 1 %}
+            {% endif %}
+        {% endfor %}
+    {% endif %}
+{% endfor %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0"><i class="bi bi-list-check me-2"></i>Host Import Preview</h1>
+    <a href="{{ path('host_import') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1"></i>Upload Different File
+    </a>
+</div>
+
+{# Summary banner #}
+{% if issueCount > 0 %}
+<div class="alert alert-danger d-flex align-items-center gap-3 mb-4">
+    <i class="bi bi-x-circle fs-4"></i>
+    <div>
+        <strong>{{ issueCount }} issue{{ issueCount != 1 ? 's' : '' }} must be resolved before importing.</strong>
+        Fix the CSV and re-upload to proceed.
+    </div>
+</div>
+{% elseif newHosts > 0 %}
+<div class="alert alert-success d-flex align-items-center gap-3 mb-4">
+    <i class="bi bi-check-circle fs-4"></i>
+    <div><strong>{{ newHosts }} host{{ newHosts != 1 ? 's' : '' }} ready to import.</strong> No issues found.</div>
+</div>
+{% else %}
+<div class="alert alert-secondary d-flex align-items-center gap-3 mb-4">
+    <i class="bi bi-clipboard-check fs-4"></i>
+    <div><strong>Nothing to import.</strong> The file contained no valid entries.</div>
+</div>
+{% endif %}
+
+{# Hosts table #}
+<div class="card mb-4">
+    <div class="table-responsive">
+        <table class="table table-hover table-sm mb-0">
+            <thead>
+                <tr>
+                    <th>Hostname</th>
+                    <th>Building</th>
+                    <th>Room</th>
+                    <th>Tags</th>
+                    <th>Interfaces</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for h in preview.hosts %}
+                {# Host row #}
+                <tr class="{{ h.status != 'new' ? 'text-muted' : '' }}">
+                    <td class="fw-semibold">{{ h.hostname }}</td>
+                    <td>
+                        {% if h.building_name %}
+                            {{ h.building_name }}
+                            {% if h.unknown_building %}
+                                <span class="badge bg-warning text-dark ms-1" title="Building not found — will be left blank">
+                                    <i class="bi bi-exclamation-triangle"></i> not found
+                                </span>
+                            {% endif %}
+                        {% else %}
+                            <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ h.room ?: '—' }}</td>
+                    <td>
+                        {% for tag in h.tags %}
+                            {% if tag in h.new_tags %}
+                                <span class="badge bg-info text-dark" title="Tag does not exist yet — will be created">{{ tag }} <i class="bi bi-plus-lg"></i></span>
+                            {% else %}
+                                <span class="badge bg-secondary">{{ tag }}</span>
+                            {% endif %}
+                        {% else %}
+                            <span class="text-muted">—</span>
+                        {% endfor %}
+                    </td>
+                    <td>{{ h.interfaces|length }}</td>
+                    <td>
+                        {% if h.status == 'new' %}
+                            <span class="badge bg-success"><i class="bi bi-plus-lg me-1"></i>Create</span>
+                        {% elseif h.status == 'existing' %}
+                            <span class="badge bg-secondary"><i class="bi bi-check me-1"></i>Skip — exists</span>
+                        {% else %}
+                            <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle me-1"></i>Skip — no valid interfaces</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {# Interface sub-rows #}
+                {% if h.status == 'new' or h.status == 'no_valid_interfaces' %}
+                    {% for i in h.interfaces %}
+                    <tr class="import-iface-row {{ i.status != 'new' ? 'text-muted' : '' }}">
+                        <td class="ps-4 small font-monospace">{{ i.mac }}</td>
+                        <td class="small">
+                            {% if i.name %}<span class="text-muted">{{ i.name }}</span>{% endif %}
+                        </td>
+                        <td class="small">
+                            {% if i.subnet_cidr %}
+                                {% if i.subnet_name %}
+                                    {{ i.subnet_name }}
+                                    <span class="text-muted small d-block ip-address">{{ i.subnet_cidr }}</span>
+                                {% else %}
+                                    <span class="ip-address">{{ i.subnet_cidr }}</span>
+                                    <span class="badge bg-warning text-dark ms-1" title="Subnet not found — interface will be skipped">not found</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="small">
+                            {% if i.dns_name %}
+                                {% if i.dns_label %}
+                                    <span class="font-monospace">{{ i.dns_label }}</span><span class="text-muted">.{{ i.dns_domain }}</span>
+                                {% else %}
+                                    <span class="ip-address">{{ i.dns_name }}</span>
+                                    <span class="badge bg-warning text-dark ms-1" title="No matching domain found — interface will be skipped">no domain</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="small ip-address">
+                            {% if i.ip_address == 'auto' %}
+                                <span class="badge bg-secondary">auto</span>
+                            {% elseif i.ip_address %}
+                                {{ i.ip_address }}
+                            {% endif %}
+                            {% if i.ipv6_address == 'auto' %}
+                                <br><span class="badge bg-secondary">auto</span>
+                            {% elseif i.ipv6_address == 'auto_v4' %}
+                                <br><span class="badge bg-secondary">auto (from IPv4)</span>
+                            {% elseif i.ipv6_address %}
+                                <br><span class="text-muted small">{{ i.ipv6_address }}</span>
+                            {% endif %}
+                            {% if not i.ip_address and not i.ipv6_address %}<span class="text-muted">—</span>{% endif %}
+                        </td>
+                        <td>
+                            {% if i.status == 'new' %}
+                                <span class="badge bg-success"><i class="bi bi-plus-lg me-1"></i>Create</span>
+                            {% elseif i.status == 'existing' %}
+                                <span class="badge bg-secondary" title="Host: {{ i.existing_host }}">
+                                    <i class="bi bi-check me-1"></i>Skip — MAC exists{% if i.existing_host %} on {{ i.existing_host }}{% endif %}
+                                </span>
+                            {% else %}
+                                <span class="badge bg-warning text-dark" title="{{ i.conflict_reason }}">
+                                    <i class="bi bi-exclamation-triangle me-1"></i>Skip — conflict
+                                </span>
+                                <span class="d-block text-danger small mt-1">{{ i.conflict_reason }}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% endif %}
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{# Confirm / Cancel #}
+<div class="d-flex gap-2 mt-2">
+    {% if issueCount == 0 and newHosts > 0 %}
+    <form method="post" action="{{ path('host_import_confirm') }}">
+        <input type="hidden" name="_token" value="{{ csrf_token('host_import_confirm') }}">
+        <button type="submit" class="btn btn-primary">
+            <i class="bi bi-cloud-upload me-1"></i>Confirm Import ({{ newHosts }} host{{ newHosts != 1 ? 's' : '' }})
+        </button>
+    </form>
+    {% endif %}
+    <a href="{{ path('host_import') }}" class="btn btn-outline-secondary">
+        <i class="bi bi-{{ issueCount > 0 ? 'arrow-repeat' : 'x-lg' }} me-1"></i>{{ issueCount > 0 ? 'Fix &amp; Re-upload' : 'Cancel' }}
+    </a>
+    <a href="{{ path('host_index') }}" class="btn btn-outline-secondary">
+        <i class="bi bi-list me-1"></i>Back to Hosts
+    </a>
+</div>
+{% endblock %}

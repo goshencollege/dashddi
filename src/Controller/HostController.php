@@ -255,7 +255,7 @@ class HostController extends AbstractController
         return $this->json(['error' => 'Unknown action'], 400);
     }
 
-    #[Route('/{id}', name: 'host_show', methods: ['GET'])]
+    #[Route('/{id}', name: 'host_show', methods: ['GET'], requirements: ['id' => '\d+'])]
     public function show(Host $host, DhcpLeaseRepository $leaseRepo): Response
     {
         $macs = array_map(
@@ -268,7 +268,7 @@ class HostController extends AbstractController
         ]);
     }
 
-    #[Route('/{id}/edit', name: 'host_edit', methods: ['GET', 'POST'])]
+    #[Route('/{id}/edit', name: 'host_edit', methods: ['GET', 'POST'], requirements: ['id' => '\d+'])]
     public function edit(Request $request, Host $host, EntityManagerInterface $em): Response
     {
         $form = $this->createForm(HostType::class, $host);
@@ -288,7 +288,7 @@ class HostController extends AbstractController
         ]);
     }
 
-    #[Route('/{id}/restore', name: 'host_restore', methods: ['POST'])]
+    #[Route('/{id}/restore', name: 'host_restore', methods: ['POST'], requirements: ['id' => '\d+'])]
     public function restore(Request $request, Host $host, EntityManagerInterface $em): Response
     {
         if ($this->isCsrfTokenValid('restore_host_' . $host->getId(), $request->request->get('_token'))) {
@@ -302,7 +302,7 @@ class HostController extends AbstractController
         return $this->redirectToRoute('host_show', ['id' => $host->getId()]);
     }
 
-    #[Route('/{id}/delete', name: 'host_delete', methods: ['POST'])]
+    #[Route('/{id}/delete', name: 'host_delete', methods: ['POST'], requirements: ['id' => '\d+'])]
     public function delete(Request $request, Host $host, EntityManagerInterface $em): Response
     {
         if ($this->isCsrfTokenValid('delete_host_' . $host->getId(), $request->request->get('_token'))) {
