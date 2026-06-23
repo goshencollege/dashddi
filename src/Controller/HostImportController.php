@@ -134,6 +134,16 @@ class HostImportController extends AbstractController
             $tags[strtolower($t->getName())] = $t;
         }
 
+        // Create (or locate) a unique import-date tag for this batch.
+        $importTagName = $this->uniqueImportTagName($em, (new \DateTimeImmutable())->format('Y-m-d'));
+        $importTag     = $tags[strtolower($importTagName)] ?? null;
+        if (!$importTag) {
+            $importTag = new Tag();
+            $importTag->setName($importTagName);
+            $em->persist($importTag);
+            $tags[strtolower($importTagName)] = $importTag;
+        }
+
         $hostsCreated = 0;
 
         foreach ($preview['hosts'] as $h) {
@@ -159,6 +169,7 @@ class HostImportController extends AbstractController
                 }
                 $host->addTag($tags[$key]);
             }
+            $host->addTag($importTag);
 
             $em->persist($host);
 
@@ -227,8 +238,9 @@ class HostImportController extends AbstractController
         $request->getSession()->remove('host_csv_import');
 
         $this->addFlash('success', sprintf(
-            'Import complete: %d host(s) created.',
-            $hostsCreated
+            'Import complete: %d host(s) created with tag "%s".',
+            $hostsCreated,
+            $importTagName
         ));
 
         return $this->redirectToRoute('host_index');
@@ -245,6 +257,31 @@ class HostImportController extends AbstractController
                 'Content-Disposition' => 'attachment; filename="host_import_template.csv"',
             ]
         );
+    }
+
+    // -------------------------------------------------------------------------
+    // Import tag helpers
+    // -------------------------------------------------------------------------
+
+    /**
+     * Returns a tag name of the form "import:YYYY-MM-DD" that does not yet
+     * exist, incrementing a numeric suffix on collisions:
+     *   import:2026-06-23, import:2026-06-23-2, import:2026-06-23-3, …
+     */
+    private function uniqueImportTagName(EntityManagerInterface $em, string $date): string
+    {
+        $base    = 'import:' . $date;
+        $tagRepo = $em->getRepository(Tag::class);
+
+        if (!$tagRepo->findOneBy(['name' => $base])) {
+            return $base;
+        }
+
+        $n = 2;
+        while ($tagRepo->findOneBy(['name' => $base . '-' . $n])) {
+            $n++;
+        }
+        return $base . '-' . $n;
     }
 
     // -------------------------------------------------------------------------
