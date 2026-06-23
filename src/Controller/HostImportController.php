@@ -178,10 +178,26 @@ class HostImportController extends AbstractController
                 $em->persist($iface);
 
                 if ($i['ip_address'] && $subnet) {
-                    $ipManager->assignIpv4($iface, $i['ip_address']);
+                    if ($i['ip_address'] === 'auto') {
+                        $ip = $ipManager->findNextAvailableIpv4($subnet);
+                        if ($ip) { $ipManager->assignIpv4($iface, $ip); }
+                    } else {
+                        $ipManager->assignIpv4($iface, $i['ip_address']);
+                    }
                 }
                 if ($i['ipv6_address'] && $subnet) {
-                    $ipManager->assignIpv6($iface, $i['ipv6_address']);
+                    if ($i['ipv6_address'] === 'auto') {
+                        $ip = $ipManager->findNextAvailableIpv6($subnet, $i['mac']);
+                        if ($ip) { $ipManager->assignIpv6($iface, $ip); }
+                    } elseif ($i['ipv6_address'] === 'auto_v4') {
+                        $ipv4 = $iface->getIpAddress()?->getAddress();
+                        if ($ipv4) {
+                            $ip = $ipManager->findIpv6FromIpv4($subnet, $ipv4);
+                            if ($ip) { $ipManager->assignIpv6($iface, $ip); }
+                        }
+                    } else {
+                        $ipManager->assignIpv6($iface, $i['ipv6_address']);
+                    }
                 }
 
                 if (!empty($i['dns_label']) && !empty($i['dns_domain'])) {
@@ -331,8 +347,12 @@ class HostImportController extends AbstractController
         $allIpv6 = [];
         foreach ($entries as $entry) {
             foreach ($entry['interfaces'] as $iface) {
-                if ($iface['ip_address'])   { $allIpv4[] = $iface['ip_address']; }
-                if ($iface['ipv6_address']) { $allIpv6[] = $iface['ipv6_address']; }
+                if ($iface['ip_address'] && !in_array($iface['ip_address'], ['auto'], true)) {
+                    $allIpv4[] = $iface['ip_address'];
+                }
+                if ($iface['ipv6_address'] && !in_array($iface['ipv6_address'], ['auto', 'auto_v4'], true)) {
+                    $allIpv6[] = $iface['ipv6_address'];
+                }
             }
         }
 
@@ -442,14 +462,14 @@ class HostImportController extends AbstractController
                     }
                 }
 
-                if ($iface['ip_address']) {
+                if ($iface['ip_address'] && $iface['ip_address'] !== 'auto') {
                     if (isset($usedIpv4[$iface['ip_address']]) || isset($seenIpv4[$iface['ip_address']])) {
                         $conflicts[] = 'IPv4 ' . $iface['ip_address'] . ' already assigned';
                     } else {
                         $seenIpv4[$iface['ip_address']] = true;
                     }
                 }
-                if ($iface['ipv6_address']) {
+                if ($iface['ipv6_address'] && !in_array($iface['ipv6_address'], ['auto', 'auto_v4'], true)) {
                     if (isset($usedIpv6[$iface['ipv6_address']]) || isset($seenIpv6[$iface['ipv6_address']])) {
                         $conflicts[] = 'IPv6 ' . $iface['ipv6_address'] . ' already assigned';
                     } else {

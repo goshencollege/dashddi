@@ -142,8 +142,18 @@
                             {% endif %}
                         </td>
                         <td class="small ip-address">
-                            {% if i.ip_address %}{{ i.ip_address }}{% endif %}
-                            {% if i.ipv6_address %}<br><span class="text-muted small">{{ i.ipv6_address }}</span>{% endif %}
+                            {% if i.ip_address == 'auto' %}
+                                <span class="badge bg-secondary">auto</span>
+                            {% elseif i.ip_address %}
+                                {{ i.ip_address }}
+                            {% endif %}
+                            {% if i.ipv6_address == 'auto' %}
+                                <br><span class="badge bg-secondary">auto</span>
+                            {% elseif i.ipv6_address == 'auto_v4' %}
+                                <br><span class="badge bg-secondary">auto (from IPv4)</span>
+                            {% elseif i.ipv6_address %}
+                                <br><span class="text-muted small">{{ i.ipv6_address }}</span>
+                            {% endif %}
                             {% if not i.ip_address and not i.ipv6_address %}<span class="text-muted">—</span>{% endif %}
                         </td>
                         <td>
