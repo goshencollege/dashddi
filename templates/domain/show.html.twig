@@ -226,8 +226,7 @@
                             {% if record.networkInterface %}
                                 {% set iface = record.networkInterface %}
                                 <a href="{{ path('interface_show', {id: iface.id}) }}" class="text-decoration-none small{% if iface_deleted %} text-warning-emphasis{% endif %}">
-                                    {% if iface.host %}{{ iface.host.name }}{% else %}<span class="text-muted fst-italic">no host</span>{% endif %}
-                                    <br><span class="font-monospace text-muted">{{ iface.name ?: iface.macAddress }}</span>
+                                    {% if iface.host %}{{ iface.host.name }}: {% endif %}<span class="font-monospace">{{ iface.name ?: iface.macAddress }}</span>
                                 </a>
                             {% else %}
                                 <span class="text-muted">—</span>
