@@ -87,18 +87,20 @@
                 {% if form.views is defined %}
                 <div class="mb-4">
                     {{ form_label(form.views, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
-                    {% if form.views|length > 0 %}
-                        <div class="d-flex flex-wrap gap-3">
-                            {% for viewWidget in form.views %}
-                                <div class="form-check">
-                                    {{ form_widget(viewWidget, {attr: {class: 'form-check-input'}}) }}
-                                    {{ form_label(viewWidget, null, {label_attr: {class: 'form-check-label'}}) }}
-                                </div>
-                            {% endfor %}
-                        </div>
-                    {% else %}
-                        <p class="text-muted small mb-0">Select a domain first to see available views.</p>
-                    {% endif %}
+                    <div id="views-section">
+                        {% if form.views|length > 0 %}
+                            <div class="d-flex flex-wrap gap-3">
+                                {% for viewWidget in form.views %}
+                                    <div class="form-check">
+                                        {{ form_widget(viewWidget, {attr: {class: 'form-check-input'}}) }}
+                                        {{ form_label(viewWidget, null, {label_attr: {class: 'form-check-label'}}) }}
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <p class="text-muted small mb-0">Select a domain first to see available views.</p>
+                        {% endif %}
+                    </div>
                     {{ form_errors(form.views) }}
                 </div>
                 {% endif %}
@@ -109,9 +111,49 @@
                         <i class="bi bi-check-lg me-1"></i>{{ record.id ? 'Save Changes' : 'Add Record' }}
                     </button>
                 </div>
-                {{ form_end(form) }}
+                {{ form_widget(form._token) }}
+                {{ form_end(form, {render_rest: false}) }}
             </div>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+{% if form.domain is defined %}
+<script>
+(function () {
+    const domainSelect      = document.querySelector('[name="domain_record[domain]"]');
+    const viewsSection      = document.getElementById('views-section');
+    const availableViewsUrl = {{ path('interface_domain_record_views', {id: interface.id})|json_encode|raw }};
+
+    if (!domainSelect || !viewsSection) return;
+
+    domainSelect.addEventListener('change', async function () {
+        const domainId = domainSelect.value;
+        if (!domainId) {
+            viewsSection.innerHTML = '<p class="text-muted small mb-0">Select a domain first to see available views.</p>';
+            return;
+        }
+        try {
+            const res   = await fetch(availableViewsUrl + '?domain_id=' + encodeURIComponent(domainId));
+            const views = await res.json();
+            if (views.length === 0) {
+                viewsSection.innerHTML = '<p class="text-muted small mb-0">No views configured for this domain.</p>';
+            } else {
+                viewsSection.innerHTML = '<div class="d-flex flex-wrap gap-3">' +
+                    views.map(v =>
+                        `<div class="form-check">` +
+                        `<input class="form-check-input" type="checkbox" name="domain_record[views][]" value="${v.id}" id="view_${v.id}">` +
+                        `<label class="form-check-label" for="view_${v.id}">${v.name}</label>` +
+                        `</div>`
+                    ).join('') + '</div>';
+            }
+        } catch {
+            viewsSection.innerHTML = '<p class="text-danger small mb-0">Failed to load views.</p>';
+        }
+    });
+})();
+</script>
+{% endif %}
 {% endblock %}
