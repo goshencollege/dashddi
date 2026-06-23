@@ -197,11 +197,15 @@
             </thead>
             <tbody>
                 {% for record in records %}
-                    <tr>
+                    {% set iface_deleted = record.networkInterface and record.networkInterface.deleted %}
+                    <tr{% if iface_deleted %} class="table-warning"{% endif %}>
                         <td class="font-monospace">
                             {{ record.hostname }}
                             {% if record.canonical %}
                                 <span class="badge bg-primary ms-1" title="Canonical — used for PTR reverse DNS">PTR</span>
+                            {% endif %}
+                            {% if iface_deleted %}
+                                <span class="badge bg-warning text-dark ms-1" title="The host owning this interface has been deleted — this record is excluded from DNS pushes">Host deleted</span>
                             {% endif %}
                         </td>
                         <td><span class="badge bg-secondary">{{ record.type.value }}</span></td>
@@ -220,9 +224,12 @@
                         </td>
                         <td style="white-space:nowrap">
                             {% if record.networkInterface and record.networkInterface.host %}
-                                <a href="{{ path('host_show', {id: record.networkInterface.host.id}) }}" class="text-decoration-none small">
+                                <a href="{{ path('host_show', {id: record.networkInterface.host.id}) }}" class="text-decoration-none small{% if iface_deleted %} text-warning-emphasis{% endif %}">
                                     {{ record.networkInterface.host.name }}
                                 </a>
+                                {% if iface_deleted %}
+                                    <span class="text-muted small ms-1">(deleted)</span>
+                                {% endif %}
                             {% else %}
                                 <span class="text-muted">—</span>
                             {% endif %}
