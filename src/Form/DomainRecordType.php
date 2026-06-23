@@ -44,9 +44,10 @@ class DomainRecordType extends AbstractType
                 'choice_label' => fn(RecordType $t) => $t->value,
             ])
             ->add('value', TextType::class, [
-                'label'    => 'Value',
-                'required' => false,
-                'attr'     => ['placeholder' => 'e.g. 192.168.1.1  or  mail.example.com.'],
+                'label'      => 'Value',
+                'required'   => false,
+                'empty_data' => '',
+                'attr'       => ['placeholder' => 'e.g. 192.168.1.1  or  mail.example.com.'],
             ])
             ->add('ttl', IntegerType::class, [
                 'required' => false,
