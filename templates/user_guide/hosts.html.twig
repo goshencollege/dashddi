@@ -191,14 +191,16 @@
         </ul>
         <h6>Conflict handling</h6>
         <p>The import is all-or-nothing: <strong>any issue blocks the entire import</strong>. Fix the CSV and re-upload to proceed. Issues that block import:</p>
-        <ul class="mb-0">
+        <ul>
             <li>Blank or invalid MAC address (caught at parse time with a line number).</li>
-            <li>Hostname already exists in the database (soft-deleted hosts do not block — the import replaces them).</li>
+            <li>Hostname already exists as a live (non-deleted) host.</li>
             <li>MAC address already assigned to a live interface.</li>
             <li>Subnet CIDR does not match any existing subnet.</li>
             <li>DNS name does not match any known domain.</li>
             <li>IP address already assigned to a live interface, or duplicated within the file.</li>
         </ul>
+        <h6>Replacing soft-deleted hosts</h6>
+        <p class="mb-0">If a hostname in the CSV matches a <strong>soft-deleted</strong> host, the import treats it as available and creates a fresh host in its place. IP addresses previously held by the deleted host's interfaces are also freed automatically, so those addresses can be re-assigned to the new host without conflict.</p>
     </div>
 </div>
 
