@@ -183,16 +183,21 @@
         <p>Required columns: <code>hostname</code>, <code>mac_address</code>. All other columns are optional.</p>
         <ul>
             <li><strong>building</strong> — matched to an existing building by name (case-insensitive); left blank if not found.</li>
-            <li><strong>tags</strong> — semicolon-separated tag names (e.g. <code>tag1;tag2</code>); must match existing tags.</li>
-            <li><strong>subnet</strong> — CIDR notation (e.g. <code>192.168.1.0/24</code>); must match an existing subnet for IPs to be assigned.</li>
-            <li><strong>ip_address</strong> / <strong>ipv6_address</strong> — only assigned when a matching subnet is found.</li>
+            <li><strong>tags</strong> — semicolon-separated tag names (e.g. <code>tag1;tag2</code>); unknown tags are created automatically.</li>
+            <li><strong>subnet</strong> — CIDR notation (e.g. <code>192.168.1.0/24</code>); must match an existing subnet.</li>
+            <li><strong>ip_address</strong> — a specific IPv4 address, or <code>auto</code> to assign the next available address in the subnet.</li>
+            <li><strong>ipv6_address</strong> — a specific IPv6 address, <code>auto</code> to assign the next available address, or <code>auto_v4</code> to derive the address from the assigned IPv4.</li>
+            <li><strong>dns_name</strong> — a fully-qualified domain name (e.g. <code>myhost.example.com</code>); the longest matching known domain is used. DNS views are selected automatically based on the subnet and domain.</li>
         </ul>
         <h6>Conflict handling</h6>
+        <p>The import is all-or-nothing: <strong>any issue blocks the entire import</strong>. Fix the CSV and re-upload to proceed. Issues that block import:</p>
         <ul class="mb-0">
-            <li>Rows with a blank or invalid MAC are rejected at parse time with a line-number error.</li>
-            <li>Hosts whose name already exists in the database are skipped.</li>
-            <li>Individual interfaces whose MAC already exists are skipped; the host is still created if it has at least one new interface.</li>
-            <li>Interfaces with an IP that is already assigned (or duplicated within the file) are marked as conflicts and skipped.</li>
+            <li>Blank or invalid MAC address (caught at parse time with a line number).</li>
+            <li>Hostname already exists in the database (soft-deleted hosts do not block — the import replaces them).</li>
+            <li>MAC address already assigned to a live interface.</li>
+            <li>Subnet CIDR does not match any existing subnet.</li>
+            <li>DNS name does not match any known domain.</li>
+            <li>IP address already assigned to a live interface, or duplicated within the file.</li>
         </ul>
     </div>
 </div>
