@@ -218,7 +218,7 @@
                                 {{ record.value }}
                             {% endif %}
                         </td>
-                        <td>
+                        <td style="white-space:nowrap">
                             {% if record.networkInterface and record.networkInterface.host %}
                                 <a href="{{ path('host_show', {id: record.networkInterface.host.id}) }}" class="text-decoration-none small">
                                     {{ record.networkInterface.host.name }}
