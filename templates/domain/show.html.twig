@@ -198,7 +198,7 @@
             <tbody>
                 {% for record in records %}
                     {% set iface_deleted = record.networkInterface and record.networkInterface.deleted %}
-                    <tr{% if iface_deleted %} class="table-warning"{% endif %}>
+                    <tr{% if iface_deleted %} class="row-deleted"{% endif %}>
                         <td class="font-monospace">
                             {{ record.hostname }}
                             {% if record.canonical %}
