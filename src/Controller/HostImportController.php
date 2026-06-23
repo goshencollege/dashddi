@@ -5,11 +5,11 @@ namespace App\Controller;
 use App\Entity\Building;
 use App\Entity\Domain;
 use App\Entity\Host;
+use App\Entity\IpAddress;
 use App\Entity\InterfaceName;
+use App\Entity\Ipv6Address;
 use App\Entity\NetworkInterface;
 use App\Entity\Tag;
-use App\Repository\IpAddressRepository;
-use App\Repository\Ipv6AddressRepository;
 use App\Repository\NetworkInterfaceRepository;
 use App\Repository\SubnetRepository;
 use App\Service\DnsViewResolver;
@@ -30,8 +30,6 @@ class HostImportController extends AbstractController
         HostCsvParser $parser,
         EntityManagerInterface $em,
         NetworkInterfaceRepository $interfaceRepo,
-        IpAddressRepository $ipRepo,
-        Ipv6AddressRepository $ipv6Repo,
         SubnetRepository $subnetRepo,
     ): Response {
         if (!$request->isMethod('POST')) {
@@ -64,7 +62,7 @@ class HostImportController extends AbstractController
             return $this->redirectToRoute('host_import');
         }
 
-        $preview = $this->buildPreview($parsed['entries'], $em, $interfaceRepo, $ipRepo, $ipv6Repo, $subnetRepo);
+        $preview = $this->buildPreview($parsed['entries'], $em, $interfaceRepo, $subnetRepo);
 
         $request->getSession()->set('host_csv_import', $preview);
 
@@ -115,6 +113,10 @@ class HostImportController extends AbstractController
                 }
             }
         }
+
+        // Free any IpAddress/Ipv6Address rows still held by soft-deleted interfaces
+        // so we can reassign those addresses without hitting unique constraint violations.
+        $this->releaseDeletedInterfaceIps($em, $preview['hosts']);
 
         // Pre-load domains for DNS name creation
         $domains = [];
@@ -246,6 +248,81 @@ class HostImportController extends AbstractController
     }
 
     // -------------------------------------------------------------------------
+    // Soft-delete helpers
+    // -------------------------------------------------------------------------
+
+    /**
+     * Removes IpAddress/Ipv6Address rows still held by soft-deleted interfaces
+     * for any specific addresses in the import, so those addresses can be
+     * re-assigned without hitting the unique constraint on flush.
+     *
+     * @param array $hosts preview['hosts']
+     */
+    private function releaseDeletedInterfaceIps(EntityManagerInterface $em, array $hosts): void
+    {
+        $specificIpv4 = [];
+        $specificIpv6 = [];
+        foreach ($hosts as $h) {
+            foreach ($h['interfaces'] as $i) {
+                if ($i['ip_address'] && $i['ip_address'] !== 'auto') {
+                    $specificIpv4[] = $i['ip_address'];
+                }
+                if ($i['ipv6_address'] && !in_array($i['ipv6_address'], ['auto', 'auto_v4'], true)) {
+                    $specificIpv6[] = $i['ipv6_address'];
+                }
+            }
+        }
+
+        $changed = false;
+
+        if ($specificIpv4) {
+            $existing = $em->createQueryBuilder()
+                ->select('ip')
+                ->from(IpAddress::class, 'ip')
+                ->where('ip.address IN (:addrs)')
+                ->setParameter('addrs', $specificIpv4)
+                ->getQuery()->getResult();
+            foreach ($existing as $ip) {
+                // Null out the FK on the owning (deleted) interface via DQL so
+                // Doctrine does not try to re-persist a stale identity-map entry.
+                $em->createQueryBuilder()
+                    ->update(NetworkInterface::class, 'ni')
+                    ->set('ni.ipAddress', ':null')
+                    ->where('ni.ipAddress = :ip')
+                    ->setParameter('null', null)
+                    ->setParameter('ip', $ip)
+                    ->getQuery()->execute();
+                $em->remove($ip);
+                $changed = true;
+            }
+        }
+
+        if ($specificIpv6) {
+            $existing = $em->createQueryBuilder()
+                ->select('ip')
+                ->from(Ipv6Address::class, 'ip')
+                ->where('ip.address IN (:addrs)')
+                ->setParameter('addrs', $specificIpv6)
+                ->getQuery()->getResult();
+            foreach ($existing as $ip) {
+                $em->createQueryBuilder()
+                    ->update(NetworkInterface::class, 'ni')
+                    ->set('ni.ipv6Address', ':null')
+                    ->where('ni.ipv6Address = :ip')
+                    ->setParameter('null', null)
+                    ->setParameter('ip', $ip)
+                    ->getQuery()->execute();
+                $em->remove($ip);
+                $changed = true;
+            }
+        }
+
+        if ($changed) {
+            $em->flush();
+        }
+    }
+
+    // -------------------------------------------------------------------------
     // FQDN resolver
     // -------------------------------------------------------------------------
 
@@ -282,8 +359,6 @@ class HostImportController extends AbstractController
         array $entries,
         EntityManagerInterface $em,
         NetworkInterfaceRepository $interfaceRepo,
-        IpAddressRepository $ipRepo,
-        Ipv6AddressRepository $ipv6Repo,
         SubnetRepository $subnetRepo,
     ): array {
         // Pre-load all existing host names
@@ -356,25 +431,32 @@ class HostImportController extends AbstractController
             }
         }
 
+        // Only count IPs assigned to non-deleted interfaces as conflicts.
         $usedIpv4 = [];
         if ($allIpv4) {
-            $rows = $ipRepo->createQueryBuilder('ip')
+            $rows = $em->createQueryBuilder()
+                ->select('ip.address')
+                ->from(IpAddress::class, 'ip')
+                ->join(NetworkInterface::class, 'ni', 'WITH', 'ni.ipAddress = ip AND ni.deletedAt IS NULL')
                 ->where('ip.address IN (:addrs)')
                 ->setParameter('addrs', array_values(array_unique($allIpv4)))
-                ->getQuery()->getResult();
+                ->getQuery()->getScalarResult();
             foreach ($rows as $row) {
-                $usedIpv4[$row->getAddress()] = true;
+                $usedIpv4[$row['address']] = true;
             }
         }
 
         $usedIpv6 = [];
         if ($allIpv6) {
-            $rows = $ipv6Repo->createQueryBuilder('ip')
+            $rows = $em->createQueryBuilder()
+                ->select('ip.address')
+                ->from(Ipv6Address::class, 'ip')
+                ->join(NetworkInterface::class, 'ni', 'WITH', 'ni.ipv6Address = ip AND ni.deletedAt IS NULL')
                 ->where('ip.address IN (:addrs)')
                 ->setParameter('addrs', array_values(array_unique($allIpv6)))
-                ->getQuery()->getResult();
+                ->getQuery()->getScalarResult();
             foreach ($rows as $row) {
-                $usedIpv6[$row->getAddress()] = true;
+                $usedIpv6[$row['address']] = true;
             }
         }
 
