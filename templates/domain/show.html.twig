@@ -142,18 +142,76 @@
 {% endif %}
 
 {# Search bar #}
-<form method="get" action="{{ path('domain_show', {id: domain.id}) }}" class="mb-4">
-    <div class="input-group">
-        <span class="input-group-text"><i class="bi bi-search"></i></span>
-        <input type="search" name="q" class="form-control"
-               placeholder="Search DNS records…"
-               value="{{ q }}">
-        <button type="submit" class="btn btn-outline-secondary">Search</button>
-        {% if q %}
-            <a href="{{ path('domain_show', {id: domain.id}) }}" class="btn btn-outline-secondary">Clear</a>
-        {% endif %}
+<div class="mb-4">
+    <form method="get" action="{{ path('domain_show', {id: domain.id}) }}" class="mb-2" id="simple-search-form">
+        <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-search"></i></span>
+            <input type="search" name="q" class="form-control"
+                   placeholder="Search DNS records by hostname, value, host, or IP…"
+                   value="{{ q }}">
+            <button type="submit" class="btn btn-outline-secondary">Search</button>
+            {% if q or isAdvanced %}
+                <a href="{{ path('domain_show', {id: domain.id, reset: 1}) }}" class="btn btn-outline-secondary">Clear</a>
+            {% endif %}
+            <button type="button" class="btn btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#advanced-search"
+                    aria-expanded="{{ isAdvanced ? 'true' : 'false' }}">
+                <i class="bi bi-sliders me-1"></i>Advanced
+            </button>
+        </div>
+    </form>
+
+    {# Advanced search #}
+    <div class="collapse {{ isAdvanced ? 'show' : '' }}" id="advanced-search">
+        <form method="get" action="{{ path('domain_show', {id: domain.id}) }}">
+            <div class="card card-body">
+                <div class="row g-2 mb-2">
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold mb-1">Hostname</label>
+                        <input type="text" name="hostname" class="form-control form-control-sm font-monospace"
+                               value="{{ criteria.hostname ?? '' }}" placeholder="e.g. web* or mail">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small fw-semibold mb-1">Type</label>
+                        <select name="type" class="form-select form-select-sm">
+                            <option value="">— Any —</option>
+                            {% for rt in recordTypes %}
+                                <option value="{{ rt.value }}" {{ (criteria.type ?? '') == rt.value ? 'selected' }}>{{ rt.value }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small fw-semibold mb-1">Value</label>
+                        <input type="text" name="value" class="form-control form-control-sm font-monospace"
+                               value="{{ criteria.value ?? '' }}" placeholder="e.g. 10.0.* or target.host">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small fw-semibold mb-1">Linked Host</label>
+                        <input type="text" name="host" class="form-control form-control-sm"
+                               value="{{ criteria.host ?? '' }}" placeholder="e.g. server-01 or web*">
+                    </div>
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold mb-1">DNS View</label>
+                        <select name="view" class="form-select form-select-sm">
+                            <option value="">— Any —</option>
+                            {% for view in views %}
+                                <option value="{{ view.id }}" {{ (criteria.view ?? '') == (view.id ~ '') ? 'selected' }}>{{ view.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="d-flex gap-2 align-items-center">
+                    <button type="submit" class="btn btn-sm btn-primary">
+                        <i class="bi bi-search me-1"></i>Search
+                    </button>
+                    <a href="{{ path('domain_show', {id: domain.id, reset: 1}) }}" class="btn btn-sm btn-outline-secondary">Clear</a>
+                    <span class="text-muted small ms-2">Use <code>*</code> as a wildcard (e.g. <code>web*</code>, <code>10.0.*</code>)</span>
+                </div>
+            </div>
+        </form>
     </div>
-</form>
+</div>
 
 {# Unified DNS Records #}
 <div class="card mb-4">
@@ -161,7 +219,7 @@
         <span>
             <i class="bi bi-list-ul me-1"></i>DNS Records
             <span class="badge bg-secondary ms-1">{{ pag.total }}</span>
-            {% if q %}<span class="text-muted small ms-1">matching "{{ q }}"</span>{% endif %}
+            {% if q %}<span class="text-muted small ms-1">matching "{{ q }}"</span>{% elseif isAdvanced %}<span class="text-muted small ms-1">filtered</span>{% endif %}
         </span>
         <div class="d-flex gap-2">
             <a href="{{ path('zone_import_upload', {id: domain.id}) }}" class="btn btn-sm btn-outline-secondary">
@@ -176,6 +234,8 @@
         <div class="card-body text-center text-muted py-3">
             {% if q %}
                 No records matched <strong>{{ q }}</strong>.
+            {% elseif isAdvanced %}
+                No records matched the search criteria. <a href="{{ path('domain_show', {id: domain.id, reset: 1}) }}">Clear search →</a>
             {% else %}
                 No records yet. <a href="{{ path('domain_record_new', {domainId: domain.id}) }}">Add one →</a>
             {% endif %}
