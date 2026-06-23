@@ -200,7 +200,7 @@
             <li>IP address already assigned to a live interface, or duplicated within the file.</li>
         </ul>
         <h6>Import date tag</h6>
-        <p>Every import run automatically creates and applies a tag of the form <code>import:YYYY-MM-DD</code> to all imported hosts. If more than one import runs on the same day, a numeric suffix is added (<code>import:2026-06-23-2</code>, <code>import:2026-06-23-3</code>, …) so each batch gets a distinct tag. The tag name is shown in the confirmation message after import.</p>
+        <p>Every import run automatically creates and applies a tag of the form <code>import:YYYY-MM-DD</code> to all imported hosts. If more than one import runs on the same day, a numeric suffix is added (<code>import:2026-06-23:2</code>, <code>import:2026-06-23:3</code>, …) so each batch gets a distinct tag. The tag name is shown in the confirmation message after import.</p>
         <h6>Replacing soft-deleted hosts</h6>
         <p class="mb-0">If a hostname in the CSV matches a <strong>soft-deleted</strong> host, the import treats it as available and creates a fresh host in its place. IP addresses previously held by the deleted host's interfaces are also freed automatically, so those addresses can be re-assigned to the new host without conflict.</p>
     </div>

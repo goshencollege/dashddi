@@ -278,10 +278,10 @@ class HostImportController extends AbstractController
         }
 
         $n = 2;
-        while ($tagRepo->findOneBy(['name' => $base . '-' . $n])) {
+        while ($tagRepo->findOneBy(['name' => $base . ':' . $n])) {
             $n++;
         }
-        return $base . '-' . $n;
+        return $base . ':' . $n;
     }
 
     // -------------------------------------------------------------------------
