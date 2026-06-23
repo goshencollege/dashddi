@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\Domain;
+use App\Enum\RecordType;
 use App\Form\DomainType;
 use App\Repository\DnsViewRepository;
 use App\Repository\DomainRecordRepository;
@@ -53,23 +54,61 @@ class DomainController extends AbstractController
         Domain $domain,
         Request $request,
         DomainRecordRepository $recordRepo,
+        DnsViewRepository $viewRepo,
     ): Response {
-        $q    = trim($request->query->getString('q'));
-        $page = max(1, $request->query->getInt('page', 1));
+        $page  = max(1, $request->query->getInt('page', 1));
+        $reset = $request->query->getBoolean('reset');
 
-        ['records' => $records, 'total' => $total] =
-            $recordRepo->searchPaginated($domain, $q, $page, self::PER_PAGE);
+        $advancedFields = ['hostname', 'type', 'value', 'host', 'view'];
+        $q          = '';
+        $criteria   = [];
+        $isAdvanced = false;
+
+        if ($reset) {
+            return $this->redirectToRoute('domain_show', ['id' => $domain->getId()]);
+        }
+
+        $hasExplicitState = $request->query->has('q')
+            || $request->query->has('page')
+            || (bool) array_filter($advancedFields, fn($f) => $request->query->has($f));
+
+        if ($hasExplicitState) {
+            $q = trim($request->query->getString('q'));
+            foreach ($advancedFields as $field) {
+                $val = trim($request->query->getString($field));
+                if ($val !== '') {
+                    $criteria[$field] = $val;
+                }
+            }
+        }
+
+        $isAdvanced = !empty($criteria);
+
+        if ($isAdvanced) {
+            ['records' => $records, 'total' => $total] =
+                $recordRepo->advancedSearchPaginated($domain, $criteria, $page, self::PER_PAGE);
+        } else {
+            ['records' => $records, 'total' => $total] =
+                $recordRepo->searchPaginated($domain, $q, $page, self::PER_PAGE);
+        }
 
         $baseParams = ['id' => $domain->getId()];
         if ($q !== '') {
             $baseParams['q'] = $q;
         }
+        foreach ($criteria as $k => $v) {
+            $baseParams[$k] = $v;
+        }
 
         return $this->render('domain/show.html.twig', [
-            'domain'  => $domain,
-            'q'       => $q,
-            'records' => $records,
-            'pag'     => [
+            'domain'     => $domain,
+            'q'          => $q,
+            'criteria'   => $criteria,
+            'isAdvanced' => $isAdvanced,
+            'records'    => $records,
+            'views'      => $viewRepo->findBy([], ['name' => 'ASC']),
+            'recordTypes' => RecordType::cases(),
+            'pag'        => [
                 'page'        => $page,
                 'pages'       => max(1, (int) ceil($total / self::PER_PAGE)),
                 'per_page'    => self::PER_PAGE,
