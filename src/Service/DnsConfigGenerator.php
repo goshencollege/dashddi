@@ -7,6 +7,7 @@ use App\Entity\DnsServer;
 use App\Entity\DnsView;
 use App\Entity\NetworkInterface;
 use App\Entity\Subnet;
+use App\Enum\RecordType;
 use App\Repository\DnsAclRepository;
 use App\Repository\DnssecPolicyRepository;
 use App\Repository\DomainRepository;
@@ -74,42 +75,40 @@ class DnsConfigGenerator
         $lines[] = sprintf('@ IN NS %s', $nameserver);
         $lines[] = '';
 
-        // A/AAAA from interface names
-        $ifaceLines = [];
-        foreach ($domain->getInterfaceNames() as $ifaceName) {
-            if (!$this->inView($view, $ifaceName->getViews()->toArray())) {
-                continue;
-            }
-            $iface = $ifaceName->getNetworkInterface();
-            if (!$iface || $iface->isDeleted()) {
-                continue;
-            }
-            $label = $ifaceName->getName();
-            $ttl   = $ifaceName->getTtl() ? (' ' . $ifaceName->getTtl()) : '';
-            if ($iface->getIpAddress()) {
-                $ifaceLines[] = sprintf('%s%s IN A %s', $label, $ttl, $iface->getIpAddress()->getAddress());
-            }
-            if ($iface->getIpv6Address()) {
-                $ifaceLines[] = sprintf('%s%s IN AAAA %s', $label, $ttl, $iface->getIpv6Address()->getAddress());
-            }
-        }
-        if (!empty($ifaceLines)) {
-            $lines[] = '; Interface names';
-            array_push($lines, ...$ifaceLines);
-            $lines[] = '';
-        }
-
-        // Manual records
+        // All DNS records (manual and interface-linked)
         $recordLines = [];
         foreach ($domain->getRecords() as $record) {
             if (!$this->inView($view, $record->getViews()->toArray())) {
                 continue;
             }
-            $ttl           = $record->getTtl() ? (' ' . $record->getTtl()) : '';
-            $recordLines[] = sprintf('%s%s IN %s %s', $record->getHostname(), $ttl, $record->getType()->value, $record->getValue());
+            $ttl = $record->getTtl() ? (' ' . $record->getTtl()) : '';
+            $iface = $record->getNetworkInterface();
+            if ($iface !== null) {
+                if ($iface->isDeleted()) {
+                    continue;
+                }
+                // Derive value from interface IP for A/AAAA records
+                if ($record->getType() === RecordType::A) {
+                    $ip = $iface->getIpAddress();
+                    if (!$ip) {
+                        continue;
+                    }
+                    $recordLines[] = sprintf('%s%s IN A %s', $record->getHostname(), $ttl, $ip->getAddress());
+                } elseif ($record->getType() === RecordType::AAAA) {
+                    $ip = $iface->getIpv6Address();
+                    if (!$ip) {
+                        continue;
+                    }
+                    $recordLines[] = sprintf('%s%s IN AAAA %s', $record->getHostname(), $ttl, $ip->getAddress());
+                } else {
+                    // Other types (TXT, HTTPS, etc.) linked to an interface use the stored value
+                    $recordLines[] = sprintf('%s%s IN %s %s', $record->getHostname(), $ttl, $record->getType()->value, $record->getValue());
+                }
+            } else {
+                $recordLines[] = sprintf('%s%s IN %s %s', $record->getHostname(), $ttl, $record->getType()->value, $record->getValue());
+            }
         }
         if (!empty($recordLines)) {
-            $lines[] = '; Manual records';
             array_push($lines, ...$recordLines);
             $lines[] = '';
         }
@@ -161,7 +160,7 @@ class DnsConfigGenerator
                 continue;
             }
 
-            $hostname = $this->ptrHostname($iface, $view);
+            $hostname = $this->ptrHostname($iface, $view, $isIpv6);
             if (!$hostname) {
                 continue;
             }
@@ -456,19 +455,23 @@ class DnsConfigGenerator
         return implode('.', array_reverse(array_slice($nibbles, $nibbleCount)));
     }
 
-    private function ptrHostname(NetworkInterface $iface, ?DnsView $view): ?string
+    private function ptrHostname(NetworkInterface $iface, ?DnsView $view, bool $isIpv6 = false): ?string
     {
-        foreach ($iface->getNames() as $name) {
-            if (!$name->isCanonical()) {
+        $canonicalType = $isIpv6 ? RecordType::AAAA : RecordType::A;
+        foreach ($iface->getDomainRecords() as $record) {
+            if (!$record->isCanonical()) {
                 continue;
             }
-            if (!$name->getDomain()) {
+            if ($record->getType() !== $canonicalType) {
                 continue;
             }
-            if ($view !== null && !$this->inView($view, $name->getViews()->toArray())) {
+            if (!$record->getDomain()) {
                 continue;
             }
-            return $name->getFullyQualifiedName() . '.';
+            if ($view !== null && !$this->inView($view, $record->getViews()->toArray())) {
+                continue;
+            }
+            return $record->getFullyQualifiedHostname() . '.';
         }
         return null;
     }

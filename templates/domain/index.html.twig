@@ -29,7 +29,6 @@
                             <th>Name</th>
                             <th>Description</th>
                             <th>Records</th>
-                            <th>Names</th>
                             <th>DNSSEC</th>
                             <th>Last Modified</th>
                             <th class="text-end">Actions</th>
@@ -45,7 +44,6 @@
                                 </td>
                                 <td class="text-muted">{{ domain.description ?: '—' }}</td>
                                 <td><span class="badge bg-secondary rounded-pill">{{ domain.records|length }}</span></td>
-                                <td><span class="badge bg-secondary rounded-pill">{{ domain.interfaceNames|length }}</span></td>
                                 <td>
                                     {% if domain.dnssecPolicy %}
                                         <span class="badge bg-success-subtle text-success border border-success-subtle">

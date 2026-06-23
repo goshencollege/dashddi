@@ -386,9 +386,9 @@
                                     </td>
                                     <td class="small font-monospace">
                                         {% set fqdns = [] %}
-                                        {% for iname in iface.names %}
-                                            {% if iname.domain %}
-                                                {% set fqdns = fqdns|merge([iname.fullyQualifiedName]) %}
+                                        {% for record in iface.domainRecords %}
+                                            {% if record.domain %}
+                                                {% set fqdns = fqdns|merge([record.fullyQualifiedHostname]) %}
                                             {% endif %}
                                         {% endfor %}
                                         {% if fqdns is empty %}

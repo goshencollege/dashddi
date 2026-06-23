@@ -75,18 +75,14 @@ class Domain
     #[ORM\OrderBy(['hostname' => 'ASC'])]
     private Collection $records;
 
-    #[ORM\OneToMany(targetEntity: InterfaceName::class, mappedBy: 'domain')]
-    private Collection $interfaceNames;
-
     #[ORM\ManyToMany(targetEntity: DnsView::class)]
     #[ORM\JoinTable(name: 'domain_dns_view')]
     private Collection $views;
 
     public function __construct()
     {
-        $this->records        = new ArrayCollection();
-        $this->interfaceNames = new ArrayCollection();
-        $this->views          = new ArrayCollection();
+        $this->records = new ArrayCollection();
+        $this->views   = new ArrayCollection();
     }
 
     public function getId(): ?int { return $this->id; }
@@ -125,7 +121,6 @@ class Domain
     public function setDdnsDnsServer(?DnsServer $v): static { $this->ddnsDnsServer = $v; return $this; }
 
     public function getRecords(): Collection { return $this->records; }
-    public function getInterfaceNames(): Collection { return $this->interfaceNames; }
 
     public function getViews(): Collection { return $this->views; }
 

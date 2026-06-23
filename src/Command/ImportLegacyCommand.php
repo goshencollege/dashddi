@@ -10,7 +10,6 @@ use App\Entity\DnsView;
 use App\Entity\Domain;
 use App\Entity\DomainRecord;
 use App\Entity\Host;
-use App\Entity\InterfaceName;
 use App\Entity\IpAddress;
 use App\Entity\Ipv6Address;
 use App\Entity\NetworkInterface;
@@ -254,8 +253,6 @@ class ImportLegacyCommand extends Command
     private function truncateImportedTables(\Doctrine\DBAL\Connection $conn, SymfonyStyle $io): void
     {
         $tables = [
-            'interface_name_dns_view',
-            'interface_name',
             'ip_address',
             'ipv6_address',
             'network_interface',
@@ -726,16 +723,50 @@ class ImportLegacyCommand extends Command
             if ($hasIp || !$row['revgc']) {
                 // Canonical name from host.name
                 if ($this->isValidDnsLabel($row['name'])) {
-                    $canonical = new InterfaceName();
-                    $canonical->setName($row['name']);
-                    $canonical->setDomain($canonicalDomain);
-                    $canonical->setIsCanonical(true);
-                    foreach ($canonicalViews as $view) {
-                        $canonical->addView($view);
+                    $hasIpv4 = $iface->getIpAddress() !== null;
+                    $hasIpv6 = $iface->getIpv6Address() !== null;
+                    if ($hasIpv4) {
+                        $canonical = new DomainRecord();
+                        $canonical->setHostname($row['name']);
+                        $canonical->setDomain($canonicalDomain);
+                        $canonical->setNetworkInterface($iface);
+                        $canonical->setType(RecordType::A);
+                        $canonical->setIsCanonical(true);
+                        foreach ($canonicalViews as $view) {
+                            $canonical->addView($view);
+                        }
+                        if (!$dryRun) {
+                            $this->em->persist($canonical);
+                        }
                     }
-                    $iface->addName($canonical);
-                    if (!$dryRun) {
-                        $this->em->persist($canonical);
+                    if ($hasIpv6) {
+                        $canonical6 = new DomainRecord();
+                        $canonical6->setHostname($row['name']);
+                        $canonical6->setDomain($canonicalDomain);
+                        $canonical6->setNetworkInterface($iface);
+                        $canonical6->setType(RecordType::AAAA);
+                        $canonical6->setIsCanonical(true);
+                        foreach ($canonicalViews as $view) {
+                            $canonical6->addView($view);
+                        }
+                        if (!$dryRun) {
+                            $this->em->persist($canonical6);
+                        }
+                    }
+                    if (!$hasIpv4 && !$hasIpv6) {
+                        // No IP yet — create placeholder A record for future assignment
+                        $canonical = new DomainRecord();
+                        $canonical->setHostname($row['name']);
+                        $canonical->setDomain($canonicalDomain);
+                        $canonical->setNetworkInterface($iface);
+                        $canonical->setType(RecordType::A);
+                        $canonical->setIsCanonical(true);
+                        foreach ($canonicalViews as $view) {
+                            $canonical->addView($view);
+                        }
+                        if (!$dryRun) {
+                            $this->em->persist($canonical);
+                        }
                     }
                 }
             }
@@ -746,16 +777,33 @@ class ImportLegacyCommand extends Command
                     if (!$this->isValidDnsLabel($aliasName)) {
                         continue;
                     }
-                    $alias = new InterfaceName();
-                    $alias->setName($aliasName);
-                    $alias->setDomain($domain);
-                    $alias->setIsCanonical(false);
-                    foreach ($sharedViews as $view) {
-                        $alias->addView($view);
+                    if ($iface->getIpAddress() !== null) {
+                        $alias = new DomainRecord();
+                        $alias->setHostname($aliasName);
+                        $alias->setDomain($domain);
+                        $alias->setNetworkInterface($iface);
+                        $alias->setType(RecordType::A);
+                        $alias->setIsCanonical(false);
+                        foreach ($sharedViews as $view) {
+                            $alias->addView($view);
+                        }
+                        if (!$dryRun) {
+                            $this->em->persist($alias);
+                        }
                     }
-                    $iface->addName($alias);
-                    if (!$dryRun) {
-                        $this->em->persist($alias);
+                    if ($iface->getIpv6Address() !== null) {
+                        $alias6 = new DomainRecord();
+                        $alias6->setHostname($aliasName);
+                        $alias6->setDomain($domain);
+                        $alias6->setNetworkInterface($iface);
+                        $alias6->setType(RecordType::AAAA);
+                        $alias6->setIsCanonical(false);
+                        foreach ($sharedViews as $view) {
+                            $alias6->addView($view);
+                        }
+                        if (!$dryRun) {
+                            $this->em->persist($alias6);
+                        }
                     }
                 }
             }

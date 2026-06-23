@@ -106,8 +106,10 @@
                                 {% endif %}
                             </td>
                             <td>
-                                {% for name in iface.names %}
-                                    <span class="badge text-bg-secondary me-1">{{ name.fullyQualifiedName }}</span>
+                                {% for record in iface.domainRecords %}
+                                    {% if record.domain %}
+                                        <span class="badge text-bg-secondary me-1">{{ record.fullyQualifiedHostname }}</span>
+                                    {% endif %}
                                 {% else %}
                                     <span class="text-muted">—</span>
                                 {% endfor %}

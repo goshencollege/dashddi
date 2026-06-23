@@ -7,6 +7,7 @@ use App\Enum\RecordType;
 use App\Repository\DnsViewRepository;
 use App\Repository\DomainRecordRepository;
 use App\Repository\DomainRepository;
+use App\Repository\NetworkInterfaceRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -24,6 +25,9 @@ class DomainRecordApiController extends AbstractController
 
         if ($domainId = $request->query->getInt('domain_id')) {
             $qb->andWhere('r.domain = :did')->setParameter('did', $domainId);
+        }
+        if ($interfaceId = $request->query->getInt('interface_id')) {
+            $qb->andWhere('r.networkInterface = :iid')->setParameter('iid', $interfaceId);
         }
         if ($type = $request->query->get('type')) {
             $qb->andWhere('r.type = :type')->setParameter('type', $type);
@@ -45,23 +49,13 @@ class DomainRecordApiController extends AbstractController
         Request $request,
         EntityManagerInterface $em,
         DomainRepository $domainRepo,
+        NetworkInterfaceRepository $interfaceRepo,
         DnsViewRepository $viewRepo,
     ): JsonResponse {
         $data = json_decode($request->getContent(), true) ?? [];
 
-        if (empty($data['domain_id'])) {
-            return $this->json(['error' => 'domain_id is required'], Response::HTTP_UNPROCESSABLE_ENTITY);
-        }
         if (empty($data['hostname'])) {
             return $this->json(['error' => 'hostname is required'], Response::HTTP_UNPROCESSABLE_ENTITY);
-        }
-        if (empty($data['value'])) {
-            return $this->json(['error' => 'value is required'], Response::HTTP_UNPROCESSABLE_ENTITY);
-        }
-
-        $domain = $domainRepo->find($data['domain_id']);
-        if (!$domain) {
-            return $this->json(['error' => 'domain_id not found'], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         $type = RecordType::tryFrom(strtoupper($data['type'] ?? ''));
@@ -73,11 +67,41 @@ class DomainRecordApiController extends AbstractController
         }
 
         $record = new DomainRecord();
-        $record->setDomain($domain);
         $record->setHostname($data['hostname']);
         $record->setType($type);
-        $record->setValue($data['value']);
         $record->setTtl(isset($data['ttl']) ? (int) $data['ttl'] : null);
+
+        // Interface-linked record
+        if (!empty($data['interface_id'])) {
+            $interface = $interfaceRepo->find($data['interface_id']);
+            if (!$interface) {
+                return $this->json(['error' => 'interface_id not found'], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+            $record->setNetworkInterface($interface);
+            $record->setIsCanonical((bool) ($data['is_canonical'] ?? false));
+        }
+
+        // Domain association
+        if (!empty($data['domain_id'])) {
+            $domain = $domainRepo->find($data['domain_id']);
+            if (!$domain) {
+                return $this->json(['error' => 'domain_id not found'], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+            $record->setDomain($domain);
+        } elseif ($record->getNetworkInterface() === null) {
+            return $this->json(['error' => 'domain_id is required for records not linked to an interface'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        // Value required for non-interface records, or for record types other than A/AAAA
+        $isInterfaceAorAAAA = $record->getNetworkInterface() !== null
+            && in_array($type, [RecordType::A, RecordType::AAAA], true);
+
+        if (!$isInterfaceAorAAAA) {
+            if (empty($data['value'])) {
+                return $this->json(['error' => 'value is required'], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+            $record->setValue($data['value']);
+        }
 
         foreach ($data['view_ids'] ?? [] as $viewId) {
             $view = $viewRepo->find($viewId);
@@ -129,14 +153,15 @@ class DomainRecordApiController extends AbstractController
         }
 
         if (array_key_exists('value', $data)) {
-            if (empty($data['value'])) {
-                return $this->json(['error' => 'value cannot be empty'], Response::HTTP_UNPROCESSABLE_ENTITY);
-            }
-            $domainRecord->setValue($data['value']);
+            $domainRecord->setValue($data['value'] ?? '');
         }
 
         if (array_key_exists('ttl', $data)) {
             $domainRecord->setTtl($data['ttl'] !== null ? (int) $data['ttl'] : null);
+        }
+
+        if (array_key_exists('is_canonical', $data)) {
+            $domainRecord->setIsCanonical((bool) $data['is_canonical']);
         }
 
         if (array_key_exists('view_ids', $data)) {
@@ -168,17 +193,20 @@ class DomainRecordApiController extends AbstractController
     private function serialize(DomainRecord $record): array
     {
         return [
-            'id'         => $record->getId(),
-            'domain_id'  => $record->getDomain()?->getId(),
-            'hostname'   => $record->getHostname(),
-            'type'       => $record->getType()->value,
-            'value'      => $record->getValue(),
-            'ttl'        => $record->getTtl(),
-            'view_ids'   => $record->getViews()->map(fn($v) => $v->getId())->toArray(),
-            'created_at' => $record->getCreatedAt()->format(\DateTimeInterface::ATOM),
-            'updated_at' => $record->getUpdatedAt()->format(\DateTimeInterface::ATOM),
-            'created_by' => $record->getCreatedBy(),
-            'updated_by' => $record->getUpdatedBy(),
+            'id'           => $record->getId(),
+            'domain_id'    => $record->getDomain()?->getId(),
+            'interface_id' => $record->getNetworkInterface()?->getId(),
+            'hostname'     => $record->getHostname(),
+            'fqdn'         => $record->getDomain() ? $record->getFullyQualifiedHostname() . '.' . $record->getDomain()->getName() : $record->getHostname(),
+            'type'         => $record->getType()->value,
+            'value'        => $record->getValue(),
+            'ttl'          => $record->getTtl(),
+            'is_canonical' => $record->isCanonical(),
+            'view_ids'     => $record->getViews()->map(fn($v) => $v->getId())->toArray(),
+            'created_at'   => $record->getCreatedAt()->format(\DateTimeInterface::ATOM),
+            'updated_at'   => $record->getUpdatedAt()->format(\DateTimeInterface::ATOM),
+            'created_by'   => $record->getCreatedBy(),
+            'updated_by'   => $record->getUpdatedBy(),
         ];
     }
 }

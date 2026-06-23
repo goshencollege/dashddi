@@ -58,12 +58,12 @@ class NetworkInterface
     #[ORM\JoinColumn(nullable: true)]
     private ?Ipv6Address $ipv6Address = null;
 
-    #[ORM\OneToMany(targetEntity: InterfaceName::class, mappedBy: 'networkInterface', cascade: ['persist', 'remove'], orphanRemoval: true)]
-    private Collection $names;
+    #[ORM\OneToMany(targetEntity: DomainRecord::class, mappedBy: 'networkInterface')]
+    private Collection $domainRecords;
 
     public function __construct()
     {
-        $this->names = new ArrayCollection();
+        $this->domainRecords = new ArrayCollection();
     }
 
     public function getId(): ?int { return $this->id; }
@@ -99,32 +99,16 @@ class NetworkInterface
     public function getIpv6Address(): ?Ipv6Address { return $this->ipv6Address; }
     public function setIpv6Address(?Ipv6Address $ipv6Address): static { $this->ipv6Address = $ipv6Address; return $this; }
 
-    public function getNames(): Collection { return $this->names; }
-
-    public function addName(InterfaceName $name): static
-    {
-        if (!$this->names->contains($name)) {
-            $this->names->add($name);
-            $name->setNetworkInterface($this);
-        }
-        return $this;
-    }
-
-    public function removeName(InterfaceName $name): static
-    {
-        if ($this->names->removeElement($name)) {
-            if ($name->getNetworkInterface() === $this) {
-                $name->setNetworkInterface(null);
-            }
-        }
-        return $this;
-    }
+    public function getDomainRecords(): Collection { return $this->domainRecords; }
 
     public function getPrimaryName(): ?string
     {
-        $first = $this->names->first();
-        if (!$first) return null;
-        return $first->getFullyQualifiedName();
+        foreach ($this->domainRecords as $record) {
+            if ($record->getDomain() !== null) {
+                return $record->getFullyQualifiedHostname();
+            }
+        }
+        return null;
     }
 
     public function __toString(): string
