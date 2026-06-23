@@ -120,14 +120,17 @@
             <dd class="col-sm-9">Optional. Choose auto-assign (uses EUI-64 generation or next available), IPv4-mapped, or manual entry.</dd>
         </dl>
 
-        <h6 class="mt-4">DNS Names</h6>
-        <p>After saving an interface, use the <strong>DNS Names</strong> section on the interface detail page to add hostnames. Each DNS name has:</p>
-        <ul class="mb-0">
-            <li><strong>Hostname</strong> — the name part (without the domain, e.g. <code>web01</code>)</li>
-            <li><strong>Domain</strong> — the DNS zone this name belongs to</li>
+        <h6 class="mt-4">DNS Records</h6>
+        <p>After saving an interface, use the <strong>DNS Records</strong> section on the interface detail page to add DNS records for that interface. Click <strong>Add Record</strong> to create a new record. Each record has:</p>
+        <ul class="mb-2">
+            <li><strong>Domain</strong> — the DNS zone this record belongs to (only zones compatible with the interface's subnet are selectable)</li>
+            <li><strong>Hostname</strong> — the name part without the domain suffix (e.g. <code>web01</code>)</li>
+            <li><strong>Type</strong> — <code>A</code>, <code>AAAA</code>, <code>TXT</code>, or any other supported record type</li>
+            <li><strong>Value</strong> — leave blank for <code>A</code>/<code>AAAA</code> records; the IP address is derived automatically from the interface</li>
+            <li><strong>Canonical</strong> — marks this record as the reverse DNS (PTR) name for the interface's IP. The first <code>A</code> record added to an interface is automatically marked canonical (used for IPv4 PTR); the first <code>AAAA</code> record is automatically canonical for IPv6. An interface can have at most one canonical <code>A</code> and one canonical <code>AAAA</code>.</li>
             <li><strong>Views</strong> — optionally restrict which DNS views include this record</li>
         </ul>
-        <p class="mt-2 mb-0 text-muted small">DNS records for interface names are generated automatically when you push configuration to your DNS server.</p>
+        <p class="text-muted small mb-0">Records with the <span class="badge bg-primary">PTR</span> badge are canonical and appear in reverse DNS zones. All interface-linked records appear in the domain's unified record list with a <em>Host</em> column showing the host name.</p>
     </div>
 </div>
 

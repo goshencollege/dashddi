@@ -168,13 +168,13 @@ class HostRepository extends ServiceEntityRepository
                     EXISTS (
                         SELECT 1 FROM App\Entity\NetworkInterface i2
                         LEFT JOIN i2.subnet s2
-                        LEFT JOIN i2.names n2
+                        LEFT JOIN i2.domainRecords n2
                         LEFT JOIN n2.domain nd2
                         WHERE i2.host = h AND (
                             s2.name LIKE :q
-                            OR n2.name LIKE :q
+                            OR n2.hostname LIKE :q
                             OR nd2.name LIKE :q
-                            OR CONCAT(n2.name, '.', nd2.name) LIKE :q
+                            OR CONCAT(n2.hostname, '.', nd2.name) LIKE :q
                         )
                     )
                 DQL,
@@ -199,16 +199,16 @@ class HostRepository extends ServiceEntityRepository
                         LEFT JOIN i2.subnet s2
                         LEFT JOIN i2.ipAddress ip4
                         LEFT JOIN i2.ipv6Address ip6
-                        LEFT JOIN i2.names n2
+                        LEFT JOIN i2.domainRecords n2
                         LEFT JOIN n2.domain nd2
                         WHERE i2.host = h AND (
                             i2.macAddress LIKE :q
                             OR s2.name LIKE :q
                             OR ip4.address LIKE :q
                             OR ip6.address LIKE :q
-                            OR n2.name LIKE :q
+                            OR n2.hostname LIKE :q
                             OR nd2.name LIKE :q
-                            OR CONCAT(n2.name, '.', nd2.name) LIKE :q
+                            OR CONCAT(n2.hostname, '.', nd2.name) LIKE :q
                         )
                     )
                 DQL,
@@ -303,12 +303,12 @@ class HostRepository extends ServiceEntityRepository
             $qb->andWhere(<<<'DQL'
                     EXISTS (
                         SELECT 1 FROM App\Entity\NetworkInterface i5
-                        LEFT JOIN i5.names n2
+                        LEFT JOIN i5.domainRecords n2
                         LEFT JOIN n2.domain nd2
                         WHERE i5.host = h AND (
-                            n2.name LIKE :dns
+                            n2.hostname LIKE :dns
                             OR nd2.name LIKE :dns
-                            OR CONCAT(n2.name, '.', nd2.name) LIKE :dns
+                            OR CONCAT(n2.hostname, '.', nd2.name) LIKE :dns
                         )
                     )
                 DQL)
@@ -382,7 +382,7 @@ class HostRepository extends ServiceEntityRepository
             ->leftJoin('i.ipAddress', 'ip4')->addSelect('ip4')
             ->leftJoin('i.ipv6Address', 'ip6')->addSelect('ip6')
             ->leftJoin('i.subnet', 's')->addSelect('s')
-            ->leftJoin('i.names', 'n')->addSelect('n')
+            ->leftJoin('i.domainRecords', 'n')->addSelect('n')
             ->leftJoin('n.domain', 'nd')->addSelect('nd')
             ->where('h.id IN (:ids)')
             ->setParameter('ids', $ids)

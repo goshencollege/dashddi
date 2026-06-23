@@ -4,7 +4,6 @@ namespace App\Controller;
 
 use App\Entity\Domain;
 use App\Entity\DomainRecord;
-use App\Entity\InterfaceName;
 use App\Entity\IpAddress;
 use App\Entity\Ipv6Address;
 use App\Entity\NetworkInterface;
@@ -127,9 +126,9 @@ class ZoneImportController extends AbstractController
             }
         }
 
-        $recordsCreated   = 0;
-        $hostNamesCreated = 0;
-        $viewsUpdated     = 0;
+        $recordsCreated    = 0;
+        $hostNamesCreated  = 0;
+        $viewsUpdated      = 0;
 
         foreach ($preview['records'] as $r) {
             if ($r['action'] === 'skip') {
@@ -142,15 +141,18 @@ class ZoneImportController extends AbstractController
                     continue;
                 }
 
-                $ifaceName = new InterfaceName();
-                $ifaceName->setName($r['name']);
-                $ifaceName->setDomain($domain);
-                $ifaceName->setNetworkInterface($iface);
-                $ifaceName->setTtl($r['ttl']);
+                $recordType = RecordType::tryFrom($r['record_type'] ?? 'A') ?? RecordType::A;
+                $record = new DomainRecord();
+                $record->setHostname($r['name']);
+                $record->setDomain($domain);
+                $record->setNetworkInterface($iface);
+                $record->setType($recordType);
+                $record->setTtl($r['ttl']);
+                $record->setIsCanonical(true);
                 foreach ($views as $view) {
-                    $ifaceName->addView($view);
+                    $record->addView($view);
                 }
-                $em->persist($ifaceName);
+                $em->persist($record);
                 $hostNamesCreated++;
                 continue;
             }
@@ -177,19 +179,12 @@ class ZoneImportController extends AbstractController
             }
 
             if ($r['action'] === 'add_view') {
-                if ($r['existing_record_id'] !== null) {
-                    $record = $em->find(DomainRecord::class, $r['existing_record_id']);
+                $targetId = $r['existing_record_id'] ?? $r['existing_interface_record_id'] ?? null;
+                if ($targetId !== null) {
+                    $record = $em->find(DomainRecord::class, $targetId);
                     if ($record) {
                         foreach ($views as $view) {
                             $record->addView($view);
-                        }
-                        $viewsUpdated++;
-                    }
-                } elseif ($r['existing_iface_name_id'] !== null) {
-                    $ifaceName = $em->find(InterfaceName::class, $r['existing_iface_name_id']);
-                    if ($ifaceName) {
-                        foreach ($views as $view) {
-                            $ifaceName->addView($view);
                         }
                         $viewsUpdated++;
                     }
@@ -294,9 +289,12 @@ class ZoneImportController extends AbstractController
             }
         }
 
-        // Index existing DomainRecords: key → ['id' => int, 'view_ids' => int[]]
+        // Index existing manual DomainRecords: key → ['id' => int, 'view_ids' => int[]]
         $existingRecords = [];
         foreach ($domain->getRecords() as $record) {
+            if ($record->getNetworkInterface() !== null) {
+                continue; // interface-linked records indexed separately below
+            }
             $key = strtolower($record->getHostname()) . '|' . $record->getType()->value . '|' . $record->getValue();
             $existingRecords[$key] = [
                 'id'       => $record->getId(),
@@ -304,44 +302,49 @@ class ZoneImportController extends AbstractController
             ];
         }
 
-        // Index existing InterfaceNames on this domain: key → ['id' => int, 'view_ids' => int[]]
-        $existingIfaceNames = [];
-        foreach ($domain->getInterfaceNames() as $ifaceName) {
-            $ifaceId = $ifaceName->getNetworkInterface()->getId();
-            $key     = $ifaceId . '|' . strtolower($ifaceName->getName());
-            $existingIfaceNames[$key] = [
-                'id'       => $ifaceName->getId(),
-                'view_ids' => array_map(fn($v) => $v->getId(), $ifaceName->getViews()->toArray()),
+        // Index existing interface-linked DomainRecords: key → ['id' => int, 'view_ids' => int[]]
+        // Key: ifaceId|hostname|type  (e.g. "42|server01|A")
+        $existingInterfaceRecords = [];
+        foreach ($domain->getRecords() as $record) {
+            $iface = $record->getNetworkInterface();
+            if ($iface === null) {
+                continue;
+            }
+            $key = $iface->getId() . '|' . strtolower($record->getHostname()) . '|' . $record->getType()->value;
+            $existingInterfaceRecords[$key] = [
+                'id'       => $record->getId(),
+                'view_ids' => array_map(fn($v) => $v->getId(), $record->getViews()->toArray()),
             ];
         }
 
         foreach ($parsedRecords as $r) {
             $entry = [
-                'name'                   => $r['name'],
-                'type'                   => $r['type'],
-                'value'                  => $r['value'],
-                'ttl'                    => $r['ttl'],
-                'comment'                => $r['comment'] ?? null,
-                'action'                 => 'dns_record',
-                'skip_reason'            => null,
-                'host_name'              => null,
-                'interface_id'           => null,
-                'existing_record_id'     => null,
-                'existing_iface_name_id' => null,
+                'name'                        => $r['name'],
+                'type'                        => $r['type'],
+                'value'                       => $r['value'],
+                'ttl'                         => $r['ttl'],
+                'comment'                     => $r['comment'] ?? null,
+                'action'                      => 'dns_record',
+                'skip_reason'                 => null,
+                'host_name'                   => null,
+                'interface_id'                => null,
+                'record_type'                 => null,
+                'existing_record_id'          => null,
+                'existing_interface_record_id' => null,
             ];
 
             if ($r['type'] === 'A' && $this->isSimpleLabel($r['name'])) {
                 $ip    = $ipByAddress[$r['value']] ?? null;
                 $iface = $ip ? ($ifaceByIpId[$ip->getId()] ?? null) : null;
                 if ($iface) {
-                    $key      = $iface->getId() . '|' . strtolower($r['name']);
-                    $existing = $existingIfaceNames[$key] ?? null;
+                    $key      = $iface->getId() . '|' . strtolower($r['name']) . '|A';
+                    $existing = $existingInterfaceRecords[$key] ?? null;
                     if ($existing !== null) {
                         $missingViews = array_diff($viewIds, $existing['view_ids']);
                         if (!empty($missingViews)) {
-                            $entry['action']                 = 'add_view';
-                            $entry['existing_iface_name_id'] = $existing['id'];
-                            $entry['host_name']              = $iface->getHost()?->getName();
+                            $entry['action']                       = 'add_view';
+                            $entry['existing_interface_record_id'] = $existing['id'];
+                            $entry['host_name']                    = $iface->getHost()?->getName();
                         } else {
                             $entry['action']      = 'skip';
                             $entry['skip_reason'] = 'Host DNS name already exists in selected view(s)';
@@ -349,6 +352,7 @@ class ZoneImportController extends AbstractController
                     } else {
                         $entry['action']       = 'host_dns_name';
                         $entry['interface_id'] = $iface->getId();
+                        $entry['record_type']  = 'A';
                         $entry['host_name']    = $iface->getHost()?->getName();
                     }
                 }
@@ -356,14 +360,14 @@ class ZoneImportController extends AbstractController
                 $ip6   = $ipv6ByAddress[$r['value']] ?? null;
                 $iface = $ip6 ? ($ifaceByIpv6Id[$ip6->getId()] ?? null) : null;
                 if ($iface) {
-                    $key      = $iface->getId() . '|' . strtolower($r['name']);
-                    $existing = $existingIfaceNames[$key] ?? null;
+                    $key      = $iface->getId() . '|' . strtolower($r['name']) . '|AAAA';
+                    $existing = $existingInterfaceRecords[$key] ?? null;
                     if ($existing !== null) {
                         $missingViews = array_diff($viewIds, $existing['view_ids']);
                         if (!empty($missingViews)) {
-                            $entry['action']                 = 'add_view';
-                            $entry['existing_iface_name_id'] = $existing['id'];
-                            $entry['host_name']              = $iface->getHost()?->getName();
+                            $entry['action']                       = 'add_view';
+                            $entry['existing_interface_record_id'] = $existing['id'];
+                            $entry['host_name']                    = $iface->getHost()?->getName();
                         } else {
                             $entry['action']      = 'skip';
                             $entry['skip_reason'] = 'Host DNS name already exists in selected view(s)';
@@ -371,6 +375,7 @@ class ZoneImportController extends AbstractController
                     } else {
                         $entry['action']       = 'host_dns_name';
                         $entry['interface_id'] = $iface->getId();
+                        $entry['record_type']  = 'AAAA';
                         $entry['host_name']    = $iface->getHost()?->getName();
                     }
                 }

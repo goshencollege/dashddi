@@ -7,7 +7,6 @@ use App\Entity\Subnet;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
-use Symfony\Component\Form\Extension\Core\Type\CollectionType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
@@ -94,16 +93,6 @@ class NetworkInterfaceType extends AbstractType
                     'autocomplete' => 'off',
                 ],
             ]);
-        if ($options['show_names']) {
-            $builder->add('names', CollectionType::class, [
-                'entry_type' => InterfaceNameType::class,
-                'allow_add' => true,
-                'allow_delete' => true,
-                'by_reference' => false,
-                'label' => 'DNS Names',
-                'entry_options' => ['label' => false],
-            ]);
-        }
     }
 
     public function configureOptions(OptionsResolver $resolver): void
@@ -111,11 +100,9 @@ class NetworkInterfaceType extends AbstractType
         $resolver->setDefaults([
             'data_class'     => NetworkInterface::class,
             'is_edit'        => false,
-            'show_names'     => true,
             'subnet_choices' => null,
         ]);
         $resolver->setAllowedTypes('is_edit', 'bool');
-        $resolver->setAllowedTypes('show_names', 'bool');
         $resolver->setAllowedTypes('subnet_choices', ['null', 'array']);
     }
 }

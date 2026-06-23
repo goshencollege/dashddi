@@ -4,12 +4,13 @@ namespace App\Controller;
 
 use App\Entity\Building;
 use App\Entity\Domain;
+use App\Entity\DomainRecord;
 use App\Entity\Host;
 use App\Entity\IpAddress;
-use App\Entity\InterfaceName;
 use App\Entity\Ipv6Address;
 use App\Entity\NetworkInterface;
 use App\Entity\Tag;
+use App\Enum\RecordType;
 use App\Repository\NetworkInterfaceRepository;
 use App\Repository\SubnetRepository;
 use App\Service\DnsViewResolver;
@@ -216,14 +217,46 @@ class HostImportController extends AbstractController
                 if (!empty($i['dns_label']) && !empty($i['dns_domain'])) {
                     $domain = $domains[strtolower($i['dns_domain'])] ?? null;
                     if ($domain) {
-                        $ifaceName = new InterfaceName();
-                        $ifaceName->setName($i['dns_label']);
-                        $ifaceName->setDomain($domain);
-                        foreach ($viewResolver->availableViewsFor($domain, $subnet) as $view) {
-                            $ifaceName->addView($view);
+                        $availableViews = $viewResolver->availableViewsFor($domain, $subnet);
+                        // Create A record if interface will have IPv4
+                        if ($i['ip_address']) {
+                            $aRecord = new DomainRecord();
+                            $aRecord->setHostname($i['dns_label']);
+                            $aRecord->setDomain($domain);
+                            $aRecord->setNetworkInterface($iface);
+                            $aRecord->setType(RecordType::A);
+                            $aRecord->setIsCanonical(true);
+                            foreach ($availableViews as $view) {
+                                $aRecord->addView($view);
+                            }
+                            $em->persist($aRecord);
                         }
-                        $iface->addName($ifaceName);
-                        $em->persist($ifaceName);
+                        // Create AAAA record if interface will have IPv6
+                        if ($i['ipv6_address']) {
+                            $aaaaRecord = new DomainRecord();
+                            $aaaaRecord->setHostname($i['dns_label']);
+                            $aaaaRecord->setDomain($domain);
+                            $aaaaRecord->setNetworkInterface($iface);
+                            $aaaaRecord->setType(RecordType::AAAA);
+                            $aaaaRecord->setIsCanonical(true);
+                            foreach ($availableViews as $view) {
+                                $aaaaRecord->addView($view);
+                            }
+                            $em->persist($aaaaRecord);
+                        }
+                        // Fallback: if no IPs specified, create a placeholder A record
+                        if (!$i['ip_address'] && !$i['ipv6_address']) {
+                            $aRecord = new DomainRecord();
+                            $aRecord->setHostname($i['dns_label']);
+                            $aRecord->setDomain($domain);
+                            $aRecord->setNetworkInterface($iface);
+                            $aRecord->setType(RecordType::A);
+                            $aRecord->setIsCanonical(true);
+                            foreach ($availableViews as $view) {
+                                $aRecord->addView($view);
+                            }
+                            $em->persist($aRecord);
+                        }
                     }
                 }
             }

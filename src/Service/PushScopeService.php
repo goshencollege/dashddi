@@ -4,7 +4,6 @@ namespace App\Service;
 
 use App\Entity\Domain;
 use App\Entity\DomainRecord;
-use App\Entity\InterfaceName;
 use App\Entity\IpAddress;
 use App\Entity\Ipv6Address;
 use App\Entity\NetworkInterface;
@@ -84,7 +83,6 @@ class PushScopeService
     private function viewIdsFor(object $entity): array
     {
         return match(true) {
-            $entity instanceof InterfaceName  => $this->collectViewIds($entity->getViews()),
             $entity instanceof NetworkInterface => $this->viewIdsForNetworkInterface($entity),
             $entity instanceof IpAddress,
             $entity instanceof Ipv6Address    => $this->collectViewIds($entity->getSubnet()?->getViews() ?? []),
@@ -108,8 +106,8 @@ class PushScopeService
     private function viewIdsForNetworkInterface(NetworkInterface $iface): array
     {
         $ids = [];
-        foreach ($iface->getNames() as $name) {
-            foreach ($name->getViews() as $v) {
+        foreach ($iface->getDomainRecords() as $record) {
+            foreach ($record->getViews() as $v) {
                 $ids[$v->getId()] = true;
             }
         }

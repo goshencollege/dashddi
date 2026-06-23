@@ -146,7 +146,7 @@
     <div class="input-group">
         <span class="input-group-text"><i class="bi bi-search"></i></span>
         <input type="search" name="q" class="form-control"
-               placeholder="Search DNS records and host DNS names…"
+               placeholder="Search DNS records…"
                value="{{ q }}">
         <button type="submit" class="btn btn-outline-secondary">Search</button>
         {% if q %}
@@ -155,12 +155,12 @@
     </div>
 </form>
 
-{# Standalone DNS Records #}
+{# Unified DNS Records #}
 <div class="card mb-4">
     <div class="card-header d-flex justify-content-between align-items-center">
         <span>
             <i class="bi bi-list-ul me-1"></i>DNS Records
-            <span class="badge bg-secondary ms-1">{{ record_pag.total }}</span>
+            <span class="badge bg-secondary ms-1">{{ pag.total }}</span>
             {% if q %}<span class="text-muted small ms-1">matching "{{ q }}"</span>{% endif %}
         </span>
         <div class="d-flex gap-2">
@@ -181,12 +181,14 @@
             {% endif %}
         </div>
     {% else %}
+        <div class="table-responsive">
         <table class="table table-sm table-hover mb-0">
             <thead>
                 <tr>
                     <th>Hostname</th>
                     <th>Type</th>
                     <th>Value</th>
+                    <th>Host</th>
                     <th>TTL</th>
                     <th>Modified</th>
                     <th>Views</th>
@@ -196,9 +198,35 @@
             <tbody>
                 {% for record in records %}
                     <tr>
-                        <td class="font-monospace">{{ record.hostname }}</td>
+                        <td class="font-monospace">
+                            {{ record.hostname }}
+                            {% if record.canonical %}
+                                <span class="badge bg-primary ms-1" title="Canonical — used for PTR reverse DNS">PTR</span>
+                            {% endif %}
+                        </td>
                         <td><span class="badge bg-secondary">{{ record.type.value }}</span></td>
-                        <td class="font-monospace small" style="word-break: break-all;">{{ record.value }}</td>
+                        <td class="font-monospace small" style="word-break: break-all;">
+                            {% if record.networkInterface %}
+                                {% if record.type.value == 'A' %}
+                                    <span class="text-muted">{{ record.networkInterface.ipAddress ? record.networkInterface.ipAddress.address : '—' }}</span>
+                                {% elseif record.type.value == 'AAAA' %}
+                                    <span class="text-muted">{{ record.networkInterface.ipv6Address ? record.networkInterface.ipv6Address.address : '—' }}</span>
+                                {% else %}
+                                    {{ record.value }}
+                                {% endif %}
+                            {% else %}
+                                {{ record.value }}
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if record.networkInterface and record.networkInterface.host %}
+                                <a href="{{ path('host_show', {id: record.networkInterface.host.id}) }}" class="text-decoration-none small">
+                                    {{ record.networkInterface.host.name }}
+                                </a>
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
                         <td class="text-muted small">{{ record.ttl ?: '—' }}</td>
                         <td class="text-muted small">
                             {{ record.updatedAt|date('Y-m-d H:i') }}
@@ -227,63 +255,8 @@
                 {% endfor %}
             </tbody>
         </table>
-        {{ _self.pager(record_pag) }}
-    {% endif %}
-</div>
-
-{# Interface names using this domain #}
-<div class="card">
-    <div class="card-header">
-        <i class="bi bi-hdd-network me-1"></i>Interface Names Using This Domain
-        <span class="badge bg-secondary ms-1">{{ name_pag.total }}</span>
-        {% if q %}<span class="text-muted small ms-1">matching "{{ q }}"</span>{% endif %}
-    </div>
-    {% if iface_names is empty %}
-        <div class="card-body text-center text-muted py-3">
-            {% if q %}
-                No interface names matched <strong>{{ q }}</strong>.
-            {% else %}
-                No host DNS names are using this domain yet.
-            {% endif %}
         </div>
-    {% else %}
-        <table class="table table-sm table-hover mb-0">
-            <thead>
-                <tr><th>FQDN</th><th>Host</th><th>IPv4</th><th>IPv6</th><th>TTL</th><th>Views</th></tr>
-            </thead>
-            <tbody>
-                {% for ifaceName in iface_names %}
-                    {% set iface = ifaceName.networkInterface %}
-                    <tr>
-                        <td class="font-monospace">{{ ifaceName.fullyQualifiedName }}</td>
-                        <td>
-                            {% if iface and iface.host %}
-                                <a href="{{ path('host_show', {id: iface.host.id}) }}">{{ iface.host.name }}</a>
-                            {% else %}—{% endif %}
-                        </td>
-                        <td class="font-monospace small">
-                            {% if iface and iface.ipAddress %}
-                                {{ iface.ipAddress.address }}
-                            {% else %}—{% endif %}
-                        </td>
-                        <td class="font-monospace small">
-                            {% if iface and iface.ipv6Address %}
-                                {{ iface.ipv6Address.address }}
-                            {% else %}—{% endif %}
-                        </td>
-                        <td class="text-muted small">{{ ifaceName.ttl ?: '—' }}</td>
-                        <td>
-                            {% for view in ifaceName.views %}
-                                <span class="badge bg-secondary me-1">{{ view.name }}</span>
-                            {% else %}
-                                <span class="text-muted">—</span>
-                            {% endfor %}
-                        </td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        {{ _self.pager(name_pag) }}
+        {{ _self.pager(pag) }}
     {% endif %}
 </div>
 

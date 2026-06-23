@@ -108,99 +108,6 @@
             </div>
         </div>
 
-        {# DNS Names #}
-        <div class="card mb-4">
-            <div class="card-header d-flex justify-content-between align-items-center fw-semibold">
-                <span><i class="bi bi-globe me-1"></i>DNS Names</span>
-                <button type="button" class="btn btn-sm btn-outline-primary" id="add-name-btn">
-                    <i class="bi bi-plus-lg me-1"></i>Add Name
-                </button>
-            </div>
-            {% set proto = form.names.vars.prototype %}
-            {% set proto_html %}
-            <div class="name-entry border rounded p-2 mb-2 d-flex align-items-center gap-2 flex-wrap">
-                <div class="flex-shrink-0 text-center" style="min-width:5rem" title="Set as canonical (reverse DNS) name">
-                    <input type="radio" class="form-check-input canonical-radio" name="canonical_radio" value="__name__">
-                </div>
-                <div class="d-none">{{ form_widget(proto.isCanonical) }}</div>
-                <div style="flex:1 1 0%;min-width:7rem">
-                    {{ form_widget(proto.name, {attr: {class: 'form-control form-control-sm font-monospace'}}) }}
-                    {{ form_errors(proto.name) }}
-                </div>
-                <span class="fw-semibold">.</span>
-                <div style="flex:1 1 0%;min-width:10rem">
-                    {{ form_widget(proto.domain, {attr: {class: 'form-select form-select-sm'}}) }}
-                    {{ form_errors(proto.domain) }}
-                </div>
-                <div style="width:7rem">
-                    {{ form_widget(proto.ttl, {attr: {class: 'form-control form-control-sm', placeholder: 'TTL'}}) }}
-                </div>
-                <div class="d-flex flex-wrap align-items-center gap-1" style="min-width:10rem">
-                    {% for viewWidget in proto.views %}
-                        <div class="form-check form-check-inline mb-0" data-view-id="{{ viewWidget.vars.value }}">
-                            {{ form_widget(viewWidget, {attr: {class: 'form-check-input'}}) }}
-                            {{ form_label(viewWidget, null, {label_attr: {class: 'form-check-label small'}}) }}
-                        </div>
-                    {% else %}
-                        <div class="d-none">{{ form_widget(proto.views) }}</div>
-                    {% endfor %}
-                </div>
-                <button type="button" class="btn btn-sm btn-outline-danger remove-name-btn ms-auto">
-                    <i class="bi bi-trash"></i>
-                </button>
-            </div>
-            {% endset %}
-            <div class="card-body" id="names-collection"
-                 data-prototype="{{ proto_html|e('html_attr') }}">
-                <div class="d-flex align-items-center gap-2 flex-wrap px-2 mb-1 text-muted fw-semibold border-bottom pb-1{% if form.names|length == 0 %} d-none{% endif %}" id="names-column-header">
-                    <div class="flex-shrink-0 text-center small" style="min-width:5rem">Canonical</div>
-                    <div class="small" style="flex:1 1 0%;min-width:7rem">Name</div>
-                    <span style="visibility:hidden" class="fw-semibold">.</span>
-                    <div class="small" style="flex:1 1 0%;min-width:10rem">Domain</div>
-                    <div class="small" style="width:7rem">TTL</div>
-                    <div class="small" style="min-width:10rem">Views</div>
-                    <button class="btn btn-sm btn-outline-danger ms-auto" style="visibility:hidden" tabindex="-1" aria-hidden="true"><i class="bi bi-trash"></i></button>
-                </div>
-                {% for nameForm in form.names %}
-                    <div class="name-entry border rounded p-2 mb-2 d-flex align-items-center gap-2 flex-wrap">
-                        <div class="flex-shrink-0 text-center" style="min-width:5rem" title="Set as canonical (reverse DNS) name">
-                            <input type="radio" class="form-check-input canonical-radio" name="canonical_radio" value="{{ nameForm.vars.name }}">
-                        </div>
-                        <div class="d-none">{{ form_widget(nameForm.isCanonical) }}</div>
-                        <div style="flex:1 1 0%;min-width:7rem">
-                            {{ form_widget(nameForm.name, {attr: {class: 'form-control form-control-sm font-monospace'}}) }}
-                            {{ form_errors(nameForm.name) }}
-                        </div>
-                        <span class="fw-semibold">.</span>
-                        <div style="flex:1 1 0%;min-width:10rem">
-                            {{ form_widget(nameForm.domain, {attr: {class: 'form-select form-select-sm'}}) }}
-                            {{ form_errors(nameForm.domain) }}
-                        </div>
-                        <div style="width:7rem">
-                            {{ form_widget(nameForm.ttl, {attr: {class: 'form-control form-control-sm', placeholder: 'TTL'}}) }}
-                        </div>
-                        <div class="d-flex flex-wrap align-items-center gap-1" style="min-width:10rem">
-                            {% for viewWidget in nameForm.views %}
-                                <div class="form-check form-check-inline mb-0" data-view-id="{{ viewWidget.vars.value }}">
-                                    {{ form_widget(viewWidget, {attr: {class: 'form-check-input'}}) }}
-                                    {{ form_label(viewWidget, null, {label_attr: {class: 'form-check-label small'}}) }}
-                                </div>
-                            {% else %}
-                                <div class="d-none">{{ form_widget(nameForm.views) }}</div>
-                            {% endfor %}
-                        </div>
-                        <button type="button" class="btn btn-sm btn-outline-danger remove-name-btn ms-auto">
-                            <i class="bi bi-trash"></i>
-                        </button>
-                    </div>
-                {% else %}
-                    <p class="text-muted small mb-0" id="no-names-msg">No DNS names added yet.</p>
-                {% endfor %}
-            </div>
-        </div>
-
-        {% do form.names.setRendered() %}
-
         <div class="d-flex gap-2">
             <button type="submit" class="btn btn-primary">
                 <i class="bi bi-check-lg me-1"></i>Save
@@ -214,6 +121,88 @@
 </div>
 </div>
 </div>
+
+{% if interface.id %}
+<div class="row justify-content-center mt-4">
+<div class="col-xl-10">
+<div class="card" id="dns-records-card">
+    <div class="card-header d-flex justify-content-between align-items-center fw-semibold">
+        <span><i class="bi bi-globe me-1"></i>DNS Records</span>
+        <button type="button" class="btn btn-sm btn-outline-primary" id="add-dns-record-btn">
+            <i class="bi bi-plus-lg me-1"></i>Add Record
+        </button>
+    </div>
+    {% set dns_records = interface.domainRecords %}
+    {% if dns_records is empty %}
+        <div class="card-body text-muted small py-2" id="dns-records-empty">No DNS records assigned.</div>
+    {% else %}
+        <div class="table-responsive">
+        <table class="table table-sm mb-0" id="dns-records-table">
+            <thead>
+                <tr>
+                    <th>Hostname</th>
+                    <th>Type</th>
+                    <th>Value</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for record in dns_records %}
+                <tr data-record-id="{{ record.id }}">
+                    <td class="font-monospace small">
+                        {{ record.fullyQualifiedHostname }}
+                        {% if record.canonical %}
+                            <span class="badge bg-primary ms-1" title="Canonical — used for PTR reverse DNS">PTR</span>
+                        {% endif %}
+                    </td>
+                    <td><span class="badge bg-secondary">{{ record.type.value }}</span></td>
+                    <td class="font-monospace small text-muted">
+                        {% if record.type.value == 'A' %}
+                            {{ interface.ipAddress ? interface.ipAddress.address : '—' }}
+                        {% elseif record.type.value == 'AAAA' %}
+                            {{ interface.ipv6Address ? interface.ipv6Address.address : '—' }}
+                        {% else %}
+                            {{ record.value }}
+                        {% endif %}
+                    </td>
+                    <td class="text-end" style="white-space:nowrap">
+                        <button type="button" class="btn btn-sm btn-outline-secondary me-1 dns-edit-btn"
+                                data-url="{{ path('domain_record_edit', {id: record.id}) }}">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <form method="post" action="{{ path('domain_record_delete', {id: record.id}) }}"
+                              class="d-inline dns-delete-form">
+                            <input type="hidden" name="_token" value="{{ csrf_token('delete_record_' ~ record.id) }}">
+                            <button type="submit" class="btn btn-sm btn-outline-danger">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    {% endif %}
+</div>
+</div>
+</div>
+
+<div class="modal fade" id="dns-record-modal" tabindex="-1" aria-labelledby="dns-record-modal-title" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="dns-record-modal-title">DNS Record</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="dns-record-modal-body">
+                <div class="text-center py-3"><span class="spinner-border spinner-border-sm"></span></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 {% endblock %}
 
 {% block scripts %}
@@ -286,170 +275,84 @@
         if (subnetSelect.value && !initialIsContainer) loadAvailableIps(subnetSelect.value);
     }
 
-    // DNS name collection: add / remove entries
-    const collection = document.getElementById('names-collection');
-    const addBtn = document.getElementById('add-name-btn');
-    let index = collection.querySelectorAll('.name-entry').length;
-
-    // ── View / domain cascade helpers ───────────────────────────────────────
-
-    function getSubnetId() {
-        return document.getElementById('network_interface_subnet')?.value || '';
-    }
-
-    async function fetchAvailableViewIds(domainId, subnetId) {
-        if (!domainId) return null;
-        let url = '/api/domains/' + domainId + '/views';
-        if (subnetId) url += '?subnet=' + subnetId;
-        try {
-            const r = await fetch(url);
-            const data = await r.json();
-            return new Set(data.map(v => v.id));
-        } catch { return null; }
-    }
-
-    async function fetchAvailableDomains(subnetId) {
-        if (!subnetId) return null;
-        try {
-            const r = await fetch('/api/subnets/' + subnetId + '/available-domains');
-            return r.ok ? await r.json() : null;
-        } catch { return null; }
-    }
-
-    function applyDomainUsability(domainSelect, domainData) {
-        if (!domainData) return;
-        const byId = {};
-        domainData.forEach(d => { byId[d.id] = d; });
-        domainSelect.querySelectorAll('option[value]').forEach(opt => {
-            const id = parseInt(opt.value, 10);
-            if (!id) return;
-            const info = byId[id];
-            if (info && !info.usable) {
-                opt.disabled = true;
-                opt.title    = info.reason || 'Not available for this subnet';
-            } else {
-                opt.disabled = false;
-                opt.title    = '';
-            }
-        });
-    }
-
-    function applyViewFilter(nameEntry, availableIds, autoCheck) {
-        nameEntry.querySelectorAll('.form-check[data-view-id]').forEach(wrap => {
-            const viewId = parseInt(wrap.dataset.viewId, 10);
-            const cb     = wrap.querySelector('input[type="checkbox"]');
-            if (availableIds === null || !availableIds.has(viewId)) {
-                wrap.style.visibility = 'hidden';
-                if (cb) cb.checked = false;
-            } else {
-                wrap.style.visibility = '';
-                if (autoCheck && cb) cb.checked = true;
-            }
-        });
-    }
-
-    async function refreshAllRows() {
-        const subnetId   = getSubnetId();
-        const domainData = await fetchAvailableDomains(subnetId);
-        const rows       = collection.querySelectorAll('.name-entry');
-
-        for (const row of rows) {
-            const domainSel = row.querySelector('select[name*="[domain]"]');
-            if (!domainSel) continue;
-            if (domainData) applyDomainUsability(domainSel, domainData);
-            const ids = await fetchAvailableViewIds(domainSel.value, subnetId);
-            applyViewFilter(row, ids, false);
-        }
-    }
-
-    // Subnet change → refresh all rows
-    if (subnetSelect) {
-        subnetSelect.addEventListener('change', refreshAllRows);
-    }
-
-    // Domain change within a row → refresh just that row's views
-    collection.addEventListener('change', async function (e) {
-        const domainSel = e.target.closest('select[name*="[domain]"]');
-        if (!domainSel) return;
-        const row = domainSel.closest('.name-entry');
-        if (!row) return;
-        const subnetId = getSubnetId();
-        const ids = await fetchAvailableViewIds(domainSel.value, subnetId);
-        applyViewFilter(row, ids, true);
-    });
-
-    // Initial page load: apply cascade to existing rows
-    refreshAllRows();
-
-    // ── Add / remove entries ────────────────────────────────────────────────
-
-    addBtn.addEventListener('click', async function () {
-        document.getElementById('no-names-msg')?.remove();
-        document.getElementById('names-column-header')?.classList.remove('d-none');
-        const div = document.createElement('div');
-        div.innerHTML = collection.dataset.prototype.replace(/__name__/g, index++);
-        const entry = div.firstElementChild;
-        collection.appendChild(entry);
-
-        // Apply domain usability for current subnet
-        const subnetId = getSubnetId();
-        if (subnetId) {
-            const domainData = await fetchAvailableDomains(subnetId);
-            const domainSel  = entry.querySelector('select[name*="[domain]"]');
-            if (domainSel && domainData) applyDomainUsability(domainSel, domainData);
-        }
-        // Hide all views until a domain is chosen
-        applyViewFilter(entry, null, false);
-
-        // If no canonical is selected yet, make this new row the canonical
-        if (!collection.querySelector('.canonical-radio:checked')) selectFirstCanonical();
-    });
-
-    collection.addEventListener('click', function (e) {
-        if (e.target.closest('.remove-name-btn')) {
-            const row = e.target.closest('.name-entry');
-            const wasCanonical = row.querySelector('.canonical-radio')?.checked;
-            row.remove();
-            if (wasCanonical) selectFirstCanonical();
-        }
-    });
-
-    // ── Canonical name radio → hidden-checkbox sync ───────────────────────
-
-    function syncCanonical(selectedKey) {
-        collection.querySelectorAll('input[name*="[isCanonical]"]').forEach(cb => { cb.checked = false; });
-        const cb = collection.querySelector('input[name*="[names][' + selectedKey + '][isCanonical]"]');
-        if (cb) cb.checked = true;
-    }
-
-    function selectFirstCanonical() {
-        const first = collection.querySelector('.canonical-radio');
-        if (first) {
-            first.checked = true;
-            syncCanonical(first.value);
-        }
-    }
-
-    collection.addEventListener('change', function (e) {
-        if (e.target.classList.contains('canonical-radio')) syncCanonical(e.target.value);
-    });
-
-    // Initialise radios from persisted checkbox state on page load; fall back to first row
-    (function () {
-        let found = false;
-        collection.querySelectorAll('input[name*="[isCanonical]"]').forEach(cb => {
-            if (cb.checked) {
-                found = true;
-                const m = cb.name.match(/\[names\]\[([^\]]+)\]\[isCanonical\]/);
-                if (m) {
-                    const r = collection.querySelector('.canonical-radio[value="' + m[1] + '"]');
-                    if (r) r.checked = true;
-                }
-            }
-        });
-        if (!found) selectFirstCanonical();
-    })();
-
 })();
 </script>
+
+{% if interface.id %}
+<script>
+(function () {
+    const modalEl  = document.getElementById('dns-record-modal');
+    if (!modalEl) return;
+    const modal     = new bootstrap.Modal(modalEl);
+    const modalBody = document.getElementById('dns-record-modal-body');
+    const modalTitle = document.getElementById('dns-record-modal-title');
+    const addNewUrl  = {{ path('interface_domain_record_new', {id: interface.id})|json_encode|raw }};
+
+    function showSpinner() {
+        modalBody.innerHTML = '<div class="text-center py-3"><span class="spinner-border spinner-border-sm"></span></div>';
+    }
+
+    async function openModal(url, title) {
+        modalTitle.textContent = title;
+        showSpinner();
+        modal.show();
+        try {
+            const res  = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+            const data = await res.json();
+            modalBody.innerHTML = data.html;
+        } catch {
+            modalBody.innerHTML = '<div class="alert alert-danger mb-0">Failed to load form.</div>';
+        }
+    }
+
+    document.getElementById('add-dns-record-btn').addEventListener('click', () => {
+        openModal(addNewUrl, 'Add DNS Record');
+    });
+
+    document.getElementById('dns-records-card').addEventListener('click', e => {
+        const editBtn = e.target.closest('.dns-edit-btn');
+        if (editBtn) openModal(editBtn.dataset.url, 'Edit DNS Record');
+    });
+
+    // Submit form inside modal via AJAX
+    modalEl.addEventListener('submit', async function (e) {
+        const form = e.target.closest('form');
+        if (!modalBody.contains(form)) return;
+        e.preventDefault();
+        const submitBtn = form.querySelector('[type="submit"]');
+        if (submitBtn) submitBtn.disabled = true;
+        try {
+            const res  = await fetch(form.action, {
+                method:  'POST',
+                body:    new FormData(form),
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            });
+            const data = await res.json();
+            if (data.success) {
+                modal.hide();
+                window.location.reload();
+            } else {
+                modalBody.innerHTML = data.html;
+            }
+        } catch {
+            if (submitBtn) submitBtn.disabled = false;
+        }
+    });
+
+    // Delete via AJAX
+    document.getElementById('dns-records-card').addEventListener('submit', async function (e) {
+        const form = e.target.closest('.dns-delete-form');
+        if (!form) return;
+        e.preventDefault();
+        if (!confirm('Delete this DNS record?')) return;
+        await fetch(form.action, {
+            method:  'POST',
+            body:    new FormData(form),
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        });
+        window.location.reload();
+    });
+})();
+</script>
+{% endif %}
 {% endblock %}

@@ -7,7 +7,6 @@ use App\Form\DomainType;
 use App\Repository\DnsViewRepository;
 use App\Repository\DomainRecordRepository;
 use App\Repository\DomainRepository;
-use App\Repository\InterfaceNameRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -54,53 +53,29 @@ class DomainController extends AbstractController
         Domain $domain,
         Request $request,
         DomainRecordRepository $recordRepo,
-        InterfaceNameRepository $ifaceNameRepo,
     ): Response {
-        $q      = trim($request->query->getString('q'));
-        $rPage  = max(1, $request->query->getInt('rpage', 1));
-        $nPage  = max(1, $request->query->getInt('npage', 1));
+        $q    = trim($request->query->getString('q'));
+        $page = max(1, $request->query->getInt('page', 1));
 
-        ['records' => $records, 'total' => $recordTotal] =
-            $recordRepo->searchPaginated($domain, $q, $rPage, self::PER_PAGE);
-
-        ['names' => $ifaceNames, 'total' => $nameTotal] =
-            $ifaceNameRepo->searchPaginatedForDomain($domain, $q, $nPage, self::PER_PAGE);
+        ['records' => $records, 'total' => $total] =
+            $recordRepo->searchPaginated($domain, $q, $page, self::PER_PAGE);
 
         $baseParams = ['id' => $domain->getId()];
         if ($q !== '') {
             $baseParams['q'] = $q;
         }
 
-        $recordLinkParams = $baseParams;
-        if ($nPage > 1) {
-            $recordLinkParams['npage'] = $nPage;
-        }
-
-        $nameLinkParams = $baseParams;
-        if ($rPage > 1) {
-            $nameLinkParams['rpage'] = $rPage;
-        }
-
         return $this->render('domain/show.html.twig', [
-            'domain'      => $domain,
-            'q'           => $q,
-            'records'     => $records,
-            'record_pag'  => [
-                'page'        => $rPage,
-                'pages'       => max(1, (int) ceil($recordTotal / self::PER_PAGE)),
+            'domain'  => $domain,
+            'q'       => $q,
+            'records' => $records,
+            'pag'     => [
+                'page'        => $page,
+                'pages'       => max(1, (int) ceil($total / self::PER_PAGE)),
                 'per_page'    => self::PER_PAGE,
-                'total'       => $recordTotal,
-                'link_params' => $recordLinkParams,
-                'page_param'  => 'rpage',
-            ],
-            'iface_names' => $ifaceNames,
-            'name_pag'    => [
-                'page'        => $nPage,
-                'pages'       => max(1, (int) ceil($nameTotal / self::PER_PAGE)),
-                'per_page'    => self::PER_PAGE,
-                'total'       => $nameTotal,
-                'link_params' => $nameLinkParams,
-                'page_param'  => 'npage',
+                'total'       => $total,
+                'link_params' => $baseParams,
+                'page_param'  => 'page',
             ],
         ]);
     }

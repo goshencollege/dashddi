@@ -5,9 +5,13 @@ namespace App\Form;
 use App\Entity\DnsView;
 use App\Entity\Domain;
 use App\Entity\DomainRecord;
+use App\Entity\NetworkInterface;
 use App\Enum\RecordType;
+use App\Repository\DnsViewRepository;
+use App\Service\DnsViewResolver;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
+use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
 use Symfony\Component\Form\Extension\Core\Type\EnumType;
 use Symfony\Component\Form\Extension\Core\Type\IntegerType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
@@ -20,20 +24,29 @@ use Symfony\Component\OptionsResolver\OptionsResolver;
 
 class DomainRecordType extends AbstractType
 {
+    public function __construct(
+        private readonly DnsViewRepository $viewRepo,
+        private readonly DnsViewResolver   $viewResolver,
+    ) {}
+
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
+        /** @var NetworkInterface|null $interface */
+        $interface = $options['network_interface'];
+
         $builder
             ->add('hostname', TextType::class, [
                 'label' => 'Hostname',
                 'attr'  => ['placeholder' => 'e.g. mail  or  @  or  *.dev'],
             ])
             ->add('type', EnumType::class, [
-                'class' => RecordType::class,
+                'class'        => RecordType::class,
                 'choice_label' => fn(RecordType $t) => $t->value,
             ])
             ->add('value', TextType::class, [
-                'label' => 'Value',
-                'attr'  => ['placeholder' => 'e.g. 192.168.1.1  or  mail.example.com.'],
+                'label'    => 'Value',
+                'required' => false,
+                'attr'     => ['placeholder' => 'e.g. 192.168.1.1  or  mail.example.com.'],
             ])
             ->add('ttl', IntegerType::class, [
                 'required' => false,
@@ -45,16 +58,48 @@ class DomainRecordType extends AbstractType
                 'label'    => 'Comment',
             ]);
 
-        $builder->addEventListener(FormEvents::PRE_SET_DATA, function (FormEvent $event) {
+        // When creating/editing from an interface context, add domain selection and isCanonical
+        if ($interface !== null) {
+            $subnet = $interface->getSubnet();
+            $builder->add('domain', EntityType::class, [
+                'class'        => Domain::class,
+                'choice_label' => 'name',
+                'placeholder'  => '-- Select a domain --',
+                'required'     => false,
+                'label'        => 'Domain',
+                'choice_attr'  => function (Domain $domain) use ($subnet) {
+                    if ($this->viewResolver->isDomainUsable($domain, $subnet)) {
+                        return [];
+                    }
+                    return [
+                        'disabled' => 'disabled',
+                        'title'    => $this->viewResolver->unusableDomainReason($domain, $subnet),
+                    ];
+                },
+            ]);
+            $builder->add('isCanonical', CheckboxType::class, [
+                'label'    => 'Set as canonical (reverse DNS) name',
+                'required' => false,
+            ]);
+        }
+
+        $builder->addEventListener(FormEvents::PRE_SET_DATA, function (FormEvent $event) use ($interface) {
             $record = $event->getData();
             $domain = ($record instanceof DomainRecord) ? $record->getDomain() : null;
-            $this->addViewsField($event->getForm(), $domain);
+            $this->addViewsField($event->getForm(), $domain, $interface);
         });
     }
 
-    private function addViewsField(FormInterface $form, ?Domain $domain): void
+    private function addViewsField(FormInterface $form, ?Domain $domain, ?NetworkInterface $interface): void
     {
-        $choices = $domain ? $domain->getViews()->toArray() : [];
+        if ($interface !== null) {
+            // Limit view choices to what's available for domain+subnet combination
+            $subnet  = $interface->getSubnet();
+            $choices = $domain ? $this->viewResolver->availableViewsFor($domain, $subnet) : [];
+        } else {
+            $choices = $domain ? $domain->getViews()->toArray() : [];
+        }
+
         $form->add('views', EntityType::class, [
             'class'        => DnsView::class,
             'choices'      => $choices,
@@ -69,6 +114,10 @@ class DomainRecordType extends AbstractType
 
     public function configureOptions(OptionsResolver $resolver): void
     {
-        $resolver->setDefaults(['data_class' => DomainRecord::class]);
+        $resolver->setDefaults([
+            'data_class'        => DomainRecord::class,
+            'network_interface' => null,
+        ]);
+        $resolver->setAllowedTypes('network_interface', ['null', NetworkInterface::class]);
     }
 }

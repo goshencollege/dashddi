@@ -21,8 +21,8 @@
         <p>DashDDI acts as the authoritative source for your DNS zones. You define domains (zones) and records here; DashDDI generates BIND-format zone files and deploys them to your DNS servers via SSH.</p>
         <p class="mb-0">DNS records can come from two sources:</p>
         <ul class="mt-2 mb-0">
-            <li><strong>Interface names</strong> — A/AAAA records generated automatically from host interface DNS name assignments</li>
-            <li><strong>Manual records</strong> — MX, CNAME, TXT, NS, or other records added directly to a domain</li>
+            <li><strong>Host interface records</strong> — A/AAAA (and other types) linked to a specific host interface, added from the interface detail page. The IP address for A/AAAA records is derived automatically from the interface. These appear in the domain record list with a <em>Host</em> column.</li>
+            <li><strong>Manual records</strong> — MX, CNAME, TXT, NS, or any other records added directly from the domain detail page.</li>
         </ul>
     </div>
 </div>
@@ -45,7 +45,7 @@
             <dt class="col-sm-3">DDNS DNS Server</dt>
             <dd class="col-sm-9">The primary DNS server that will accept DNS UPDATE packets for this zone. Must have a DDNS algorithm selected (which causes DashDDI to auto-generate the TSIG secret).</dd>
         </dl>
-        <p class="mb-0">The domain detail page shows all DNS records in the zone — both manual records and those derived from host interface names.</p>
+        <p class="mb-0">The domain detail page shows all DNS records in the zone in a single unified table. Records linked to host interfaces include a <em>Host</em> column with a link to the host, and canonical records carry a <span class="badge bg-primary">PTR</span> badge indicating they are used as the reverse DNS name for their interface's IP.</p>
     </div>
 </div>
 

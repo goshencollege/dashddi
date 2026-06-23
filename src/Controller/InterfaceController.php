@@ -3,12 +3,9 @@
 namespace App\Controller;
 
 use App\Dto\NetworkEvent;
-use App\Entity\Domain;
 use App\Entity\Host;
-use App\Entity\InterfaceName;
 use App\Entity\NetworkInterface;
 use App\Entity\Subnet;
-use App\Form\InterfaceNameType;
 use App\Form\NetworkInterfaceType;
 use App\Repository\AppSettingRepository;
 use App\Repository\ArubaSwitchRepository;
@@ -19,7 +16,6 @@ use App\Repository\NetworkInterfaceRepository;
 use App\Repository\SubnetRepository;
 use App\Repository\UserPreferenceRepository;
 use App\Service\DnsViewResolver;
-use App\Service\FcrdnsChecker;
 use App\Service\IpAddressManager;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -33,7 +29,6 @@ class InterfaceController extends AbstractController
     public function __construct(
         private readonly IpAddressManager $ipManager,
         private readonly DnsViewResolver  $viewResolver,
-        private readonly FcrdnsChecker    $fcrdnsChecker,
     ) {}
 
     #[Route('/hosts/{id}/interfaces/new', name: 'interface_new', methods: ['GET', 'POST'])]
@@ -134,15 +129,6 @@ class InterfaceController extends AbstractController
                     $this->ipManager->releaseIpv6($interface);
                 }
                 $this->handleIpAssignment($form, $interface, isEdit: true);
-                foreach ($interface->getNames() as $name) {
-                    if ($name->isCanonical()) {
-                        $fcrdnsError = $this->checkCanonical($name, $interface);
-                        if ($fcrdnsError !== null) {
-                            $this->addFlash('warning', 'FCrDNS check failed — name saved as canonical anyway. ' . $fcrdnsError);
-                        }
-                        break;
-                    }
-                }
                 $em->flush();
                 $this->addFlash('success', 'Interface updated.');
                 return $this->redirectToRoute('interface_show', ['id' => $interface->getId()]);
@@ -243,73 +229,6 @@ class InterfaceController extends AbstractController
         return $this->redirectToRoute('interface_show', ['id' => $interface->getId()]);
     }
 
-    #[Route('/interfaces/{id}/names/new', name: 'interface_name_new', methods: ['GET', 'POST'])]
-    public function nameNew(Request $request, NetworkInterface $interface, EntityManagerInterface $em): Response
-    {
-        $name = new InterfaceName();
-        $form = $this->createForm(InterfaceNameType::class, $name, ['network_interface' => $interface]);
-        $form->handleRequest($request);
-
-        if ($form->isSubmitted() && $form->isValid()) {
-            $fcrdnsError = $this->checkCanonical($name, $interface);
-            if ($fcrdnsError !== null) {
-                $this->addFlash('warning', 'FCrDNS check failed — name saved as canonical anyway. ' . $fcrdnsError);
-            }
-            if ($name->isCanonical()) {
-                $this->clearOtherCanonicals($name, $interface);
-            }
-            $interface->addName($name);
-            $em->persist($name);
-            $em->flush();
-            $this->addFlash('success', 'Name added.');
-            return $this->redirectToRoute('interface_show', ['id' => $interface->getId()]);
-        }
-
-        return $this->render('interface/name_form.html.twig', [
-            'form'      => $form,
-            'interface' => $interface,
-            'title'     => 'Add DNS Name',
-        ]);
-    }
-
-    #[Route('/interfaces/{interfaceId}/names/{id}/edit', name: 'interface_name_edit', methods: ['GET', 'POST'])]
-    public function nameEdit(Request $request, int $interfaceId, InterfaceName $name, NetworkInterfaceRepository $repo, EntityManagerInterface $em): Response
-    {
-        $interface = $repo->find($interfaceId);
-        $form = $this->createForm(InterfaceNameType::class, $name, ['network_interface' => $interface]);
-        $form->handleRequest($request);
-
-        if ($form->isSubmitted() && $form->isValid()) {
-            $fcrdnsError = $this->checkCanonical($name, $interface);
-            if ($fcrdnsError !== null) {
-                $this->addFlash('warning', 'FCrDNS check failed — name saved as canonical anyway. ' . $fcrdnsError);
-            }
-            if ($name->isCanonical()) {
-                $this->clearOtherCanonicals($name, $interface);
-            }
-            $em->flush();
-            $this->addFlash('success', 'Name updated.');
-            return $this->redirectToRoute('interface_show', ['id' => $interfaceId]);
-        }
-
-        return $this->render('interface/name_form.html.twig', [
-            'form'      => $form,
-            'interface' => $interface,
-            'title'     => 'Edit DNS Name',
-        ]);
-    }
-
-    #[Route('/interfaces/{interfaceId}/names/{id}/delete', name: 'interface_name_delete', methods: ['POST'])]
-    public function nameDelete(Request $request, int $interfaceId, InterfaceName $name, EntityManagerInterface $em): Response
-    {
-        if ($this->isCsrfTokenValid('delete_name_' . $name->getId(), $request->request->get('_token'))) {
-            $em->remove($name);
-            $em->flush();
-            $this->addFlash('success', 'Name deleted.');
-        }
-        return $this->redirectToRoute('interface_show', ['id' => $interfaceId]);
-    }
-
     /** JSON endpoint for the interface form to fetch available IPs when subnet changes. */
     #[Route('/api/subnets/{id}/available-ips', name: 'api_subnet_available_ips', methods: ['GET'])]
     public function availableIps(\App\Entity\Subnet $subnet): JsonResponse
@@ -325,10 +244,10 @@ class InterfaceController extends AbstractController
 
     /**
      * Returns views available for a domain, optionally intersected with a subnet's allowed views.
-     * Used by the interface name form JS to update view checkboxes on domain change.
+     * Used by the DNS record form JS to update view checkboxes on domain change.
      */
     #[Route('/api/domains/{id}/views', name: 'api_domain_views', methods: ['GET'])]
-    public function domainViews(Domain $domain, Request $request, SubnetRepository $subnetRepo): JsonResponse
+    public function domainViews(\App\Entity\Domain $domain, Request $request, SubnetRepository $subnetRepo): JsonResponse
     {
         $subnetId = $request->query->get('subnet');
         $subnet   = $subnetId ? $subnetRepo->find((int) $subnetId) : null;
@@ -348,7 +267,7 @@ class InterfaceController extends AbstractController
     {
         $domains = $domainRepo->findBy([], ['name' => 'ASC']);
 
-        $result = array_map(function (Domain $domain) use ($subnet) {
+        $result = array_map(function (\App\Entity\Domain $domain) use ($subnet) {
             $usable = $this->viewResolver->isDomainUsable($domain, $subnet);
             $entry  = ['id' => $domain->getId(), 'name' => $domain->getName(), 'usable' => $usable];
             if (!$usable) {
@@ -434,32 +353,6 @@ class InterfaceController extends AbstractController
         return $this->json(['message' => $count . ' interface(s) updated.']);
     }
 
-    private function checkCanonical(InterfaceName $name, NetworkInterface $interface): ?string
-    {
-        if (!$name->isCanonical()) {
-            return null;
-        }
-
-        if ($name->getDomain() === null) {
-            return 'A domain is required to set a name as canonical — a bare label cannot be used for reverse DNS.';
-        }
-
-        return $this->fcrdnsChecker->check(
-            $name->getFullyQualifiedName(),
-            $interface->getIpAddress()?->getAddress(),
-            $interface->getIpv6Address()?->getAddress(),
-        );
-    }
-
-    private function clearOtherCanonicals(InterfaceName $canonical, NetworkInterface $interface): void
-    {
-        foreach ($interface->getNames() as $other) {
-            if ($other !== $canonical && $other->isCanonical()) {
-                $other->setIsCanonical(false);
-            }
-        }
-    }
-
     private function validateIpInputs(\Symfony\Component\Form\FormInterface $form, ?\App\Entity\Subnet $subnet, ?NetworkInterface $current): array
     {
         if ($subnet?->isContainer()) {
@@ -529,5 +422,4 @@ class InterfaceController extends AbstractController
             }
         }
     }
-
 }
