@@ -1412,16 +1412,13 @@ class ImportLegacyCommand extends Command
             ["goshen.edu", "@", "MX", "5 alt2.aspmx.l.google.com", 3600, null, ["external", "internal"]],
             ["goshen.edu", "give", "MX", "10 mxa.mailgun.org", 3600, "Blackbaud records for Development", ["external", "internal"]],
             ["goshen.edu", "give", "MX", "10 mxb.mailgun.org", 3600, "Blackbaud records for Development", ["external", "internal"]],
-            ["goshen.edu", "@", "NS", "dns3.goshen.edu", 3600, null, ["external", "internal"]],
-            ["goshen.edu", "@", "NS", "dns2.goshen.edu", 3600, null, ["external", "internal"]],
-            ["goshen.edu", "@", "NS", "dns1.goshen.edu", 3600, null, ["external", "internal"]],
-            ["goshen.edu", "dyn", "NS", "dns-legacy.goshen.edu", 600, null, ["internal"]],
-            ["goshen.edu", "gc", "NS", "dc4.goshen.edu", 600, null, ["internal"]],
-            ["goshen.edu", "gc", "NS", "dc3.goshen.edu", 600, null, ["internal"]],
-            ["goshen.edu", "gc", "NS", "dc1.goshen.edu", 600, null, ["internal"]],
-            ["goshen.edu", "pc-printer-discovery", "NS", "print.goshen.edu", 600, "Print mobility records", ["internal"]],
-            ["goshen.edu", "b._dns-sd._udp", "PTR", "pc-printer-discovery", 600, "Print mobility records", ["internal"]],
-            ["goshen.edu", "lb._dns-sd._udp", "PTR", "pc-printer-discovery", 600, "Print mobility records", ["internal"]],
+            ["goshen.edu", "@", "NS", "dns3.goshen.edu.", 3600, null, ["external", "internal"]],
+            ["goshen.edu", "@", "NS", "dns2.goshen.edu.", 3600, null, ["external", "internal"]],
+            ["goshen.edu", "@", "NS", "dns1.goshen.edu.", 3600, null, ["external", "internal"]],
+            ["goshen.edu", "dyn", "NS", "dns-legacy.goshen.edu.", 600, null, ["internal"]],
+            ["goshen.edu", "gc", "NS", "dc4.goshen.edu.", 600, null, ["internal"]],
+            ["goshen.edu", "gc", "NS", "dc3.goshen.edu.", 600, null, ["internal"]],
+            ["goshen.edu", "gc", "NS", "dc1.goshen.edu.", 600, null, ["internal"]],
             ["goshen.edu", "_acme-challenge.giving", "TXT", "7JAqWGzFefEI6DL3ceJSs9NwBNzam6koJ3tPsdN9Rwo", 3600, "GiveCampus records", ["external", "internal"]],
             ["goshen.edu", "_acme-challenge.login", "TXT", "E3tgm4ok71CdO0l5IuPiBneppIctrCUpbmdaq0xds34", 3600, "Okta records", ["external", "internal"]],
             ["goshen.edu", "_amazonses", "TXT", "24rNK29uXti65QqBrI4tsMEGhvApR4S7HlevmKKQXvk=", 3600, "RNL records for Financial Aid", ["external", "internal"]],
@@ -1429,7 +1426,7 @@ class ImportLegacyCommand extends Command
             ["goshen.edu", "_dmarc.merrylea", "TXT", "v=DMARC1; p=none;", 3600, "Merry Lea records for DoubleKnot", ["external", "internal"]],
             ["goshen.edu", "_domainkey", "TXT", "t=y; o=~;", 3600, null, ["external", "internal"]],
             ["goshen.edu", "_oktaverification", "TXT", "675a6f53bef84bdfb2cc9914998ba4e0", 3600, "Okta records", ["external", "internal"]],
-            ["goshen.edu", "@", "TXT", "v=spf1 ip4:199.8.232.0/24 ip6:2001:18e8:408:1e8::/64 include:amazonses.com include:mktomail.com include:_spf.google.com  include:servers.mcsv.net include:spf1.formassembly.com include:_spf.qualtrics.com include:okta-mail.goshen.edu include:sendgrid.net -all", 3600, "SPF components:\nip4:199.8.232.0/24 is our on-campus range\ninclude:mktomail.com is Marketo mail\ninclude:_spf.google.com is GMail\ninclude:servers.mcsv.net is MailChimp\ninclude:spf.messagegears.net is RNL Demand Builder -- removed 2022-04-25 by davidwk\ninclude:amazonses.com is for Box Office emails\ninclude:spf1.formassembly.com for FormAssembly emails\ninclude:_spf.qualtrics.com for Qualtrics emails\ninclude:okta-mail.goshen.edu for Okta emails\ninclude:sendgrid.net for emails from Asher hosted sites", ["external", "internal"]],
+            ["goshen.edu", "@", "TXT", "v=spf1 ip4:199.8.232.0/24 ip6:2001:18e8:408:1e8::/64 ip4:67.220.127.252 include:amazonses.com include:mktomail.com include:_spf.google.com  include:servers.mcsv.net include:spf1.formassembly.com include:_spf.qualtrics.com include:okta-mail.goshen.edu include:sendgrid.net -all", 3600, "SPF components:\nip4:199.8.232.0/24 is our on-campus range\nip4:67.220.127.252 is the Koha mailserver (Library mgmt software)\ninclude:mktomail.com is Marketo mail\ninclude:_spf.google.com is GMail\ninclude:servers.mcsv.net is MailChimp\ninclude:spf.messagegears.net is RNL Demand Builder -- removed 2022-04-25 by davidwk\ninclude:amazonses.com is for Box Office emails\ninclude:spf1.formassembly.com for FormAssembly emails\ninclude:_spf.qualtrics.com for Qualtrics emails\ninclude:okta-mail.goshen.edu for Okta emails\ninclude:sendgrid.net for emails from Asher hosted sites", ["external", "internal"]],
             ["goshen.edu", "@", "TXT", "MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDLZzBd2I9Xt7vUIrCbTrucbhMEWjaANTTVsCqGuJpsJMM9eIyiXTAgPQIFbIUTJRm0r6rOZvOrlfl13BLO1UuPfIN2jGexJ4HFKtmRJ13Q5pfvmFt/9hOl29Ukmm3MuTw5aQwvIAgeANvslRxFCiymNUxHZoh5H6KZi/v1VPOsywIDAQAB", 3600, "ACTIVENET verification records for the Music Center", ["external", "internal"]],
             ["goshen.edu", "@", "TXT", "google-site-verification=irO_1KmgvJbtLHX-SjwUh-1XtCYfCeMdF6hUj5_uZPY", 3600, "Merry Lea records to point to Asher", ["external", "internal"]],
             ["goshen.edu", "@", "TXT", "stripe-verification=3E314FE614258CA6F0A8386086EAC67F742B898DCA2DE55C5C7443F5E1E4C2E0", 3600, "Stripe domain verification record", ["external", "internal"]],
@@ -1501,7 +1498,7 @@ class ImportLegacyCommand extends Command
         }
 
         $subnets   = $this->em->getRepository(Subnet::class)->findBy(['isContainer' => false]);
-        $nsServers = ['dns1.goshen.edu', 'dns2.goshen.edu', 'dns3.goshen.edu'];
+        $nsServers = ['dns1.goshen.edu.', 'dns2.goshen.edu.', 'dns3.goshen.edu.'];
         $count     = 0;
 
         foreach ($subnets as $subnet) {
