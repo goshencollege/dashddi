@@ -313,7 +313,7 @@
                     viewsSection.innerHTML = '<div class="d-flex flex-wrap gap-3">' +
                         views.map(v =>
                             `<div class="form-check">` +
-                            `<input class="form-check-input" type="checkbox" name="domain_record[views][]" value="${v.id}" id="modal_view_${v.id}">` +
+                            `<input class="form-check-input" type="checkbox" name="domain_record[views][]" value="${v.id}" id="modal_view_${v.id}" checked>` +
                             `<label class="form-check-label" for="modal_view_${v.id}">${v.name}</label>` +
                             `</div>`
                         ).join('') + '</div>';
