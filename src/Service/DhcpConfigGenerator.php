@@ -172,9 +172,9 @@ class DhcpConfigGenerator
 
     private function findAnyDdnsLabel(NetworkInterface $iface): ?string
     {
-        foreach ($iface->getNames() as $name) {
-            if ($name->getDomain()?->isDdnsEnabled()) {
-                return $name->getName();
+        foreach ($iface->getDomainRecords() as $record) {
+            if ($record->getDomain()?->isDdnsEnabled()) {
+                return $record->getHostname();
             }
         }
         return null;
