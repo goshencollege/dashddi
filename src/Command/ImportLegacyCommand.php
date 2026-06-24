@@ -210,7 +210,7 @@ class ImportLegacyCommand extends Command
                 'name'        => 'gc',
                 'description' => null,
                 'keys'        => [
-                    ['type' => 'ksk', 'lifetime' => null,   'algorithm' => 'ecdsap256sha256'],
+                    ['type' => 'ksk', 'lifetime' => 'unlimited',   'algorithm' => 'ecdsap256sha256'],
                     ['type' => 'zsk', 'lifetime' => 'P60D', 'algorithm' => 'ecdsap256sha256'],
                 ],
             ],
@@ -218,7 +218,7 @@ class ImportLegacyCommand extends Command
                 'name'        => 'gc_RSASHA512',
                 'description' => 'legacy policy',
                 'keys'        => [
-                    ['type' => 'ksk', 'lifetime' => null,   'algorithm' => 'rsasha512'],
+                    ['type' => 'ksk', 'lifetime' => 'unlimited',   'algorithm' => 'rsasha512'],
                     ['type' => 'zsk', 'lifetime' => 'P60D', 'algorithm' => 'rsasha512'],
                 ],
             ],
@@ -235,7 +235,7 @@ class ImportLegacyCommand extends Command
             $policy->setPurgeKeys('P90D');
             $policy->setPublishSafety('PT2H');
             $policy->setRetireSafety('PT2H');
-            $policy->setNsec3param('0 false 0');
+            $policy->setNsec3param('iterations 0 optout false salt-length 0');
             $policy->setExtraOptions($extraOptions);
             $policy->setKeys($def['keys']);
             if (!$dryRun) {
