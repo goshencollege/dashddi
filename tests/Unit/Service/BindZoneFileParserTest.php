@@ -230,6 +230,22 @@ ZONE;
         $this->assertSame('ns1.example.com', $record['value']);
     }
 
+    public function testParsesDsRecord(): void
+    {
+        $zone = <<<ZONE
+\$ORIGIN example.com.
+\$TTL 3600
+child IN DS 12345 13 2 AABBCCDDEEFF00112233445566778899AABBCCDDEEFF00112233445566778899
+ZONE;
+
+        $result = $this->parser->parse($zone, 'example.com');
+        $record = $this->findRecord($result['records'], 'child', 'DS');
+
+        $this->assertNotNull($record);
+        $this->assertSame('12345 13 2 AABBCCDDEEFF00112233445566778899AABBCCDDEEFF00112233445566778899', $record['value']);
+        $this->assertSame(3600, $record['ttl']);
+    }
+
     public function testTtlWithUnitSuffix(): void
     {
         $zone = <<<ZONE

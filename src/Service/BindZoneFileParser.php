@@ -4,7 +4,7 @@ namespace App\Service;
 
 class BindZoneFileParser
 {
-    private const SUPPORTED_TYPES = ['A', 'AAAA', 'CNAME', 'MX', 'NS', 'TXT', 'PTR', 'SRV'];
+    private const SUPPORTED_TYPES = ['A', 'AAAA', 'CNAME', 'MX', 'NS', 'TXT', 'PTR', 'SRV', 'DS'];
 
     private const ALL_RECORD_TYPES = [
         'A', 'AAAA', 'CNAME', 'MX', 'NS', 'TXT', 'PTR', 'SRV', 'SOA',
