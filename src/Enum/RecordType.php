@@ -12,4 +12,7 @@ enum RecordType: string
     case TXT   = 'TXT';
     case PTR   = 'PTR';
     case SRV   = 'SRV';
+    case DS    = 'DS';
+    case CAA   = 'CAA';
+    case HTTPS = 'HTTPS';
 }

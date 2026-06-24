@@ -1422,6 +1422,7 @@ class ImportLegacyCommand extends Command
             ["goshen.edu", "@", "NS", "dns2.goshen.edu.", null, ["external", "internal"]],
             ["goshen.edu", "@", "NS", "dns1.goshen.edu.", null, ["external", "internal"]],
             ["goshen.edu", "dyn", "NS", "dns-legacy.goshen.edu.", null, ["internal"]],
+            ["goshen.edu", "dyn", "DS", "58843 15 2 BE8F589C3A6C5B70C9E720814B0984CEC34FABB14E8D3442504D2F9E9ADEBFAC", null, ["internal"]],
             ["goshen.edu", "gc", "NS", "dc3.goshen.edu.", null, ["internal"]],
             ["goshen.edu", "gc", "NS", "dc2.goshen.edu.", null, ["internal"]],
             ["goshen.edu", "gc", "NS", "dc1.goshen.edu.", null, ["internal"]],
