@@ -246,6 +246,36 @@ ZONE;
         $this->assertSame(3600, $record['ttl']);
     }
 
+    public function testParsesCaaRecord(): void
+    {
+        $zone = <<<ZONE
+\$ORIGIN example.com.
+\$TTL 3600
+@ IN CAA 0 issue "letsencrypt.org"
+ZONE;
+
+        $result = $this->parser->parse($zone, 'example.com');
+        $record = $this->findRecord($result['records'], '@', 'CAA');
+
+        $this->assertNotNull($record);
+        $this->assertSame('0 issue "letsencrypt.org"', $record['value']);
+    }
+
+    public function testParsesHttpsRecord(): void
+    {
+        $zone = <<<ZONE
+\$ORIGIN example.com.
+\$TTL 3600
+@ IN HTTPS 1 . alpn="h2,h3"
+ZONE;
+
+        $result = $this->parser->parse($zone, 'example.com');
+        $record = $this->findRecord($result['records'], '@', 'HTTPS');
+
+        $this->assertNotNull($record);
+        $this->assertSame('1 . alpn="h2,h3"', $record['value']);
+    }
+
     public function testTtlWithUnitSuffix(): void
     {
         $zone = <<<ZONE
