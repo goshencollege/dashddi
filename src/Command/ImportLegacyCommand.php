@@ -709,10 +709,7 @@ class ImportLegacyCommand extends Command
             $hasIp = $iface->getIpAddress() !== null || $iface->getIpv6Address() !== null;
             $sharedViews = $this->intersectViews($domain, $subnet);
 
-            if ($row['revgc']) {
-                $canonicalDomain = $gcDomain;
-                $canonicalViews  = [];
-            } elseif (!$hasIp) {
+            if (!$hasIp && !$row['revgc']) {
                 $canonicalDomain = $dynDomain;
                 $canonicalViews  = $this->intersectViews($dynDomain, $subnet);
             } else {
@@ -721,36 +718,58 @@ class ImportLegacyCommand extends Command
             }
 
             if ($hasIp || !$row['revgc']) {
-                // Canonical name from host.name
+                // Forward name from host.name
                 if ($this->isValidDnsLabel($row['name'])) {
                     $hasIpv4 = $iface->getIpAddress() !== null;
                     $hasIpv6 = $iface->getIpv6Address() !== null;
                     if ($hasIpv4) {
-                        $canonical = new DomainRecord();
-                        $canonical->setHostname($row['name']);
-                        $canonical->setDomain($canonicalDomain);
-                        $canonical->setNetworkInterface($iface);
-                        $canonical->setType(RecordType::A);
-                        $canonical->setIsCanonical(true);
+                        $forward = new DomainRecord();
+                        $forward->setHostname($row['name']);
+                        $forward->setDomain($canonicalDomain);
+                        $forward->setNetworkInterface($iface);
+                        $forward->setType(RecordType::A);
+                        $forward->setIsCanonical(!$row['revgc']);
                         foreach ($canonicalViews as $view) {
-                            $canonical->addView($view);
+                            $forward->addView($view);
                         }
                         if (!$dryRun) {
-                            $this->em->persist($canonical);
+                            $this->em->persist($forward);
+                        }
+                        if ($row['revgc']) {
+                            $gcRecord = new DomainRecord();
+                            $gcRecord->setHostname($row['name']);
+                            $gcRecord->setDomain($gcDomain);
+                            $gcRecord->setNetworkInterface($iface);
+                            $gcRecord->setType(RecordType::A);
+                            $gcRecord->setIsCanonical(true);
+                            if (!$dryRun) {
+                                $this->em->persist($gcRecord);
+                            }
                         }
                     }
                     if ($hasIpv6) {
-                        $canonical6 = new DomainRecord();
-                        $canonical6->setHostname($row['name']);
-                        $canonical6->setDomain($canonicalDomain);
-                        $canonical6->setNetworkInterface($iface);
-                        $canonical6->setType(RecordType::AAAA);
-                        $canonical6->setIsCanonical(true);
+                        $forward6 = new DomainRecord();
+                        $forward6->setHostname($row['name']);
+                        $forward6->setDomain($canonicalDomain);
+                        $forward6->setNetworkInterface($iface);
+                        $forward6->setType(RecordType::AAAA);
+                        $forward6->setIsCanonical(!$row['revgc']);
                         foreach ($canonicalViews as $view) {
-                            $canonical6->addView($view);
+                            $forward6->addView($view);
                         }
                         if (!$dryRun) {
-                            $this->em->persist($canonical6);
+                            $this->em->persist($forward6);
+                        }
+                        if ($row['revgc']) {
+                            $gcRecord6 = new DomainRecord();
+                            $gcRecord6->setHostname($row['name']);
+                            $gcRecord6->setDomain($gcDomain);
+                            $gcRecord6->setNetworkInterface($iface);
+                            $gcRecord6->setType(RecordType::AAAA);
+                            $gcRecord6->setIsCanonical(true);
+                            if (!$dryRun) {
+                                $this->em->persist($gcRecord6);
+                            }
                         }
                     }
                     if (!$hasIpv4 && !$hasIpv6) {
