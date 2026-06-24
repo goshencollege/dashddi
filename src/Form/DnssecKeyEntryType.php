@@ -28,8 +28,10 @@ class DnssecKeyEntryType extends AbstractType
                 ],
             ])
             ->add('lifetime', TextType::class, [
-                'label' => false,
-                'attr'  => ['placeholder' => 'e.g. unlimited, P30D, P1Y'],
+                'label'      => false,
+                'required'   => false,
+                'empty_data' => 'unlimited',
+                'attr'       => ['placeholder' => 'e.g. unlimited, P30D, P1Y'],
             ]);
     }
 

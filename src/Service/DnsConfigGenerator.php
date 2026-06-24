@@ -237,7 +237,7 @@ class DnsConfigGenerator
             if (!empty($keys)) {
                 $lines[] = '    keys {';
                 foreach ($keys as $key) {
-                    $lines[] = '        ' . $key['type'] . ' lifetime ' . $key['lifetime'] . ' algorithm ' . $key['algorithm'] . ';';
+                    $lines[] = '        ' . $key['type'] . ' lifetime ' . ($key['lifetime'] ?? 'unlimited') . ' algorithm ' . $key['algorithm'] . ';';
                 }
                 $lines[] = '    };';
             }
