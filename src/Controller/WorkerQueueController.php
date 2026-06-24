@@ -17,32 +17,40 @@ class WorkerQueueController extends AbstractController
     public function index(Connection $conn, ScheduledTaskRepository $taskRepo, AppSettingRepository $settingRepo): Response
     {
         $tz = $settingRepo->getInstance()->getTimezone() ?? 'UTC';
-        $rows = $conn->fetchAllAssociative(
-            'SELECT id, queue_name, created_at, available_at, delivered_at, body
-             FROM messenger_messages
-             ORDER BY created_at DESC
-             LIMIT 500'
-        );
-
         $taskNames = [];
         foreach ($taskRepo->findAll() as $task) {
             $taskNames[$task->getId()] = $task->getName();
         }
 
-        $running = [];
-        $pending = [];
-        $failed  = [];
-
-        foreach ($rows as $row) {
+        $addLabel = function (array $row) use ($taskNames): array {
             $row['label'] = $this->parseLabel($row['body'], $taskNames);
-            if (str_starts_with($row['queue_name'], 'failed')) {
-                $failed[] = $row;
-            } elseif ($row['delivered_at'] !== null) {
-                $running[] = $row;
-            } else {
-                $pending[] = $row;
-            }
-        }
+            return $row;
+        };
+
+        $running = array_map($addLabel, $conn->fetchAllAssociative(
+            "SELECT id, queue_name, created_at, available_at, delivered_at, body
+             FROM messenger_messages
+             WHERE queue_name NOT IN ('failed_priority', 'failed_bulk')
+               AND delivered_at IS NOT NULL
+             ORDER BY delivered_at ASC"
+        ));
+
+        $pending = array_map($addLabel, $conn->fetchAllAssociative(
+            "SELECT id, queue_name, created_at, available_at, delivered_at, body
+             FROM messenger_messages
+             WHERE queue_name NOT IN ('failed_priority', 'failed_bulk')
+               AND delivered_at IS NULL
+             ORDER BY available_at ASC
+             LIMIT 500"
+        ));
+
+        $failed = array_map($addLabel, $conn->fetchAllAssociative(
+            "SELECT id, queue_name, created_at, available_at, delivered_at, body
+             FROM messenger_messages
+             WHERE queue_name IN ('failed_priority', 'failed_bulk')
+             ORDER BY created_at DESC
+             LIMIT 500"
+        ));
 
         return $this->render('worker_queue/index.html.twig', [
             'running' => $running,
