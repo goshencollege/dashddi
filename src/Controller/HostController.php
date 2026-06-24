@@ -252,6 +252,46 @@ class HostController extends AbstractController
             return $this->json(['message' => $tagNames . ' ' . $verb . ' ' . count($hosts) . ' host(s).']);
         }
 
+        if ($action === 'merge') {
+            $primaryId = isset($data['primaryId']) ? (int) $data['primaryId'] : 0;
+            if (count($hosts) < 2) {
+                return $this->json(['error' => 'Select at least 2 hosts to merge'], 400);
+            }
+            $primary = null;
+            $others  = [];
+            foreach ($hosts as $host) {
+                if ($host->getId() === $primaryId) {
+                    $primary = $host;
+                } else {
+                    $others[] = $host;
+                }
+            }
+            if ($primary === null) {
+                return $this->json(['error' => 'Invalid primary host'], 400);
+            }
+
+            foreach ($others as $other) {
+                foreach ($other->getTags() as $tag) {
+                    $primary->addTag($tag);
+                }
+            }
+            $em->flush();
+
+            $conn = $em->getConnection();
+            foreach ($others as $other) {
+                $conn->executeStatement(
+                    'UPDATE network_interface SET host_id = ? WHERE host_id = ?',
+                    [$primary->getId(), $other->getId()]
+                );
+                $conn->executeStatement('DELETE FROM host WHERE id = ?', [$other->getId()]);
+                $em->detach($other);
+            }
+            $em->refresh($primary);
+
+            $merged = count($others);
+            return $this->json(['message' => 'Merged ' . $merged . ' host' . ($merged !== 1 ? 's' : '') . ' into "' . $primary->getName() . '".']);
+        }
+
         return $this->json(['error' => 'Unknown action'], 400);
     }
 

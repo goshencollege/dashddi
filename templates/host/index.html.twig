@@ -231,6 +231,9 @@
                         <button type="button" class="btn btn-sm btn-outline-secondary" id="host-remove-tag-btn">
                             <i class="bi bi-tag me-1"></i>Remove Tag
                         </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary d-none" id="host-merge-btn">
+                            <i class="bi bi-union me-1"></i>Merge Hosts
+                        </button>
                         <button type="button" class="btn btn-sm btn-outline-danger" id="host-delete-btn">
                             <i class="bi bi-trash me-1"></i>Delete Selected Hosts
                         </button>
@@ -456,6 +459,28 @@
     </div>
 </div>
 
+{# Merge hosts modal #}
+<div class="modal fade" id="merge-host-modal" tabindex="-1" aria-labelledby="merge-host-modal-label" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="merge-host-modal-label">Merge Hosts</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small mb-3">Select the primary host to keep. All interfaces from the other hosts will be moved to it, their tags will be merged, and those hosts will be deleted.</p>
+                <div id="merge-host-list"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-sm btn-danger" id="merge-host-submit">
+                    <i class="bi bi-union me-1"></i>Merge Hosts
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {# Bulk edit interfaces modal #}
 <div class="modal fade" id="bulk-iface-edit-modal" tabindex="-1" aria-labelledby="bulk-iface-edit-modal-label" aria-hidden="true">
     <div class="modal-dialog modal-lg">
@@ -624,6 +649,7 @@ function updateBulkBar() {
     document.getElementById('iface-bulk-section').classList.toggle('d-none', iCount === 0);
     document.getElementById('bulk-bar-separator').classList.toggle('d-none', hCount === 0 || iCount === 0);
     document.getElementById('bulk-clear-btn').classList.toggle('d-none', !any);
+    document.getElementById('host-merge-btn')?.classList.toggle('d-none', hCount < 2);
     document.getElementById('host-selected-count').textContent =
         hCount + ' host' + (hCount !== 1 ? 's' : '') + ' selected';
     document.getElementById('iface-selected-count').textContent =
@@ -854,5 +880,64 @@ if (bulkTagModalEl) {
         else { alert(data.error ?? 'Error'); }
     });
 }
+
+// --- Merge hosts ---
+const mergeHostModalEl = document.getElementById('merge-host-modal');
+const mergeHostModal   = mergeHostModalEl ? new bootstrap.Modal(mergeHostModalEl) : null;
+
+function escHtml(str) {
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function getHostInfo(id) {
+    const row      = document.querySelector(`tr.host-row[data-host-id="${id}"]`);
+    const nameEl   = row?.querySelector('td:nth-child(3) a.fw-semibold');
+    const name     = nameEl ? nameEl.textContent.trim() : 'Host #' + id;
+    const ifaceCount = document.querySelectorAll(`tr.iface-row[data-parent-host="${id}"]`).length;
+    return { name, ifaceCount };
+}
+
+document.getElementById('host-merge-btn')?.addEventListener('click', function () {
+    let bestId = null, bestCount = -1;
+    for (const id of hostSelected) {
+        const { ifaceCount } = getHostInfo(id);
+        if (ifaceCount > bestCount) { bestCount = ifaceCount; bestId = id; }
+    }
+
+    const list = document.getElementById('merge-host-list');
+    list.innerHTML = '';
+    for (const id of hostSelected) {
+        const { name, ifaceCount } = getHostInfo(id);
+        const ifaceText = ifaceCount === 1 ? '1 interface' : ifaceCount + ' interfaces';
+        const div = document.createElement('div');
+        div.className = 'form-check mb-2';
+        div.innerHTML =
+            `<input class="form-check-input" type="radio" name="merge_primary" id="merge_primary_${id}" value="${id}"${id === bestId ? ' checked' : ''}>`
+            + `<label class="form-check-label" for="merge_primary_${id}">`
+            + `<strong>${escHtml(name)}</strong>`
+            + ` <span class="text-muted small">(${escHtml(ifaceText)})</span>`
+            + `</label>`;
+        list.appendChild(div);
+    }
+    mergeHostModal?.show();
+});
+
+document.getElementById('merge-host-submit')?.addEventListener('click', async function () {
+    const primaryId = document.querySelector('input[name="merge_primary"]:checked')?.value;
+    if (!primaryId) { alert('Please select a primary host.'); return; }
+    const resp = await fetch('{{ path('host_bulk') }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            action: 'merge',
+            ids: [...hostSelected],
+            primaryId: parseInt(primaryId, 10),
+            _token: '{{ csrf_token('bulk_hosts') }}',
+        }),
+    });
+    const data = await resp.json();
+    if (resp.ok) { mergeHostModal?.hide(); location.reload(); }
+    else { alert(data.error ?? 'Error'); }
+});
 </script>
 {% endblock scripts %}
