@@ -21,6 +21,9 @@ use App\Entity\SubnetRecord;
 use App\Entity\Tag;
 use App\Enum\BlockType;
 use App\Enum\RecordType;
+use App\Message\PushClearpassAllMessage;
+use App\Service\PushScopeService;
+use App\Service\PushSuppressionContext;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -28,6 +31,8 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
+use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\DeduplicateStamp;
 
 #[AsCommand(
     name: 'app:import:legacy',
@@ -35,8 +40,12 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 )]
 class ImportLegacyCommand extends Command
 {
-    public function __construct(private readonly EntityManagerInterface $em)
-    {
+    public function __construct(
+        private readonly EntityManagerInterface $em,
+        private readonly PushSuppressionContext $suppression,
+        private readonly PushScopeService       $pushScope,
+        private readonly MessageBusInterface    $bus,
+    ) {
         parent::__construct();
     }
 
@@ -65,6 +74,7 @@ class ImportLegacyCommand extends Command
             $conn->beginTransaction();
         }
 
+        $this->suppression->suppressClearpass();
         try {
             $io->section('Buildings');
             $buildings = $this->importBuildings($pdo, $io, $dryRun);
@@ -110,6 +120,17 @@ class ImportLegacyCommand extends Command
                 $conn->rollBack();
             }
             throw $e;
+        } finally {
+            $this->suppression->resumeClearpass();
+        }
+
+        if (!$dryRun) {
+            foreach ($this->pushScope->allClearpassServerIds() as $serverId) {
+                $this->bus->dispatch(
+                    new PushClearpassAllMessage($serverId),
+                    [new DeduplicateStamp('push_clearpass_' . $serverId . '_all', ttl: 3600)],
+                );
+            }
         }
 
         $io->success($dryRun ? 'Dry run complete — no changes written' : 'Import complete');
@@ -1255,7 +1276,6 @@ class ImportLegacyCommand extends Command
             ["goshen.edu", "dns1", "A", "208.94.148.63", "db.goshen.edu.external.footer content", ["external"]],
             ["goshen.edu", "dns2", "A", "208.80.124.63", "db.goshen.edu.external.footer content", ["external"]],
             ["goshen.edu", "dns3", "A", "208.80.126.63", "db.goshen.edu.external.footer content", ["external"]],
-            ["goshen.edu", "dtn-un", "A", "198.51.244.18", "DTN records", ["internal"]],
             ["goshen.edu", "dtn-un", "A", "198.51.244.18", "DTN records", ["external", "internal"]],
             ["goshen.edu", "dtn.ilo", "A", "192.168.61.33", null, ["internal"]],
             ["goshen.edu", "euphrates.ipmi.valpo", "A", "192.168.59.8", "Valpo backup site", ["internal"]],
@@ -1352,7 +1372,6 @@ class ImportLegacyCommand extends Command
             ["goshen.edu", "dns1", "AAAA", "2600:1800:5::1:1f", null, ["external"]],
             ["goshen.edu", "dns2", "AAAA", "2600:1801:6::1:1f", null, ["external"]],
             ["goshen.edu", "dns3", "AAAA", "2600:1802:7::1:1f", null, ["external"]],
-            ["goshen.edu", "dtn-un", "AAAA", "2001:18e8:408:110::2", "DTN records", ["internal"]],
             ["goshen.edu", "dtn-un", "AAAA", "2001:18e8:408:110::2", "DTN records", ["external", "internal"]],
             ["goshen.edu", "euphrates.valpo", "AAAA", "2001:18e8:408:3b::6", "Valpo backup site", ["internal"]],
             ["goshen.edu", "fw", "AAAA", "2001:18e8:408:4000::1", "Routing Loopback's", ["internal"]],

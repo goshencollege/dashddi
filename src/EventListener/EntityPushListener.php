@@ -6,6 +6,7 @@ use App\Message\PushClearpassMessage;
 use App\Message\PushDhcpMessage;
 use App\Message\PushDnsMessage;
 use App\Service\PushScopeService;
+use App\Service\PushSuppressionContext;
 use Doctrine\Bundle\DoctrineBundle\Attribute\AsDoctrineListener;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Event\PostFlushEventArgs;
@@ -31,8 +32,9 @@ class EntityPushListener
     private bool $pendingAllDhcp = false;
 
     public function __construct(
-        private readonly PushScopeService    $scope,
-        private readonly MessageBusInterface $bus,
+        private readonly PushScopeService       $scope,
+        private readonly MessageBusInterface    $bus,
+        private readonly PushSuppressionContext $suppression,
     ) {}
 
     public function postPersist(PostPersistEventArgs $args): void
@@ -85,20 +87,22 @@ class EntityPushListener
             $this->bus->dispatch(new PushDnsMessage($id), [new DeduplicateStamp('push_dns_' . $id)]);
         }
 
-        if (!empty($clearpassMacs)) {
-            foreach ($this->scope->allClearpassServerIds() as $serverId) {
-                foreach (array_keys($clearpassMacs) as $mac) {
-                    $this->bus->dispatch(new PushClearpassMessage($serverId, $mac), [new DeduplicateStamp('push_clearpass_' . $serverId . '_' . $mac)]);
+        if (!$this->suppression->isClearpassSuppressed()) {
+            if (!empty($clearpassMacs)) {
+                foreach ($this->scope->allClearpassServerIds() as $serverId) {
+                    foreach (array_keys($clearpassMacs) as $mac) {
+                        $this->bus->dispatch(new PushClearpassMessage($serverId, $mac), [new DeduplicateStamp('push_clearpass_' . $serverId . '_' . $mac)]);
+                    }
                 }
             }
-        }
 
-        // Soft-delete pushes use a separate key so they are never blocked by a
-        // pending regular-update message with the same MAC.
-        if (!empty($deleteMacs)) {
-            foreach ($this->scope->allClearpassServerIds() as $serverId) {
-                foreach (array_keys($deleteMacs) as $mac) {
-                    $this->bus->dispatch(new PushClearpassMessage($serverId, $mac), [new DeduplicateStamp('push_clearpass_delete_' . $serverId . '_' . $mac)]);
+            // Soft-delete pushes use a separate key so they are never blocked by a
+            // pending regular-update message with the same MAC.
+            if (!empty($deleteMacs)) {
+                foreach ($this->scope->allClearpassServerIds() as $serverId) {
+                    foreach (array_keys($deleteMacs) as $mac) {
+                        $this->bus->dispatch(new PushClearpassMessage($serverId, $mac), [new DeduplicateStamp('push_clearpass_delete_' . $serverId . '_' . $mac)]);
+                    }
                 }
             }
         }
