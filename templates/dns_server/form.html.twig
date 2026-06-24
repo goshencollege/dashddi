@@ -145,8 +145,12 @@ function runSshTest(url, token) {
     result.classList.add('d-none');
 
     const body = new URLSearchParams({ _token: token });
-    fetch(url, { method: 'POST', body })
-        .then(r => r.json())
+    fetch(url, { method: 'POST', body, headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(r => {
+            const ct = r.headers.get('Content-Type') || '';
+            if (!ct.includes('application/json')) throw new Error('Session expired — please reload the page and log in again.');
+            return r.json();
+        })
         .then(data => {
             hint.classList.add('d-none');
             result.classList.remove('d-none');
