@@ -96,6 +96,14 @@
                         <td>{{ switchInfo.nasPortId ?: '—' }}</td>
                     </tr>
                     {% endif %}
+                    <tr>
+                        <th class="text-muted fw-normal ps-3">Last Auth</th>
+                        <td>{{ interface.lastAuthAt ? interface.lastAuthAt|date('Y-m-d H:i') : '—' }}</td>
+                    </tr>
+                    <tr>
+                        <th class="text-muted fw-normal ps-3">Last DHCP</th>
+                        <td>{{ interface.lastDhcpAt ? interface.lastDhcpAt|date('Y-m-d H:i') : '—' }}</td>
+                    </tr>
                     {% if interface.notes %}
                     <tr>
                         <th class="text-muted fw-normal ps-3">Notes</th>

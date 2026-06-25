@@ -54,6 +54,7 @@ class DhcpLeaseController extends AbstractController
         Request $request,
         EntityManagerInterface $em,
         SubnetRepository $subnetRepo,
+        NetworkInterfaceRepository $ifaceRepo,
     ): JsonResponse {
         $data = json_decode($request->getContent(), true);
         if (!is_array($data)) {
@@ -77,6 +78,11 @@ class DhcpLeaseController extends AbstractController
         }
 
         $lease->setSubnet($this->findSubnetForIp($ipStr, $subnetRepo));
+
+        $iface = $ifaceRepo->findByMacs([$lease->getMacAddress()])[$lease->getMacAddress()] ?? null;
+        if ($iface !== null) {
+            $iface->setLastDhcpAt($lease->getLeaseStart());
+        }
 
         $em->persist($lease);
         $em->flush();
