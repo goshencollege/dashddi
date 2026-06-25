@@ -61,6 +61,12 @@ class EntityPushListener
                 }
                 return;
             }
+
+            // Activity-timestamp updates don't affect DNS, DHCP, or ClearPass config.
+            $activityOnly = ['lastAuthAt', 'lastDhcpAt'];
+            if (!empty($changeset) && empty(array_diff(array_keys($changeset), $activityOnly))) {
+                return;
+            }
         }
 
         $this->collect($entity);
