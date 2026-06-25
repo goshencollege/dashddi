@@ -312,9 +312,18 @@
         statusBody.innerHTML = '<span class="text-muted">Loading…</span>';
 
         fetch(statusUrl)
-            .then(r => r.json())
+            .then(r => {
+                if (!r.ok) {
+                    if (r.status === 401 || r.status === 403) throw new Error('Session expired — please reload the page and try again.');
+                    throw new Error(`Server returned ${r.status} ${r.statusText}. Check the switch connection and server logs.`);
+                }
+                return r.json();
+            })
             .then(data => { statusBody.innerHTML = renderClients(data); })
-            .catch(err => { statusBody.innerHTML = `<div class="alert alert-danger mb-0 py-2">Request failed: ${err}</div>`; })
+            .catch(err => {
+                const msg = err instanceof SyntaxError ? 'Unexpected response from server — the switch may be unreachable or the session may have expired. Please reload the page.' : err.message;
+                statusBody.innerHTML = `<div class="alert alert-danger mb-0 py-2">${msg}</div>`;
+            })
             .finally(() => {
                 statusBtn.disabled = false;
                 statusBtn.innerHTML = '<i class="bi bi-arrow-clockwise me-1"></i>Refresh';
@@ -328,7 +337,13 @@
         statusBody.innerHTML = `<span class="text-muted">${busyLabel}…</span>`;
 
         fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mac }) })
-            .then(r => r.json())
+            .then(r => {
+                if (!r.ok) {
+                    if (r.status === 401 || r.status === 403) throw new Error('Session expired — please reload the page and try again.');
+                    throw new Error(`Server returned ${r.status} ${r.statusText}. Check the switch connection and server logs.`);
+                }
+                return r.json();
+            })
             .then(data => {
                 const out = data.output ? `<pre class="mt-2 mb-0 p-2 border rounded small" style="max-height:120px;overflow:auto">${data.output}</pre>` : '';
                 if (data.success) {
@@ -337,7 +352,10 @@
                     statusBody.innerHTML = `<div class="alert alert-danger mb-0 py-2">Failed: ${data.error}${out}</div>`;
                 }
             })
-            .catch(err => { statusBody.innerHTML = `<div class="alert alert-danger mb-0 py-2">Request failed: ${err}</div>`; })
+            .catch(err => {
+                const msg = err instanceof SyntaxError ? 'Unexpected response from server — the switch may be unreachable or the session may have expired. Please reload the page.' : err.message;
+                statusBody.innerHTML = `<div class="alert alert-danger mb-0 py-2">${msg}</div>`;
+            })
             .finally(() => { btn.disabled = false; btn.innerHTML = idleLabel; });
     }
 

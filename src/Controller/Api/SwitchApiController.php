@@ -37,7 +37,11 @@ class SwitchApiController extends AbstractController
             return $resolved;
         }
 
-        return $this->json($this->cx->getPortInfo($creds, $resolved['switch_ip'], $resolved['port_id']));
+        try {
+            return $this->json($this->cx->getPortInfo($creds, $resolved['switch_ip'], $resolved['port_id']));
+        } catch (\Throwable $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
     }
 
     #[Route('/port-reauthenticate', name: 'api_switch_port_reauthenticate', methods: ['POST'])]
@@ -71,11 +75,15 @@ class SwitchApiController extends AbstractController
             return $resolved;
         }
 
-        $result = match ($action) {
-            'reauth'     => $this->cx->reauthenticatePort($creds, $resolved['switch_ip'], $resolved['port_id']),
-            'bounce'     => $this->cx->bouncePort($creds, $resolved['switch_ip'], $resolved['port_id']),
-            'poe-bounce' => $this->cx->poeBouncePort($creds, $resolved['switch_ip'], $resolved['port_id']),
-        };
+        try {
+            $result = match ($action) {
+                'reauth'     => $this->cx->reauthenticatePort($creds, $resolved['switch_ip'], $resolved['port_id']),
+                'bounce'     => $this->cx->bouncePort($creds, $resolved['switch_ip'], $resolved['port_id']),
+                'poe-bounce' => $this->cx->poeBouncePort($creds, $resolved['switch_ip'], $resolved['port_id']),
+            };
+        } catch (\Throwable $e) {
+            return $this->json(['success' => false, 'error' => $e->getMessage(), 'output' => null], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
 
         if (!$result['success']) {
             return $this->json($result, Response::HTTP_INTERNAL_SERVER_ERROR);
