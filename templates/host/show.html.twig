@@ -87,6 +87,7 @@
                         <th>Subnet</th>
                         <th>IPv4</th>
                         <th>IPv6</th>
+                        <th>Last Seen</th>
                         <th>Last Modified</th>
                         <th class="text-end">Actions</th>
                     </tr>
@@ -130,6 +131,22 @@
                                 {% endif %}
                             </td>
                             <td class="ip-address small">{{ iface.ipv6Address ? iface.ipv6Address.address : '—' }}</td>
+                            <td class="text-muted small">
+                                {% set lastSeen = null %}
+                                {% if iface.lastAuthAt and iface.lastDhcpAt %}
+                                    {% set lastSeen = iface.lastAuthAt > iface.lastDhcpAt ? iface.lastAuthAt : iface.lastDhcpAt %}
+                                {% elseif iface.lastAuthAt %}
+                                    {% set lastSeen = iface.lastAuthAt %}
+                                {% elseif iface.lastDhcpAt %}
+                                    {% set lastSeen = iface.lastDhcpAt %}
+                                {% endif %}
+                                {% if lastSeen %}
+                                    {{ lastSeen|date('Y-m-d') }}
+                                    {% if iface.lastAuthAt == lastSeen %}<br><span class="text-info-emphasis">auth</span>{% else %}<br><span class="text-success-emphasis">dhcp</span>{% endif %}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
                             <td class="text-muted small">
                                 {{ iface.updatedAt|date('Y-m-d H:i') }}
                                 {% if iface.updatedBy %}<br>{{ iface.updatedBy }}{% endif %}

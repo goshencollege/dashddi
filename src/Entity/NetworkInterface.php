@@ -18,6 +18,8 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\Index(columns: ['subnet_id'],       name: 'idx_network_interface_subnet_id')]
 #[ORM\Index(columns: ['ip_address_id'],   name: 'idx_network_interface_ip_address_id')]
 #[ORM\Index(columns: ['ipv6_address_id'], name: 'idx_network_interface_ipv6_address_id')]
+#[ORM\Index(columns: ['last_auth_at'],    name: 'idx_network_interface_last_auth_at')]
+#[ORM\Index(columns: ['last_dhcp_at'],    name: 'idx_network_interface_last_dhcp_at')]
 #[UniqueMacAddress]
 class NetworkInterface
 {
@@ -61,6 +63,12 @@ class NetworkInterface
     #[ORM\OneToMany(targetEntity: DomainRecord::class, mappedBy: 'networkInterface')]
     private Collection $domainRecords;
 
+    #[ORM\Column(nullable: true)]
+    private ?\DateTimeImmutable $lastAuthAt = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?\DateTimeImmutable $lastDhcpAt = null;
+
     public function __construct()
     {
         $this->domainRecords = new ArrayCollection();
@@ -100,6 +108,12 @@ class NetworkInterface
     public function setIpv6Address(?Ipv6Address $ipv6Address): static { $this->ipv6Address = $ipv6Address; return $this; }
 
     public function getDomainRecords(): Collection { return $this->domainRecords; }
+
+    public function getLastAuthAt(): ?\DateTimeImmutable { return $this->lastAuthAt; }
+    public function setLastAuthAt(?\DateTimeImmutable $dt): static { $this->lastAuthAt = $dt; return $this; }
+
+    public function getLastDhcpAt(): ?\DateTimeImmutable { return $this->lastDhcpAt; }
+    public function setLastDhcpAt(?\DateTimeImmutable $dt): static { $this->lastDhcpAt = $dt; return $this; }
 
     public function getPrimaryName(): ?string
     {

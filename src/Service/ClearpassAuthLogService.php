@@ -126,7 +126,12 @@ class ClearpassAuthLogService
                     $log->setNasPortId($item['nasportid'] ?? null ?: null);
                     $log->setRole($item['arubauserrole'] ?? null ?: null);
                     $log->setVlan($item['arubauservlan'] ?? null ?: null);
-                    $log->setNetworkInterface($ifaceMap[$mac] ?? null);
+                    $iface = $ifaceMap[$mac] ?? null;
+                    $log->setNetworkInterface($iface);
+
+                    if ($iface !== null && ($iface->getLastAuthAt() === null || $authTs > $iface->getLastAuthAt())) {
+                        $iface->setLastAuthAt($authTs);
+                    }
 
                     $this->em->persist($log);
                     $imported++;

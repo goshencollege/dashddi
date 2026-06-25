@@ -664,7 +664,7 @@ class ImportLegacyCommand extends Command
         $skipped = 0;
 
         $stmt = $pdo->query(
-            'SELECT hID, name, ip, hw, bID, room, nID, cID, dID, ipv6, revgc FROM host ORDER BY hID'
+            'SELECT hID, name, ip, hw, bID, room, nID, cID, dID, ipv6, revgc, last_dhcp FROM host ORDER BY hID'
         );
 
         while ($row = $stmt->fetch()) {
@@ -693,6 +693,13 @@ class ImportLegacyCommand extends Command
             $iface = new NetworkInterface();
             $iface->setMacAddress($row['hw']);
             $iface->setSubnet($subnet);
+
+            if (!empty($row['last_dhcp'])) {
+                try {
+                    $iface->setLastDhcpAt(new \DateTimeImmutable($row['last_dhcp']));
+                } catch (\Throwable) {
+                }
+            }
 
             // IPv4 address — skip if duplicate
             $ip = trim($row['ip'] ?? '');
