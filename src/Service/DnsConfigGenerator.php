@@ -22,6 +22,26 @@ class DnsConfigGenerator
         private readonly DnsAclRepository       $aclRepo,
     ) {}
 
+    /**
+     * Returns a YYYYMMDDNN serial, incrementing NN (01–99) if called multiple times
+     * within the same second on the same day. Uses a static counter so a single
+     * request that regenerates many zones still advances the counter correctly.
+     */
+    private static int $serialCounter = 0;
+    private static string $serialDate  = '';
+
+    private function generateSerial(): int
+    {
+        $today = date('Ymd');
+        if ($today !== self::$serialDate) {
+            self::$serialDate    = $today;
+            self::$serialCounter = 1;
+        } else {
+            self::$serialCounter = min(self::$serialCounter + 1, 99);
+        }
+        return (int)($today . sprintf('%02d', self::$serialCounter));
+    }
+
     /** @return Domain[] */
     public function domainsForView(DnsView $view): array
     {
@@ -53,7 +73,7 @@ class DnsConfigGenerator
     public function generateZoneFile(Domain $domain, ?DnsView $view = null): string
     {
         $defaultTtl = $domain->getSoaTtl() ?? 3600;
-        $serial     = time();
+        $serial     = $this->generateSerial();
         $nameserver = $this->ensureTrailingDot($domain->getSoaNameserver() ?? ('ns1.' . $domain->getName() . '.'));
         $email      = $this->emailToRname($domain->getSoaEmail() ?? ('hostmaster.' . $domain->getName() . '.'));
         $refresh    = $domain->getSoaRefresh() ?? 3600;
@@ -148,7 +168,7 @@ class DnsConfigGenerator
         $refresh    = $subnet->getSoaRefresh() ?? 3600;
         $retry      = $subnet->getSoaRetry()   ?? 900;
         $expire     = $subnet->getSoaExpire()  ?? 604800;
-        $serial     = time();
+        $serial     = $this->generateSerial();
 
         $lines   = [];
         $lines[] = '; Reverse zone for ' . $cidr . ($view ? ' (view: ' . $view->getName() . ')' : '');
@@ -564,7 +584,7 @@ class DnsConfigGenerator
         int $expire,
         ?string $localAddress = null,
     ): string {
-        $serial = time();
+        $serial = $this->generateSerial();
         $soa    = implode(' ', [$nameserver, $email, $serial, $refresh, $retry, $expire, $ttl]);
 
         $lines = [];
