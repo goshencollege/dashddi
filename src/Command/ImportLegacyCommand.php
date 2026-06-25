@@ -694,7 +694,7 @@ class ImportLegacyCommand extends Command
             $iface->setMacAddress($row['hw']);
             $iface->setSubnet($subnet);
 
-            if (!empty($row['last_dhcp'])) {
+            if (!empty($row['last_dhcp']) && !str_starts_with($row['last_dhcp'], '0000-')) {
                 try {
                     $iface->setLastDhcpAt(new \DateTimeImmutable($row['last_dhcp']));
                 } catch (\Throwable) {
