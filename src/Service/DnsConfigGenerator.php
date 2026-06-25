@@ -72,7 +72,22 @@ class DnsConfigGenerator
             $nameserver, $email, $serial, $refresh, $retry, $expire, $defaultTtl
         );
         $lines[] = '';
-        $lines[] = sprintf('@ IN NS %s', $nameserver);
+
+        // Only emit an auto-generated apex NS record when the user has no manual NS records for this zone.
+        // If they do, their records will cover it and we'd produce a duplicate for the SOA nameserver.
+        $hasManualApexNs = false;
+        foreach ($domain->getRecords() as $record) {
+            if ($record->getType() === RecordType::NS
+                && in_array($record->getHostname(), ['@', '', $domain->getName(), rtrim($domain->getName(), '.') . '.'], true)
+                && ($view === null || $this->inView($view, $record->getViews()->toArray()))
+            ) {
+                $hasManualApexNs = true;
+                break;
+            }
+        }
+        if (!$hasManualApexNs) {
+            $lines[] = sprintf('@ IN NS %s', $nameserver);
+        }
         $lines[] = '';
 
         // All DNS records (manual and interface-linked)
