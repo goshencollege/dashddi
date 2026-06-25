@@ -29,7 +29,7 @@ class NetworkInterfaceRepository extends ServiceEntityRepository
         return $this->createQueryBuilder('ni')
             ->addSelect('s', 'iname', 'd')
             ->leftJoin('ni.subnet', 's')
-            ->leftJoin('ni.names', 'iname')
+            ->leftJoin('ni.domainRecords', 'iname')
             ->leftJoin('iname.domain', 'd')
             ->where('ni.macAddress != :zero')
             ->andWhere('ni.deletedAt IS NULL')
