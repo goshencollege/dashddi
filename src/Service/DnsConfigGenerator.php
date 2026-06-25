@@ -162,7 +162,20 @@ class DnsConfigGenerator
             $nameserver, $email, $serial, $refresh, $retry, $expire, $defaultTtl
         );
         $lines[] = '';
-        $lines[] = sprintf('@ IN NS %s', $nameserver);
+
+        $hasManualApexNs = false;
+        foreach ($subnet->getRecords() as $record) {
+            if ($record->getType() === RecordType::NS
+                && in_array($record->getHostname(), ['@', '', $zoneName, $zoneName . '.'], true)
+                && ($view === null || $this->inView($view, $record->getViews()->toArray()))
+            ) {
+                $hasManualApexNs = true;
+                break;
+            }
+        }
+        if (!$hasManualApexNs) {
+            $lines[] = sprintf('@ IN NS %s', $nameserver);
+        }
         $lines[] = '';
 
         $ptrLines = [];
