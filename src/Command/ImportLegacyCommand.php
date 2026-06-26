@@ -5,6 +5,7 @@ namespace App\Command;
 use App\Entity\AddressBlock;
 use App\Entity\Building;
 use App\Entity\DnsAcl;
+use App\Entity\DnsServer;
 use App\Entity\DnssecPolicy;
 use App\Entity\DnsView;
 use App\Entity\Domain;
@@ -407,6 +408,7 @@ class ImportLegacyCommand extends Command
         $dynDomain->setSoaNameserver('dns1.goshen.edu');
         $dynDomain->setSoaEmail('hostmaster@goshen.edu');
         $dynDomain->setDdnsEnabled(true);
+        $dynDomain->setDdnsDnsServer($this->em->getReference(DnsServer::class, 1));
         if (!$dryRun) {
             $this->em->persist($dynDomain);
         }
