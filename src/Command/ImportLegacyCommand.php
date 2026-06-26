@@ -459,6 +459,7 @@ class ImportLegacyCommand extends Command
                 $subnet = $this->makeSubnet($row['name'], (int) $row['vID'], null);
                 $subnet->setVrf($vrfs['corporate']);
                 $subnet->setDdnsDomain($dynDomain);
+                $subnet->setLeaseRetentionDays(14);
                 $map[$nid] = $subnet;
                 if (!$dryRun) {
                     $this->em->persist($subnet);
@@ -472,6 +473,7 @@ class ImportLegacyCommand extends Command
             $subnet->setVrf(in_array($cidr, $datacenterCidrs, true) ? $vrfs['datacenter'] : $vrfs['corporate']);
             $subnet->setGateway(long2ip(ip2long($network) + 1));
             $subnet->setDdnsDomain($dynDomain);
+            $subnet->setLeaseRetentionDays(14);
             if ($gcPolicy && !$this->isPrivateIpv4($network)) {
                 $subnet->setDnssecPolicy($gcPolicy);
             }
@@ -1036,6 +1038,7 @@ class ImportLegacyCommand extends Command
             $vrf = isset($def['vrf']) ? $vrfs[$def['vrf']] : (in_array($def['ipv4'], $datacenterCidrs, true) ? $vrfs['datacenter'] : $vrfs['corporate']);
             $subnet->setVrf($vrf);
             $subnet->setDdnsDomain($dynDomain);
+            $subnet->setLeaseRetentionDays(14);
             if ($gcPolicy && $def['ipv4'] !== null && !$this->isPrivateIpv4(explode('/', $def['ipv4'])[0])) {
                 $subnet->setDnssecPolicy($gcPolicy);
             }
