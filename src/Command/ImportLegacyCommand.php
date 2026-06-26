@@ -5,6 +5,7 @@ namespace App\Command;
 use App\Entity\AddressBlock;
 use App\Entity\Building;
 use App\Entity\DnsAcl;
+use App\Entity\DnsServer;
 use App\Entity\DnssecPolicy;
 use App\Entity\DnsView;
 use App\Entity\Domain;
@@ -85,14 +86,18 @@ class ImportLegacyCommand extends Command
             $io->section('VRFs');
             $vrfs = $this->seedVrfs($io, $dryRun);
 
-            $io->section('Subnets');
-            $subnets = $this->importSubnets($pdo, $io, $dryRun, $domains, $vrfs);
-
             $io->section('DNS ACLs');
             $this->seedDnsAcls($io, $dryRun);
 
             $io->section('DNSSEC Policies');
-            $this->seedDnssecPolicies($io, $dryRun);
+            $dnssecPolicies = $this->seedDnssecPolicies($io, $dryRun);
+            $goshenDomain = current(array_filter($domains, fn(Domain $d) => $d->getName() === 'goshen.edu'));
+            if ($goshenDomain && isset($dnssecPolicies['gc'])) {
+                $goshenDomain->setDnssecPolicy($dnssecPolicies['gc']);
+            }
+
+            $io->section('Subnets');
+            $subnets = $this->importSubnets($pdo, $io, $dryRun, $domains, $vrfs, $dynDomain, $dnssecPolicies['gc'] ?? null);
 
             $io->section('DNS Views');
             $this->setupDnsViews($io, $dryRun, $domains, $subnets, $dynDomain);
@@ -104,7 +109,7 @@ class ImportLegacyCommand extends Command
             $this->importHosts($pdo, $io, $dryRun, $buildings, $domains, $subnets, $tags, $gcDomain, $dynDomain);
 
             $io->section('Seed Data');
-            $this->seedLocalData($io, $dryRun, $vrfs);
+            $this->seedLocalData($io, $dryRun, $vrfs, $dynDomain, $dnssecPolicies['gc'] ?? null);
 
             $io->section('Domain Records');
             $this->seedDomainRecords($io, $dryRun);
@@ -222,7 +227,7 @@ class ImportLegacyCommand extends Command
         $io->writeln(sprintf('  Created %d ACLs: %s', count($acls), implode(', ', array_column($acls, 'name'))));
     }
 
-    private function seedDnssecPolicies(SymfonyStyle $io, bool $dryRun): void
+    private function seedDnssecPolicies(SymfonyStyle $io, bool $dryRun): array
     {
         $extraOptions = "parent-ds-ttl P1D;\nparent-propagation-delay PT1H;";
 
@@ -245,6 +250,7 @@ class ImportLegacyCommand extends Command
             ],
         ];
 
+        $created = [];
         foreach ($policies as $def) {
             $policy = new DnssecPolicy();
             $policy->setName($def['name']);
@@ -259,6 +265,7 @@ class ImportLegacyCommand extends Command
             $policy->setNsec3param('iterations 0 optout false salt-length 0');
             $policy->setExtraOptions($extraOptions);
             $policy->setKeys($def['keys']);
+            $created[$def['name']] = $policy;
             if (!$dryRun) {
                 $this->em->persist($policy);
             }
@@ -269,6 +276,8 @@ class ImportLegacyCommand extends Command
         }
 
         $io->writeln(sprintf('  Created %d policies: %s', count($policies), implode(', ', array_column($policies, 'name'))));
+
+        return $created;
     }
 
     private function truncateImportedTables(\Doctrine\DBAL\Connection $conn, SymfonyStyle $io): void
@@ -406,6 +415,8 @@ class ImportLegacyCommand extends Command
         $dynDomain->setName('dyn.goshen.edu');
         $dynDomain->setSoaNameserver('dns1.goshen.edu');
         $dynDomain->setSoaEmail('hostmaster@goshen.edu');
+        $dynDomain->setDdnsEnabled(true);
+        $dynDomain->setDdnsDnsServer($this->em->getReference(DnsServer::class, 1));
         if (!$dryRun) {
             $this->em->persist($dynDomain);
         }
@@ -428,7 +439,7 @@ class ImportLegacyCommand extends Command
      *
      * @return array<string, Subnet>
      */
-    private function importSubnets(\PDO $pdo, SymfonyStyle $io, bool $dryRun, array $domains, array $vrfs): array
+    private function importSubnets(\PDO $pdo, SymfonyStyle $io, bool $dryRun, array $domains, array $vrfs, Domain $dynDomain, ?DnssecPolicy $gcPolicy = null): array
     {
         $addressRanges = $this->loadAddressRanges($pdo);
 
@@ -447,6 +458,8 @@ class ImportLegacyCommand extends Command
             if ($range === null) {
                 $subnet = $this->makeSubnet($row['name'], (int) $row['vID'], null);
                 $subnet->setVrf($vrfs['corporate']);
+                $subnet->setDdnsDomain($dynDomain);
+                $subnet->setLeaseRetentionDays(14);
                 $map[$nid] = $subnet;
                 if (!$dryRun) {
                     $this->em->persist($subnet);
@@ -459,6 +472,11 @@ class ImportLegacyCommand extends Command
             $subnet = $this->makeSubnet($row['name'], (int) $row['vID'], $cidr, $network);
             $subnet->setVrf(in_array($cidr, $datacenterCidrs, true) ? $vrfs['datacenter'] : $vrfs['corporate']);
             $subnet->setGateway(long2ip(ip2long($network) + 1));
+            $subnet->setDdnsDomain($dynDomain);
+            $subnet->setLeaseRetentionDays(14);
+            if ($gcPolicy && !$this->isPrivateIpv4($network)) {
+                $subnet->setDnssecPolicy($gcPolicy);
+            }
             $map[$nid] = $subnet;
 
             if (!$dryRun) {
@@ -935,6 +953,17 @@ class ImportLegacyCommand extends Command
         return $shared;
     }
 
+    private function isPrivateIpv4(string $ip): bool
+    {
+        $long = ip2long($ip);
+        return $long === false
+            || ($long & 0xFF000000) === ip2long('10.0.0.0')
+            || ($long & 0xFFF00000) === ip2long('172.16.0.0')
+            || ($long & 0xFFFF0000) === ip2long('192.168.0.0')
+            || ($long & 0xFF000000) === ip2long('127.0.0.0')
+            || ($long & 0xFFFF0000) === ip2long('169.254.0.0');
+    }
+
     private function isValidDnsLabel(string $name): bool
     {
         return (bool) preg_match('/^[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?$/', $name);
@@ -969,7 +998,7 @@ class ImportLegacyCommand extends Command
     // Local seed data (subnets, Snipe-IT server, category maps)
     // -------------------------------------------------------------------------
 
-    private function seedLocalData(SymfonyStyle $io, bool $dryRun, array $vrfs): void
+    private function seedLocalData(SymfonyStyle $io, bool $dryRun, array $vrfs, Domain $dynDomain, ?DnssecPolicy $gcPolicy = null): void
     {
         // Additional subnets not present in the legacy database
         $subnetDefs = [
@@ -1008,6 +1037,11 @@ class ImportLegacyCommand extends Command
             $subnet->setIsContainer($def['container']);
             $vrf = isset($def['vrf']) ? $vrfs[$def['vrf']] : (in_array($def['ipv4'], $datacenterCidrs, true) ? $vrfs['datacenter'] : $vrfs['corporate']);
             $subnet->setVrf($vrf);
+            $subnet->setDdnsDomain($dynDomain);
+            $subnet->setLeaseRetentionDays(14);
+            if ($gcPolicy && $def['ipv4'] !== null && !$this->isPrivateIpv4(explode('/', $def['ipv4'])[0])) {
+                $subnet->setDnssecPolicy($gcPolicy);
+            }
             $seedSubnets[$def['name']] = $subnet;
             if (!$dryRun) {
                 $this->em->persist($subnet);
