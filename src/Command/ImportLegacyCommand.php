@@ -105,7 +105,7 @@ class ImportLegacyCommand extends Command
             $this->importHosts($pdo, $io, $dryRun, $buildings, $domains, $subnets, $tags, $gcDomain, $dynDomain);
 
             $io->section('Seed Data');
-            $this->seedLocalData($io, $dryRun, $vrfs);
+            $this->seedLocalData($io, $dryRun, $vrfs, $dynDomain);
 
             $io->section('Domain Records');
             $this->seedDomainRecords($io, $dryRun);
@@ -974,7 +974,7 @@ class ImportLegacyCommand extends Command
     // Local seed data (subnets, Snipe-IT server, category maps)
     // -------------------------------------------------------------------------
 
-    private function seedLocalData(SymfonyStyle $io, bool $dryRun, array $vrfs): void
+    private function seedLocalData(SymfonyStyle $io, bool $dryRun, array $vrfs, Domain $dynDomain): void
     {
         // Additional subnets not present in the legacy database
         $subnetDefs = [
@@ -1013,6 +1013,7 @@ class ImportLegacyCommand extends Command
             $subnet->setIsContainer($def['container']);
             $vrf = isset($def['vrf']) ? $vrfs[$def['vrf']] : (in_array($def['ipv4'], $datacenterCidrs, true) ? $vrfs['datacenter'] : $vrfs['corporate']);
             $subnet->setVrf($vrf);
+            $subnet->setDdnsDomain($dynDomain);
             $seedSubnets[$def['name']] = $subnet;
             if (!$dryRun) {
                 $this->em->persist($subnet);
