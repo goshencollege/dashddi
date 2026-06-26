@@ -7,6 +7,7 @@ use App\Entity\Domain;
 use App\Entity\DomainRecord;
 use App\Entity\NetworkInterface;
 use App\Enum\RecordType;
+use App\Validator\TxtRecordValueValidator;
 use App\Repository\DnsViewRepository;
 use App\Repository\DomainRepository;
 use App\Service\DnsViewResolver;
@@ -100,8 +101,14 @@ class DomainRecordType extends AbstractType
         // it from the submitted domain ID.  Without an interface the domain field is
         // absent from the form and is fixed, so reuse the value captured in PRE_SET_DATA.
         $builder->addEventListener(FormEvents::PRE_SUBMIT, function (FormEvent $event) use ($interface, &$domainFromPreSetData) {
+            $data = $event->getData();
+
+            if (($data['type'] ?? '') === 'TXT' && isset($data['value'])) {
+                $data['value'] = TxtRecordValueValidator::normalizeTxtValue($data['value']);
+                $event->setData($data);
+            }
+
             if ($interface !== null) {
-                $data     = $event->getData();
                 $domainId = isset($data['domain']) ? (int) $data['domain'] : null;
                 $domain   = $domainId ? $this->domainRepo->find($domainId) : null;
             } else {

@@ -5,6 +5,29 @@ namespace App\Validator;
 class TxtRecordValueValidator
 {
     /**
+     * Strip BIND zone-file quoting from a TXT value submitted by the user.
+     * Only acts when the value starts with a double-quote; plain raw values
+     * are returned unchanged so non-zone-file input is never mangled.
+     */
+    public static function normalizeTxtValue(string $value): string
+    {
+        $trimmed = trim($value);
+        if (!str_starts_with($trimmed, '"')) {
+            return $value;
+        }
+        // Extract content from each quoted segment (handles \" escapes inside).
+        preg_match_all('/"((?:[^"\\\\]|\\\\.)*)"/', $trimmed, $matches);
+        if (!empty($matches[1])) {
+            return implode('', array_map(
+                fn(string $p) => str_replace('\\"', '"', $p),
+                $matches[1],
+            ));
+        }
+        // Fallback: value is wrapped in a single pair of quotes with no inner escapes.
+        return trim($trimmed, '"');
+    }
+
+    /**
      * Validate structured TXT record content based on hostname and value conventions.
      * Returns an array of human-readable error strings; empty means valid.
      */

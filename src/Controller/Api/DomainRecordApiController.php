@@ -14,6 +14,7 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use App\Validator\TxtRecordValueValidator;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 #[Route('/api/domain-records')]
@@ -102,7 +103,11 @@ class DomainRecordApiController extends AbstractController
             if (empty($data['value'])) {
                 return $this->json(['error' => 'value is required'], Response::HTTP_UNPROCESSABLE_ENTITY);
             }
-            $record->setValue($data['value']);
+            $value = $data['value'];
+            if ($type === RecordType::TXT) {
+                $value = TxtRecordValueValidator::normalizeTxtValue($value);
+            }
+            $record->setValue($value);
         }
 
         foreach ($data['view_ids'] ?? [] as $viewId) {
@@ -161,7 +166,11 @@ class DomainRecordApiController extends AbstractController
         }
 
         if (array_key_exists('value', $data)) {
-            $domainRecord->setValue($data['value'] ?? '');
+            $value = $data['value'] ?? '';
+            if ($domainRecord->getType() === RecordType::TXT) {
+                $value = TxtRecordValueValidator::normalizeTxtValue($value);
+            }
+            $domainRecord->setValue($value);
         }
 
         if (array_key_exists('ttl', $data)) {

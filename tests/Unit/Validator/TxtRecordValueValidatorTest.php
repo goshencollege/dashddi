@@ -203,4 +203,50 @@ class TxtRecordValueValidatorTest extends TestCase
         $errors = TxtRecordValueValidator::validate('sub', 'v=spf1 -all');
         $this->assertEmpty($errors);
     }
+
+    // --- normalizeTxtValue ---
+
+    public function testNormalizeSingleQuotedSegmentStripsQuotes(): void
+    {
+        $this->assertSame(
+            'v=DKIM1; k=rsa; p=ABC123',
+            TxtRecordValueValidator::normalizeTxtValue('"v=DKIM1; k=rsa; p=ABC123"'),
+        );
+    }
+
+    public function testNormalizeMultipleQuotedSegmentsJoinsThem(): void
+    {
+        $this->assertSame(
+            'v=DKIM1; k=rsa; p=ABCDEF',
+            TxtRecordValueValidator::normalizeTxtValue('"v=DKIM1; k=rsa; p=ABC" "DEF"'),
+        );
+    }
+
+    public function testNormalizeUnquotedValueIsReturnedUnchanged(): void
+    {
+        $raw = 'v=spf1 include:example.com -all';
+        $this->assertSame($raw, TxtRecordValueValidator::normalizeTxtValue($raw));
+    }
+
+    public function testNormalizeValueWithEmbeddedEscapedQuotesUnescapesThem(): void
+    {
+        $this->assertSame(
+            'has "quotes" inside',
+            TxtRecordValueValidator::normalizeTxtValue('"has \\"quotes\\" inside"'),
+        );
+    }
+
+    public function testNormalizeIgnoresValueThatStartsWithNonQuoteCharacter(): void
+    {
+        $raw = 'some "quoted" word in the middle';
+        $this->assertSame($raw, TxtRecordValueValidator::normalizeTxtValue($raw));
+    }
+
+    public function testNormalizeTrimsLeadingAndTrailingWhitespaceAroundQuotedValue(): void
+    {
+        $this->assertSame(
+            'v=DKIM1; p=ABC',
+            TxtRecordValueValidator::normalizeTxtValue('  "v=DKIM1; p=ABC"  '),
+        );
+    }
 }
