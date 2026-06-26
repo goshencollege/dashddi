@@ -406,6 +406,7 @@ class ImportLegacyCommand extends Command
         $dynDomain->setName('dyn.goshen.edu');
         $dynDomain->setSoaNameserver('dns1.goshen.edu');
         $dynDomain->setSoaEmail('hostmaster@goshen.edu');
+        $dynDomain->setDdnsEnabled(true);
         if (!$dryRun) {
             $this->em->persist($dynDomain);
         }
