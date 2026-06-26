@@ -6,6 +6,7 @@ use App\Entity\Trait\AuditableTrait;
 use App\Enum\RecordType;
 use App\Repository\DomainRecordRepository;
 use App\Validator\NoCnameConflict;
+use App\Validator\NoMultipleSpfTxt;
 use App\Validator\TxtRecordValueValidator;
 use App\Validator\ViewsAllowedForDomainRecord;
 use Doctrine\Common\Collections\ArrayCollection;
@@ -19,6 +20,7 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
 #[ORM\Index(columns: ['domain_id'], name: 'idx_domain_record_domain_id')]
 #[ORM\Index(columns: ['network_interface_id'], name: 'idx_domain_record_network_interface_id')]
 #[NoCnameConflict]
+#[NoMultipleSpfTxt]
 #[ViewsAllowedForDomainRecord]
 class DomainRecord
 {
@@ -40,6 +42,10 @@ class DomainRecord
     #[ORM\Column(length: 255)]
     #[Assert\NotBlank]
     #[Assert\Length(max: 255)]
+    #[Assert\Regex(
+        pattern: '/^(@|\*\.?|[a-zA-Z0-9_]([a-zA-Z0-9_\-]*[a-zA-Z0-9_])?(\.[a-zA-Z0-9_]([a-zA-Z0-9_\-]*[a-zA-Z0-9_])?)*\.?)$/',
+        message: 'Must be a valid DNS label (letters, digits, hyphens, underscores; dots allowed for subdomaining; @ for zone apex).'
+    )]
     private string $hostname = '';
 
     #[ORM\Column(length: 10, enumType: RecordType::class)]
@@ -156,8 +162,7 @@ class DomainRecord
 
     private function validateHostnameValue(ExecutionContextInterface $context): void
     {
-        // Allows @, wildcards, single/multi-label names, optional trailing dot
-        if (!preg_match('/^(@|\*\.?|[a-zA-Z0-9*]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9*]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*\.?)$/', $this->value)) {
+        if (!$this->isValidHostnameTarget($this->value)) {
             $context->buildViolation('Must be a valid hostname or FQDN (e.g. "mail.example.com" or "mail.example.com.").')
                 ->atPath('value')
                 ->addViolation();
@@ -166,7 +171,7 @@ class DomainRecord
 
     private function validateMxValue(ExecutionContextInterface $context): void
     {
-        if (!preg_match('/^(\d{1,5})\s+\S+\.?$/', $this->value, $m)) {
+        if (!preg_match('/^(\d{1,5})\s+(\S+)$/', $this->value, $m)) {
             $context->buildViolation('MX value must be formatted as "<priority> <hostname>" (e.g. "10 mail.example.com").')
                 ->atPath('value')
                 ->addViolation();
@@ -177,11 +182,17 @@ class DomainRecord
                 ->atPath('value')
                 ->addViolation();
         }
+        // '.' is a valid null MX target (RFC 7505)
+        if ($m[2] !== '.' && !$this->isValidHostnameTarget($m[2])) {
+            $context->buildViolation('MX hostname target must be a valid hostname or FQDN.')
+                ->atPath('value')
+                ->addViolation();
+        }
     }
 
     private function validateSrvValue(ExecutionContextInterface $context): void
     {
-        if (!preg_match('/^(\d{1,5})\s+(\d{1,5})\s+(\d{1,5})\s+\S+\.?$/', $this->value, $m)) {
+        if (!preg_match('/^(\d{1,5})\s+(\d{1,5})\s+(\d{1,5})\s+(\S+)$/', $this->value, $m)) {
             $context->buildViolation('SRV value must be formatted as "<priority> <weight> <port> <target>" (e.g. "10 20 443 sip.example.com").')
                 ->atPath('value')
                 ->addViolation();
@@ -195,6 +206,21 @@ class DomainRecord
                     ->addViolation();
             }
         }
+        // '.' means no service available
+        if ($m[4] !== '.' && !$this->isValidHostnameTarget($m[4])) {
+            $context->buildViolation('SRV target must be a valid hostname or FQDN.')
+                ->atPath('value')
+                ->addViolation();
+        }
+    }
+
+    // Shared pattern: letters, digits, hyphens, underscores; multi-label with dots; optional trailing dot; @ and wildcards
+    private function isValidHostnameTarget(string $value): bool
+    {
+        return (bool) preg_match(
+            '/^(@|\*\.?|[a-zA-Z0-9_]([a-zA-Z0-9_\-]*[a-zA-Z0-9_])?(\.[a-zA-Z0-9_]([a-zA-Z0-9_\-]*[a-zA-Z0-9_])?)*\.?)$/',
+            $value
+        );
     }
 
     private function validateCaaValue(ExecutionContextInterface $context): void

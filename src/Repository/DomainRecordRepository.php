@@ -195,4 +195,24 @@ class DomainRecordRepository extends ServiceEntityRepository
 
         return (int) $qb->getQuery()->getSingleScalarResult() > 0;
     }
+
+    public function hasOtherSpfTxtForHostname(Domain $domain, string $hostname, ?int $excludeId): bool
+    {
+        $qb = $this->createQueryBuilder('r')
+            ->select('COUNT(r.id)')
+            ->where('r.domain = :domain')
+            ->andWhere('r.hostname = :hostname')
+            ->andWhere('r.type = :type')
+            ->andWhere('r.value LIKE :prefix')
+            ->setParameter('domain', $domain)
+            ->setParameter('hostname', $hostname)
+            ->setParameter('type', RecordType::TXT)
+            ->setParameter('prefix', 'v=spf1%');
+
+        if ($excludeId !== null) {
+            $qb->andWhere('r.id != :id')->setParameter('id', $excludeId);
+        }
+
+        return (int) $qb->getQuery()->getSingleScalarResult() > 0;
+    }
 }
