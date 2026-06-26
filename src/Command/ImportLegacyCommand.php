@@ -87,7 +87,7 @@ class ImportLegacyCommand extends Command
             $vrfs = $this->seedVrfs($io, $dryRun);
 
             $io->section('Subnets');
-            $subnets = $this->importSubnets($pdo, $io, $dryRun, $domains, $vrfs);
+            $subnets = $this->importSubnets($pdo, $io, $dryRun, $domains, $vrfs, $dynDomain);
 
             $io->section('DNS ACLs');
             $this->seedDnsAcls($io, $dryRun);
@@ -431,7 +431,7 @@ class ImportLegacyCommand extends Command
      *
      * @return array<string, Subnet>
      */
-    private function importSubnets(\PDO $pdo, SymfonyStyle $io, bool $dryRun, array $domains, array $vrfs): array
+    private function importSubnets(\PDO $pdo, SymfonyStyle $io, bool $dryRun, array $domains, array $vrfs, Domain $dynDomain): array
     {
         $addressRanges = $this->loadAddressRanges($pdo);
 
@@ -450,6 +450,7 @@ class ImportLegacyCommand extends Command
             if ($range === null) {
                 $subnet = $this->makeSubnet($row['name'], (int) $row['vID'], null);
                 $subnet->setVrf($vrfs['corporate']);
+                $subnet->setDdnsDomain($dynDomain);
                 $map[$nid] = $subnet;
                 if (!$dryRun) {
                     $this->em->persist($subnet);
@@ -462,6 +463,7 @@ class ImportLegacyCommand extends Command
             $subnet = $this->makeSubnet($row['name'], (int) $row['vID'], $cidr, $network);
             $subnet->setVrf(in_array($cidr, $datacenterCidrs, true) ? $vrfs['datacenter'] : $vrfs['corporate']);
             $subnet->setGateway(long2ip(ip2long($network) + 1));
+            $subnet->setDdnsDomain($dynDomain);
             $map[$nid] = $subnet;
 
             if (!$dryRun) {
