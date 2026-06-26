@@ -161,4 +161,38 @@ class DomainRecordRepository extends ServiceEntityRepository
             ->getSingleScalarResult();
         return $count > 0;
     }
+
+    public function hasOtherRecordsForHostname(Domain $domain, string $hostname, ?int $excludeId): bool
+    {
+        $qb = $this->createQueryBuilder('r')
+            ->select('COUNT(r.id)')
+            ->where('r.domain = :domain')
+            ->andWhere('r.hostname = :hostname')
+            ->setParameter('domain', $domain)
+            ->setParameter('hostname', $hostname);
+
+        if ($excludeId !== null) {
+            $qb->andWhere('r.id != :id')->setParameter('id', $excludeId);
+        }
+
+        return (int) $qb->getQuery()->getSingleScalarResult() > 0;
+    }
+
+    public function hasCnameForHostname(Domain $domain, string $hostname, ?int $excludeId): bool
+    {
+        $qb = $this->createQueryBuilder('r')
+            ->select('COUNT(r.id)')
+            ->where('r.domain = :domain')
+            ->andWhere('r.hostname = :hostname')
+            ->andWhere('r.type = :type')
+            ->setParameter('domain', $domain)
+            ->setParameter('hostname', $hostname)
+            ->setParameter('type', RecordType::CNAME);
+
+        if ($excludeId !== null) {
+            $qb->andWhere('r.id != :id')->setParameter('id', $excludeId);
+        }
+
+        return (int) $qb->getQuery()->getSingleScalarResult() > 0;
+    }
 }

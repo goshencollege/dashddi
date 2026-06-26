@@ -5,6 +5,8 @@ namespace App\Entity;
 use App\Entity\Trait\AuditableTrait;
 use App\Enum\RecordType;
 use App\Repository\DomainRecordRepository;
+use App\Validator\NoCnameConflict;
+use App\Validator\TxtRecordValueValidator;
 use App\Validator\ViewsAllowedForDomainRecord;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -16,6 +18,7 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
 #[ORM\Table(name: 'domain_record')]
 #[ORM\Index(columns: ['domain_id'], name: 'idx_domain_record_domain_id')]
 #[ORM\Index(columns: ['network_interface_id'], name: 'idx_domain_record_network_interface_id')]
+#[NoCnameConflict]
 #[ViewsAllowedForDomainRecord]
 class DomainRecord
 {
@@ -122,7 +125,123 @@ class DomainRecord
                 $context->buildViolation('This value should not be blank.')
                     ->atPath('value')
                     ->addViolation();
+                return;
             }
+        }
+
+        if ($this->value === '') {
+            return;
+        }
+
+        match ($this->type) {
+            RecordType::A    => $this->validateIpValue($context, FILTER_FLAG_IPV4, 'Must be a valid IPv4 address.'),
+            RecordType::AAAA => $this->validateIpValue($context, FILTER_FLAG_IPV6, 'Must be a valid IPv6 address.'),
+            RecordType::CNAME, RecordType::NS, RecordType::PTR => $this->validateHostnameValue($context),
+            RecordType::MX   => $this->validateMxValue($context),
+            RecordType::SRV  => $this->validateSrvValue($context),
+            RecordType::CAA  => $this->validateCaaValue($context),
+            RecordType::DS    => $this->validateDsValue($context),
+            RecordType::TXT   => $this->validateTxtValue($context),
+            RecordType::HTTPS => $this->validateHttpsValue($context),
+            default           => null,
+        };
+    }
+
+    private function validateIpValue(ExecutionContextInterface $context, int $flag, string $message): void
+    {
+        if (filter_var($this->value, FILTER_VALIDATE_IP, $flag) === false) {
+            $context->buildViolation($message)->atPath('value')->addViolation();
+        }
+    }
+
+    private function validateHostnameValue(ExecutionContextInterface $context): void
+    {
+        // Allows @, wildcards, single/multi-label names, optional trailing dot
+        if (!preg_match('/^(@|\*\.?|[a-zA-Z0-9*]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9*]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*\.?)$/', $this->value)) {
+            $context->buildViolation('Must be a valid hostname or FQDN (e.g. "mail.example.com" or "mail.example.com.").')
+                ->atPath('value')
+                ->addViolation();
+        }
+    }
+
+    private function validateMxValue(ExecutionContextInterface $context): void
+    {
+        if (!preg_match('/^(\d{1,5})\s+\S+\.?$/', $this->value, $m)) {
+            $context->buildViolation('MX value must be formatted as "<priority> <hostname>" (e.g. "10 mail.example.com").')
+                ->atPath('value')
+                ->addViolation();
+            return;
+        }
+        if ((int) $m[1] > 65535) {
+            $context->buildViolation('MX priority must be between 0 and 65535.')
+                ->atPath('value')
+                ->addViolation();
+        }
+    }
+
+    private function validateSrvValue(ExecutionContextInterface $context): void
+    {
+        if (!preg_match('/^(\d{1,5})\s+(\d{1,5})\s+(\d{1,5})\s+\S+\.?$/', $this->value, $m)) {
+            $context->buildViolation('SRV value must be formatted as "<priority> <weight> <port> <target>" (e.g. "10 20 443 sip.example.com").')
+                ->atPath('value')
+                ->addViolation();
+            return;
+        }
+        $labels = ['priority', 'weight', 'port'];
+        foreach ([1, 2, 3] as $i) {
+            if ((int) $m[$i] > 65535) {
+                $context->buildViolation(sprintf('SRV %s must be between 0 and 65535.', $labels[$i - 1]))
+                    ->atPath('value')
+                    ->addViolation();
+            }
+        }
+    }
+
+    private function validateCaaValue(ExecutionContextInterface $context): void
+    {
+        if (!preg_match('/^(\d{1,3})\s+(issue|issuewild|iodef|contactemail|contactphone|issuemail)\s+"[^"]*"$/i', $this->value, $m)) {
+            $context->buildViolation('CAA value must be formatted as \'<flags> <tag> "<value>"\' (e.g. \'0 issue "letsencrypt.org"\').')
+                ->atPath('value')
+                ->addViolation();
+            return;
+        }
+        if ((int) $m[1] > 255) {
+            $context->buildViolation('CAA flags must be between 0 and 255.')
+                ->atPath('value')
+                ->addViolation();
+        }
+    }
+
+    private function validateDsValue(ExecutionContextInterface $context): void
+    {
+        if (!preg_match('/^\d+\s+\d+\s+\d+\s+[0-9a-fA-F]+$/', $this->value)) {
+            $context->buildViolation('DS value must be formatted as "<keytag> <algorithm> <digest-type> <digest>" (e.g. "12345 13 2 ABCDEF...").')
+                ->atPath('value')
+                ->addViolation();
+        }
+    }
+
+    private function validateTxtValue(ExecutionContextInterface $context): void
+    {
+        foreach (TxtRecordValueValidator::validate($this->hostname, $this->value) as $error) {
+            $context->buildViolation($error)->atPath('value')->addViolation();
+        }
+    }
+
+    private function validateHttpsValue(ExecutionContextInterface $context): void
+    {
+        // RFC 9460: <priority> <target> [<params>...]
+        // Priority 0 = alias mode (target required), 1-65535 = service mode
+        if (!preg_match('/^(\d{1,5})\s+\S+/', $this->value, $m)) {
+            $context->buildViolation('HTTPS value must be formatted as "<priority> <target> [<params>]" (e.g. "1 . alpn=h2,h3" or "0 example.com.").')
+                ->atPath('value')
+                ->addViolation();
+            return;
+        }
+        if ((int) $m[1] > 65535) {
+            $context->buildViolation('HTTPS priority must be between 0 and 65535.')
+                ->atPath('value')
+                ->addViolation();
         }
     }
 }
