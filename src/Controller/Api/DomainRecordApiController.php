@@ -14,6 +14,8 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use App\Validator\TxtRecordValueValidator;
+use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 #[Route('/api/domain-records')]
 class DomainRecordApiController extends AbstractController
@@ -51,6 +53,7 @@ class DomainRecordApiController extends AbstractController
         DomainRepository $domainRepo,
         NetworkInterfaceRepository $interfaceRepo,
         DnsViewRepository $viewRepo,
+        ValidatorInterface $validator,
     ): JsonResponse {
         $data = json_decode($request->getContent(), true) ?? [];
 
@@ -100,7 +103,11 @@ class DomainRecordApiController extends AbstractController
             if (empty($data['value'])) {
                 return $this->json(['error' => 'value is required'], Response::HTTP_UNPROCESSABLE_ENTITY);
             }
-            $record->setValue($data['value']);
+            $value = $data['value'];
+            if ($type === RecordType::TXT) {
+                $value = TxtRecordValueValidator::normalizeTxtValue($value);
+            }
+            $record->setValue($value);
         }
 
         foreach ($data['view_ids'] ?? [] as $viewId) {
@@ -108,6 +115,11 @@ class DomainRecordApiController extends AbstractController
             if ($view) {
                 $record->addView($view);
             }
+        }
+
+        $violations = $validator->validate($record);
+        if (count($violations) > 0) {
+            return $this->json(['errors' => $this->formatViolations($violations)], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         $em->persist($record);
@@ -123,6 +135,7 @@ class DomainRecordApiController extends AbstractController
         EntityManagerInterface $em,
         DomainRepository $domainRepo,
         DnsViewRepository $viewRepo,
+        ValidatorInterface $validator,
     ): JsonResponse {
         $data = json_decode($request->getContent(), true) ?? [];
 
@@ -153,7 +166,11 @@ class DomainRecordApiController extends AbstractController
         }
 
         if (array_key_exists('value', $data)) {
-            $domainRecord->setValue($data['value'] ?? '');
+            $value = $data['value'] ?? '';
+            if ($domainRecord->getType() === RecordType::TXT) {
+                $value = TxtRecordValueValidator::normalizeTxtValue($value);
+            }
+            $domainRecord->setValue($value);
         }
 
         if (array_key_exists('ttl', $data)) {
@@ -176,6 +193,11 @@ class DomainRecordApiController extends AbstractController
             }
         }
 
+        $violations = $validator->validate($domainRecord);
+        if (count($violations) > 0) {
+            return $this->json(['errors' => $this->formatViolations($violations)], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
         $em->flush();
 
         return $this->json($this->serialize($domainRecord));
@@ -188,6 +210,16 @@ class DomainRecordApiController extends AbstractController
         $em->flush();
 
         return $this->json(null, Response::HTTP_NO_CONTENT);
+    }
+
+    private function formatViolations(\Symfony\Component\Validator\ConstraintViolationListInterface $violations): array
+    {
+        $errors = [];
+        foreach ($violations as $violation) {
+            $field = ltrim($violation->getPropertyPath(), '.');
+            $errors[$field ?: 'record'][] = $violation->getMessage();
+        }
+        return $errors;
     }
 
     private function serialize(DomainRecord $record): array

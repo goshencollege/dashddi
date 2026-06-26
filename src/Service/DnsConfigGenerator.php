@@ -137,10 +137,10 @@ class DnsConfigGenerator
                     $recordLines[] = sprintf('%s%s IN AAAA %s', $record->getHostname(), $ttl, $ip->getAddress());
                 } else {
                     // Other types (TXT, HTTPS, etc.) linked to an interface use the stored value
-                    $recordLines[] = sprintf('%s%s IN %s %s', $record->getHostname(), $ttl, $record->getType()->value, $record->getValue());
+                    $recordLines[] = sprintf('%s%s IN %s %s', $record->getHostname(), $ttl, $record->getType()->value, $this->formatRecordValue($record->getType(), $record->getValue()));
                 }
             } else {
-                $recordLines[] = sprintf('%s%s IN %s %s', $record->getHostname(), $ttl, $record->getType()->value, $record->getValue());
+                $recordLines[] = sprintf('%s%s IN %s %s', $record->getHostname(), $ttl, $record->getType()->value, $this->formatRecordValue($record->getType(), $record->getValue()));
             }
         }
         if (!empty($recordLines)) {
@@ -231,7 +231,7 @@ class DnsConfigGenerator
                 continue;
             }
             $ttl           = $record->getTtl() ? (' ' . $record->getTtl()) : '';
-            $recordLines[] = sprintf('%s%s IN %s %s', $record->getHostname(), $ttl, $record->getType()->value, $record->getValue());
+            $recordLines[] = sprintf('%s%s IN %s %s', $record->getHostname(), $ttl, $record->getType()->value, $this->formatRecordValue($record->getType(), $record->getValue()));
         }
         if (!empty($recordLines)) {
             $lines[] = '; Manual records';
@@ -572,6 +572,23 @@ class DnsConfigGenerator
     {
         $rname = str_replace('@', '.', $email);
         return $this->ensureTrailingDot($rname);
+    }
+
+    // TXT record values must be quoted strings in zone files. Values longer than
+    // 255 bytes are split into multiple quoted strings (concatenated by resolvers).
+    private function formatRecordValue(RecordType $type, string $value): string
+    {
+        if ($type !== RecordType::TXT) {
+            return $value;
+        }
+        $escaped = str_replace(['\\', '"'], ['\\\\', '\\"'], $value);
+        if (strlen($escaped) <= 255) {
+            return '"' . $escaped . '"';
+        }
+        return implode(' ', array_map(
+            fn(string $chunk) => '"' . $chunk . '"',
+            str_split($escaped, 255),
+        ));
     }
 
     private function buildApexNsUpdate(
