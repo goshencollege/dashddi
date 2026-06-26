@@ -93,7 +93,11 @@ class ImportLegacyCommand extends Command
             $this->seedDnsAcls($io, $dryRun);
 
             $io->section('DNSSEC Policies');
-            $this->seedDnssecPolicies($io, $dryRun);
+            $dnssecPolicies = $this->seedDnssecPolicies($io, $dryRun);
+            $goshenDomain = current(array_filter($domains, fn(Domain $d) => $d->getName() === 'goshen.edu'));
+            if ($goshenDomain && isset($dnssecPolicies['gc'])) {
+                $goshenDomain->setDnssecPolicy($dnssecPolicies['gc']);
+            }
 
             $io->section('DNS Views');
             $this->setupDnsViews($io, $dryRun, $domains, $subnets, $dynDomain);
@@ -223,7 +227,7 @@ class ImportLegacyCommand extends Command
         $io->writeln(sprintf('  Created %d ACLs: %s', count($acls), implode(', ', array_column($acls, 'name'))));
     }
 
-    private function seedDnssecPolicies(SymfonyStyle $io, bool $dryRun): void
+    private function seedDnssecPolicies(SymfonyStyle $io, bool $dryRun): array
     {
         $extraOptions = "parent-ds-ttl P1D;\nparent-propagation-delay PT1H;";
 
@@ -246,6 +250,7 @@ class ImportLegacyCommand extends Command
             ],
         ];
 
+        $created = [];
         foreach ($policies as $def) {
             $policy = new DnssecPolicy();
             $policy->setName($def['name']);
@@ -260,6 +265,7 @@ class ImportLegacyCommand extends Command
             $policy->setNsec3param('iterations 0 optout false salt-length 0');
             $policy->setExtraOptions($extraOptions);
             $policy->setKeys($def['keys']);
+            $created[$def['name']] = $policy;
             if (!$dryRun) {
                 $this->em->persist($policy);
             }
@@ -270,6 +276,8 @@ class ImportLegacyCommand extends Command
         }
 
         $io->writeln(sprintf('  Created %d policies: %s', count($policies), implode(', ', array_column($policies, 'name'))));
+
+        return $created;
     }
 
     private function truncateImportedTables(\Doctrine\DBAL\Connection $conn, SymfonyStyle $io): void
