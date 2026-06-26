@@ -43,8 +43,8 @@ class DomainRecord
     #[Assert\NotBlank]
     #[Assert\Length(max: 255)]
     #[Assert\Regex(
-        pattern: '/^(@|\*\.?|[a-zA-Z0-9_]([a-zA-Z0-9_\-]*[a-zA-Z0-9_])?(\.[a-zA-Z0-9_]([a-zA-Z0-9_\-]*[a-zA-Z0-9_])?)*\.?)$/',
-        message: 'Must be a valid DNS label (letters, digits, hyphens, underscores; dots allowed for subdomaining; @ for zone apex).'
+        pattern: '/^(@|\*(\.[a-zA-Z0-9_]([a-zA-Z0-9_\-]*[a-zA-Z0-9_])?)*\.?|[a-zA-Z0-9_]([a-zA-Z0-9_\-]*[a-zA-Z0-9_])?(\.[a-zA-Z0-9_]([a-zA-Z0-9_\-]*[a-zA-Z0-9_])?)*\.?)$/',
+        message: 'Must be a valid DNS label (letters, digits, hyphens, underscores; dots allowed for subdomaining; *.sub wildcards allowed; @ for zone apex).'
     )]
     private string $hostname = '';
 
@@ -214,11 +214,10 @@ class DomainRecord
         }
     }
 
-    // Shared pattern: letters, digits, hyphens, underscores; multi-label with dots; optional trailing dot; @ and wildcards
     private function isValidHostnameTarget(string $value): bool
     {
         return (bool) preg_match(
-            '/^(@|\*\.?|[a-zA-Z0-9_]([a-zA-Z0-9_\-]*[a-zA-Z0-9_])?(\.[a-zA-Z0-9_]([a-zA-Z0-9_\-]*[a-zA-Z0-9_])?)*\.?)$/',
+            '/^(@|[a-zA-Z0-9_]([a-zA-Z0-9_\-]*[a-zA-Z0-9_])?(\.[a-zA-Z0-9_]([a-zA-Z0-9_\-]*[a-zA-Z0-9_])?)*\.?)$/',
             $value
         );
     }
