@@ -284,7 +284,7 @@
             {% else %}
                 <div class="table-responsive">
                     <table class="table table-sm mb-0">
-                        <thead class=""><tr><th>Address</th><th>Interface</th></tr></thead>
+                        <thead class=""><tr><th>Address</th><th>Interface</th><th>Host</th></tr></thead>
                         <tbody>
                             {% for ip in ipv6_addresses %}
                                 {% set iface = subnet.interfaces|filter(i => i.ipv6Address and i.ipv6Address.id == ip.id)|first %}
@@ -295,6 +295,11 @@
                                             <a href="{{ path('interface_show', {id: iface.id}) }}">
                                                 <code>{{ iface.macAddress }}</code>
                                             </a>
+                                        {% else %}—{% endif %}
+                                    </td>
+                                    <td>
+                                        {% if iface and iface.host %}
+                                            <a href="{{ path('host_show', {id: iface.host.id}) }}">{{ iface.host.name }}</a>
                                         {% else %}—{% endif %}
                                     </td>
                                 </tr>
