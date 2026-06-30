@@ -42,7 +42,7 @@
                                         {{ domain.name }}
                                     </a>
                                     {% if domain.aliases is not empty %}
-                                        <span class="badge bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle ms-1" title="{{ domain.aliases|length }} alias(es)">
+                                        <span class="badge bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle ms-1" title="{{ domain.aliases|map(a => a.name)|join(', ') }}">
                                             +{{ domain.aliases|length }}
                                         </span>
                                     {% endif %}
