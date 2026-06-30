@@ -152,6 +152,21 @@
     </div>
 </div>
 
+<div class="card mb-4" id="domain-aliases">
+    <div class="card-header fw-semibold"><i class="bi bi-link-45deg me-1"></i>Domain Aliases</div>
+    <div class="card-body">
+        <p>A <strong>domain alias</strong> lets you serve a second (or third) zone name using exactly the same records as an existing domain — without duplicating any data. Common uses include serving both <code>example.com</code> and <code>example.net</code>, or maintaining a legacy domain name alongside a new one.</p>
+        <p>Aliases are managed from the domain detail page under the <strong>Domain Aliases</strong> card. Type the alias zone name and click <strong>Add Alias</strong>. Each alias:</p>
+        <ul>
+            <li>Inherits all records, SOA settings, and DNS view assignments from the primary domain.</li>
+            <li>Gets its own zone file on disk with the correct <code>$ORIGIN</code> and SOA apex, so BIND serves correct data for that name.</li>
+            <li>Appears as a separate <code>zone</code> block in the generated BIND configuration.</li>
+            <li>Does not support DNSSEC or DDNS independently — those are configured on the primary domain.</li>
+        </ul>
+        <p class="mb-0 text-muted small">An alias name must be unique — it cannot match any existing domain name or another alias. Push DNS config after adding or removing aliases to deploy the changes to your servers.</p>
+    </div>
+</div>
+
 <div class="card mb-4" id="zone-import">
     <div class="card-header fw-semibold"><i class="bi bi-upload me-1"></i>Importing a Zone File</div>
     <div class="card-body">
@@ -174,6 +189,7 @@
             <a href="#dnssec" class="list-group-item list-group-item-action py-1">DNSSEC</a>
             <a href="#ddns" class="list-group-item list-group-item-action py-1">Dynamic DNS (DDNS)</a>
             <a href="#push" class="list-group-item list-group-item-action py-1">Pushing Config</a>
+            <a href="#domain-aliases" class="list-group-item list-group-item-action py-1">Domain Aliases</a>
             <a href="#zone-import" class="list-group-item list-group-item-action py-1">Importing Zone Files</a>
         </div>
     </div>

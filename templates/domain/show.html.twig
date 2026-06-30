@@ -80,6 +80,44 @@
     </div>
 </div>
 
+{# Domain Aliases #}
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-link-45deg me-1"></i>Domain Aliases</span>
+        <span class="badge bg-secondary rounded-pill">{{ domain.aliases|length }}</span>
+    </div>
+    <div class="card-body pb-2">
+        <p class="text-muted small mb-3">
+            Alias zones share this domain's records and SOA settings but are served under a different name.
+            Each alias generates its own zone file with the correct <code>$ORIGIN</code>.
+        </p>
+        {% if domain.aliases is not empty %}
+        <div class="mb-3">
+            {% for alias in domain.aliases %}
+            <div class="d-inline-flex align-items-center gap-2 me-2 mb-2 px-2 py-1 border rounded bg-body-secondary">
+                <code class="small">{{ alias.name }}</code>
+                <form method="post" action="{{ path('domain_alias_delete', {id: domain.id, aliasId: alias.id}) }}" class="d-inline">
+                    <input type="hidden" name="_token" value="{{ csrf_token('alias_delete_' ~ alias.id) }}">
+                    <button type="submit" class="btn btn-sm btn-link text-danger p-0 lh-1" title="Remove alias"
+                            onclick="return confirm('Remove alias {{ alias.name|e('js') }}?')">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </form>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        <form method="post" action="{{ path('domain_alias_add', {id: domain.id}) }}" class="d-flex gap-2">
+            <input type="hidden" name="_token" value="{{ csrf_token('alias_add_' ~ domain.id) }}">
+            <input type="text" name="alias_name" class="form-control form-control-sm font-monospace"
+                   placeholder="e.g. example.net" style="max-width: 280px;">
+            <button type="submit" class="btn btn-sm btn-outline-primary">
+                <i class="bi bi-plus-lg me-1"></i>Add Alias
+            </button>
+        </form>
+    </div>
+</div>
+
 {% if domain.soaNameserver or domain.soaEmail %}
 <div class="card mb-4">
     <div class="card-header"><i class="bi bi-file-earmark-code me-1"></i>SOA Record</div>

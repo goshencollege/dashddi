@@ -3,9 +3,11 @@
 namespace App\Controller;
 
 use App\Entity\Domain;
+use App\Entity\DomainAlias;
 use App\Enum\RecordType;
 use App\Form\DomainType;
 use App\Repository\DnsViewRepository;
+use App\Repository\DomainAliasRepository;
 use App\Repository\DomainRecordRepository;
 use App\Repository\DomainRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -13,6 +15,7 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 #[Route('/domains')]
 class DomainController extends AbstractController
@@ -147,5 +150,59 @@ class DomainController extends AbstractController
             $this->addFlash('success', 'Domain deleted.');
         }
         return $this->redirectToRoute('domain_index');
+    }
+
+    #[Route('/{id}/aliases/add', name: 'domain_alias_add', methods: ['POST'])]
+    public function addAlias(
+        Request $request,
+        Domain $domain,
+        EntityManagerInterface $em,
+        ValidatorInterface $validator,
+    ): Response {
+        if (!$this->isCsrfTokenValid('alias_add_' . $domain->getId(), $request->request->get('_token'))) {
+            $this->addFlash('error', 'Invalid CSRF token.');
+            return $this->redirectToRoute('domain_show', ['id' => $domain->getId()]);
+        }
+
+        $name  = trim((string) $request->request->get('alias_name', ''));
+        $alias = (new DomainAlias())->setName($name)->setDomain($domain);
+
+        $errors = $validator->validate($alias);
+        if (count($errors) > 0) {
+            foreach ($errors as $error) {
+                $this->addFlash('error', $error->getMessage());
+            }
+            return $this->redirectToRoute('domain_show', ['id' => $domain->getId()]);
+        }
+
+        $domain->addAlias($alias);
+        $em->persist($alias);
+        $em->flush();
+        $this->addFlash('success', 'Alias "' . $name . '" added.');
+
+        return $this->redirectToRoute('domain_show', ['id' => $domain->getId()]);
+    }
+
+    #[Route('/{id}/aliases/{aliasId}/delete', name: 'domain_alias_delete', methods: ['POST'])]
+    public function deleteAlias(
+        Request $request,
+        Domain $domain,
+        int $aliasId,
+        EntityManagerInterface $em,
+        DomainAliasRepository $aliasRepo,
+    ): Response {
+        if (!$this->isCsrfTokenValid('alias_delete_' . $aliasId, $request->request->get('_token'))) {
+            $this->addFlash('error', 'Invalid CSRF token.');
+            return $this->redirectToRoute('domain_show', ['id' => $domain->getId()]);
+        }
+
+        $alias = $aliasRepo->find($aliasId);
+        if ($alias !== null && $alias->getDomain()->getId() === $domain->getId()) {
+            $em->remove($alias);
+            $em->flush();
+            $this->addFlash('success', 'Alias "' . $alias->getName() . '" removed.');
+        }
+
+        return $this->redirectToRoute('domain_show', ['id' => $domain->getId()]);
     }
 }
