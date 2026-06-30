@@ -94,7 +94,7 @@
         {% if domain.aliases is not empty %}
         <div class="mb-3">
             {% for alias in domain.aliases %}
-            <div class="d-inline-flex align-items-center gap-2 me-2 mb-2 px-2 py-1 border rounded bg-light">
+            <div class="d-inline-flex align-items-center gap-2 me-2 mb-2 px-2 py-1 border rounded bg-body-secondary">
                 <code class="small">{{ alias.name }}</code>
                 <form method="post" action="{{ path('domain_alias_delete', {id: domain.id, aliasId: alias.id}) }}" class="d-inline">
                     <input type="hidden" name="_token" value="{{ csrf_token('alias_delete_' ~ alias.id) }}">
