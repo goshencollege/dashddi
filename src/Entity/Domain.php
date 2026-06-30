@@ -5,6 +5,7 @@ namespace App\Entity;
 use App\Entity\Trait\AuditableTrait;
 use App\Repository\DomainRepository;
 use App\Entity\DnssecPolicy;
+use App\Entity\DomainAlias;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
@@ -79,10 +80,15 @@ class Domain
     #[ORM\JoinTable(name: 'domain_dns_view')]
     private Collection $views;
 
+    #[ORM\OneToMany(targetEntity: DomainAlias::class, mappedBy: 'domain', cascade: ['persist', 'remove'], orphanRemoval: true)]
+    #[ORM\OrderBy(['name' => 'ASC'])]
+    private Collection $aliases;
+
     public function __construct()
     {
         $this->records = new ArrayCollection();
         $this->views   = new ArrayCollection();
+        $this->aliases = new ArrayCollection();
     }
 
     public function getId(): ?int { return $this->id; }
@@ -135,6 +141,24 @@ class Domain
     public function removeView(DnsView $view): static
     {
         $this->views->removeElement($view);
+        return $this;
+    }
+
+    /** @return Collection<int, DomainAlias> */
+    public function getAliases(): Collection { return $this->aliases; }
+
+    public function addAlias(DomainAlias $alias): static
+    {
+        if (!$this->aliases->contains($alias)) {
+            $this->aliases->add($alias);
+            $alias->setDomain($this);
+        }
+        return $this;
+    }
+
+    public function removeAlias(DomainAlias $alias): static
+    {
+        $this->aliases->removeElement($alias);
         return $this;
     }
 

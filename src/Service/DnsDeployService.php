@@ -85,6 +85,18 @@ class DnsDeployService
                             'output'  => $ok ? '' : 'SFTP upload failed',
                         ];
                     }
+
+                    foreach ($domain->getAliases() as $alias) {
+                        $hasDomains     = true;
+                        $aliasRemote    = $zonePath . '/' . $viewName . '/' . $alias->getName() . '.zone';
+                        $aliasDisplay   = $viewName . '/' . $alias->getName() . '.zone';
+                        $ok = $sftp->put($aliasRemote, $this->generator->generateZoneFile($domain, $view, $alias->getName()));
+                        $viewResult['zones'][$alias->getName()] = [
+                            'success' => $ok,
+                            'file'    => $aliasDisplay,
+                            'output'  => $ok ? '' : 'SFTP upload failed',
+                        ];
+                    }
                 }
 
                 foreach ($subnets as $subnet) {

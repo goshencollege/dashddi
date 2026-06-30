@@ -41,6 +41,11 @@
                                     <a href="{{ path('domain_show', {id: domain.id}) }}" class="fw-semibold text-decoration-none">
                                         {{ domain.name }}
                                     </a>
+                                    {% if domain.aliases is not empty %}
+                                        <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle ms-1" title="{{ domain.aliases|length }} alias(es)">
+                                            +{{ domain.aliases|length }}
+                                        </span>
+                                    {% endif %}
                                 </td>
                                 <td class="text-muted">{{ domain.description ?: '—' }}</td>
                                 <td><span class="badge bg-secondary rounded-pill">{{ domain.records|length }}</span></td>
