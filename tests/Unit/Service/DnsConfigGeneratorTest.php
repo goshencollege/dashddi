@@ -249,6 +249,98 @@ class DnsConfigGeneratorTest extends TestCase
         $this->assertStringContainsString('allow-update { key "ddns-ns1"; };', $output);
     }
 
+    // ── generateViewsConf secondary server ───────────────────────────────────
+
+    public function testSecondaryConfEmitsNoViewBlock(): void
+    {
+        $server = (new DnsServer())
+            ->setName('ns2')
+            ->setHostname('10.0.0.2')
+            ->setServerType('secondary')
+            ->setPrimaryHostname('10.0.0.1');
+        $view = $this->makeView(1);
+        $server->addView($view);
+
+        $domain = (new Domain())->setName('example.com');
+        $gen    = $this->makeViewsConfGenerator($server, [$domain], []);
+        $output = $gen->generateViewsConf($server);
+
+        $this->assertStringNotContainsString('view "', $output);
+        $this->assertStringContainsString('zone "example.com" IN {', $output);
+        $this->assertStringContainsString('    type secondary;', $output);
+        $this->assertStringContainsString('    primaries { 10.0.0.1; };', $output);
+    }
+
+    public function testSecondaryConfEmitsNoAclsOrDnssecPolicies(): void
+    {
+        $server = (new DnsServer())
+            ->setName('ns2')
+            ->setHostname('10.0.0.2')
+            ->setServerType('secondary');
+        $view = $this->makeView(1);
+        $server->addView($view);
+
+        $gen    = $this->makeViewsConfGenerator($server, [], []);
+        $output = $gen->generateViewsConf($server);
+
+        $this->assertStringNotContainsString('acl ', $output);
+        $this->assertStringNotContainsString('dnssec-policy ', $output);
+    }
+
+    public function testSecondaryConfEmitsNoTsigKeyBlock(): void
+    {
+        $server = (new DnsServer())
+            ->setName('ns2')
+            ->setHostname('10.0.0.2')
+            ->setServerType('secondary')
+            ->setDdnsAlgorithm(TsigAlgorithm::HmacSha256)
+            ->setDdnsSecret('secret==');
+        $view = $this->makeView(1);
+        $server->addView($view);
+
+        $gen    = $this->makeViewsConfGenerator($server, [], []);
+        $output = $gen->generateViewsConf($server);
+
+        $this->assertStringNotContainsString('key "', $output);
+    }
+
+    public function testSecondaryConfIncludesReverseZone(): void
+    {
+        $server = (new DnsServer())
+            ->setName('ns2')
+            ->setHostname('10.0.0.2')
+            ->setServerType('secondary')
+            ->setPrimaryHostname('10.0.0.1');
+        $view = $this->makeView(1);
+        $server->addView($view);
+
+        $subnet = (new Subnet())->setIpv4Cidr('192.168.1.0/24');
+        $gen    = $this->makeViewsConfGenerator($server, [], [$subnet]);
+        $output = $gen->generateViewsConf($server);
+
+        $this->assertStringContainsString('zone "1.168.192.in-addr.arpa" IN {', $output);
+        $this->assertStringContainsString('    type secondary;', $output);
+        $this->assertStringContainsString('    primaries { 10.0.0.1; };', $output);
+        $this->assertStringNotContainsString('view "', $output);
+    }
+
+    public function testSecondaryConfOmitsPrimariesWhenNotConfigured(): void
+    {
+        $server = (new DnsServer())
+            ->setName('ns2')
+            ->setHostname('10.0.0.2')
+            ->setServerType('secondary');
+        $view = $this->makeView(1);
+        $server->addView($view);
+
+        $domain = (new Domain())->setName('example.com');
+        $gen    = $this->makeViewsConfGenerator($server, [$domain], []);
+        $output = $gen->generateViewsConf($server);
+
+        $this->assertStringContainsString('zone "example.com" IN {', $output);
+        $this->assertStringNotContainsString('primaries', $output);
+    }
+
     // ── generateViewsConf helpers ─────────────────────────────────────────────
 
     private function makeServerWithDdns(string $name, TsigAlgorithm $algo, string $secret): DnsServer
