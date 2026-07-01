@@ -198,6 +198,24 @@ class DomainRecordController extends AbstractController
         ]);
     }
 
+    #[Route('/domain-records/{id}/unlink', name: 'domain_record_unlink', methods: ['POST'])]
+    public function unlink(DomainRecord $record, Request $request): Response
+    {
+        $interfaceId = $record->getNetworkInterface()?->getId();
+
+        if ($this->isCsrfTokenValid('unlink_record_' . $record->getId(), $request->request->get('_token'))) {
+            $record->setNetworkInterface(null);
+            $this->em->flush();
+            $this->addFlash('success', 'Record unlinked from interface.');
+        }
+
+        $referer = $request->headers->get('referer', '');
+        if ($interfaceId && str_contains($referer, '/interfaces/')) {
+            return $this->redirectToRoute('interface_show', ['id' => $interfaceId]);
+        }
+        return $this->redirectToRoute('domain_show', ['id' => $record->getDomain()->getId()]);
+    }
+
     #[Route('/domain-records/{id}/delete', name: 'domain_record_delete', methods: ['POST'])]
     public function delete(DomainRecord $record, Request $request): Response
     {
