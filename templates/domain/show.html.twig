@@ -308,17 +308,6 @@
                             {% if iface_deleted %}
                                 <span class="badge bg-warning text-dark ms-1" title="This interface has been deleted — this record is excluded from DNS pushes">Interface deleted</span>
                             {% endif %}
-                            {% if record.networkInterface and record.value %}
-                                {% set liveIp = record.type.value == 'A'
-                                    ? record.networkInterface.ipAddress?.address
-                                    : (record.type.value == 'AAAA' ? record.networkInterface.ipv6Address?.address : null) %}
-                                {% if liveIp and record.value != liveIp %}
-                                    <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle ms-1"
-                                          title="Stored value {{ record.value }} doesn't match interface IP {{ liveIp }} — edit the record to fix">
-                                        <i class="bi bi-exclamation-triangle me-1"></i>IP mismatch
-                                    </span>
-                                {% endif %}
-                            {% endif %}
                         </td>
                         <td><span class="badge bg-secondary">{{ record.type.value }}</span></td>
                         <td class="font-monospace small" style="word-break: break-all;">
