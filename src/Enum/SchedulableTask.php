@@ -14,6 +14,7 @@ enum SchedulableTask: string
     case PurgeDeletedHosts       = 'purge_deleted_hosts';
     case DatabaseBackup          = 'database_backup';
     case PullSnipeIt             = 'pull_snipe_it';
+    case PurgeActivityLogs       = 'purge_activity_logs';
 
     public function label(): string
     {
@@ -28,6 +29,7 @@ enum SchedulableTask: string
             self::PurgeDeletedHosts      => 'Purge Deleted Hosts',
             self::DatabaseBackup         => 'Database Backup',
             self::PullSnipeIt            => 'Pull Snipe-IT Assets',
+            self::PurgeActivityLogs      => 'Purge Activity Logs',
         };
     }
 
@@ -44,6 +46,7 @@ enum SchedulableTask: string
             self::PurgeDeletedHosts      => 'Hard-deletes hosts and interfaces that were soft-deleted more than the configured retention period ago (default 90 days). Configured in Application Settings.',
             self::DatabaseBackup         => 'Creates a database backup using the destination and options configured in Backup Settings.',
             self::PullSnipeIt            => 'Fetches assets from all configured Snipe-IT servers. Creates a host for each asset that has a MAC address in any configured custom field, updates existing hosts, and removes hosts whose assets have been deleted or archived.',
+            self::PurgeActivityLogs      => 'Deletes activity log entries older than the retention period configured in Application Settings (default 90 days).',
         };
     }
 
@@ -61,6 +64,7 @@ enum SchedulableTask: string
             self::PurgeDeletedHosts      => 'app:purge-deleted-hosts',
             self::DatabaseBackup         => 'app:database:backup',
             self::PullSnipeIt            => 'app:pull-snipe-it',
+            self::PurgeActivityLogs      => 'app:purge-activity-logs',
         };
     }
 
@@ -77,6 +81,7 @@ enum SchedulableTask: string
             self::PurgeDeletedHosts      => '0 3 * * 0',
             self::DatabaseBackup         => '0 2 * * *',
             self::PullSnipeIt            => '0 3 * * *',
+            self::PurgeActivityLogs      => '0 3 * * 0',
         };
     }
 }

@@ -55,6 +55,21 @@ class AppSetting
     #[ORM\Column(length: 50, nullable: true)]
     private ?string $timezone = null;
 
+    #[ORM\Column(nullable: true, options: ['default' => 90])]
+    private ?int $activityLogRetentionDays = 90;
+
+    #[ORM\Column(options: ['default' => false])]
+    private bool $syslogEnabled = false;
+
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $syslogHost = null;
+
+    #[ORM\Column(nullable: true, options: ['default' => 514])]
+    private ?int $syslogPort = 514;
+
+    #[ORM\Column(length: 3, nullable: true, options: ['default' => 'udp'])]
+    private ?string $syslogProtocol = 'udp';
+
     public function getId(): int { return $this->id; }
 
     public function getDefaultLeaseRetentionDays(): ?int { return $this->defaultLeaseRetentionDays; }
@@ -98,4 +113,19 @@ class AppSetting
 
     public function getSwitchInfoMaxAgeDays(): ?int { return $this->switchInfoMaxAgeDays; }
     public function setSwitchInfoMaxAgeDays(?int $days): static { $this->switchInfoMaxAgeDays = $days; return $this; }
+
+    public function getActivityLogRetentionDays(): ?int { return $this->activityLogRetentionDays; }
+    public function setActivityLogRetentionDays(?int $days): static { $this->activityLogRetentionDays = $days; return $this; }
+
+    public function isSyslogEnabled(): bool { return $this->syslogEnabled; }
+    public function setSyslogEnabled(bool $v): static { $this->syslogEnabled = $v; return $this; }
+
+    public function getSyslogHost(): ?string { return $this->syslogHost; }
+    public function setSyslogHost(?string $host): static { $this->syslogHost = $host; return $this; }
+
+    public function getSyslogPort(): ?int { return $this->syslogPort; }
+    public function setSyslogPort(?int $port): static { $this->syslogPort = $port; return $this; }
+
+    public function getSyslogProtocol(): ?string { return $this->syslogProtocol; }
+    public function setSyslogProtocol(?string $protocol): static { $this->syslogProtocol = $protocol; return $this; }
 }

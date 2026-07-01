@@ -393,13 +393,21 @@ class HostRepository extends ServiceEntityRepository
 
     public function purgeDeletedBefore(\DateTimeImmutable $before): int
     {
-        return (int) $this->createQueryBuilder('h')
-            ->delete()
+        $entities = $this->createQueryBuilder('h')
             ->where('h.deletedAt IS NOT NULL')
             ->andWhere('h.deletedAt < :before')
             ->setParameter('before', $before)
             ->getQuery()
-            ->execute();
+            ->getResult();
+
+        foreach ($entities as $entity) {
+            $this->getEntityManager()->remove($entity);
+        }
+        if (!empty($entities)) {
+            $this->getEntityManager()->flush();
+        }
+
+        return count($entities);
     }
 
     private function toLike(string $value): string

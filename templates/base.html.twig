@@ -409,6 +409,12 @@
                         </li>
                     </ul>
                 </li>
+                <li class="nav-item">
+                    <a class="nav-link {{ app.request.attributes.get('_route') starts with 'activity_log' ? 'active' }}"
+                       href="{{ path('activity_log_index') }}">
+                        <i class="bi bi-shield-check me-1"></i>Audit Log
+                    </a>
+                </li>
                 {% set settingsActive = app.request.attributes.get('_route') starts with 'building'
                     or app.request.attributes.get('_route') starts with 'tag'
                     or app.request.attributes.get('_route') starts with 'app_settings'

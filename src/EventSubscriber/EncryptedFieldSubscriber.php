@@ -36,6 +36,12 @@ class EncryptedFieldSubscriber
 
     public function __construct(private readonly EncryptionService $encryption) {}
 
+    /** Returns the list of property names that are encrypted for a given entity class. */
+    public static function encryptedFieldsFor(string $class): array
+    {
+        return self::FIELDS[$class] ?? [];
+    }
+
     public function prePersist(PrePersistEventArgs $args): void
     {
         $this->encryptEntity($args->getObject());

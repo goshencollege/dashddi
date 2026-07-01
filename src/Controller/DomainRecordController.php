@@ -277,18 +277,19 @@ class DomainRecordController extends AbstractController
         if (!$record->isCanonical() || !$record->getNetworkInterface()) {
             return;
         }
-        $this->em->createQueryBuilder()
-            ->update(DomainRecord::class, 'r')
-            ->set('r.isCanonical', ':false')
-            ->where('r.networkInterface = :iface')
-            ->andWhere('r.type = :type')
-            ->andWhere('r.id != :id')
-            ->setParameter('false', false)
-            ->setParameter('iface', $record->getNetworkInterface())
-            ->setParameter('type', $record->getType())
-            ->setParameter('id', $record->getId())
-            ->getQuery()
-            ->execute();
+        // Load and update via ORM (not a bulk DQL UPDATE) so Doctrine lifecycle
+        // events fire and ActivityLogListener records the flag being cleared.
+        $previous = $this->recordRepo->findBy([
+            'networkInterface' => $record->getNetworkInterface(),
+            'type'             => $record->getType(),
+            'isCanonical'      => true,
+        ]);
+        foreach ($previous as $other) {
+            if ($other->getId() !== $record->getId()) {
+                $other->setIsCanonical(false);
+            }
+        }
+        $this->em->flush();
     }
 
     private function restoreValueFromInterface(DomainRecord $record): void

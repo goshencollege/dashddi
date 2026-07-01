@@ -335,21 +335,21 @@ class SnipeItSyncService
 
     /**
      * Moves all interfaces from each host in $others into $primary, then deletes the now-empty hosts.
-     * Uses DBAL directly to avoid Doctrine's orphan-removal scheduling interfering with the UPDATE
-     * before the DELETE. host_tag rows are cleaned up by the DB-level ON DELETE CASCADE on host.
+     * Updates only the owning side (setHost) to avoid triggering orphanRemoval on Host.interfaces,
+     * then refresh()es before remove() so cascade:remove finds an empty collection.
      */
     private function mergeHosts(Host $primary, array $others): void
     {
-        $conn = $this->em->getConnection();
         foreach ($others as $other) {
-            $conn->executeStatement(
-                'UPDATE network_interface SET host_id = ? WHERE host_id = ?',
-                [$primary->getId(), $other->getId()]
-            );
-            $conn->executeStatement('DELETE FROM host WHERE id = ?', [$other->getId()]);
-            $this->em->detach($other);
+            foreach ($other->getInterfaces()->toArray() as $interface) {
+                $interface->setHost($primary);
+            }
+            $this->em->flush();
+
+            $this->em->refresh($other);
+            $this->em->remove($other);
+            $this->em->flush();
         }
-        // Reload primary so Doctrine's identity map reflects the moved interfaces
         $this->em->refresh($primary);
     }
 
@@ -489,7 +489,6 @@ class SnipeItSyncService
             fn(NetworkInterface $i) => $i->getMacAddress(),
             $host->getInterfaces()->filter(fn(NetworkInterface $i) => !$i->isDeleted())->toArray()
         );
-        $conn = $this->em->getConnection();
         foreach ($normalizedMacs as $mac) {
             if (in_array($mac, $existingMacs, true)) {
                 continue;
@@ -513,21 +512,16 @@ class SnipeItSyncService
                     $errors[] = sprintf('MAC %s already linked via another Snipe asset — skipped for "%s".', $mac, $name);
                     continue;
                 }
-                // Unlinked host — move this interface to the Snipe-linked host via DBAL to avoid
-                // Doctrine's orphan-removal race with the host deletion on flush.
-                $conn->executeStatement(
-                    'UPDATE network_interface SET host_id = ? WHERE id = ?',
-                    [$host->getId(), $conflict->getId()]
-                );
-                $remaining = (int) $conn->fetchOne(
-                    'SELECT COUNT(*) FROM network_interface WHERE host_id = ?',
-                    [$conflictHost->getId()]
-                );
-                if ($remaining === 0) {
-                    $conn->executeStatement('DELETE FROM host WHERE id = ?', [$conflictHost->getId()]);
+                // Unlinked host — move this interface via ORM (owning side only, no orphanRemoval
+                // triggered) then refresh the conflict host to get an accurate interface count.
+                $conflict->setHost($host);
+                $this->em->flush();
+
+                $this->em->refresh($conflictHost);
+                if ($conflictHost->getInterfaces()->isEmpty()) {
+                    $this->em->remove($conflictHost);
+                    $this->em->flush();
                 }
-                $this->em->detach($conflict);
-                $this->em->detach($conflictHost);
                 // Record the MAC so the loop below doesn't try to create a duplicate interface
                 $existingMacs[] = $mac;
                 continue;

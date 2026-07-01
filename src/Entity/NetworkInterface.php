@@ -60,7 +60,7 @@ class NetworkInterface
     #[ORM\JoinColumn(nullable: true)]
     private ?Ipv6Address $ipv6Address = null;
 
-    #[ORM\OneToMany(targetEntity: DomainRecord::class, mappedBy: 'networkInterface')]
+    #[ORM\OneToMany(targetEntity: DomainRecord::class, mappedBy: 'networkInterface', cascade: ['remove'])]
     private Collection $domainRecords;
 
     #[ORM\Column(nullable: true)]

@@ -131,6 +131,43 @@
                 </div>
             </div>
         </div>
+        <div class="card mt-4">
+            <div class="card-header"><strong>Audit Log</strong></div>
+            <div class="card-body">
+                <div class="mb-3">
+                    {{ form_label(form.activityLogRetentionDays, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                    {{ form_widget(form.activityLogRetentionDays) }}
+                    {{ form_errors(form.activityLogRetentionDays) }}
+                    {{ form_help(form.activityLogRetentionDays) }}
+                </div>
+                <hr>
+                <p class="text-muted small">Forward activity log entries to a remote syslog server in RFC 5424 format.</p>
+                <div class="mb-3">
+                    <div class="form-check">
+                        {{ form_widget(form.syslogEnabled, {attr: {class: 'form-check-input'}}) }}
+                        {{ form_label(form.syslogEnabled, null, {label_attr: {class: 'form-check-label fw-semibold'}}) }}
+                    </div>
+                </div>
+                <div class="mb-3">
+                    {{ form_label(form.syslogHost, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                    {{ form_widget(form.syslogHost, {attr: {class: 'form-control'}}) }}
+                    {{ form_errors(form.syslogHost) }}
+                </div>
+                <div class="row g-3 mb-0">
+                    <div class="col-sm-5">
+                        {{ form_label(form.syslogPort, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                        {{ form_widget(form.syslogPort, {attr: {class: 'form-control'}}) }}
+                        {{ form_errors(form.syslogPort) }}
+                    </div>
+                    <div class="col-sm-7">
+                        {{ form_label(form.syslogProtocol, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                        {{ form_widget(form.syslogProtocol, {attr: {class: 'form-select'}}) }}
+                        {{ form_errors(form.syslogProtocol) }}
+                        {{ form_help(form.syslogProtocol) }}
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
