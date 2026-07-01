@@ -24,7 +24,7 @@ class SyslogForwarderService
     private function format(SyslogMessage $msg): string
     {
         $ts       = $msg->occurredAt->format(\DateTimeInterface::RFC3339_EXTENDED);
-        $hostname = gethostname() ?: 'dashddi';
+        $hostname = parse_url($_ENV['DEFAULT_URI'] ?? '', PHP_URL_HOST) ?: gethostname() ?: 'dashddi';
         $header   = "<134>1 {$ts} {$hostname} dashddi - - -";
 
         $kv = 'action=' . $msg->action;
