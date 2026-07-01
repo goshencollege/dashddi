@@ -74,6 +74,11 @@ class DomainType extends AbstractType
                 'label'    => 'Enable DDNS (allow dynamic updates from Kea)',
                 'required' => false,
             ])
+            ->add('excludeFromInterfaces', CheckboxType::class, [
+                'label'    => 'Exclude from interface DNS record forms',
+                'required' => false,
+                'help'     => 'When checked, this domain will not appear in the domain selector when adding or editing DNS records from an interface.',
+            ])
             ->add('ddnsDnsServer', EntityType::class, [
                 'class'         => DnsServer::class,
                 'choice_label'  => 'name',

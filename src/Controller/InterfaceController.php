@@ -265,7 +265,7 @@ class InterfaceController extends AbstractController
     #[Route('/api/subnets/{id}/available-domains', name: 'api_subnet_available_domains', methods: ['GET'])]
     public function subnetAvailableDomains(Subnet $subnet, DomainRepository $domainRepo): JsonResponse
     {
-        $domains = $domainRepo->findBy([], ['name' => 'ASC']);
+        $domains = $domainRepo->findBy(['excludeFromInterfaces' => false], ['name' => 'ASC']);
 
         $result = array_map(function (\App\Entity\Domain $domain) use ($subnet) {
             $usable = $this->viewResolver->isDomainUsable($domain, $subnet);
