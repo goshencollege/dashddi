@@ -10,6 +10,7 @@ use App\Entity\DnsServer;
 use App\Entity\SnipeItServer;
 use App\Service\EncryptionService;
 use Doctrine\Bundle\DoctrineBundle\Attribute\AsDoctrineListener;
+use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Event\PostLoadEventArgs;
 use Doctrine\ORM\Event\PostPersistEventArgs;
 use Doctrine\ORM\Event\PostUpdateEventArgs;
@@ -74,7 +75,23 @@ class EncryptedFieldSubscriber
 
     public function postLoad(PostLoadEventArgs $args): void
     {
-        $this->decryptEntity($args->getObject());
+        $entity = $args->getObject();
+        $em     = $args->getObjectManager();
+
+        $this->decryptEntity($entity);
+
+        // After decrypting, update Doctrine's identity-map baseline to the plaintext values.
+        // Without this, Doctrine compares plaintext (current) against ciphertext (original) on
+        // every flush and marks the entity dirty, causing spurious UPDATEs and audit log entries.
+        if ($em instanceof EntityManagerInterface && isset(self::FIELDS[$this->entityClass($entity)])) {
+            $uow          = $em->getUnitOfWork();
+            $originalData = $uow->getOriginalEntityData($entity);
+            foreach (self::FIELDS[$this->entityClass($entity)] as $property) {
+                $getter = 'get' . ucfirst($property);
+                $originalData[$property] = $entity->$getter();
+            }
+            $uow->setOriginalEntityData($entity, $originalData);
+        }
     }
 
     private function entityClass(object $entity): string
