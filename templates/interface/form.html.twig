@@ -143,6 +143,7 @@
                     <th>Hostname</th>
                     <th>Type</th>
                     <th>Value</th>
+                    <th>View</th>
                     <th class="text-end">Actions</th>
                 </tr>
             </thead>
@@ -163,6 +164,15 @@
                             {{ interface.ipv6Address ? interface.ipv6Address.address : '—' }}
                         {% else %}
                             {{ record.value }}
+                        {% endif %}
+                    </td>
+                    <td class="small">
+                        {% if record.views is empty %}
+                            <span class="text-muted">All views</span>
+                        {% else %}
+                            {% for view in record.views %}
+                                <span class="badge bg-info text-dark">{{ view.name }}</span>
+                            {% endfor %}
                         {% endif %}
                     </td>
                     <td class="text-end" style="white-space:nowrap">

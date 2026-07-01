@@ -50,18 +50,20 @@
 </div>
 
 <div class="row g-3 mb-4">
-    <div class="col-md-6">
-        <div class="card h-100">
+    <div class="col-12">
+        <div class="card">
             <div class="card-header fw-semibold"><i class="bi bi-info-circle me-1"></i>Details</div>
             <table class="table mb-0">
                 <tbody>
                     <tr>
-                        <th class="text-muted fw-normal ps-3" style="width:40%">Host</th>
-                        <td>
+                        <th class="text-muted fw-normal ps-3" style="width:20%">Host</th>
+                        <td style="width:30%">
                             {% if interface.host %}
                                 <a href="{{ path('host_show', {id: interface.host.id}) }}">{{ interface.host.name }}</a>
                             {% else %}—{% endif %}
                         </td>
+                        <th class="text-muted fw-normal ps-3" style="width:20%">Last Auth</th>
+                        <td>{{ interface.lastAuthAt ? interface.lastAuthAt|date('Y-m-d H:i') : '—' }}</td>
                     </tr>
                     <tr>
                         <th class="text-muted fw-normal ps-3">Subnet</th>
@@ -70,17 +72,13 @@
                                 <a href="{{ path('subnet_show', {id: interface.subnet.id}) }}">{{ interface.subnet.name }}</a>
                             {% else %}—{% endif %}
                         </td>
+                        <th class="text-muted fw-normal ps-3">Last DHCP</th>
+                        <td>{{ interface.lastDhcpAt ? interface.lastDhcpAt|date('Y-m-d H:i') : '—' }}</td>
                     </tr>
                     <tr>
                         <th class="text-muted fw-normal ps-3">IPv4 Address</th>
                         <td class="ip-address">{{ interface.ipAddress ? interface.ipAddress.address : '—' }}</td>
-                    </tr>
-                    <tr>
-                        <th class="text-muted fw-normal ps-3">IPv6 Address</th>
-                        <td class="ip-address small">{{ interface.ipv6Address ? interface.ipv6Address.address : '—' }}</td>
-                    </tr>
-                    {% if switchInfo and switchInfo.nasIp %}
-                    <tr>
+                        {% if switchInfo and switchInfo.nasIp %}
                         <th class="text-muted fw-normal ps-3">Switch IP</th>
                         <td class="ip-address">
                             {% if switchIface and switchIface.host %}
@@ -90,91 +88,101 @@
                                 {{ switchInfo.nasIp }}
                             {% endif %}
                         </td>
+                        {% else %}
+                        <td colspan="2"></td>
+                        {% endif %}
                     </tr>
                     <tr>
+                        <th class="text-muted fw-normal ps-3">IPv6 Address</th>
+                        <td class="ip-address small">{{ interface.ipv6Address ? interface.ipv6Address.address : '—' }}</td>
+                        {% if switchInfo and switchInfo.nasIp %}
                         <th class="text-muted fw-normal ps-3">Switch Port</th>
                         <td>{{ switchInfo.nasPortId ?: '—' }}</td>
-                    </tr>
-                    {% endif %}
-                    <tr>
-                        <th class="text-muted fw-normal ps-3">Last Auth</th>
-                        <td>{{ interface.lastAuthAt ? interface.lastAuthAt|date('Y-m-d H:i') : '—' }}</td>
-                    </tr>
-                    <tr>
-                        <th class="text-muted fw-normal ps-3">Last DHCP</th>
-                        <td>{{ interface.lastDhcpAt ? interface.lastDhcpAt|date('Y-m-d H:i') : '—' }}</td>
+                        {% else %}
+                        <td colspan="2"></td>
+                        {% endif %}
                     </tr>
                     {% if interface.notes %}
                     <tr>
                         <th class="text-muted fw-normal ps-3">Notes</th>
-                        <td style="white-space:pre-wrap">{{ interface.notes }}</td>
+                        <td colspan="3" style="white-space:pre-wrap">{{ interface.notes }}</td>
                     </tr>
                     {% endif %}
                 </tbody>
             </table>
         </div>
     </div>
+</div>
 
-    <div class="col-md-6">
-        <div class="card h-100">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span class="fw-semibold"><i class="bi bi-globe me-1"></i>DNS Records</span>
-                {% if not interface.deleted %}
-                <a href="{{ path('interface_domain_record_new', {id: interface.id}) }}" class="btn btn-sm btn-outline-primary">
-                    <i class="bi bi-plus-lg me-1"></i>Add Record
-                </a>
-                {% endif %}
-            </div>
-            {% if interface.domainRecords is empty %}
-                <div class="card-body text-muted text-center py-3">No DNS records assigned.</div>
-            {% else %}
-                <div class="table-responsive">
-                <table class="table table-sm mb-0">
-                    <thead>
-                        <tr>
-                            <th>Hostname</th>
-                            <th>Type</th>
-                            <th class="text-end">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for record in interface.domainRecords %}
-                        <tr>
-                            <td class="font-monospace small">
-                                {{ record.fullyQualifiedHostname }}
-                                {% if record.canonical %}
-                                    <span class="badge bg-primary ms-1" title="Canonical — used for PTR reverse DNS">PTR</span>
-                                {% endif %}
-                            </td>
-                            <td><span class="badge bg-secondary">{{ record.type.value }}</span></td>
-                            <td class="text-end" style="white-space:nowrap">
-                                <a href="{{ path('domain_record_edit', {id: record.id, from: 'interface'}) }}"
-                                   class="btn btn-sm btn-outline-secondary me-1">
-                                    <i class="bi bi-pencil"></i>
-                                </a>
-                                <form method="post" action="{{ path('domain_record_unlink', {id: record.id}) }}"
-                                      class="d-inline" onsubmit="return confirm('Unlink this record from the interface? The record will remain in the domain.')">
-                                    <input type="hidden" name="_token" value="{{ csrf_token('unlink_record_' ~ record.id) }}">
-                                    <button type="submit" class="btn btn-sm btn-outline-warning me-1" title="Unlink from interface">
-                                        <i class="bi bi-slash-circle"></i>
-                                    </button>
-                                </form>
-                                <form method="post" action="{{ path('domain_record_delete', {id: record.id}) }}"
-                                      class="d-inline" onsubmit="return confirm('Delete this record?')">
-                                    <input type="hidden" name="_token" value="{{ csrf_token('delete_record_' ~ record.id) }}">
-                                    <button type="submit" class="btn btn-sm btn-outline-danger">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </form>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-                </div>
-            {% endif %}
-        </div>
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="fw-semibold"><i class="bi bi-globe me-1"></i>DNS Records</span>
+        {% if not interface.deleted %}
+        <a href="{{ path('interface_domain_record_new', {id: interface.id}) }}" class="btn btn-sm btn-outline-primary">
+            <i class="bi bi-plus-lg me-1"></i>Add Record
+        </a>
+        {% endif %}
     </div>
+    {% if interface.domainRecords is empty %}
+        <div class="card-body text-muted text-center py-3">No DNS records assigned.</div>
+    {% else %}
+        <div class="table-responsive">
+        <table class="table table-sm mb-0">
+            <thead>
+                <tr>
+                    <th>Hostname</th>
+                    <th>Type</th>
+                    <th>Value</th>
+                    <th>View</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for record in interface.domainRecords %}
+                <tr>
+                    <td class="font-monospace small">
+                        {{ record.fullyQualifiedHostname }}
+                        {% if record.canonical %}
+                            <span class="badge bg-primary ms-1" title="Canonical — used for PTR reverse DNS">PTR</span>
+                        {% endif %}
+                    </td>
+                    <td><span class="badge bg-secondary">{{ record.type.value }}</span></td>
+                    <td class="font-monospace small">{{ record.value }}</td>
+                    <td class="small">
+                        {% if record.views is empty %}
+                            <span class="text-muted">All views</span>
+                        {% else %}
+                            {% for view in record.views %}
+                                <span class="badge bg-info text-dark">{{ view.name }}</span>
+                            {% endfor %}
+                        {% endif %}
+                    </td>
+                    <td class="text-end" style="white-space:nowrap">
+                        <a href="{{ path('domain_record_edit', {id: record.id, from: 'interface'}) }}"
+                           class="btn btn-sm btn-outline-secondary me-1">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                        <form method="post" action="{{ path('domain_record_unlink', {id: record.id}) }}"
+                              class="d-inline" onsubmit="return confirm('Unlink this record from the interface? The record will remain in the domain.')">
+                            <input type="hidden" name="_token" value="{{ csrf_token('unlink_record_' ~ record.id) }}">
+                            <button type="submit" class="btn btn-sm btn-outline-warning me-1" title="Unlink from interface">
+                                <i class="bi bi-slash-circle"></i>
+                            </button>
+                        </form>
+                        <form method="post" action="{{ path('domain_record_delete', {id: record.id}) }}"
+                              class="d-inline" onsubmit="return confirm('Delete this record?')">
+                            <input type="hidden" name="_token" value="{{ csrf_token('delete_record_' ~ record.id) }}">
+                            <button type="submit" class="btn btn-sm btn-outline-danger">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    {% endif %}
 </div>
 
 {% if arubaSwitch and switchInfo and switchInfo.nasPortId %}
