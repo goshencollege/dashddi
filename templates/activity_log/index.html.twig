@@ -145,7 +145,7 @@
                                 {% if log.entityType %}
                                     <span class="text-muted small me-1">{{ log.entityType }}</span>
                                 {% endif %}
-                                {% set ri = entityRoutes[log.entityType] ?? null %}
+                                {% set ri = log.action != 'delete' ? (entityRoutes[log.entityType] ?? null) : null %}
                                 {% if ri and (not ri.hasId or log.entityId) %}
                                     <a href="{{ path(ri.route, ri.hasId ? {id: log.entityId} : {}) }}" class="fw-semibold">{{ log.entityLabel }}</a>
                                 {% else %}
