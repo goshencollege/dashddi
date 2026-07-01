@@ -98,8 +98,35 @@ class ActivityLogListener
             return;
         }
 
-        // Capture label and ID before the row is deleted
-        $this->pending[] = $this->buildPending('delete', $entity, null);
+        $em       = $args->getObjectManager();
+        $snapshot = $em instanceof EntityManagerInterface
+            ? $this->buildDeleteSnapshot($entity, $em)
+            : null;
+
+        $this->pending[] = $this->buildPending('delete', $entity, $snapshot ?: null);
+    }
+
+    private function buildDeleteSnapshot(object $entity, EntityManagerInterface $em): array
+    {
+        $originalData    = $em->getUnitOfWork()->getOriginalEntityData($entity);
+        $encryptedFields = EncryptedFieldSubscriber::encryptedFieldsFor(get_class($entity));
+        $snapshot        = [];
+
+        foreach ($originalData as $field => $value) {
+            if (in_array($field, self::ALWAYS_IGNORED, true)) {
+                continue;
+            }
+            if ($value === null || $value === '') {
+                continue;
+            }
+            if (in_array($field, $encryptedFields, true)) {
+                $snapshot[$field] = ['[redacted]', null];
+            } else {
+                $snapshot[$field] = [$this->serializeValue($value), null];
+            }
+        }
+
+        return $snapshot;
     }
 
     public function postFlush(PostFlushEventArgs $args): void
@@ -161,6 +188,34 @@ class ActivityLogListener
 
     private function entityLabel(object $entity): string
     {
+        // Parent-context labels: "child @ parent"
+        if (method_exists($entity, 'getDomain') && ($domain = $entity->getDomain()) !== null) {
+            $name   = method_exists($entity, 'getHostname') ? (string) $entity->getHostname() : '';
+            $parent = method_exists($domain, 'getName') ? (string) $domain->getName() : '';
+            return $parent !== '' ? "{$name} @ {$parent}" : $name;
+        }
+
+        if (method_exists($entity, 'getHost') && ($host = $entity->getHost()) !== null) {
+            $parentName = method_exists($host, 'getName') ? (string) $host->getName() : '';
+            $name       = method_exists($entity, 'getName') ? ((string) $entity->getName()) : '';
+            $identifier = $name !== '' ? $name
+                : (method_exists($entity, 'getMacAddress') ? (string) $entity->getMacAddress() : '');
+            return $parentName !== '' && $identifier !== '' ? "{$identifier} @ {$parentName}" : $identifier;
+        }
+
+        if (method_exists($entity, 'getSubnet') && ($subnet = $entity->getSubnet()) !== null) {
+            $parentName = method_exists($subnet, 'getName') ? (string) $subnet->getName() : '';
+            $name       = '';
+            foreach (['getLabel', 'getHostname', 'getName'] as $m) {
+                if (method_exists($entity, $m)) {
+                    $v = (string) $entity->$m();
+                    if ($v !== '') { $name = $v; break; }
+                }
+            }
+            return $parentName !== '' && $name !== '' ? "{$name} @ {$parentName}" : $name;
+        }
+
+        // Generic fallback
         foreach (['getName', 'getHostname', 'getLabel', 'getTitle'] as $method) {
             if (method_exists($entity, $method)) {
                 $value = $entity->$method();
@@ -184,8 +239,24 @@ class ActivityLogListener
         if ($value instanceof \DateTimeInterface) {
             return $value->format(\DateTimeInterface::ATOM);
         }
+        if ($value instanceof \BackedEnum) {
+            return $value->value;
+        }
+        if ($value instanceof \UnitEnum) {
+            return $value->name;
+        }
         if (is_object($value) && method_exists($value, 'getId')) {
-            return (new \ReflectionClass($value))->getShortName() . '#' . $value->getId();
+            $id   = $value->getId();
+            $name = null;
+            foreach (['getName', 'getHostname'] as $m) {
+                if (method_exists($value, $m)) {
+                    $n = $value->$m();
+                    if ($n !== null && $n !== '') { $name = (string) $n; break; }
+                }
+            }
+            return $name !== null
+                ? "{$name} (#{$id})"
+                : (new \ReflectionClass($value))->getShortName() . '#' . $id;
         }
         if (is_array($value)) {
             return json_encode($value);
