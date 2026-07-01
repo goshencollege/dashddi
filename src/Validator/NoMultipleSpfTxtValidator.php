@@ -36,7 +36,8 @@ class NoMultipleSpfTxtValidator extends ConstraintValidator
             return;
         }
 
-        if ($this->repository->hasOtherSpfTxtForHostname($domain, $value->getHostname(), $value->getId())) {
+        $viewIds = array_map(fn($v) => $v->getId(), $value->getViews()->toArray());
+        if ($this->repository->hasOtherSpfTxtForHostname($domain, $value->getHostname(), $value->getId(), $viewIds)) {
             $this->context->buildViolation($constraint->message)
                 ->setParameter('{{ hostname }}', $value->getHostname())
                 ->atPath('value')

@@ -131,7 +131,7 @@ class NoMultipleSpfTxtValidatorTest extends TestCase
         $repo = $this->createMock(DomainRecordRepository::class);
         $repo->expects($this->once())
             ->method('hasOtherSpfTxtForHostname')
-            ->with($domain, '@', 7)
+            ->with($domain, '@', 7, [])
             ->willReturn(false);
 
         $validator = new NoMultipleSpfTxtValidator($repo);

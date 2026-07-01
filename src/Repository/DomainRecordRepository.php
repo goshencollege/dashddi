@@ -162,10 +162,10 @@ class DomainRecordRepository extends ServiceEntityRepository
         return $count > 0;
     }
 
-    public function hasOtherRecordsForHostname(Domain $domain, string $hostname, ?int $excludeId): bool
+    public function hasOtherRecordsForHostname(Domain $domain, string $hostname, ?int $excludeId, array $viewIds = []): bool
     {
         $qb = $this->createQueryBuilder('r')
-            ->select('COUNT(r.id)')
+            ->select('COUNT(DISTINCT r.id)')
             ->where('r.domain = :domain')
             ->andWhere('r.hostname = :hostname')
             ->setParameter('domain', $domain)
@@ -175,13 +175,15 @@ class DomainRecordRepository extends ServiceEntityRepository
             $qb->andWhere('r.id != :id')->setParameter('id', $excludeId);
         }
 
+        $this->applyViewFilter($qb, $viewIds);
+
         return (int) $qb->getQuery()->getSingleScalarResult() > 0;
     }
 
-    public function hasCnameForHostname(Domain $domain, string $hostname, ?int $excludeId): bool
+    public function hasCnameForHostname(Domain $domain, string $hostname, ?int $excludeId, array $viewIds = []): bool
     {
         $qb = $this->createQueryBuilder('r')
-            ->select('COUNT(r.id)')
+            ->select('COUNT(DISTINCT r.id)')
             ->where('r.domain = :domain')
             ->andWhere('r.hostname = :hostname')
             ->andWhere('r.type = :type')
@@ -193,13 +195,15 @@ class DomainRecordRepository extends ServiceEntityRepository
             $qb->andWhere('r.id != :id')->setParameter('id', $excludeId);
         }
 
+        $this->applyViewFilter($qb, $viewIds);
+
         return (int) $qb->getQuery()->getSingleScalarResult() > 0;
     }
 
-    public function hasOtherSpfTxtForHostname(Domain $domain, string $hostname, ?int $excludeId): bool
+    public function hasOtherSpfTxtForHostname(Domain $domain, string $hostname, ?int $excludeId, array $viewIds = []): bool
     {
         $qb = $this->createQueryBuilder('r')
-            ->select('COUNT(r.id)')
+            ->select('COUNT(DISTINCT r.id)')
             ->where('r.domain = :domain')
             ->andWhere('r.hostname = :hostname')
             ->andWhere('r.type = :type')
@@ -213,6 +217,24 @@ class DomainRecordRepository extends ServiceEntityRepository
             $qb->andWhere('r.id != :id')->setParameter('id', $excludeId);
         }
 
+        $this->applyViewFilter($qb, $viewIds);
+
         return (int) $qb->getQuery()->getSingleScalarResult() > 0;
+    }
+
+    /**
+     * Restricts a query to records that share at least one view with the candidate.
+     * Records with no views only conflict with other records that also have no views.
+     */
+    private function applyViewFilter(\Doctrine\ORM\QueryBuilder $qb, array $viewIds): void
+    {
+        if (!empty($viewIds)) {
+            $qb->join('r.views', 'v')
+                ->andWhere('v.id IN (:viewIds)')
+                ->setParameter('viewIds', $viewIds);
+        } else {
+            $qb->leftJoin('r.views', 'v')
+                ->andWhere('v.id IS NULL');
+        }
     }
 }
