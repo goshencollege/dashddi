@@ -154,12 +154,20 @@ class NetworkInterfaceRepository extends ServiceEntityRepository
 
     public function purgeDeletedBefore(\DateTimeImmutable $before): int
     {
-        return (int) $this->createQueryBuilder('ni')
-            ->delete()
+        $entities = $this->createQueryBuilder('ni')
             ->where('ni.deletedAt IS NOT NULL')
             ->andWhere('ni.deletedAt < :before')
             ->setParameter('before', $before)
             ->getQuery()
-            ->execute();
+            ->getResult();
+
+        foreach ($entities as $entity) {
+            $this->_em->remove($entity);
+        }
+        if (!empty($entities)) {
+            $this->_em->flush();
+        }
+
+        return count($entities);
     }
 }
