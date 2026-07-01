@@ -277,14 +277,21 @@ class HostController extends AbstractController
             }
             $em->flush();
 
-            $conn = $em->getConnection();
             foreach ($others as $other) {
-                $conn->executeStatement(
-                    'UPDATE network_interface SET host_id = ? WHERE host_id = ?',
-                    [$primary->getId(), $other->getId()]
-                );
-                $conn->executeStatement('DELETE FROM host WHERE id = ?', [$other->getId()]);
-                $em->detach($other);
+                // Update only the owning side (setHost) without touching the inverse
+                // collection on $other — this avoids triggering orphanRemoval while
+                // still letting Doctrine detect the FK change and fire postUpdate for
+                // each interface, so the host reassignment appears in the audit log.
+                foreach ($other->getInterfaces()->toArray() as $interface) {
+                    $interface->setHost($primary);
+                }
+                $em->flush();
+
+                // Refresh clears $other's now-stale interface collection; cascade:remove
+                // then finds nothing to delete, and preRemove fires for the host itself.
+                $em->refresh($other);
+                $em->remove($other);
+                $em->flush();
             }
             $em->refresh($primary);
 
