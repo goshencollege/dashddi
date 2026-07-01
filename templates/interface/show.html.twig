@@ -152,8 +152,9 @@
                         {% if record.views is empty %}
                             <span class="text-muted">All views</span>
                         {% else %}
+                            {% set view_palettes = ['bg-primary', 'bg-success', 'bg-danger', 'bg-warning text-dark', 'bg-info text-dark', 'bg-dark'] %}
                             {% for view in record.views %}
-                                <span class="badge bg-info text-dark">{{ view.name }}</span>
+                                <span class="badge {{ view_palettes[view.id % (view_palettes|length)] }}">{{ view.name }}</span>
                             {% endfor %}
                         {% endif %}
                     </td>
