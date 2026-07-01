@@ -230,8 +230,11 @@ class ActivityLogListener
 
     private function serializeValue(mixed $value): mixed
     {
-        if ($value === null || is_int($value) || is_float($value) || is_bool($value)) {
+        if ($value === null || is_int($value) || is_float($value)) {
             return $value;
+        }
+        if (is_bool($value)) {
+            return $value ? 'true' : 'false';
         }
         if (is_string($value)) {
             return strlen($value) > 500 ? substr($value, 0, 500) . '…' : $value;
