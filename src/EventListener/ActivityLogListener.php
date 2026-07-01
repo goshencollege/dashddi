@@ -6,6 +6,7 @@ use App\EventSubscriber\EncryptedFieldSubscriber;
 use App\Message\SyslogMessage;
 use Doctrine\Bundle\DoctrineBundle\Attribute\AsDoctrineListener;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\Event\OnFlushEventArgs;
 use Doctrine\ORM\Event\PostFlushEventArgs;
 use Doctrine\ORM\Event\PostPersistEventArgs;
 use Doctrine\ORM\Event\PostUpdateEventArgs;
@@ -18,6 +19,7 @@ use Symfony\Component\Security\Core\User\UserInterface;
 
 #[AsDoctrineListener(event: Events::postPersist)]
 #[AsDoctrineListener(event: Events::postUpdate)]
+#[AsDoctrineListener(event: Events::onFlush)]
 #[AsDoctrineListener(event: Events::preRemove)]
 #[AsDoctrineListener(event: Events::postFlush)]
 class ActivityLogListener
@@ -89,6 +91,37 @@ class ActivityLogListener
         }
 
         $this->pending[] = $this->buildPending('update', $entity, $fields);
+    }
+
+    public function onFlush(OnFlushEventArgs $args): void
+    {
+        $uow = $args->getObjectManager()->getUnitOfWork();
+
+        foreach ($uow->getScheduledCollectionUpdates() as $collection) {
+            $owner = $collection->getOwner();
+            if ($owner === null || !$this->isAuditable($owner)) {
+                continue;
+            }
+
+            $inserted = $collection->getInsertDiff();
+            $deleted  = $collection->getDeleteDiff();
+            if (empty($inserted) && empty($deleted)) {
+                continue;
+            }
+
+            $fieldName   = $collection->getMapping()->fieldName;
+            $currentItems = array_values($collection->toArray());
+
+            // Reconstruct the pre-change list: current minus added, plus removed
+            $oldItems = array_merge(
+                array_values(array_filter($currentItems, fn($item) => !in_array($item, $inserted, true))),
+                array_values($deleted),
+            );
+
+            $this->pending[] = $this->buildPending('update', $owner, [
+                $fieldName => [$this->serializeCollection($oldItems), $this->serializeCollection($currentItems)],
+            ]);
+        }
     }
 
     public function preRemove(PreRemoveEventArgs $args): void
@@ -265,6 +298,13 @@ class ActivityLogListener
             return json_encode($value);
         }
         return (string) $value;
+    }
+
+    private function serializeCollection(array $items): string
+    {
+        $serialized = array_map(fn($item) => $this->serializeValue($item), $items);
+        sort($serialized);
+        return implode(', ', $serialized);
     }
 
     private function currentUserIdentifier(): ?string
