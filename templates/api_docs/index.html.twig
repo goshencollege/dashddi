@@ -363,6 +363,16 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
                 notes: 'Restores a soft-deleted interface. If the parent host is also soft-deleted, it is restored too. If the interface is not deleted, the current state is returned unchanged.',
                 response_example: '{\n  "id": 1,\n  "name": "eth0",\n  "mac_address": "aa:bb:cc:dd:ee:ff",\n  "host_id": 1,\n  "subnet_id": 2,\n  "ip_address": "10.0.0.5",\n  "ipv6_address": null,\n  "deleted_at": null,\n  "created_at": "2024-01-01T00:00:00+00:00",\n  "updated_at": "2024-01-01T00:00:00+00:00",\n  "created_by": "user@example.com",\n  "updated_by": "user@example.com"\n}',
             } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                method: 'GET', path: '/api/interfaces/search', name: 'Search interfaces',
+                notes: 'Full-text search across host name, interface name, IPv4/IPv6 address, and MAC address. Only non-deleted interfaces are returned. Requires at least 2 characters.',
+                query: [
+                    {name: 'q', type: 'string', desc: 'Search term (minimum 2 characters). Matched against host name, interface name, IP address, IPv6 address, and MAC address.'},
+                    {name: 'limit', type: 'integer', desc: 'Maximum number of results to return. Default: <code>20</code>, max: <code>50</code>.'},
+                ],
+                response_example: '[\n  {\n    "id": 1,\n    "label": "server01: eth0",\n    "host_name": "server01",\n    "iface_name": "eth0",\n    "mac": "aa:bb:cc:dd:ee:ff",\n    "ip": "10.0.0.5",\n    "ipv6": null\n  }\n]',
+            } %}
         </section>
 
         {# ═══════════════════════════════════════════════════════════════════

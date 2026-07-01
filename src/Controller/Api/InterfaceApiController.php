@@ -41,6 +41,29 @@ class InterfaceApiController extends AbstractController
         return $this->json(array_map($this->serialize(...), $interfaces));
     }
 
+    #[Route('/search', name: 'api_interfaces_search', methods: ['GET'])]
+    public function search(Request $request, NetworkInterfaceRepository $repo): JsonResponse
+    {
+        $q = trim($request->query->get('q', ''));
+        if (strlen($q) < 2) {
+            return $this->json([]);
+        }
+        $limit = min(50, max(1, (int) $request->query->get('limit', 20)));
+        $results = $repo->search($q, $limit);
+        return $this->json(array_map(function (NetworkInterface $iface) {
+            $host = $iface->getHost();
+            return [
+                'id'         => $iface->getId(),
+                'label'      => ($host ? $host->getName() . ': ' : '') . ($iface->getName() ?: $iface->getMacAddress()),
+                'host_name'  => $host?->getName(),
+                'iface_name' => $iface->getName(),
+                'mac'        => $iface->getMacAddress(),
+                'ip'         => $iface->getIpAddress()?->getAddress(),
+                'ipv6'       => $iface->getIpv6Address()?->getAddress(),
+            ];
+        }, $results));
+    }
+
     #[Route('/{id}', name: 'api_interfaces_show', methods: ['GET'])]
     public function show(NetworkInterface $interface): JsonResponse
     {

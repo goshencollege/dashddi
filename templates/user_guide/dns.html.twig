@@ -20,10 +20,12 @@
     <div class="card-body">
         <p>DashDDI acts as the authoritative source for your DNS zones. You define domains (zones) and records here; DashDDI generates BIND-format zone files and deploys them to your DNS servers via SSH.</p>
         <p class="mb-0">DNS records can come from two sources:</p>
-        <ul class="mt-2 mb-0">
-            <li><strong>Host interface records</strong> — A/AAAA (and other types) linked to a specific host interface, added from the interface detail page. The IP address for A/AAAA records is derived automatically from the interface. These appear in the domain record list with a <em>Host</em> column.</li>
+        <ul class="mt-2 mb-3">
+            <li><strong>Host interface records</strong> — A/AAAA (and other types) linked to a specific host interface. The IP address for A/AAAA records is derived automatically from the interface. These appear in the domain record list with a <em>Host</em> column.</li>
             <li><strong>Manual records</strong> — MX, CNAME, TXT, NS, or any other records added directly from the domain detail page.</li>
         </ul>
+        <p>Records can be linked to an interface in two ways: by adding them from the interface detail page, or by editing an existing record from the domain detail page and using the <strong>Linked Interface</strong> search field. Linking an existing A or AAAA record to an interface clears its stored value so the live IP is derived from the interface going forward.</p>
+        <p class="mb-0">To unlink a record, open its edit form (from either the domain or interface detail page) and clear the <strong>Linked Interface</strong> field, or use the unlink button on the interface detail page. When an A or AAAA record is unlinked, its value is automatically populated with the interface's current IP address so the record remains valid.</p>
     </div>
 </div>
 

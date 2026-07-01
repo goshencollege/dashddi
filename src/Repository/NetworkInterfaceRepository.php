@@ -130,6 +130,28 @@ class NetworkInterfaceRepository extends ServiceEntityRepository
             ->getOneOrNullResult();
     }
 
+    /**
+     * Full-text search across host name, interface name, IPv4, and IPv6 address.
+     *
+     * @return NetworkInterface[]
+     */
+    public function search(string $q, int $limit = 20): array
+    {
+        $like = '%' . $q . '%';
+        return $this->createQueryBuilder('i')
+            ->leftJoin('i.host', 'h')
+            ->leftJoin('i.ipAddress', 'ip')
+            ->leftJoin('i.ipv6Address', 'ip6')
+            ->where('i.deletedAt IS NULL')
+            ->andWhere('h.name LIKE :q OR i.name LIKE :q OR ip.address LIKE :q OR ip6.address LIKE :q OR i.macAddress LIKE :q')
+            ->setParameter('q', $like)
+            ->orderBy('h.name', 'ASC')
+            ->addOrderBy('i.id', 'ASC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+    }
+
     public function purgeDeletedBefore(\DateTimeImmutable $before): int
     {
         return (int) $this->createQueryBuilder('ni')

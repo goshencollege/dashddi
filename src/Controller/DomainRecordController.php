@@ -8,6 +8,7 @@ use App\Entity\NetworkInterface;
 use App\Enum\RecordType;
 use App\Form\DomainRecordType;
 use App\Repository\DomainRecordRepository;
+use App\Repository\NetworkInterfaceRepository;
 use App\Service\DnsViewResolver;
 use App\Service\FcrdnsChecker;
 use Doctrine\ORM\EntityManagerInterface;
@@ -20,10 +21,11 @@ use Symfony\Component\Routing\Attribute\Route;
 class DomainRecordController extends AbstractController
 {
     public function __construct(
-        private readonly EntityManagerInterface $em,
-        private readonly FcrdnsChecker          $fcrdnsChecker,
-        private readonly DomainRecordRepository $recordRepo,
-        private readonly DnsViewResolver        $viewResolver,
+        private readonly EntityManagerInterface      $em,
+        private readonly FcrdnsChecker               $fcrdnsChecker,
+        private readonly DomainRecordRepository      $recordRepo,
+        private readonly DnsViewResolver             $viewResolver,
+        private readonly NetworkInterfaceRepository  $ifaceRepo,
     ) {}
 
     #[Route('/domain/{domainId}/records/new', name: 'domain_record_new')]
@@ -124,15 +126,38 @@ class DomainRecordController extends AbstractController
         $domain    = $record->getDomain();
         $interface = $record->getNetworkInterface();
 
+        // Use the interface-page form layout only when the edit link explicitly says so,
+        // or for XHR requests (which always come from the interface page modal).
+        $fromInterface = $request->query->get('from') === 'interface' || $request->isXmlHttpRequest();
+        $formInterface = $fromInterface ? $interface : null;
+
         $form = $this->createForm(DomainRecordType::class, $record, [
-            'network_interface' => $interface,
+            'network_interface' => $formInterface,
         ]);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
+            // Handle interface linking/unlinking from the domain-context form.
+            if ($formInterface === null) {
+                $rawId = $request->request->get('interface_id', '');
+                if ($rawId === '' || $rawId === null) {
+                    $this->restoreValueFromInterface($record);
+                    $record->setNetworkInterface(null);
+                } else {
+                    $linked = $this->ifaceRepo->find((int) $rawId);
+                    if ($linked !== null && !$linked->isDeleted()) {
+                        $record->setNetworkInterface($linked);
+                        // Clear stored value for A/AAAA so the live IP is used.
+                        if (in_array($record->getType()->value, ['A', 'AAAA'], true)) {
+                            $record->setValue('');
+                        }
+                    }
+                }
+            }
+
             $this->em->flush();
 
-            if ($interface !== null && $record->isCanonical()) {
+            if ($record->getNetworkInterface() !== null && $record->isCanonical()) {
                 $this->enforceCanonicalUniqueness($record);
                 $fcrdnsError = $this->checkCanonical($record);
                 if ($fcrdnsError !== null) {
@@ -146,27 +171,27 @@ class DomainRecordController extends AbstractController
 
             $this->addFlash('success', 'Record updated.');
 
-            if ($interface !== null) {
+            if ($fromInterface && $interface !== null) {
                 return $this->redirectToRoute('interface_show', ['id' => $interface->getId()]);
             }
             return $this->redirectToRoute('domain_show', ['id' => $domain->getId()]);
         }
 
-        if ($interface !== null && $request->isXmlHttpRequest()) {
+        if ($formInterface !== null && $request->isXmlHttpRequest()) {
             return $this->json([
                 'success' => false,
                 'html'    => $this->renderView('domain_record/_interface_modal_form.html.twig', [
                     'form'      => $form,
-                    'interface' => $interface,
+                    'interface' => $formInterface,
                     'record'    => $record,
                 ]),
             ]);
         }
 
-        if ($interface !== null) {
+        if ($formInterface !== null) {
             return $this->render('domain_record/interface_form.html.twig', [
                 'form'      => $form,
-                'interface' => $interface,
+                'interface' => $formInterface,
                 'record'    => $record,
                 'title'     => 'Edit DNS Record',
             ]);
@@ -177,6 +202,25 @@ class DomainRecordController extends AbstractController
             'domain' => $domain,
             'record' => $record,
         ]);
+    }
+
+    #[Route('/domain-records/{id}/unlink', name: 'domain_record_unlink', methods: ['POST'])]
+    public function unlink(DomainRecord $record, Request $request): Response
+    {
+        $interfaceId = $record->getNetworkInterface()?->getId();
+
+        if ($this->isCsrfTokenValid('unlink_record_' . $record->getId(), $request->request->get('_token'))) {
+            $this->restoreValueFromInterface($record);
+            $record->setNetworkInterface(null);
+            $this->em->flush();
+            $this->addFlash('success', 'Record unlinked from interface.');
+        }
+
+        $referer = $request->headers->get('referer', '');
+        if ($interfaceId && str_contains($referer, '/interfaces/')) {
+            return $this->redirectToRoute('interface_show', ['id' => $interfaceId]);
+        }
+        return $this->redirectToRoute('domain_show', ['id' => $record->getDomain()->getId()]);
     }
 
     #[Route('/domain-records/{id}/delete', name: 'domain_record_delete', methods: ['POST'])]
@@ -235,6 +279,25 @@ class DomainRecordController extends AbstractController
             ->setParameter('id', $record->getId())
             ->getQuery()
             ->execute();
+    }
+
+    private function restoreValueFromInterface(DomainRecord $record): void
+    {
+        $iface = $record->getNetworkInterface();
+        if ($iface === null) {
+            return;
+        }
+        $type = $record->getType()->value;
+        if ($type === 'A') {
+            $ip = $iface->getIpAddress()?->getAddress();
+        } elseif ($type === 'AAAA') {
+            $ip = $iface->getIpv6Address()?->getAddress();
+        } else {
+            return;
+        }
+        if ($ip !== null) {
+            $record->setValue($ip);
+        }
     }
 
     private function checkCanonical(DomainRecord $record): ?string
