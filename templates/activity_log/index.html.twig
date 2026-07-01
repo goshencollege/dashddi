@@ -94,12 +94,27 @@
                         </tr>
                     </thead>
                     <tbody>
+                    {% set entityRoutes = {
+                        'Host':             {route: 'host_show',              hasId: true},
+                        'NetworkInterface': {route: 'interface_show',         hasId: true},
+                        'Subnet':           {route: 'subnet_show',            hasId: true},
+                        'AddressBlock':     {route: 'block_edit',             hasId: true},
+                        'Domain':           {route: 'domain_show',            hasId: true},
+                        'DomainRecord':     {route: 'domain_record_edit',     hasId: true},
+                        'SubnetRecord':     {route: 'subnet_record_edit',     hasId: true},
+                        'DnsServer':        {route: 'dns_server_edit',        hasId: true},
+                        'DhcpServer':       {route: 'dhcp_server_edit',       hasId: true},
+                        'ClearpassServer':  {route: 'clearpass_server_edit',  hasId: true},
+                        'SnipeItServer':    {route: 'snipe_it_server_edit',   hasId: true},
+                        'ArubaSwitch':      {route: 'aruba_switch_configure', hasId: false},
+                        'SamlProvider':     {route: 'saml_provider_edit',     hasId: true},
+                    } %}
                     {% for log in logs %}
                         {% set detailId = 'log-detail-' ~ log.id %}
                         {% set hasDetail = log.changedFields is not empty %}
-                        <tr class="{{ hasDetail ? 'cursor-pointer' }}"
-                            {% if hasDetail %}data-bs-toggle="collapse" data-bs-target="#{{ detailId }}"{% endif %}>
-                            <td class="ps-3">
+                        <tr>
+                            <td class="ps-3{% if hasDetail %} cursor-pointer{% endif %}"
+                                {% if hasDetail %}data-bs-toggle="collapse" data-bs-target="#{{ detailId }}"{% endif %}>
                                 {% if hasDetail %}
                                     <i class="bi bi-chevron-right detail-chevron text-muted" style="transition:transform .15s; font-size:.75rem;"></i>
                                 {% endif %}
@@ -130,7 +145,12 @@
                                 {% if log.entityType %}
                                     <span class="text-muted small me-1">{{ log.entityType }}</span>
                                 {% endif %}
-                                <span class="fw-semibold">{{ log.entityLabel }}</span>
+                                {% set ri = entityRoutes[log.entityType] ?? null %}
+                                {% if ri and (not ri.hasId or log.entityId) %}
+                                    <a href="{{ path(ri.route, ri.hasId ? {id: log.entityId} : {}) }}" class="fw-semibold">{{ log.entityLabel }}</a>
+                                {% else %}
+                                    <span class="fw-semibold">{{ log.entityLabel }}</span>
+                                {% endif %}
                                 {% if log.entityId %}
                                     <span class="text-muted small ms-1">#{{ log.entityId }}</span>
                                 {% endif %}
