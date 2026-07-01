@@ -36,7 +36,7 @@ class DomainRecord
     private ?Domain $domain = null;
 
     #[ORM\ManyToOne(targetEntity: NetworkInterface::class, inversedBy: 'domainRecords')]
-    #[ORM\JoinColumn(nullable: true, onDelete: 'CASCADE')]
+    #[ORM\JoinColumn(nullable: true)]
     private ?NetworkInterface $networkInterface = null;
 
     #[ORM\Column(length: 255)]
