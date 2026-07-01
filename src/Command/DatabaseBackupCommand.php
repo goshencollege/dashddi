@@ -43,6 +43,7 @@ class DatabaseBackupCommand extends Command
             ->addOption('backup-password', null, InputOption::VALUE_REQUIRED, 'Password for backup file encryption/decryption')
             ->addOption('retention', null, InputOption::VALUE_REQUIRED, 'Number of backups to keep (0 = unlimited, overrides settings)')
             ->addOption('exclude-dhcp-leases', null, InputOption::VALUE_NONE, 'Omit the dhcp_lease table from the backup')
+            ->addOption('exclude-activity-log', null, InputOption::VALUE_NONE, 'Omit the activity_log table from the backup')
         ;
     }
 
@@ -73,6 +74,7 @@ class DatabaseBackupCommand extends Command
         $includeKey         = $input->getOption('include-key')         || $settings->isIncludeEncryptionKey();
         $encryptBackup      = $input->getOption('encrypt-backup')      || $settings->isEncryptBackup();
         $excludeDhcpLeases  = $input->getOption('exclude-dhcp-leases') || $settings->isExcludeDhcpLeases();
+        $excludeActivityLog = $input->getOption('exclude-activity-log') || $settings->isExcludeActivityLog();
         $backupPassword = $input->getOption('backup-password') ?? $settings->getBackupPassword() ?? '';
         $retention      = $input->getOption('retention') !== null
             ? (int) $input->getOption('retention')
@@ -95,7 +97,13 @@ class DatabaseBackupCommand extends Command
 
         $io->writeln('Dumping database…');
 
-        $excludeTables = $excludeDhcpLeases ? ['dhcp_lease'] : [];
+        $excludeTables = [];
+        if ($excludeDhcpLeases) {
+            $excludeTables[] = 'dhcp_lease';
+        }
+        if ($excludeActivityLog) {
+            $excludeTables[] = 'activity_log';
+        }
 
         $tmpFile = null;
         try {

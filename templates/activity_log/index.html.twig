@@ -1,0 +1,215 @@
+{% extends 'base.html.twig' %}
+{% block title %}Activity Log{% endblock %}
+{% block body_class %}page-list-view{% endblock %}
+
+{% block stylesheets %}
+<style>
+    .filter-bar { background: var(--bs-tertiary-bg); border-radius: .375rem; padding: .75rem 1rem; }
+    .changed-fields-table { font-size: .8rem; width: 100%; }
+    .changed-fields-table td { padding: .2rem .5rem; vertical-align: top; }
+    .changed-fields-table td:first-child { white-space: nowrap; font-weight: 600; width: 1%; color: var(--bs-secondary-color); }
+    .val-old { color: var(--bs-danger-text-emphasis); text-decoration: line-through; word-break: break-all; }
+    .val-new { color: var(--bs-success-text-emphasis); word-break: break-all; }
+    .detail-row td { background-color: var(--bs-tertiary-bg); padding: .75rem 1.25rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="list-page-content">
+    <div class="sticky-list-header d-flex justify-content-between align-items-center mb-3">
+        <h1 class="h4 mb-0"><i class="bi bi-shield-check me-2"></i>Activity Log</h1>
+        <div class="d-flex align-items-center gap-3">
+            <span class="text-muted small">{{ total }} record{{ total != 1 ? 's' }}</span>
+            <a href="{{ path('user_guide_servers') }}#activity-log" class="btn btn-sm btn-outline-secondary" title="User Guide" target="_blank"><i class="bi bi-question-circle"></i></a>
+        </div>
+    </div>
+
+    {# ── Filter bar ──────────────────────────────────────────────────────── #}
+    <div class="filter-bar mb-3">
+        <form method="get" action="{{ path('activity_log_index') }}" class="row g-2 align-items-end">
+            <div class="col-sm-4 col-md-3">
+                <label class="form-label form-label-sm mb-1">User</label>
+                <input type="text" name="user" class="form-control form-control-sm" placeholder="email…"
+                       value="{{ filters.userIdentifier ?? '' }}">
+            </div>
+            <div class="col-sm-4 col-md-2">
+                <label class="form-label form-label-sm mb-1">Entity Type</label>
+                <select name="entity_type" class="form-select form-select-sm">
+                    <option value="">All</option>
+                    {% for type in ['AddressBlock','ArubaSwitch','ClearpassServer','DhcpServer','DnsServer',
+                                    'Domain','DomainRecord','Host','NetworkInterface','SamlProvider',
+                                    'SnipeItServer','Subnet','SubnetRecord'] %}
+                        <option value="{{ type }}" {{ filters.entityType == type ? 'selected' }}>{{ type }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-sm-4 col-md-2">
+                <label class="form-label form-label-sm mb-1">Action</label>
+                <select name="action" class="form-select form-select-sm">
+                    <option value="">All</option>
+                    {% for action in ['create','update','soft_delete','restore','delete','login'] %}
+                        <option value="{{ action }}" {{ filters.action == action ? 'selected' }}>{{ action }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-sm-4 col-md-2">
+                <label class="form-label form-label-sm mb-1">From</label>
+                <input type="date" name="date_from" class="form-control form-control-sm"
+                       value="{{ filters.dateFrom ?? '' }}">
+            </div>
+            <div class="col-sm-4 col-md-2">
+                <label class="form-label form-label-sm mb-1">To</label>
+                <input type="date" name="date_to" class="form-control form-control-sm"
+                       value="{{ filters.dateTo ?? '' }}">
+            </div>
+            <div class="col-sm-4 col-md-1 d-flex gap-1">
+                <button type="submit" class="btn btn-sm btn-primary flex-grow-1">Filter</button>
+                {% if filters.userIdentifier or filters.entityType or filters.action or filters.dateFrom or filters.dateTo %}
+                    <a href="{{ path('activity_log_index') }}" class="btn btn-sm btn-outline-secondary" title="Clear filters"><i class="bi bi-x"></i></a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+
+    {% if logs is empty %}
+        <div class="card">
+            <div class="card-body text-center text-muted py-5">
+                <i class="bi bi-shield-check fs-1 d-block mb-3 opacity-25"></i>
+                No activity log entries found.
+            </div>
+        </div>
+    {% else %}
+    <div class="list-scroll-card">
+        <div class="card">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0 align-middle">
+                    <thead>
+                        <tr>
+                            <th style="width:1%"></th>
+                            <th>When</th>
+                            <th>Action</th>
+                            <th>Entity</th>
+                            <th>User</th>
+                            <th>IP</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for log in logs %}
+                        {% set detailId = 'log-detail-' ~ log.id %}
+                        {% set hasDetail = log.changedFields is not empty %}
+                        <tr class="{{ hasDetail ? 'cursor-pointer' }}"
+                            {{ hasDetail ? 'data-bs-toggle="collapse" data-bs-target="#' ~ detailId ~ '"' }}>
+                            <td class="ps-3">
+                                {% if hasDetail %}
+                                    <i class="bi bi-chevron-right detail-chevron text-muted" style="transition:transform .15s; font-size:.75rem;"></i>
+                                {% endif %}
+                            </td>
+                            <td class="text-nowrap">
+                                <span title="{{ log.createdAt|date('Y-m-d H:i:s') }}">
+                                    {{ log.createdAt|date('M j, g:i:s a') }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if log.action == 'create' %}
+                                    <span class="badge bg-success">create</span>
+                                {% elseif log.action == 'update' %}
+                                    <span class="badge bg-primary">update</span>
+                                {% elseif log.action == 'soft_delete' %}
+                                    <span class="badge bg-warning text-dark">soft delete</span>
+                                {% elseif log.action == 'restore' %}
+                                    <span class="badge bg-info text-dark">restore</span>
+                                {% elseif log.action == 'delete' %}
+                                    <span class="badge bg-danger">delete</span>
+                                {% elseif log.action == 'login' %}
+                                    <span class="badge bg-secondary">login</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">{{ log.action }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if log.entityType %}
+                                    <span class="text-muted small me-1">{{ log.entityType }}</span>
+                                {% endif %}
+                                <span class="fw-semibold">{{ log.entityLabel }}</span>
+                                {% if log.entityId %}
+                                    <span class="text-muted small ms-1">#{{ log.entityId }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-muted small">{{ log.userIdentifier ?? '—' }}</td>
+                            <td class="text-muted font-monospace small">{{ log.ipAddress ?? '—' }}</td>
+                        </tr>
+                        {% if hasDetail %}
+                        <tr class="collapse detail-row" id="{{ detailId }}">
+                            <td colspan="6">
+                                <table class="changed-fields-table">
+                                    {% for field, values in log.changedFields %}
+                                    <tr>
+                                        <td>{{ field }}</td>
+                                        <td>
+                                            {% if values[0] is not null and values[0] != '[redacted]' %}
+                                                <span class="val-old font-monospace">{{ values[0] }}</span>
+                                                <span class="text-muted mx-1">→</span>
+                                            {% elseif values[0] == '[redacted]' %}
+                                                <span class="text-muted font-monospace">[redacted]</span>
+                                                <span class="text-muted mx-1">→</span>
+                                            {% endif %}
+                                            {% if values[1] == '[redacted]' %}
+                                                <span class="text-muted font-monospace">[redacted]</span>
+                                            {% else %}
+                                                <span class="val-new font-monospace">{{ values[1] ?? 'null' }}</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </table>
+                            </td>
+                        </tr>
+                        {% endif %}
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {# ── Pagination ──────────────────────────────────────────────────────── #}
+    {% if pages > 1 %}
+    <nav class="mt-3">
+        <ul class="pagination pagination-sm justify-content-center">
+            {% if page > 1 %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ path('activity_log_index', filters|merge({page: page - 1})) }}">&laquo;</a>
+                </li>
+            {% endif %}
+            {% for p in max(1, page - 3)..min(pages, page + 3) %}
+                <li class="page-item {{ p == page ? 'active' }}">
+                    <a class="page-link" href="{{ path('activity_log_index', filters|merge({page: p})) }}">{{ p }}</a>
+                </li>
+            {% endfor %}
+            {% if page < pages %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ path('activity_log_index', filters|merge({page: page + 1})) }}">&raquo;</a>
+                </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    document.querySelectorAll('[data-bs-toggle="collapse"]').forEach(function (row) {
+        const targetId = row.getAttribute('data-bs-target');
+        const target   = document.querySelector(targetId);
+        const chevron  = row.querySelector('.detail-chevron');
+        if (!target || !chevron) return;
+        target.addEventListener('show.bs.collapse', () => chevron.style.transform = 'rotate(90deg)');
+        target.addEventListener('hide.bs.collapse', () => chevron.style.transform = '');
+    });
+})();
+</script>
+{% endblock %}

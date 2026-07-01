@@ -55,6 +55,10 @@ class BackupSetting
     #[ORM\Column]
     private bool $excludeDhcpLeases = false;
 
+    /** Omit the activity_log table from backups */
+    #[ORM\Column]
+    private bool $excludeActivityLog = false;
+
     /** Number of backup files to retain (0 = unlimited) */
     #[ORM\Column]
     private int $retentionCount = 10;
@@ -93,6 +97,9 @@ class BackupSetting
 
     public function isExcludeDhcpLeases(): bool { return $this->excludeDhcpLeases; }
     public function setExcludeDhcpLeases(bool $v): static { $this->excludeDhcpLeases = $v; return $this; }
+
+    public function isExcludeActivityLog(): bool { return $this->excludeActivityLog; }
+    public function setExcludeActivityLog(bool $v): static { $this->excludeActivityLog = $v; return $this; }
 
     public function getRetentionCount(): int { return $this->retentionCount; }
     public function setRetentionCount(int $n): static { $this->retentionCount = $n; return $this; }

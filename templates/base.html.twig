@@ -382,6 +382,7 @@
                     or app.request.attributes.get('_route') starts with 'dns_server'
                     or app.request.attributes.get('_route') starts with 'servers'
                     or app.request.attributes.get('_route') starts with 'push_log'
+                    or app.request.attributes.get('_route') starts with 'activity_log'
                     or app.request.attributes.get('_route') starts with 'worker_queue'
                     or app.request.attributes.get('_route') starts with 'snipe_it_server' %}
                 <li class="nav-item dropdown">
@@ -399,6 +400,12 @@
                             <a class="dropdown-item {{ app.request.attributes.get('_route') starts with 'push_log' ? 'active' }}"
                                href="{{ path('push_log_index') }}">
                                 <i class="bi bi-journal-code me-1"></i>Push Logs
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item {{ app.request.attributes.get('_route') starts with 'activity_log' ? 'active' }}"
+                               href="{{ path('activity_log_index') }}">
+                                <i class="bi bi-shield-check me-1"></i>Activity Log
                             </a>
                         </li>
                         <li>

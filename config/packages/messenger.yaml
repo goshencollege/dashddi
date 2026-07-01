@@ -29,3 +29,4 @@ framework:
             'App\Message\PushClearpassAllMessage': async_bulk
             'App\Message\RunScheduledTaskMessage': async_bulk
             'App\Message\PullSnipeItMessage':      async_bulk
+            'App\Message\SyslogMessage':           async_priority

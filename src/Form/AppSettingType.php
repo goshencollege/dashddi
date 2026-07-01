@@ -4,6 +4,7 @@ namespace App\Form;
 
 use App\Entity\AppSetting;
 use Symfony\Component\Form\AbstractType;
+use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Form\Extension\Core\Type\EmailType;
 use Symfony\Component\Form\Extension\Core\Type\IntegerType;
@@ -101,6 +102,35 @@ class AppSettingType extends AbstractType
                 'label'    => 'From Name',
                 'required' => false,
                 'attr'     => ['placeholder' => 'DashDDI'],
+            ])
+            ->add('activityLogRetentionDays', IntegerType::class, [
+                'label'    => 'Activity Log Retention (days)',
+                'required' => false,
+                'attr'     => ['placeholder' => '90'],
+                'help'     => 'How long to keep activity log entries in the database. Leave blank to keep forever.',
+            ])
+            ->add('syslogEnabled', CheckboxType::class, [
+                'label'    => 'Enable remote syslog forwarding',
+                'required' => false,
+            ])
+            ->add('syslogHost', TextType::class, [
+                'label'    => 'Syslog Server Host',
+                'required' => false,
+                'attr'     => ['placeholder' => 'e.g. syslog.example.com or 192.168.1.10'],
+            ])
+            ->add('syslogPort', IntegerType::class, [
+                'label'    => 'Syslog Port',
+                'required' => false,
+                'attr'     => ['placeholder' => '514'],
+            ])
+            ->add('syslogProtocol', ChoiceType::class, [
+                'label'    => 'Syslog Protocol',
+                'required' => false,
+                'choices'  => [
+                    'UDP' => 'udp',
+                    'TCP' => 'tcp',
+                ],
+                'help' => 'TCP allows persistent connections and larger messages. UDP is simpler but limited to ~1024 bytes per message.',
             ])
         ;
     }
