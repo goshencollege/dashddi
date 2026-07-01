@@ -21,6 +21,24 @@
             border: 1px solid rgba(255,255,255,.25);
         }
 
+        /* ── Custom badge colors ────────────────────────────────── */
+        .badge-orange-subtle {
+            background-color: #fff4e6; color: #c2410c;
+            border: 1px solid #ffc078;
+        }
+        .badge-purple-subtle {
+            background-color: #f9f0ff; color: #6b21a8;
+            border: 1px solid #d8b4fe;
+        }
+        [data-bs-theme="dark"] .badge-orange-subtle {
+            background-color: #3a1500; color: #fb923c;
+            border-color: #9a3412;
+        }
+        [data-bs-theme="dark"] .badge-purple-subtle {
+            background-color: #2e1065; color: #d8b4fe;
+            border-color: #7e22ce;
+        }
+
         /* ── Purple theme ───────────────────────────────────────── */
         [data-theme="purple"] .navbar {
             background-color: #3b0764 !important;
