@@ -401,10 +401,10 @@ class HostRepository extends ServiceEntityRepository
             ->getResult();
 
         foreach ($entities as $entity) {
-            $this->_em->remove($entity);
+            $this->getEntityManager()->remove($entity);
         }
         if (!empty($entities)) {
-            $this->_em->flush();
+            $this->getEntityManager()->flush();
         }
 
         return count($entities);
