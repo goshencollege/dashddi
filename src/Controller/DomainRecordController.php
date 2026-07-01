@@ -126,14 +126,19 @@ class DomainRecordController extends AbstractController
         $domain    = $record->getDomain();
         $interface = $record->getNetworkInterface();
 
+        // Use the interface-page form layout only when the edit link explicitly says so,
+        // or for XHR requests (which always come from the interface page modal).
+        $fromInterface = $request->query->get('from') === 'interface' || $request->isXmlHttpRequest();
+        $formInterface = $fromInterface ? $interface : null;
+
         $form = $this->createForm(DomainRecordType::class, $record, [
-            'network_interface' => $interface,
+            'network_interface' => $formInterface,
         ]);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            // Handle interface linking from the domain-context edit form (not the interface form).
-            if ($interface === null) {
+            // Handle interface linking/unlinking from the domain-context form.
+            if ($formInterface === null) {
                 $rawId = $request->request->get('interface_id', '');
                 if ($rawId === '' || $rawId === null) {
                     $record->setNetworkInterface(null);
@@ -151,7 +156,7 @@ class DomainRecordController extends AbstractController
 
             $this->em->flush();
 
-            if ($interface !== null && $record->isCanonical()) {
+            if ($record->getNetworkInterface() !== null && $record->isCanonical()) {
                 $this->enforceCanonicalUniqueness($record);
                 $fcrdnsError = $this->checkCanonical($record);
                 if ($fcrdnsError !== null) {
@@ -165,27 +170,27 @@ class DomainRecordController extends AbstractController
 
             $this->addFlash('success', 'Record updated.');
 
-            if ($interface !== null) {
+            if ($fromInterface && $interface !== null) {
                 return $this->redirectToRoute('interface_show', ['id' => $interface->getId()]);
             }
             return $this->redirectToRoute('domain_show', ['id' => $domain->getId()]);
         }
 
-        if ($interface !== null && $request->isXmlHttpRequest()) {
+        if ($formInterface !== null && $request->isXmlHttpRequest()) {
             return $this->json([
                 'success' => false,
                 'html'    => $this->renderView('domain_record/_interface_modal_form.html.twig', [
                     'form'      => $form,
-                    'interface' => $interface,
+                    'interface' => $formInterface,
                     'record'    => $record,
                 ]),
             ]);
         }
 
-        if ($interface !== null) {
+        if ($formInterface !== null) {
             return $this->render('domain_record/interface_form.html.twig', [
                 'form'      => $form,
-                'interface' => $interface,
+                'interface' => $formInterface,
                 'record'    => $record,
                 'title'     => 'Edit DNS Record',
             ]);
