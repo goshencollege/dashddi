@@ -324,6 +324,22 @@
         });
     }
 
+    function bindCanonicalVisibility() {
+        const typeSelect     = modalBody.querySelector('[name="domain_record[type]"]');
+        const canonicalField = modalBody.querySelector('#canonical-field');
+        if (!typeSelect || !canonicalField) return;
+        function update() {
+            const show = typeSelect.value === 'A' || typeSelect.value === 'AAAA';
+            canonicalField.style.display = show ? '' : 'none';
+            if (!show) {
+                const cb = canonicalField.querySelector('input[type="checkbox"]');
+                if (cb) cb.checked = false;
+            }
+        }
+        typeSelect.addEventListener('change', update);
+        update();
+    }
+
     async function openModal(url, title) {
         modalTitle.textContent = title;
         showSpinner();
@@ -333,6 +349,7 @@
             const data = await res.json();
             modalBody.innerHTML = data.html;
             bindDomainViewsUpdater();
+            bindCanonicalVisibility();
         } catch {
             modalBody.innerHTML = '<div class="alert alert-danger mb-0">Failed to load form.</div>';
         }
@@ -367,6 +384,7 @@
             } else {
                 modalBody.innerHTML = data.html;
                 bindDomainViewsUpdater();
+                bindCanonicalVisibility();
             }
         } catch {
             if (submitBtn) submitBtn.disabled = false;

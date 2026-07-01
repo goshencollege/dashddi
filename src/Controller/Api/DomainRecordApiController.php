@@ -81,7 +81,11 @@ class DomainRecordApiController extends AbstractController
                 return $this->json(['error' => 'interface_id not found'], Response::HTTP_UNPROCESSABLE_ENTITY);
             }
             $record->setNetworkInterface($interface);
-            $record->setIsCanonical((bool) ($data['is_canonical'] ?? false));
+            if (in_array($type, [RecordType::A, RecordType::AAAA], true)) {
+                $record->setIsCanonical((bool) ($data['is_canonical'] ?? false));
+            } elseif (!empty($data['is_canonical'])) {
+                return $this->json(['error' => 'is_canonical is only valid for A and AAAA records'], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
         }
 
         // Domain association
@@ -178,7 +182,12 @@ class DomainRecordApiController extends AbstractController
         }
 
         if (array_key_exists('is_canonical', $data)) {
-            $domainRecord->setIsCanonical((bool) $data['is_canonical']);
+            $type = $domainRecord->getType();
+            $canBeCanonical = in_array($type, [RecordType::A, RecordType::AAAA], true);
+            if (!$canBeCanonical && $data['is_canonical']) {
+                return $this->json(['error' => 'is_canonical is only valid for A and AAAA records'], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+            $domainRecord->setIsCanonical($canBeCanonical && (bool) $data['is_canonical']);
         }
 
         if (array_key_exists('view_ids', $data)) {
