@@ -31,6 +31,7 @@ class NoCnameConflictValidator extends ConstraintValidator
         $hostname  = $value->getHostname();
         $type      = $value->getType();
         $excludeId = $value->getId();
+        $viewIds   = array_map(fn($v) => $v->getId(), $value->getViews()->toArray());
 
         if ($hostname === '@' && $type === RecordType::CNAME) {
             $this->context->buildViolation($constraint->cnameAtApexMessage)
@@ -40,14 +41,14 @@ class NoCnameConflictValidator extends ConstraintValidator
         }
 
         if ($type === RecordType::CNAME) {
-            if ($this->repository->hasOtherRecordsForHostname($domain, $hostname, $excludeId)) {
+            if ($this->repository->hasOtherRecordsForHostname($domain, $hostname, $excludeId, $viewIds)) {
                 $this->context->buildViolation($constraint->cnameConflictMessage)
                     ->setParameter('{{ hostname }}', $hostname)
                     ->atPath('hostname')
                     ->addViolation();
             }
         } else {
-            if ($this->repository->hasCnameForHostname($domain, $hostname, $excludeId)) {
+            if ($this->repository->hasCnameForHostname($domain, $hostname, $excludeId, $viewIds)) {
                 $this->context->buildViolation($constraint->otherConflictMessage)
                     ->setParameter('{{ hostname }}', $hostname)
                     ->setParameter('{{ type }}', $type->value)

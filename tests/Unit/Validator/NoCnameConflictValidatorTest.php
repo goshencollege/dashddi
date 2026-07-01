@@ -124,7 +124,7 @@ class NoCnameConflictValidatorTest extends TestCase
         $repo = $this->createMock(DomainRecordRepository::class);
         $repo->expects($this->once())
             ->method('hasOtherRecordsForHostname')
-            ->with($domain, 'www', 42)
+            ->with($domain, 'www', 42, [])
             ->willReturn(false);
 
         $validator = $this->makeValidator($repo);
