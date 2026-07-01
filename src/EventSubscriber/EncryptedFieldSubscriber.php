@@ -55,39 +55,15 @@ class EncryptedFieldSubscriber
     public function preUpdate(PreUpdateEventArgs $args): void
     {
         $entity = $args->getObject();
-        $class  = $this->entityClass($entity);
 
-        if (!isset(self::FIELDS[$class])) {
+        if (!isset(self::FIELDS[$this->entityClass($entity)])) {
             return;
         }
 
-        $em           = $args->getObjectManager();
-        $uow          = $em->getUnitOfWork();
-        $originalData = $uow->getOriginalEntityData($entity);
-        $recompute    = false;
-
-        foreach (self::FIELDS[$class] as $property) {
-            $getter  = 'get' . ucfirst($property);
-            $setter  = 'set' . ucfirst($property);
-            $current = $entity->$getter();
-
-            if ($current === null || $current === '' || $this->encryption->isEncrypted($current)) {
-                continue;
-            }
-
-            // Value is plaintext (decrypted by postLoad). Check if it actually changed.
-            $stored = $originalData[$property] ?? null;
-            if ($stored !== null && $this->encryption->isEncrypted($stored) && $this->encryption->decrypt($stored) === $current) {
-                // Unchanged — put the original ciphertext back so Doctrine sees no diff
-                $entity->$setter($stored);
-            } else {
-                $entity->$setter($this->encryption->encrypt($current));
-            }
-            $recompute = true;
-        }
-
-        if ($recompute) {
-            $uow->recomputeSingleEntityChangeSet($em->getClassMetadata($class), $entity);
+        if ($this->encryptEntity($entity)) {
+            $em       = $args->getObjectManager();
+            $metadata = $em->getClassMetadata($this->entityClass($entity));
+            $em->getUnitOfWork()->recomputeSingleEntityChangeSet($metadata, $entity);
         }
     }
 
