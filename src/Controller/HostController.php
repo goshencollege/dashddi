@@ -235,6 +235,18 @@ class HostController extends AbstractController
             return $this->json(['message' => $count . ' host(s) deleted.']);
         }
 
+        if ($action === 'restore') {
+            $count = count($hosts);
+            foreach ($hosts as $host) {
+                $host->restore();
+                foreach ($host->getInterfaces() as $iface) {
+                    $iface->restore();
+                }
+            }
+            $em->flush();
+            return $this->json(['message' => $count . ' host(s) restored.']);
+        }
+
         if ($action === 'add-tag' || $action === 'remove-tag') {
             $tagIds = array_values(array_filter(array_map('intval', (array) ($data['tagIds'] ?? [])), fn($id) => $id > 0));
             $tags   = $tagIds ? $tagRepo->findBy(['id' => $tagIds]) : [];

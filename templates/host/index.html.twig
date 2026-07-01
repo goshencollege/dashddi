@@ -234,9 +234,15 @@
                         <button type="button" class="btn btn-sm btn-outline-secondary d-none" id="host-merge-btn">
                             <i class="bi bi-union me-1"></i>Merge Hosts
                         </button>
+                        {% if showDeleted %}
+                        <button type="button" class="btn btn-sm btn-outline-warning" id="host-restore-btn">
+                            <i class="bi bi-arrow-counterclockwise me-1"></i>Restore Selected Hosts
+                        </button>
+                        {% else %}
                         <button type="button" class="btn btn-sm btn-outline-danger" id="host-delete-btn">
                             <i class="bi bi-trash me-1"></i>Delete Selected Hosts
                         </button>
+                        {% endif %}
                     </div>
                     <div id="bulk-bar-separator" class="vr d-none mx-2"></div>
                     <div id="iface-bulk-section" class="d-none d-flex align-items-center gap-2">
@@ -727,6 +733,19 @@ document.getElementById('host-delete-btn')?.addEventListener('click', async func
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'delete', ids: [...hostSelected], _token: '{{ csrf_token('bulk_hosts') }}' }),
+    });
+    const data = await resp.json();
+    if (resp.ok) { location.reload(); } else { alert(data.error ?? 'Error'); }
+});
+
+// --- Bulk host restore ---
+document.getElementById('host-restore-btn')?.addEventListener('click', async function () {
+    const count = hostSelected.size;
+    if (!confirm(`Restore ${count} host${count !== 1 ? 's' : ''} and all their interfaces?`)) return;
+    const resp = await fetch('{{ path('host_bulk') }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'restore', ids: [...hostSelected], _token: '{{ csrf_token('bulk_hosts') }}' }),
     });
     const data = await resp.json();
     if (resp.ok) { location.reload(); } else { alert(data.error ?? 'Error'); }
