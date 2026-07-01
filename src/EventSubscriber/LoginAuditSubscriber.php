@@ -20,6 +20,11 @@ class LoginAuditSubscriber
     #[AsEventListener(event: LoginSuccessEvent::class)]
     public function onLoginSuccess(LoginSuccessEvent $event): void
     {
+        // API token requests authenticate on every call — don't flood the log
+        if ($this->requestStack->getCurrentRequest()?->attributes->has('_api_token')) {
+            return;
+        }
+
         $identifier = $event->getAuthenticatedToken()->getUserIdentifier();
         $ip         = $this->requestStack->getCurrentRequest()?->getClientIp();
         $now        = new \DateTimeImmutable();
