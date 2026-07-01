@@ -68,9 +68,9 @@
 </div>
 
 <div class="card mb-4" id="activity-log">
-    <div class="card-header fw-semibold"><i class="bi bi-shield-check me-1"></i>Activity Log</div>
+    <div class="card-header fw-semibold"><i class="bi bi-shield-check me-1"></i>Audit Log</div>
     <div class="card-body">
-        <p>The Activity Log records all create, update, soft-delete, restore, and hard-delete operations on managed entities, plus user logins. View it at <strong>Servers → Activity Log</strong>.</p>
+        <p>The Audit Log records all create, update, soft-delete, restore, and hard-delete operations on managed entities, plus user logins. View it at <strong>Audit Log</strong> in the top navigation.</p>
         <p>Each entry shows:</p>
         <ul>
             <li>Timestamp, action type, and the entity affected — child entities include parent context (e.g. <em>photo-dir @ example.com</em> for a DNS record, <em>eth0 @ server01</em> for an interface)</li>
@@ -80,8 +80,8 @@
             <li>For deletes: a snapshot of all field values at the time of deletion, so the record is readable even after it is gone</li>
         </ul>
         <p>Sensitive fields (SSH keys, passwords, API keys) are shown as <code>[redacted]</code> so you can see that a credential changed without exposing the value.</p>
-        <p><strong>Retention</strong> is configured in <strong>Application Settings → Activity Log</strong>. The default is 90 days; leave it blank to keep entries indefinitely. A <em>Purge Activity Logs</em> task is available in the Scheduler.</p>
-        <p class="mb-0"><strong>Remote syslog forwarding</strong> is also configured in Application Settings. When enabled, every activity log entry is forwarded asynchronously to your syslog server in RFC 5424 format, including field-level change details. Both UDP and TCP transports are supported; TCP connections are kept alive across messages by the background worker.</p>
+        <p><strong>Retention</strong> is configured in <strong>Application Settings → Audit Log</strong>. The default is 90 days; leave it blank to keep entries indefinitely. A <em>Purge Activity Logs</em> task is available in the Scheduler.</p>
+        <p class="mb-0"><strong>Remote syslog forwarding</strong> is also configured in Application Settings. When enabled, every audit log entry is forwarded asynchronously to your syslog server in RFC 5424 format, including field-level change details. Both UDP and TCP transports are supported; TCP connections are kept alive across messages by the background worker.</p>
     </div>
 </div>
 
@@ -134,7 +134,7 @@
             <a href="#servers-overview" class="list-group-item list-group-item-action py-1">Servers Overview</a>
             <a href="#dns-servers" class="list-group-item list-group-item-action py-1">DNS Servers</a>
             <a href="#push-logs" class="list-group-item list-group-item-action py-1">Push Logs</a>
-            <a href="#activity-log" class="list-group-item list-group-item-action py-1">Activity Log</a>
+            <a href="#activity-log" class="list-group-item list-group-item-action py-1">Audit Log</a>
             <a href="#worker-queue" class="list-group-item list-group-item-action py-1">Worker Queue</a>
             <a href="#scheduler" class="list-group-item list-group-item-action py-1">Scheduled Tasks</a>
         </div>
