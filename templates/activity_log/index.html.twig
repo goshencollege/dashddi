@@ -98,7 +98,7 @@
                         {% set detailId = 'log-detail-' ~ log.id %}
                         {% set hasDetail = log.changedFields is not empty %}
                         <tr class="{{ hasDetail ? 'cursor-pointer' }}"
-                            {{ hasDetail ? 'data-bs-toggle="collapse" data-bs-target="#' ~ detailId ~ '"' }}>
+                            {% if hasDetail %}data-bs-toggle="collapse" data-bs-target="#{{ detailId }}"{% endif %}>
                             <td class="ps-3">
                                 {% if hasDetail %}
                                     <i class="bi bi-chevron-right detail-chevron text-muted" style="transition:transform .15s; font-size:.75rem;"></i>
