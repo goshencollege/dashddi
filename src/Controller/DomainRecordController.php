@@ -141,6 +141,7 @@ class DomainRecordController extends AbstractController
             if ($formInterface === null) {
                 $rawId = $request->request->get('interface_id', '');
                 if ($rawId === '' || $rawId === null) {
+                    $this->restoreValueFromInterface($record);
                     $record->setNetworkInterface(null);
                 } else {
                     $linked = $this->ifaceRepo->find((int) $rawId);
@@ -209,6 +210,7 @@ class DomainRecordController extends AbstractController
         $interfaceId = $record->getNetworkInterface()?->getId();
 
         if ($this->isCsrfTokenValid('unlink_record_' . $record->getId(), $request->request->get('_token'))) {
+            $this->restoreValueFromInterface($record);
             $record->setNetworkInterface(null);
             $this->em->flush();
             $this->addFlash('success', 'Record unlinked from interface.');
@@ -277,6 +279,25 @@ class DomainRecordController extends AbstractController
             ->setParameter('id', $record->getId())
             ->getQuery()
             ->execute();
+    }
+
+    private function restoreValueFromInterface(DomainRecord $record): void
+    {
+        $iface = $record->getNetworkInterface();
+        if ($iface === null) {
+            return;
+        }
+        $type = $record->getType()->value;
+        if ($type === 'A') {
+            $ip = $iface->getIpAddress()?->getAddress();
+        } elseif ($type === 'AAAA') {
+            $ip = $iface->getIpv6Address()?->getAddress();
+        } else {
+            return;
+        }
+        if ($ip !== null) {
+            $record->setValue($ip);
+        }
     }
 
     private function checkCanonical(DomainRecord $record): ?string
