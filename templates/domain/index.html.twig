@@ -46,6 +46,11 @@
                                             +{{ domain.aliases|length }}
                                         </span>
                                     {% endif %}
+                                    {% if domain.excludeFromInterfaces %}
+                                        <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle ms-1" title="Excluded from interface DNS record forms">
+                                            <i class="bi bi-slash-circle me-1"></i>No interfaces
+                                        </span>
+                                    {% endif %}
                                 </td>
                                 <td class="text-muted">{{ domain.description ?: '—' }}</td>
                                 <td><span class="badge bg-secondary rounded-pill">{{ domain.records|length }}</span></td>

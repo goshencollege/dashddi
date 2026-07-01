@@ -66,12 +66,15 @@ class DomainRecordType extends AbstractType
         if ($interface !== null) {
             $subnet = $interface->getSubnet();
             $builder->add('domain', EntityType::class, [
-                'class'        => Domain::class,
-                'choice_label' => 'name',
-                'placeholder'  => '-- Select a domain --',
-                'required'     => false,
-                'label'        => 'Domain',
-                'choice_attr'  => function (Domain $domain) use ($subnet) {
+                'class'         => Domain::class,
+                'choice_label'  => 'name',
+                'placeholder'   => '-- Select a domain --',
+                'required'      => false,
+                'label'         => 'Domain',
+                'query_builder' => fn($repo) => $repo->createQueryBuilder('d')
+                    ->where('d.excludeFromInterfaces = false')
+                    ->orderBy('d.name', 'ASC'),
+                'choice_attr'   => function (Domain $domain) use ($subnet) {
                     if ($this->viewResolver->isDomainUsable($domain, $subnet)) {
                         return [];
                     }

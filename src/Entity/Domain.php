@@ -68,6 +68,9 @@ class Domain
     #[ORM\Column(options: ['default' => false])]
     private bool $ddnsEnabled = false;
 
+    #[ORM\Column(options: ['default' => false])]
+    private bool $excludeFromInterfaces = false;
+
     #[ORM\ManyToOne(targetEntity: DnsServer::class)]
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
     private ?DnsServer $ddnsDnsServer = null;
@@ -122,6 +125,9 @@ class Domain
 
     public function isDdnsEnabled(): bool { return $this->ddnsEnabled; }
     public function setDdnsEnabled(bool $v): static { $this->ddnsEnabled = $v; return $this; }
+
+    public function isExcludeFromInterfaces(): bool { return $this->excludeFromInterfaces; }
+    public function setExcludeFromInterfaces(bool $v): static { $this->excludeFromInterfaces = $v; return $this; }
 
     public function getDdnsDnsServer(): ?DnsServer { return $this->ddnsDnsServer; }
     public function setDdnsDnsServer(?DnsServer $v): static { $this->ddnsDnsServer = $v; return $this; }

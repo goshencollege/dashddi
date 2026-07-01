@@ -44,6 +44,8 @@
             <dd class="col-sm-9">Allow Kea to dynamically register hostnames in this zone via authenticated DNS UPDATE packets (see Dynamic DNS below).</dd>
             <dt class="col-sm-3">DDNS DNS Server</dt>
             <dd class="col-sm-9">The primary DNS server that will accept DNS UPDATE packets for this zone. Must have a DDNS algorithm selected (which causes DashDDI to auto-generate the TSIG secret).</dd>
+            <dt class="col-sm-3">Exclude from interface forms</dt>
+            <dd class="col-sm-9">When checked, this domain will not appear in the domain selector when adding or editing DNS records from a host interface. Use this for zones that are managed exclusively through manual records — e.g. reverse zones, external zones, or infrastructure zones that should never have interface A/AAAA records assigned to them.</dd>
         </dl>
         <p class="mb-0">The domain detail page shows all DNS records in the zone in a single unified table. Records linked to host interfaces include a <em>Host</em> column with a link to the host, and canonical records carry a <span class="badge bg-primary">PTR</span> badge indicating they are used as the reverse DNS name for their interface's IP.</p>
     </div>

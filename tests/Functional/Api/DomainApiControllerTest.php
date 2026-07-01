@@ -65,6 +65,21 @@ class DomainApiControllerTest extends AppWebTestCase
         $this->assertSame('Updated desc', $data['description']);
     }
 
+    public function testExcludeFromInterfacesDefaultsFalse(): void
+    {
+        $domain = $this->makeDomain('noflag.example.com');
+        $data = $this->apiRequest('GET', "/api/domains/{$domain->getId()}");
+        $this->assertFalse($data['exclude_from_interfaces']);
+    }
+
+    public function testExcludeFromInterfacesCanBeSet(): void
+    {
+        $domain = $this->makeDomain('flagged.example.com');
+        $data = $this->apiRequest('PATCH', "/api/domains/{$domain->getId()}", ['exclude_from_interfaces' => true]);
+        $this->assertSame(200, $this->client->getResponse()->getStatusCode());
+        $this->assertTrue($data['exclude_from_interfaces']);
+    }
+
     public function testDelete(): void
     {
         $domain = $this->makeDomain('delete.example.com');
