@@ -8,6 +8,7 @@ use App\Entity\NetworkInterface;
 use App\Enum\RecordType;
 use App\Form\DomainRecordType;
 use App\Repository\DomainRecordRepository;
+use App\Repository\NetworkInterfaceRepository;
 use App\Service\DnsViewResolver;
 use App\Service\FcrdnsChecker;
 use Doctrine\ORM\EntityManagerInterface;
@@ -20,10 +21,11 @@ use Symfony\Component\Routing\Attribute\Route;
 class DomainRecordController extends AbstractController
 {
     public function __construct(
-        private readonly EntityManagerInterface $em,
-        private readonly FcrdnsChecker          $fcrdnsChecker,
-        private readonly DomainRecordRepository $recordRepo,
-        private readonly DnsViewResolver        $viewResolver,
+        private readonly EntityManagerInterface      $em,
+        private readonly FcrdnsChecker               $fcrdnsChecker,
+        private readonly DomainRecordRepository      $recordRepo,
+        private readonly DnsViewResolver             $viewResolver,
+        private readonly NetworkInterfaceRepository  $ifaceRepo,
     ) {}
 
     #[Route('/domain/{domainId}/records/new', name: 'domain_record_new')]
@@ -130,6 +132,23 @@ class DomainRecordController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
+            // Handle interface linking from the domain-context edit form (not the interface form).
+            if ($interface === null) {
+                $rawId = $request->request->get('interface_id', '');
+                if ($rawId === '' || $rawId === null) {
+                    $record->setNetworkInterface(null);
+                } else {
+                    $linked = $this->ifaceRepo->find((int) $rawId);
+                    if ($linked !== null && !$linked->isDeleted()) {
+                        $record->setNetworkInterface($linked);
+                        // Clear stored value for A/AAAA so the live IP is used.
+                        if (in_array($record->getType()->value, ['A', 'AAAA'], true)) {
+                            $record->setValue('');
+                        }
+                    }
+                }
+            }
+
             $this->em->flush();
 
             if ($interface !== null && $record->isCanonical()) {

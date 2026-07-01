@@ -61,6 +61,54 @@
                     {% endif %}
                 </div>
                 {% endif %}
+                <hr class="my-3">
+                {# ── Interface link ─────────────────────────────────────────── #}
+                {% set linked = record.networkInterface %}
+                {% if linked %}
+                    {% set linkedIp = record.type.value == 'A'
+                        ? linked.ipAddress?.address
+                        : (record.type.value == 'AAAA' ? linked.ipv6Address?.address : null) %}
+                    {% set hasMismatch = linkedIp and record.value and record.value != linkedIp %}
+                {% else %}
+                    {% set hasMismatch = false %}
+                {% endif %}
+                <div class="mb-4">
+                    <label class="form-label fw-semibold">Linked Interface</label>
+                    <input type="hidden" name="interface_id" id="interface_id" value="{{ linked ? linked.id : '' }}">
+                    {% if linked %}
+                    <div id="iface-selected" class="d-flex align-items-center gap-2 p-2 border rounded bg-body-secondary mb-2">
+                        <i class="bi bi-hdd-network text-secondary"></i>
+                        <span id="iface-label" class="flex-grow-1 small">
+                            {% if linked.host %}{{ linked.host.name }}: {% endif %}{{ linked.name ?: linked.macAddress }}
+                            {% if linked.ipAddress %}<span class="text-muted ms-1">({{ linked.ipAddress.address }})</span>{% endif %}
+                        </span>
+                        <button type="button" class="btn btn-sm btn-outline-danger" id="iface-clear" title="Unlink interface">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+                    </div>
+                    {% if hasMismatch %}
+                    <div class="alert alert-warning py-2 small mb-2">
+                        <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                        Stored value <code>{{ record.value }}</code> doesn't match the interface IP <code>{{ linkedIp }}</code>.
+                        Saving will clear the stored value so the live interface IP is used.
+                    </div>
+                    {% endif %}
+                    {% else %}
+                    <div id="iface-selected" class="d-none d-flex align-items-center gap-2 p-2 border rounded bg-body-secondary mb-2">
+                        <i class="bi bi-hdd-network text-secondary"></i>
+                        <span id="iface-label" class="flex-grow-1 small"></span>
+                        <button type="button" class="btn btn-sm btn-outline-danger" id="iface-clear" title="Unlink interface">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+                    </div>
+                    {% endif %}
+                    <div id="iface-search-wrap" class="{{ linked ? 'd-none' : '' }} position-relative">
+                        <input type="text" id="iface-search" class="form-control form-control-sm"
+                               placeholder="Search by host name, interface name, or IP…" autocomplete="off">
+                        <ul id="iface-results" class="list-group position-absolute w-100 shadow-sm d-none" style="z-index:1000; top:100%; max-height:240px; overflow-y:auto;"></ul>
+                    </div>
+                    <div class="form-text">Link this record to a host interface so A/AAAA values are derived from the interface IP.</div>
+                </div>
                 <div class="d-flex justify-content-between">
                     <a href="{{ path('domain_show', {id: domain.id}) }}" class="btn btn-outline-secondary">Cancel</a>
                     <button type="submit" class="btn btn-primary">
@@ -68,6 +116,75 @@
                     </button>
                 </div>
                 {{ form_end(form) }}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    const searchInput  = document.getElementById('iface-search');
+    const resultsList  = document.getElementById('iface-results');
+    const hiddenField  = document.getElementById('interface_id');
+    const selectedWrap = document.getElementById('iface-selected');
+    const selectedLabel= document.getElementById('iface-label');
+    const clearBtn     = document.getElementById('iface-clear');
+    const searchWrap   = document.getElementById('iface-search-wrap');
+
+    let debounce = null;
+
+    clearBtn.addEventListener('click', function () {
+        hiddenField.value = '';
+        selectedLabel.textContent = '';
+        selectedWrap.classList.add('d-none');
+        searchWrap.classList.remove('d-none');
+        searchInput.value = '';
+        searchInput.focus();
+    });
+
+    searchInput.addEventListener('input', function () {
+        clearTimeout(debounce);
+        const q = this.value.trim();
+        if (q.length < 2) { resultsList.classList.add('d-none'); return; }
+        debounce = setTimeout(() => fetchResults(q), 250);
+    });
+
+    searchInput.addEventListener('blur', function () {
+        setTimeout(() => resultsList.classList.add('d-none'), 200);
+    });
+
+    function fetchResults(q) {
+        fetch('/api/interfaces/search?q=' + encodeURIComponent(q))
+            .then(r => r.json())
+            .then(data => {
+                resultsList.innerHTML = '';
+                if (!data.length) {
+                    resultsList.innerHTML = '<li class="list-group-item list-group-item-action text-muted small disabled">No results</li>';
+                } else {
+                    data.forEach(function (item) {
+                        const li = document.createElement('li');
+                        li.className = 'list-group-item list-group-item-action small py-1';
+                        const ip = item.ip ? ' <span class="text-muted">(' + item.ip + ')</span>' : '';
+                        li.innerHTML = item.label + ip;
+                        li.addEventListener('mousedown', function () { selectInterface(item); });
+                        resultsList.appendChild(li);
+                    });
+                }
+                resultsList.classList.remove('d-none');
+            });
+    }
+
+    function selectInterface(item) {
+        hiddenField.value = item.id;
+        const ip = item.ip ? ' (' + item.ip + ')' : '';
+        selectedLabel.textContent = item.label + ip;
+        selectedWrap.classList.remove('d-none');
+        searchWrap.classList.add('d-none');
+        resultsList.classList.add('d-none');
+        searchInput.value = '';
+    }
+})();
+</script>
             </div>
         </div>
     </div>
