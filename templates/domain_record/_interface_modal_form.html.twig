@@ -49,7 +49,7 @@
 </div>
 
 {% if form.isCanonical is defined %}
-<div class="mb-3 form-check">
+<div id="canonical-field" class="mb-3 form-check">
     {{ form_widget(form.isCanonical, {attr: {class: 'form-check-input'}}) }}
     {{ form_label(form.isCanonical, null, {label_attr: {class: 'form-check-label'}}) }}
     <div class="form-text">Canonical A/AAAA records are used as the PTR hostname in reverse DNS zones.</div>

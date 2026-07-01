@@ -83,6 +83,7 @@ class DomainRecordController extends AbstractController
 
         if ($form->isSubmitted() && $form->isValid()) {
             $this->autoSetCanonical($record);
+            $this->normalizeCanonical($record);
             $this->em->persist($record);
             $this->em->flush();
 
@@ -155,6 +156,7 @@ class DomainRecordController extends AbstractController
                 }
             }
 
+            $this->normalizeCanonical($record);
             $this->em->flush();
 
             if ($record->getNetworkInterface() !== null && $record->isCanonical()) {
@@ -259,6 +261,14 @@ class DomainRecordController extends AbstractController
         }
         if (!$this->recordRepo->hasAnyForInterface($iface, $type)) {
             $record->setIsCanonical(true);
+        }
+    }
+
+    private function normalizeCanonical(DomainRecord $record): void
+    {
+        $type = $record->getType();
+        if ($type !== RecordType::A && $type !== RecordType::AAAA) {
+            $record->setIsCanonical(false);
         }
     }
 
