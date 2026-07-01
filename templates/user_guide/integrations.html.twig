@@ -442,20 +442,7 @@ curl -s -X POST https://dashddi.example.com/api/dhcp/lease \
     <div class="card-body">
         <p>DashDDI exposes a REST API covering all major resources — hosts, interfaces, subnets, domains, records, and more. Interactive API documentation with request/response schemas and the ability to test calls is available at <a href="{{ path('api_docs') }}"><strong>API Docs</strong></a>.</p>
         <p>Authentication uses Bearer tokens. Create a token under <strong>Other Settings → API Tokens</strong> and grant only the per-route permissions that integration needs.</p>
-        <p>A free-text interface search endpoint is available for tooling and integrations:</p>
-        <div class="table-responsive mb-3">
-            <table class="table table-sm table-bordered mb-0">
-                <thead><tr><th>Method</th><th>Path</th><th>Description</th></tr></thead>
-                <tbody>
-                    <tr>
-                        <td><span class="badge bg-success">GET</span></td>
-                        <td><code>/api/interfaces/search?q=…&amp;limit=20</code></td>
-                        <td>Full-text search across host name, interface name, IPv4/IPv6 address, and MAC. Returns up to <code>limit</code> (max 50) non-deleted interfaces with <code>id</code>, <code>label</code>, <code>host_name</code>, <code>iface_name</code>, <code>mac</code>, <code>ip</code>, and <code>ipv6</code> fields. Requires at least 2 characters.</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-        <p class="mb-0 text-muted small">The repository also includes a <strong>certbot-dns-dashddi</strong> Python plugin that enables Let's Encrypt DNS-01 challenge automation via DashDDI's API.</p>
+        <p class="mb-0 text-muted small">The repository also includes a <strong>certbot-dns-dashddi</strong> Python plugin that enables Let's Encrypt DNS-01 challenge automation via DashDDI's API. Full endpoint reference — including request parameters, field descriptions, and response examples — is in the <a href="{{ path('api_docs') }}">API Docs</a>.</p>
     </div>
 </div>
 
