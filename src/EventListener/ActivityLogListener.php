@@ -116,7 +116,7 @@ class ActivityLogListener
             if (in_array($field, self::ALWAYS_IGNORED, true)) {
                 continue;
             }
-            if ($value === null || $value === '') {
+            if ($value === null || $value === '' || $value instanceof \Doctrine\Common\Collections\Collection) {
                 continue;
             }
             if (in_array($field, $encryptedFields, true)) {
