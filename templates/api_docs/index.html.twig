@@ -271,7 +271,7 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
         <section id="responses" class="mb-5">
             <h2 class="h5 border-bottom pb-2 mb-3">Common Response Codes</h2>
             <table class="table table-sm table-bordered mb-0">
-                <thead class="table-light"><tr><th style="width:80px">Code</th><th>Meaning</th></tr></thead>
+                <thead><tr><th style="width:80px">Code</th><th>Meaning</th></tr></thead>
                 <tbody>
                     <tr><td><code>200</code></td><td>Success — returns the resource or a list.</td></tr>
                     <tr><td><code>201</code></td><td>Created — returns the new resource.</td></tr>
@@ -1024,7 +1024,7 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
             <h3 class="h6 mt-3 mb-2">Port resolution</h3>
             <p class="small">All four endpoints accept the same two ways to identify the target port:</p>
             <table class="table table-sm table-bordered mb-3 small">
-                <thead class="table-light"><tr><th>Field</th><th>Description</th></tr></thead>
+                <thead><tr><th>Field</th><th>Description</th></tr></thead>
                 <tbody>
                     <tr><td><code>mac</code></td><td>MAC address of the client (any format — <code>aa:bb:cc:dd:ee:ff</code>, <code>aa-bb-cc-dd-ee-ff</code>, or bare <code>aabbccddeeff</code>). Looks up the switch IP and port from the most recent ClearPass auth log for this MAC.</td></tr>
                     <tr><td><code>ip</code></td><td>IPv4 address of the client. Resolves to the interface's MAC address, then performs the same ClearPass lookup as above.</td></tr>
