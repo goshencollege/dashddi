@@ -280,6 +280,24 @@ if ($AppEnv -eq 'prod') {
     $DbRootPassword = RandHex 16
 }
 
+# ── Container log forwarding ──────────────────────────────────────────────────
+Header 'Container log forwarding'
+Write-Host
+Write-Host '  Container stdout/stderr (Docker logs) can be forwarded to a remote syslog server.'
+Write-Host '  This is separate from the in-app audit-log syslog setting.'
+Write-Host
+$ContainerSyslogEnabled = $false
+if (AskYn 'Forward container logs to a remote syslog server?') {
+    $ContainerSyslogEnabled  = $true
+    $ContainerSyslogProtocol = Ask 'Protocol (udp or tcp)' 'udp'
+    $ContainerSyslogHost     = Ask 'Syslog server hostname or IP'
+    $ContainerSyslogPort     = Ask 'Port' '514'
+    $ContainerSyslogAddress  = "${ContainerSyslogProtocol}://${ContainerSyslogHost}:${ContainerSyslogPort}"
+    Ok "Container logs → $ContainerSyslogAddress"
+} else {
+    Ok 'Container logs will be stored locally (json-file driver)'
+}
+
 # ── 6. Write compose file ─────────────────────────────────────────────────────
 if ($AppEnv -eq 'dev') {
     Header 'Writing docker-compose.dev.yml'
@@ -323,6 +341,11 @@ if ($AppEnv -eq 'dev') {
       interval: 5s
       timeout: 5s
       retries: 12
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
 "@
         $dependsOnBlock = @"
     depends_on:
@@ -446,6 +469,21 @@ $volumesBlock
 
     [IO.File]::WriteAllText($ComposeFile, $composeContent)
     Ok 'docker-compose.prod.yml written'
+}
+
+# Replace json-file logging with syslog if configured
+if ($ContainerSyslogEnabled) {
+    $addr = $ContainerSyslogAddress
+    $raw  = [IO.File]::ReadAllText($ComposeFile)
+    $raw  = [Regex]::Replace($raw,
+        '(?m)^( +)logging:\r?\n\1  driver: json-file\r?\n\1  options:\r?\n\1    max-size: "20m"\r?\n\1    max-file: "5"',
+        {
+            param($m)
+            $i = $m.Groups[1].Value
+            "${i}logging:`n${i}  driver: syslog`n${i}  options:`n${i}    syslog-address: `"$addr`"`n${i}    tag: `"dashddi/{{.Name}}`""
+        })
+    [IO.File]::WriteAllText($ComposeFile, $raw)
+    Ok "Logging driver set to syslog ($ContainerSyslogAddress)"
 }
 
 # ── 7. Build image(s) ─────────────────────────────────────────────────────────
