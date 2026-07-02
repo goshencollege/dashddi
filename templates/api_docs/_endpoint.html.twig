@@ -11,6 +11,7 @@
 #}
 {% set method = method ?? 'GET' %}
 {% set response_status = response_status ?? '200' %}
+{% set anchor_id = anchor_id ?? null %}
 
 {% set badge_class = {
     'GET':    'bg-primary',
@@ -19,7 +20,7 @@
     'DELETE': 'bg-danger',
 }[method] ?? 'bg-secondary' %}
 
-<div class="card mb-3">
+<div class="card mb-3"{% if anchor_id %} id="{{ anchor_id }}"{% endif %}>
     <div class="card-header d-flex align-items-center gap-2 py-2">
         <span class="badge {{ badge_class }} font-monospace" style="min-width:3.5rem">{{ method }}</span>
         <code class="fw-semibold">{{ path }}</code>
