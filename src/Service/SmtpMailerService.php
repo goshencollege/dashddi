@@ -45,15 +45,17 @@ class SmtpMailerService
 
         stream_set_timeout($socket, $timeout);
 
+        $localHostname = parse_url($_ENV['DEFAULT_URI'] ?? '', PHP_URL_HOST) ?: gethostname() ?: 'dashddi';
+
         $this->expect($socket, '220');
-        $this->send_line($socket, "EHLO " . gethostname());
+        $this->send_line($socket, "EHLO {$localHostname}");
         $ehloResponse = $this->read_all($socket);
 
         if ($encryption === 'tls') {
             $this->send_line($socket, 'STARTTLS');
             $this->expect_raw($socket, '220');
             stream_socket_enable_crypto($socket, true, STREAM_CRYPTO_METHOD_TLS_CLIENT);
-            $this->send_line($socket, "EHLO " . gethostname());
+            $this->send_line($socket, "EHLO {$localHostname}");
             $this->read_all($socket);
         }
 
@@ -76,7 +78,7 @@ class SmtpMailerService
         $this->expect($socket, '354');
 
         $date    = date('r');
-        $msgId   = sprintf('<%s@%s>', uniqid('dashddi', true), gethostname());
+        $msgId   = sprintf('<%s@%s>', uniqid('dashddi', true), $localHostname);
         $headers = implode("\r\n", [
             "Date: {$date}",
             "From: {$fromName} <{$fromEmail}>",
