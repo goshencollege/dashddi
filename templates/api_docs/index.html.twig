@@ -2,30 +2,230 @@
 {% block title %}API Documentation{% endblock %}
 
 {% block content %}
+<style>
+.api-nav-toggle .bi-chevron-down { transition: transform .15s ease; }
+.api-nav-toggle:not(.collapsed) .bi-chevron-down { transform: rotate(-180deg); }
+.api-sub-nav .nav-link { font-size: .78rem; color: var(--bs-secondary-color); line-height: 1.6; padding-top: .1rem; padding-bottom: .1rem; }
+.api-sub-nav .nav-link:hover { color: var(--bs-body-color); background: none; }
+.method-get    { color: #0d6efd; font-family: monospace; font-size: .7rem; }
+.method-post   { color: #198754; font-family: monospace; font-size: .7rem; }
+.method-patch  { color: #856404; font-family: monospace; font-size: .7rem; }
+.method-delete { color: #dc3545; font-family: monospace; font-size: .7rem; }
+</style>
+
 <div class="row g-4">
 
     {# ── Sidebar ─────────────────────────────────────────────────────────── #}
     <div class="col-lg-2 d-none d-lg-block">
-        <nav class="sticky-top pt-1" style="top:1rem">
+        <nav class="sticky-top pt-1" style="top:1rem;max-height:calc(100vh - 2rem);overflow-y:auto">
             <div class="small fw-semibold text-uppercase text-muted mb-2 ps-2">Contents</div>
-            <ul class="nav flex-column nav-pills nav-fill gap-1 small">
+            <ul class="nav flex-column nav-pills gap-1 small">
                 <li class="nav-item"><a class="nav-link py-1 px-2 text-start" href="#auth">Authentication</a></li>
                 <li class="nav-item"><a class="nav-link py-1 px-2 text-start" href="#responses">Responses</a></li>
                 <li class="nav-item mt-2">
                     <span class="small fw-semibold text-uppercase text-muted ps-2">Resources</span>
                 </li>
-                <li class="nav-item"><a class="nav-link py-1 px-2 text-start" href="#buildings">Buildings</a></li>
-                <li class="nav-item"><a class="nav-link py-1 px-2 text-start" href="#dns-servers">DNS Servers</a></li>
-                <li class="nav-item"><a class="nav-link py-1 px-2 text-start" href="#dhcp-servers">DHCP Servers</a></li>
-                <li class="nav-item"><a class="nav-link py-1 px-2 text-start" href="#hosts">Hosts</a></li>
-                <li class="nav-item"><a class="nav-link py-1 px-2 text-start" href="#interfaces">Interfaces</a></li>
-                <li class="nav-item"><a class="nav-link py-1 px-2 text-start" href="#subnets">Subnets</a></li>
-                <li class="nav-item"><a class="nav-link py-1 px-2 text-start" href="#address-blocks">Address Blocks</a></li>
-                <li class="nav-item"><a class="nav-link py-1 px-2 text-start" href="#domains">Domains</a></li>
-                <li class="nav-item"><a class="nav-link py-1 px-2 text-start" href="#domain-records">Domain Records</a></li>
-                <li class="nav-item"><a class="nav-link py-1 px-2 text-start" href="#tags">Tags</a></li>
-                <li class="nav-item"><a class="nav-link py-1 px-2 text-start" href="#dhcp-lease">DHCP Lease</a></li>
-                <li class="nav-item"><a class="nav-link py-1 px-2 text-start" href="#switch-ports">Switch Ports</a></li>
+
+                {# Buildings #}
+                <li class="nav-item">
+                    <div class="d-flex align-items-center">
+                        <a class="nav-link flex-grow-1 py-1 px-2 text-start" href="#buildings">Buildings</a>
+                        <button class="btn btn-link btn-sm py-0 px-2 border-0 text-muted api-nav-toggle collapsed" data-bs-toggle="collapse" data-bs-target="#nav-buildings" aria-expanded="false"><i class="bi bi-chevron-down" style="font-size:.65rem"></i></button>
+                    </div>
+                    <div class="collapse" id="nav-buildings">
+                        <ul class="nav flex-column gap-0 ms-2 ps-2 border-start api-sub-nav">
+                            <li><a class="nav-link px-2 text-start" href="#ep-buildings-list"><span class="method-get me-1">GET</span>List</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-buildings-get"><span class="method-get me-1">GET</span>Get</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-buildings-create"><span class="method-post me-1">POST</span>Create</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-buildings-update"><span class="method-patch me-1">PATCH</span>Update</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-buildings-delete"><span class="method-delete me-1">DEL</span>Delete</a></li>
+                        </ul>
+                    </div>
+                </li>
+
+                {# DNS Servers #}
+                <li class="nav-item">
+                    <div class="d-flex align-items-center">
+                        <a class="nav-link flex-grow-1 py-1 px-2 text-start" href="#dns-servers">DNS Servers</a>
+                        <button class="btn btn-link btn-sm py-0 px-2 border-0 text-muted api-nav-toggle collapsed" data-bs-toggle="collapse" data-bs-target="#nav-dns-servers" aria-expanded="false"><i class="bi bi-chevron-down" style="font-size:.65rem"></i></button>
+                    </div>
+                    <div class="collapse" id="nav-dns-servers">
+                        <ul class="nav flex-column gap-0 ms-2 ps-2 border-start api-sub-nav">
+                            <li><a class="nav-link px-2 text-start" href="#ep-dns-servers-list"><span class="method-get me-1">GET</span>List</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-dns-servers-get"><span class="method-get me-1">GET</span>Get</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-dns-servers-create"><span class="method-post me-1">POST</span>Create</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-dns-servers-update"><span class="method-patch me-1">PATCH</span>Update</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-dns-servers-delete"><span class="method-delete me-1">DEL</span>Delete</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-dns-servers-push"><span class="method-post me-1">POST</span>Push</a></li>
+                        </ul>
+                    </div>
+                </li>
+
+                {# DHCP Servers #}
+                <li class="nav-item">
+                    <div class="d-flex align-items-center">
+                        <a class="nav-link flex-grow-1 py-1 px-2 text-start" href="#dhcp-servers">DHCP Servers</a>
+                        <button class="btn btn-link btn-sm py-0 px-2 border-0 text-muted api-nav-toggle collapsed" data-bs-toggle="collapse" data-bs-target="#nav-dhcp-servers" aria-expanded="false"><i class="bi bi-chevron-down" style="font-size:.65rem"></i></button>
+                    </div>
+                    <div class="collapse" id="nav-dhcp-servers">
+                        <ul class="nav flex-column gap-0 ms-2 ps-2 border-start api-sub-nav">
+                            <li><a class="nav-link px-2 text-start" href="#ep-dhcp-servers-list"><span class="method-get me-1">GET</span>List</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-dhcp-servers-get"><span class="method-get me-1">GET</span>Get</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-dhcp-servers-create"><span class="method-post me-1">POST</span>Create</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-dhcp-servers-update"><span class="method-patch me-1">PATCH</span>Update</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-dhcp-servers-delete"><span class="method-delete me-1">DEL</span>Delete</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-dhcp-servers-push"><span class="method-post me-1">POST</span>Push</a></li>
+                        </ul>
+                    </div>
+                </li>
+
+                {# Hosts #}
+                <li class="nav-item">
+                    <div class="d-flex align-items-center">
+                        <a class="nav-link flex-grow-1 py-1 px-2 text-start" href="#hosts">Hosts</a>
+                        <button class="btn btn-link btn-sm py-0 px-2 border-0 text-muted api-nav-toggle collapsed" data-bs-toggle="collapse" data-bs-target="#nav-hosts" aria-expanded="false"><i class="bi bi-chevron-down" style="font-size:.65rem"></i></button>
+                    </div>
+                    <div class="collapse" id="nav-hosts">
+                        <ul class="nav flex-column gap-0 ms-2 ps-2 border-start api-sub-nav">
+                            <li><a class="nav-link px-2 text-start" href="#ep-hosts-list"><span class="method-get me-1">GET</span>List</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-hosts-get"><span class="method-get me-1">GET</span>Get</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-hosts-create"><span class="method-post me-1">POST</span>Create</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-hosts-update"><span class="method-patch me-1">PATCH</span>Update</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-hosts-delete"><span class="method-delete me-1">DEL</span>Delete</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-hosts-restore"><span class="method-post me-1">POST</span>Restore</a></li>
+                        </ul>
+                    </div>
+                </li>
+
+                {# Interfaces #}
+                <li class="nav-item">
+                    <div class="d-flex align-items-center">
+                        <a class="nav-link flex-grow-1 py-1 px-2 text-start" href="#interfaces">Interfaces</a>
+                        <button class="btn btn-link btn-sm py-0 px-2 border-0 text-muted api-nav-toggle collapsed" data-bs-toggle="collapse" data-bs-target="#nav-interfaces" aria-expanded="false"><i class="bi bi-chevron-down" style="font-size:.65rem"></i></button>
+                    </div>
+                    <div class="collapse" id="nav-interfaces">
+                        <ul class="nav flex-column gap-0 ms-2 ps-2 border-start api-sub-nav">
+                            <li><a class="nav-link px-2 text-start" href="#ep-interfaces-list"><span class="method-get me-1">GET</span>List</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-interfaces-get"><span class="method-get me-1">GET</span>Get</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-interfaces-create"><span class="method-post me-1">POST</span>Create</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-interfaces-update"><span class="method-patch me-1">PATCH</span>Update</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-interfaces-delete"><span class="method-delete me-1">DEL</span>Delete</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-interfaces-restore"><span class="method-post me-1">POST</span>Restore</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-interfaces-search"><span class="method-get me-1">GET</span>Search</a></li>
+                        </ul>
+                    </div>
+                </li>
+
+                {# Subnets #}
+                <li class="nav-item">
+                    <div class="d-flex align-items-center">
+                        <a class="nav-link flex-grow-1 py-1 px-2 text-start" href="#subnets">Subnets</a>
+                        <button class="btn btn-link btn-sm py-0 px-2 border-0 text-muted api-nav-toggle collapsed" data-bs-toggle="collapse" data-bs-target="#nav-subnets" aria-expanded="false"><i class="bi bi-chevron-down" style="font-size:.65rem"></i></button>
+                    </div>
+                    <div class="collapse" id="nav-subnets">
+                        <ul class="nav flex-column gap-0 ms-2 ps-2 border-start api-sub-nav">
+                            <li><a class="nav-link px-2 text-start" href="#ep-subnets-list"><span class="method-get me-1">GET</span>List</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-subnets-get"><span class="method-get me-1">GET</span>Get</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-subnets-create"><span class="method-post me-1">POST</span>Create</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-subnets-update"><span class="method-patch me-1">PATCH</span>Update</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-subnets-delete"><span class="method-delete me-1">DEL</span>Delete</a></li>
+                        </ul>
+                    </div>
+                </li>
+
+                {# Address Blocks #}
+                <li class="nav-item">
+                    <div class="d-flex align-items-center">
+                        <a class="nav-link flex-grow-1 py-1 px-2 text-start" href="#address-blocks">Address Blocks</a>
+                        <button class="btn btn-link btn-sm py-0 px-2 border-0 text-muted api-nav-toggle collapsed" data-bs-toggle="collapse" data-bs-target="#nav-address-blocks" aria-expanded="false"><i class="bi bi-chevron-down" style="font-size:.65rem"></i></button>
+                    </div>
+                    <div class="collapse" id="nav-address-blocks">
+                        <ul class="nav flex-column gap-0 ms-2 ps-2 border-start api-sub-nav">
+                            <li><a class="nav-link px-2 text-start" href="#ep-address-blocks-list"><span class="method-get me-1">GET</span>List</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-address-blocks-get"><span class="method-get me-1">GET</span>Get</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-address-blocks-create"><span class="method-post me-1">POST</span>Create</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-address-blocks-update"><span class="method-patch me-1">PATCH</span>Update</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-address-blocks-delete"><span class="method-delete me-1">DEL</span>Delete</a></li>
+                        </ul>
+                    </div>
+                </li>
+
+                {# Domains #}
+                <li class="nav-item">
+                    <div class="d-flex align-items-center">
+                        <a class="nav-link flex-grow-1 py-1 px-2 text-start" href="#domains">Domains</a>
+                        <button class="btn btn-link btn-sm py-0 px-2 border-0 text-muted api-nav-toggle collapsed" data-bs-toggle="collapse" data-bs-target="#nav-domains" aria-expanded="false"><i class="bi bi-chevron-down" style="font-size:.65rem"></i></button>
+                    </div>
+                    <div class="collapse" id="nav-domains">
+                        <ul class="nav flex-column gap-0 ms-2 ps-2 border-start api-sub-nav">
+                            <li><a class="nav-link px-2 text-start" href="#ep-domains-list"><span class="method-get me-1">GET</span>List</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-domains-get"><span class="method-get me-1">GET</span>Get</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-domains-create"><span class="method-post me-1">POST</span>Create</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-domains-update"><span class="method-patch me-1">PATCH</span>Update</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-domains-delete"><span class="method-delete me-1">DEL</span>Delete</a></li>
+                        </ul>
+                    </div>
+                </li>
+
+                {# Domain Records #}
+                <li class="nav-item">
+                    <div class="d-flex align-items-center">
+                        <a class="nav-link flex-grow-1 py-1 px-2 text-start" href="#domain-records">Domain Records</a>
+                        <button class="btn btn-link btn-sm py-0 px-2 border-0 text-muted api-nav-toggle collapsed" data-bs-toggle="collapse" data-bs-target="#nav-domain-records" aria-expanded="false"><i class="bi bi-chevron-down" style="font-size:.65rem"></i></button>
+                    </div>
+                    <div class="collapse" id="nav-domain-records">
+                        <ul class="nav flex-column gap-0 ms-2 ps-2 border-start api-sub-nav">
+                            <li><a class="nav-link px-2 text-start" href="#ep-domain-records-list"><span class="method-get me-1">GET</span>List</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-domain-records-get"><span class="method-get me-1">GET</span>Get</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-domain-records-create"><span class="method-post me-1">POST</span>Create</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-domain-records-update"><span class="method-patch me-1">PATCH</span>Update</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-domain-records-delete"><span class="method-delete me-1">DEL</span>Delete</a></li>
+                        </ul>
+                    </div>
+                </li>
+
+                {# Tags #}
+                <li class="nav-item">
+                    <div class="d-flex align-items-center">
+                        <a class="nav-link flex-grow-1 py-1 px-2 text-start" href="#tags">Tags</a>
+                        <button class="btn btn-link btn-sm py-0 px-2 border-0 text-muted api-nav-toggle collapsed" data-bs-toggle="collapse" data-bs-target="#nav-tags" aria-expanded="false"><i class="bi bi-chevron-down" style="font-size:.65rem"></i></button>
+                    </div>
+                    <div class="collapse" id="nav-tags">
+                        <ul class="nav flex-column gap-0 ms-2 ps-2 border-start api-sub-nav">
+                            <li><a class="nav-link px-2 text-start" href="#ep-tags-search"><span class="method-get me-1">GET</span>Search</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-tags-create"><span class="method-post me-1">POST</span>Create</a></li>
+                        </ul>
+                    </div>
+                </li>
+
+                {# DHCP Lease #}
+                <li class="nav-item">
+                    <div class="d-flex align-items-center">
+                        <a class="nav-link flex-grow-1 py-1 px-2 text-start" href="#dhcp-lease">DHCP Lease</a>
+                        <button class="btn btn-link btn-sm py-0 px-2 border-0 text-muted api-nav-toggle collapsed" data-bs-toggle="collapse" data-bs-target="#nav-dhcp-lease" aria-expanded="false"><i class="bi bi-chevron-down" style="font-size:.65rem"></i></button>
+                    </div>
+                    <div class="collapse" id="nav-dhcp-lease">
+                        <ul class="nav flex-column gap-0 ms-2 ps-2 border-start api-sub-nav">
+                            <li><a class="nav-link px-2 text-start" href="#ep-dhcp-lease-record"><span class="method-post me-1">POST</span>Record lease</a></li>
+                        </ul>
+                    </div>
+                </li>
+
+                {# Switch Ports #}
+                <li class="nav-item">
+                    <div class="d-flex align-items-center">
+                        <a class="nav-link flex-grow-1 py-1 px-2 text-start" href="#switch-ports">Switch Ports</a>
+                        <button class="btn btn-link btn-sm py-0 px-2 border-0 text-muted api-nav-toggle collapsed" data-bs-toggle="collapse" data-bs-target="#nav-switch-ports" aria-expanded="false"><i class="bi bi-chevron-down" style="font-size:.65rem"></i></button>
+                    </div>
+                    <div class="collapse" id="nav-switch-ports">
+                        <ul class="nav flex-column gap-0 ms-2 ps-2 border-start api-sub-nav">
+                            <li><a class="nav-link px-2 text-start" href="#ep-switch-port-status"><span class="method-get me-1">GET</span>Port status</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-switch-port-reauth"><span class="method-post me-1">POST</span>Reauthenticate</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-switch-port-bounce"><span class="method-post me-1">POST</span>Bounce</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-switch-port-poe"><span class="method-post me-1">POST</span>PoE bounce</a></li>
+                        </ul>
+                    </div>
+                </li>
             </ul>
         </nav>
     </div>
@@ -90,8 +290,19 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
            ═══════════════════════════════════════════════════════════════════ #}
         <section id="buildings" class="mb-5">
             <h2 class="h5 border-bottom pb-2 mb-3">Buildings <code class="small fw-normal text-muted">/api/buildings</code></h2>
+            <p class="text-muted small mb-3">Simple CRUD for building records used to categorize hosts by physical location.</p>
+            <table class="table table-sm table-borderless mb-4 small">
+                <tbody>
+                    <tr><td style="width:3.5rem"><span class="badge bg-primary font-monospace">GET</span></td><td><code>/api/buildings</code></td><td class="text-muted">List all buildings</td></tr>
+                    <tr><td><span class="badge bg-primary font-monospace">GET</span></td><td><code>/api/buildings/{id}</code></td><td class="text-muted">Get a building</td></tr>
+                    <tr><td><span class="badge bg-success font-monospace">POST</span></td><td><code>/api/buildings</code></td><td class="text-muted">Create a building</td></tr>
+                    <tr><td><span class="badge bg-warning text-dark font-monospace">PATCH</span></td><td><code>/api/buildings/{id}</code></td><td class="text-muted">Update a building</td></tr>
+                    <tr><td><span class="badge bg-danger font-monospace">DELETE</span></td><td><code>/api/buildings/{id}</code></td><td class="text-muted">Delete a building</td></tr>
+                </tbody>
+            </table>
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-buildings-list',
                 method: 'GET', path: '/api/buildings', name: 'List buildings',
                 query: [
                     {name: 'name', type: 'string', desc: 'Partial name match (case-insensitive).'},
@@ -100,11 +311,13 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-buildings-get',
                 method: 'GET', path: '/api/buildings/{id}', name: 'Get building',
                 response_example: '{\n  "id": 1,\n  "name": "Science Hall",\n  "description": "Main science building"\n}',
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-buildings-create',
                 method: 'POST', path: '/api/buildings', name: 'Create building',
                 body: [
                     {name: 'name', type: 'string', required: true, desc: 'Building name (must be unique).'},
@@ -114,6 +327,7 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-buildings-update',
                 method: 'PATCH', path: '/api/buildings/{id}', name: 'Update building',
                 notes: 'Only include fields you want to change.',
                 body: [
@@ -123,6 +337,7 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-buildings-delete',
                 method: 'DELETE', path: '/api/buildings/{id}', name: 'Delete building',
                 response_status: '204',
             } %}
@@ -133,18 +348,31 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
            ═══════════════════════════════════════════════════════════════════ #}
         <section id="dns-servers" class="mb-5">
             <h2 class="h5 border-bottom pb-2 mb-3">DNS Servers <code class="small fw-normal text-muted">/api/dns-servers</code></h2>
-            <p class="text-muted small">SSH keys are generated automatically when a server is created. The <code>ssh_public_key</code> value must be added to <code>authorized_keys</code> on the server. Private keys are never returned by the API.</p>
+            <p class="text-muted small mb-1">Manage BIND DNS server connections. SSH keys are generated automatically on create — copy the returned <code>ssh_public_key</code> to <code>authorized_keys</code> on the server. Private keys are never returned.</p>
+            <table class="table table-sm table-borderless mb-4 small">
+                <tbody>
+                    <tr><td style="width:3.5rem"><span class="badge bg-primary font-monospace">GET</span></td><td><code>/api/dns-servers</code></td><td class="text-muted">List all DNS servers</td></tr>
+                    <tr><td><span class="badge bg-primary font-monospace">GET</span></td><td><code>/api/dns-servers/{id}</code></td><td class="text-muted">Get a DNS server</td></tr>
+                    <tr><td><span class="badge bg-success font-monospace">POST</span></td><td><code>/api/dns-servers</code></td><td class="text-muted">Create a DNS server</td></tr>
+                    <tr><td><span class="badge bg-warning text-dark font-monospace">PATCH</span></td><td><code>/api/dns-servers/{id}</code></td><td class="text-muted">Update a DNS server</td></tr>
+                    <tr><td><span class="badge bg-danger font-monospace">DELETE</span></td><td><code>/api/dns-servers/{id}</code></td><td class="text-muted">Delete a DNS server</td></tr>
+                    <tr><td><span class="badge bg-success font-monospace">POST</span></td><td><code>/api/dns-servers/{id}/push</code></td><td class="text-muted">Queue a config deploy to the server (async, returns 202)</td></tr>
+                </tbody>
+            </table>
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-dns-servers-list',
                 method: 'GET', path: '/api/dns-servers', name: 'List DNS servers',
                 response_example: '[\n  {\n    "id": 1,\n    "name": "ns1",\n    "hostname": "ns1.example.com",\n    "ssh_user": "root",\n    "ssh_public_key": "ssh-ed25519 AAAA...",\n    "remote_zone_path": "/etc/bind/zones",\n    "key_directory": null,\n    "server_type": "primary",\n    "primary_hostname": null,\n    "description": null,\n    "view_ids": [1],\n    "created_at": "2024-01-01T00:00:00+00:00",\n    "updated_at": "2024-01-01T00:00:00+00:00",\n    "created_by": "user@example.com",\n    "updated_by": "user@example.com"\n  }\n]',
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-dns-servers-get',
                 method: 'GET', path: '/api/dns-servers/{id}', name: 'Get DNS server',
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-dns-servers-create',
                 method: 'POST', path: '/api/dns-servers', name: 'Create DNS server',
                 notes: 'An SSH key pair is generated automatically. Copy the <code>ssh_public_key</code> from the response to <code>authorized_keys</code> on the target server.',
                 body: [
@@ -162,6 +390,7 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-dns-servers-update',
                 method: 'PATCH', path: '/api/dns-servers/{id}', name: 'Update DNS server',
                 notes: 'Only include fields you want to change. SSH keys cannot be updated via this endpoint.',
                 body: [
@@ -178,11 +407,13 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-dns-servers-delete',
                 method: 'DELETE', path: '/api/dns-servers/{id}', name: 'Delete DNS server',
                 response_status: '204',
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-dns-servers-push',
                 method: 'POST', path: '/api/dns-servers/{id}/push', name: 'Push config to DNS server',
                 notes: 'Queues a zone file generation and deploy via the async worker. Returns immediately; deployment result is logged in Servers → Push Logs.',
                 response_example: '{"queued": true}',
@@ -195,18 +426,31 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
            ═══════════════════════════════════════════════════════════════════ #}
         <section id="dhcp-servers" class="mb-5">
             <h2 class="h5 border-bottom pb-2 mb-3">DHCP Servers <code class="small fw-normal text-muted">/api/dhcp-servers</code></h2>
-            <p class="text-muted small">SSH keys are generated automatically when a server is created. The <code>ssh_public_key</code> value must be added to <code>authorized_keys</code> on the server. Private keys and control passwords are never returned by the API.</p>
+            <p class="text-muted small mb-1">Manage Kea DHCP server connections. SSH keys are generated automatically on create — copy the returned <code>ssh_public_key</code> to <code>authorized_keys</code> on the server. Private keys and control passwords are never returned.</p>
+            <table class="table table-sm table-borderless mb-4 small">
+                <tbody>
+                    <tr><td style="width:3.5rem"><span class="badge bg-primary font-monospace">GET</span></td><td><code>/api/dhcp-servers</code></td><td class="text-muted">List all DHCP servers</td></tr>
+                    <tr><td><span class="badge bg-primary font-monospace">GET</span></td><td><code>/api/dhcp-servers/{id}</code></td><td class="text-muted">Get a DHCP server</td></tr>
+                    <tr><td><span class="badge bg-success font-monospace">POST</span></td><td><code>/api/dhcp-servers</code></td><td class="text-muted">Create a DHCP server</td></tr>
+                    <tr><td><span class="badge bg-warning text-dark font-monospace">PATCH</span></td><td><code>/api/dhcp-servers/{id}</code></td><td class="text-muted">Update a DHCP server</td></tr>
+                    <tr><td><span class="badge bg-danger font-monospace">DELETE</span></td><td><code>/api/dhcp-servers/{id}</code></td><td class="text-muted">Delete a DHCP server</td></tr>
+                    <tr><td><span class="badge bg-success font-monospace">POST</span></td><td><code>/api/dhcp-servers/{id}/push</code></td><td class="text-muted">Queue a config deploy to the server (async, returns 202)</td></tr>
+                </tbody>
+            </table>
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-dhcp-servers-list',
                 method: 'GET', path: '/api/dhcp-servers', name: 'List DHCP servers',
                 response_example: '[\n  {\n    "id": 1,\n    "name": "dhcp1",\n    "hostname": "dhcp1.example.com",\n    "ssh_user": "root",\n    "ssh_public_key": "ssh-ed25519 AAAA...",\n    "remote_path": "/etc/kea",\n    "control_url": "http://localhost:8000",\n    "control_user": "kea",\n    "description": null,\n    "created_at": "2024-01-01T00:00:00+00:00",\n    "updated_at": "2024-01-01T00:00:00+00:00",\n    "created_by": "user@example.com",\n    "updated_by": "user@example.com"\n  }\n]',
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-dhcp-servers-get',
                 method: 'GET', path: '/api/dhcp-servers/{id}', name: 'Get DHCP server',
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-dhcp-servers-create',
                 method: 'POST', path: '/api/dhcp-servers', name: 'Create DHCP server',
                 notes: 'An SSH key pair is generated automatically. Copy the <code>ssh_public_key</code> from the response to <code>authorized_keys</code> on the target server.',
                 body: [
@@ -223,6 +467,7 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-dhcp-servers-update',
                 method: 'PATCH', path: '/api/dhcp-servers/{id}', name: 'Update DHCP server',
                 notes: 'Only include fields you want to change. SSH keys cannot be updated via this endpoint. Sending <code>control_password</code> replaces the stored password.',
                 body: [
@@ -238,11 +483,13 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-dhcp-servers-delete',
                 method: 'DELETE', path: '/api/dhcp-servers/{id}', name: 'Delete DHCP server',
                 response_status: '204',
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-dhcp-servers-push',
                 method: 'POST', path: '/api/dhcp-servers/{id}/push', name: 'Push config to DHCP server',
                 notes: 'Queues a Kea config generation and deploy via the async worker. Returns immediately; deployment result is logged in Servers → Push Logs.',
                 response_example: '{"queued": true}',
@@ -255,8 +502,20 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
            ═══════════════════════════════════════════════════════════════════ #}
         <section id="hosts" class="mb-5">
             <h2 class="h5 border-bottom pb-2 mb-3">Hosts <code class="small fw-normal text-muted">/api/hosts</code></h2>
+            <p class="text-muted small mb-1">Hosts are the top-level record for a device. Each host contains one or more network interfaces. Hosts support soft-delete — deleted hosts are retained and can be restored.</p>
+            <table class="table table-sm table-borderless mb-4 small">
+                <tbody>
+                    <tr><td style="width:3.5rem"><span class="badge bg-primary font-monospace">GET</span></td><td><code>/api/hosts</code></td><td class="text-muted">List hosts (filterable, includes deleted)</td></tr>
+                    <tr><td><span class="badge bg-primary font-monospace">GET</span></td><td><code>/api/hosts/{id}</code></td><td class="text-muted">Get a host</td></tr>
+                    <tr><td><span class="badge bg-success font-monospace">POST</span></td><td><code>/api/hosts</code></td><td class="text-muted">Create a host</td></tr>
+                    <tr><td><span class="badge bg-warning text-dark font-monospace">PATCH</span></td><td><code>/api/hosts/{id}</code></td><td class="text-muted">Update a host</td></tr>
+                    <tr><td><span class="badge bg-danger font-monospace">DELETE</span></td><td><code>/api/hosts/{id}</code></td><td class="text-muted">Soft-delete a host and its interfaces</td></tr>
+                    <tr><td><span class="badge bg-success font-monospace">POST</span></td><td><code>/api/hosts/{id}/restore</code></td><td class="text-muted">Restore a soft-deleted host</td></tr>
+                </tbody>
+            </table>
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-hosts-list',
                 method: 'GET', path: '/api/hosts', name: 'List hosts',
                 query: [
                     {name: 'name', type: 'string', desc: 'Partial name match (case-insensitive).'},
@@ -267,11 +526,13 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-hosts-get',
                 method: 'GET', path: '/api/hosts/{id}', name: 'Get host',
                 response_example: '{\n  "id": 1,\n  "name": "server01",\n  "room": "A101",\n  "building_id": 3,\n  "tag_ids": [1, 2],\n  "deleted_at": null,\n  "created_at": "2024-01-01T00:00:00+00:00",\n  "updated_at": "2024-01-01T00:00:00+00:00",\n  "created_by": "user@example.com",\n  "updated_by": "user@example.com"\n}',
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-hosts-create',
                 method: 'POST', path: '/api/hosts', name: 'Create host',
                 body: [
                     {name: 'name', type: 'string', required: true, desc: 'Host name.'},
@@ -283,6 +544,7 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-hosts-update',
                 method: 'PATCH', path: '/api/hosts/{id}', name: 'Update host',
                 notes: 'Only include fields you want to change. Omitted fields are left unchanged.',
                 body: [
@@ -294,12 +556,14 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-hosts-delete',
                 method: 'DELETE', path: '/api/hosts/{id}', name: 'Delete host',
                 notes: 'Soft-deletes the host and all of its interfaces. The records are retained and can be restored. Returns <code>204</code> even if the host was already deleted.',
                 response_status: '204',
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-hosts-restore',
                 method: 'POST', path: '/api/hosts/{id}/restore', name: 'Restore host',
                 notes: 'Restores a soft-deleted host and all of its interfaces. If the host is not deleted, the current state is returned unchanged.',
                 response_example: '{\n  "id": 1,\n  "name": "server01",\n  "room": "A101",\n  "building_id": 3,\n  "tag_ids": [1, 2],\n  "deleted_at": null,\n  "created_at": "2024-01-01T00:00:00+00:00",\n  "updated_at": "2024-01-01T00:00:00+00:00",\n  "created_by": "user@example.com",\n  "updated_by": "user@example.com"\n}',
@@ -311,8 +575,21 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
            ═══════════════════════════════════════════════════════════════════ #}
         <section id="interfaces" class="mb-5">
             <h2 class="h5 border-bottom pb-2 mb-3">Interfaces <code class="small fw-normal text-muted">/api/interfaces</code></h2>
+            <p class="text-muted small mb-1">Network interfaces belong to a host and hold MAC, IP, and subnet assignments. Supports soft-delete, restore, auto IP assignment, and full-text search.</p>
+            <table class="table table-sm table-borderless mb-4 small">
+                <tbody>
+                    <tr><td style="width:3.5rem"><span class="badge bg-primary font-monospace">GET</span></td><td><code>/api/interfaces</code></td><td class="text-muted">List interfaces (filterable, includes deleted)</td></tr>
+                    <tr><td><span class="badge bg-primary font-monospace">GET</span></td><td><code>/api/interfaces/{id}</code></td><td class="text-muted">Get an interface</td></tr>
+                    <tr><td><span class="badge bg-success font-monospace">POST</span></td><td><code>/api/interfaces</code></td><td class="text-muted">Create an interface (supports auto IP assignment)</td></tr>
+                    <tr><td><span class="badge bg-warning text-dark font-monospace">PATCH</span></td><td><code>/api/interfaces/{id}</code></td><td class="text-muted">Update an interface</td></tr>
+                    <tr><td><span class="badge bg-danger font-monospace">DELETE</span></td><td><code>/api/interfaces/{id}</code></td><td class="text-muted">Soft-delete an interface</td></tr>
+                    <tr><td><span class="badge bg-success font-monospace">POST</span></td><td><code>/api/interfaces/{id}/restore</code></td><td class="text-muted">Restore a soft-deleted interface</td></tr>
+                    <tr><td><span class="badge bg-primary font-monospace">GET</span></td><td><code>/api/interfaces/search</code></td><td class="text-muted">Full-text search across host name, MAC, and IP</td></tr>
+                </tbody>
+            </table>
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-interfaces-list',
                 method: 'GET', path: '/api/interfaces', name: 'List interfaces',
                 query: [
                     {name: 'host_id', type: 'integer', desc: 'Filter by host ID.'},
@@ -324,10 +601,12 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-interfaces-get',
                 method: 'GET', path: '/api/interfaces/{id}', name: 'Get interface',
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-interfaces-create',
                 method: 'POST', path: '/api/interfaces', name: 'Create interface',
                 notes: 'For <code>ip_address</code> and <code>ipv6_address</code>, pass <code>"auto"</code> to auto-assign the next available address from the subnet, a specific IP string to assign that address, or omit the field to leave unassigned. For IPv6 only, <code>"auto_v4"</code> derives the address from the interface\'s IPv4 assignment. The interface must have a <code>subnet_id</code> with the appropriate CIDR for auto-assignment.',
                 body: [
@@ -342,6 +621,7 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-interfaces-update',
                 method: 'PATCH', path: '/api/interfaces/{id}', name: 'Update interface',
                 notes: 'Only include fields you want to change. Sending <code>ip_address</code> or <code>ipv6_address</code> always releases the existing address first, then applies the new value. Pass <code>null</code> or <code>""</code> to clear without reassigning.',
                 body: [
@@ -355,18 +635,21 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-interfaces-delete',
                 method: 'DELETE', path: '/api/interfaces/{id}', name: 'Delete interface',
                 notes: 'Soft-deletes the interface. The record is retained and can be restored. Returns <code>204</code> even if the interface was already deleted.',
                 response_status: '204',
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-interfaces-restore',
                 method: 'POST', path: '/api/interfaces/{id}/restore', name: 'Restore interface',
                 notes: 'Restores a soft-deleted interface. If the parent host is also soft-deleted, it is restored too. If the interface is not deleted, the current state is returned unchanged.',
                 response_example: '{\n  "id": 1,\n  "name": "eth0",\n  "mac_address": "aa:bb:cc:dd:ee:ff",\n  "host_id": 1,\n  "subnet_id": 2,\n  "ip_address": "10.0.0.5",\n  "ipv6_address": null,\n  "deleted_at": null,\n  "created_at": "2024-01-01T00:00:00+00:00",\n  "updated_at": "2024-01-01T00:00:00+00:00",\n  "created_by": "user@example.com",\n  "updated_by": "user@example.com"\n}',
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-interfaces-search',
                 method: 'GET', path: '/api/interfaces/search', name: 'Search interfaces',
                 notes: 'Full-text search across host name, interface name, IPv4/IPv6 address, and MAC address. Only non-deleted interfaces are returned. Requires at least 2 characters.',
                 query: [
@@ -382,8 +665,19 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
            ═══════════════════════════════════════════════════════════════════ #}
         <section id="subnets" class="mb-5">
             <h2 class="h5 border-bottom pb-2 mb-3">Subnets <code class="small fw-normal text-muted">/api/subnets</code></h2>
+            <p class="text-muted small mb-1">Subnets define IPv4 and/or IPv6 address spaces. They hold interfaces, address blocks, and DNS view associations. Container subnets are parent ranges that hold child subnets.</p>
+            <table class="table table-sm table-borderless mb-4 small">
+                <tbody>
+                    <tr><td style="width:3.5rem"><span class="badge bg-primary font-monospace">GET</span></td><td><code>/api/subnets</code></td><td class="text-muted">List subnets</td></tr>
+                    <tr><td><span class="badge bg-primary font-monospace">GET</span></td><td><code>/api/subnets/{id}</code></td><td class="text-muted">Get a subnet</td></tr>
+                    <tr><td><span class="badge bg-success font-monospace">POST</span></td><td><code>/api/subnets</code></td><td class="text-muted">Create a subnet</td></tr>
+                    <tr><td><span class="badge bg-warning text-dark font-monospace">PATCH</span></td><td><code>/api/subnets/{id}</code></td><td class="text-muted">Update a subnet</td></tr>
+                    <tr><td><span class="badge bg-danger font-monospace">DELETE</span></td><td><code>/api/subnets/{id}</code></td><td class="text-muted">Delete a subnet</td></tr>
+                </tbody>
+            </table>
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-subnets-list',
                 method: 'GET', path: '/api/subnets', name: 'List subnets',
                 query: [
                     {name: 'name', type: 'string', desc: 'Partial name match.'},
@@ -394,10 +688,12 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-subnets-get',
                 method: 'GET', path: '/api/subnets/{id}', name: 'Get subnet',
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-subnets-create',
                 method: 'POST', path: '/api/subnets', name: 'Create subnet',
                 body: [
                     {name: 'name', type: 'string', required: true, desc: 'Subnet name.'},
@@ -416,6 +712,7 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-subnets-update',
                 method: 'PATCH', path: '/api/subnets/{id}', name: 'Update subnet',
                 notes: 'Only include fields you want to change.',
                 body: [
@@ -434,6 +731,7 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-subnets-delete',
                 method: 'DELETE', path: '/api/subnets/{id}', name: 'Delete subnet',
                 response_status: '204',
             } %}
@@ -444,8 +742,19 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
            ═══════════════════════════════════════════════════════════════════ #}
         <section id="address-blocks" class="mb-5">
             <h2 class="h5 border-bottom pb-2 mb-3">Address Blocks <code class="small fw-normal text-muted">/api/address-blocks</code></h2>
+            <p class="text-muted small mb-1">Address blocks define reserved, dynamic (DHCP pool), or fixed IP ranges within a subnet. Each block belongs to exactly one subnet.</p>
+            <table class="table table-sm table-borderless mb-4 small">
+                <tbody>
+                    <tr><td style="width:3.5rem"><span class="badge bg-primary font-monospace">GET</span></td><td><code>/api/address-blocks</code></td><td class="text-muted">List address blocks</td></tr>
+                    <tr><td><span class="badge bg-primary font-monospace">GET</span></td><td><code>/api/address-blocks/{id}</code></td><td class="text-muted">Get an address block</td></tr>
+                    <tr><td><span class="badge bg-success font-monospace">POST</span></td><td><code>/api/address-blocks</code></td><td class="text-muted">Create an address block</td></tr>
+                    <tr><td><span class="badge bg-warning text-dark font-monospace">PATCH</span></td><td><code>/api/address-blocks/{id}</code></td><td class="text-muted">Update an address block</td></tr>
+                    <tr><td><span class="badge bg-danger font-monospace">DELETE</span></td><td><code>/api/address-blocks/{id}</code></td><td class="text-muted">Delete an address block</td></tr>
+                </tbody>
+            </table>
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-address-blocks-list',
                 method: 'GET', path: '/api/address-blocks', name: 'List address blocks',
                 query: [
                     {name: 'subnet_id', type: 'integer', desc: 'Filter by subnet ID.'},
@@ -455,10 +764,12 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-address-blocks-get',
                 method: 'GET', path: '/api/address-blocks/{id}', name: 'Get address block',
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-address-blocks-create',
                 method: 'POST', path: '/api/address-blocks', name: 'Create address block',
                 body: [
                     {name: 'subnet_id', type: 'integer', required: true, desc: 'Subnet this block belongs to.'},
@@ -471,6 +782,7 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-address-blocks-update',
                 method: 'PATCH', path: '/api/address-blocks/{id}', name: 'Update address block',
                 notes: 'Only include fields you want to change.',
                 body: [
@@ -483,6 +795,7 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-address-blocks-delete',
                 method: 'DELETE', path: '/api/address-blocks/{id}', name: 'Delete address block',
                 response_status: '204',
             } %}
@@ -493,8 +806,19 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
            ═══════════════════════════════════════════════════════════════════ #}
         <section id="domains" class="mb-5">
             <h2 class="h5 border-bottom pb-2 mb-3">Domains <code class="small fw-normal text-muted">/api/domains</code></h2>
+            <p class="text-muted small mb-1">DNS domains (zones) managed by DashDDI. Each domain can be scoped to one or more DNS views and carries SOA record configuration.</p>
+            <table class="table table-sm table-borderless mb-4 small">
+                <tbody>
+                    <tr><td style="width:3.5rem"><span class="badge bg-primary font-monospace">GET</span></td><td><code>/api/domains</code></td><td class="text-muted">List domains</td></tr>
+                    <tr><td><span class="badge bg-primary font-monospace">GET</span></td><td><code>/api/domains/{id}</code></td><td class="text-muted">Get a domain</td></tr>
+                    <tr><td><span class="badge bg-success font-monospace">POST</span></td><td><code>/api/domains</code></td><td class="text-muted">Create a domain</td></tr>
+                    <tr><td><span class="badge bg-warning text-dark font-monospace">PATCH</span></td><td><code>/api/domains/{id}</code></td><td class="text-muted">Update a domain</td></tr>
+                    <tr><td><span class="badge bg-danger font-monospace">DELETE</span></td><td><code>/api/domains/{id}</code></td><td class="text-muted">Delete a domain</td></tr>
+                </tbody>
+            </table>
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-domains-list',
                 method: 'GET', path: '/api/domains', name: 'List domains',
                 query: [
                     {name: 'name', type: 'string', desc: 'Partial name match.'},
@@ -503,10 +827,12 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-domains-get',
                 method: 'GET', path: '/api/domains/{id}', name: 'Get domain',
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-domains-create',
                 method: 'POST', path: '/api/domains', name: 'Create domain',
                 body: [
                     {name: 'name', type: 'string', required: true, desc: 'Domain name (e.g. example.com).'},
@@ -524,6 +850,7 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-domains-update',
                 method: 'PATCH', path: '/api/domains/{id}', name: 'Update domain',
                 notes: 'Only include fields you want to change.',
                 body: [
@@ -541,6 +868,7 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-domains-delete',
                 method: 'DELETE', path: '/api/domains/{id}', name: 'Delete domain',
                 response_status: '204',
             } %}
@@ -551,8 +879,19 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
            ═══════════════════════════════════════════════════════════════════ #}
         <section id="domain-records" class="mb-5">
             <h2 class="h5 border-bottom pb-2 mb-3">Domain Records <code class="small fw-normal text-muted">/api/domain-records</code></h2>
+            <p class="text-muted small mb-1">DNS records within a domain. Records can be standalone (with an explicit <code>value</code>) or linked to a network interface — for interface-linked A/AAAA records the value is derived automatically from the interface IP.</p>
+            <table class="table table-sm table-borderless mb-4 small">
+                <tbody>
+                    <tr><td style="width:3.5rem"><span class="badge bg-primary font-monospace">GET</span></td><td><code>/api/domain-records</code></td><td class="text-muted">List records (filterable by domain, interface, or type)</td></tr>
+                    <tr><td><span class="badge bg-primary font-monospace">GET</span></td><td><code>/api/domain-records/{id}</code></td><td class="text-muted">Get a record</td></tr>
+                    <tr><td><span class="badge bg-success font-monospace">POST</span></td><td><code>/api/domain-records</code></td><td class="text-muted">Create a record</td></tr>
+                    <tr><td><span class="badge bg-warning text-dark font-monospace">PATCH</span></td><td><code>/api/domain-records/{id}</code></td><td class="text-muted">Update a record</td></tr>
+                    <tr><td><span class="badge bg-danger font-monospace">DELETE</span></td><td><code>/api/domain-records/{id}</code></td><td class="text-muted">Delete a record</td></tr>
+                </tbody>
+            </table>
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-domain-records-list',
                 method: 'GET', path: '/api/domain-records', name: 'List domain records',
                 query: [
                     {name: 'domain_id', type: 'integer', desc: 'Filter by domain ID.'},
@@ -563,10 +902,12 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-domain-records-get',
                 method: 'GET', path: '/api/domain-records/{id}', name: 'Get domain record',
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-domain-records-create',
                 method: 'POST', path: '/api/domain-records', name: 'Create domain record',
                 notes: 'When creating an interface-linked A or AAAA record, the <code>value</code> field is derived automatically from the interface IP and may be omitted. <code>domain_id</code> is required for standalone records but optional for interface-linked records.',
                 body: [
@@ -583,6 +924,7 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-domain-records-update',
                 method: 'PATCH', path: '/api/domain-records/{id}', name: 'Update domain record',
                 notes: 'Only include fields you want to change.',
                 body: [
@@ -597,6 +939,7 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-domain-records-delete',
                 method: 'DELETE', path: '/api/domain-records/{id}', name: 'Delete domain record',
                 response_status: '204',
             } %}
@@ -607,8 +950,16 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
            ═══════════════════════════════════════════════════════════════════ #}
         <section id="tags" class="mb-5">
             <h2 class="h5 border-bottom pb-2 mb-3">Tags <code class="small fw-normal text-muted">/api/tags</code></h2>
+            <p class="text-muted small mb-1">Tags are short labels applied to hosts and subnets for filtering and organization. The create endpoint is idempotent — existing tags are returned rather than duplicated.</p>
+            <table class="table table-sm table-borderless mb-4 small">
+                <tbody>
+                    <tr><td style="width:3.5rem"><span class="badge bg-primary font-monospace">GET</span></td><td><code>/api/tags</code></td><td class="text-muted">Search tags by name (up to 20 results)</td></tr>
+                    <tr><td><span class="badge bg-success font-monospace">POST</span></td><td><code>/api/tags</code></td><td class="text-muted">Create a tag (idempotent)</td></tr>
+                </tbody>
+            </table>
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-tags-search',
                 method: 'GET', path: '/api/tags', name: 'Search tags',
                 notes: 'Returns up to 20 results. If no query is provided, returns the first 20 tags alphabetically.',
                 query: [
@@ -618,6 +969,7 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-tags-create',
                 method: 'POST', path: '/api/tags', name: 'Create tag',
                 notes: 'Idempotent — if a tag with the given name already exists, it is returned rather than creating a duplicate.',
                 body: [
@@ -633,9 +985,15 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
            ═══════════════════════════════════════════════════════════════════ #}
         <section id="dhcp-lease" class="mb-5">
             <h2 class="h5 border-bottom pb-2 mb-3">DHCP Lease <code class="small fw-normal text-muted">/api/dhcp/lease</code></h2>
-            <p class="text-muted small">Used by DHCP servers to record lease events. The subnet is matched automatically from the IP address.</p>
+            <p class="text-muted small mb-1">Write-only endpoint used by DHCP servers to record lease events. The subnet is matched automatically from the IP address. Typically called from a Kea <code>run_script</code> hook — see the <a href="{{ path('user_guide_integrations') }}#kea-lease-notifications">integrations guide</a> for setup instructions.</p>
+            <table class="table table-sm table-borderless mb-4 small">
+                <tbody>
+                    <tr><td style="width:3.5rem"><span class="badge bg-success font-monospace">POST</span></td><td><code>/api/dhcp/lease</code></td><td class="text-muted">Record a DHCP lease event</td></tr>
+                </tbody>
+            </table>
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-dhcp-lease-record',
                 method: 'POST', path: '/api/dhcp/lease', name: 'Record DHCP lease',
                 body: [
                     {name: 'ip-address', type: 'string', required: true, desc: 'Leased IP address.'},
@@ -653,7 +1011,15 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
            ═══════════════════════════════════════════════════════════════════ #}
         <section id="switch-ports" class="mb-5">
             <h2 class="h5 border-bottom pb-2 mb-3">Switch Ports <code class="small fw-normal text-muted">/api/switch</code></h2>
-            <p class="text-muted small">Query live port-access client data and trigger port actions on Aruba CX switches. All endpoints require Aruba CX credentials to be configured in the application.</p>
+            <p class="text-muted small mb-1">Query live port-access client data and trigger port actions on Aruba CX switches. The target port is resolved by looking up the most recent ClearPass auth log for the given MAC or IP address. Aruba CX credentials must be configured in the application.</p>
+            <table class="table table-sm table-borderless mb-4 small">
+                <tbody>
+                    <tr><td style="width:3.5rem"><span class="badge bg-primary font-monospace">GET</span></td><td><code>/api/switch/port-status</code></td><td class="text-muted">Get live port-access client data</td></tr>
+                    <tr><td><span class="badge bg-success font-monospace">POST</span></td><td><code>/api/switch/port-reauthenticate</code></td><td class="text-muted">Force 802.1X/MAC-auth reauthentication</td></tr>
+                    <tr><td><span class="badge bg-success font-monospace">POST</span></td><td><code>/api/switch/port-bounce</code></td><td class="text-muted">Shut port down and bring it back up</td></tr>
+                    <tr><td><span class="badge bg-success font-monospace">POST</span></td><td><code>/api/switch/port-poe-bounce</code></td><td class="text-muted">Power-cycle PoE on the port</td></tr>
+                </tbody>
+            </table>
 
             <h3 class="h6 mt-3 mb-2">Port resolution</h3>
             <p class="small">All four endpoints accept the same two ways to identify the target port:</p>
@@ -668,6 +1034,7 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
             <p class="small text-muted mb-4">Port actions (reauthenticate, bounce, PoE bounce) connect to the switch over SSH and may take up to 15–20 seconds to complete due to the built-in pause between down and up states.</p>
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-switch-port-status',
                 method: 'GET', path: '/api/switch/port-status', name: 'Get port-access clients',
                 notes: 'Returns live port-access client data for the specified port. Tries the REST API first; falls back to SSH if REST is unavailable.',
                 query: [
@@ -678,6 +1045,7 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-switch-port-reauth',
                 method: 'POST', path: '/api/switch/port-reauthenticate', name: 'Reauthenticate port',
                 notes: 'Sends a <code>port-access reauthenticate interface</code> command to the switch via SSH, forcing the connected client to re-run 802.1X or MAC-auth.',
                 body: [
@@ -688,6 +1056,7 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-switch-port-bounce',
                 method: 'POST', path: '/api/switch/port-bounce', name: 'Bounce port',
                 notes: 'Administratively shuts the port down, waits 10 seconds, then brings it back up. Tries the REST API first; falls back to SSH. Disconnects and reconnects any client on the port.',
                 body: [
@@ -698,6 +1067,7 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-switch-port-poe',
                 method: 'POST', path: '/api/switch/port-poe-bounce', name: 'PoE bounce port',
                 notes: 'Cuts PoE power to the port (<code>no power-over-ethernet</code>), shuts it down, waits 10 seconds, then restores both. Forces a full power cycle of any PoE-powered device (e.g. an AP or IP phone).',
                 body: [
@@ -710,4 +1080,27 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
 
     </div>{# /col #}
 </div>{# /row #}
+
+<script>
+(function () {
+    function openCollapseForHash(hash) {
+        if (!hash) return;
+        var target = document.querySelector(hash);
+        if (!target) return;
+        var section = target.closest('section[id]');
+        if (!section) return;
+        var collapseEl = document.getElementById('nav-' + section.id);
+        if (!collapseEl) return;
+        bootstrap.Collapse.getOrCreateInstance(collapseEl, {toggle: false}).show();
+        var btn = document.querySelector('[data-bs-target="#nav-' + section.id + '"]');
+        if (btn) btn.classList.remove('collapsed');
+    }
+    document.addEventListener('DOMContentLoaded', function () {
+        openCollapseForHash(window.location.hash);
+    });
+    window.addEventListener('hashchange', function () {
+        openCollapseForHash(window.location.hash);
+    });
+}());
+</script>
 {% endblock %}
