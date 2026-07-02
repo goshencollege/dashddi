@@ -1,5 +1,5 @@
 {% extends 'base.html.twig' %}
-{% block title %}Audit Log{% endblock %}
+{% block title %}Activity Log{% endblock %}
 {% block body_class %}page-list-view{% endblock %}
 
 {% block stylesheets %}
@@ -17,7 +17,7 @@
 {% block content %}
 <div class="list-page-content">
     <div class="sticky-list-header d-flex justify-content-between align-items-center mb-3">
-        <h1 class="h4 mb-0"><i class="bi bi-shield-check me-2"></i>Audit Log</h1>
+        <h1 class="h4 mb-0"><i class="bi bi-shield-check me-2"></i>Activity Log</h1>
         <div class="d-flex align-items-center gap-3">
             <span class="text-muted small">{{ total }} record{{ total != 1 ? 's' }}</span>
             <a href="{{ path('user_guide_servers') }}#activity-log" class="btn btn-sm btn-outline-secondary" title="User Guide" target="_blank"><i class="bi bi-question-circle"></i></a>
