@@ -19,7 +19,6 @@
                 <li class="nav-item"><a class="nav-link py-1 px-2 text-start" href="#dhcp-servers">DHCP Servers</a></li>
                 <li class="nav-item"><a class="nav-link py-1 px-2 text-start" href="#hosts">Hosts</a></li>
                 <li class="nav-item"><a class="nav-link py-1 px-2 text-start" href="#interfaces">Interfaces</a></li>
-                <li class="nav-item"><a class="nav-link py-1 px-2 text-start" href="#interface-names">Interface Names</a></li>
                 <li class="nav-item"><a class="nav-link py-1 px-2 text-start" href="#subnets">Subnets</a></li>
                 <li class="nav-item"><a class="nav-link py-1 px-2 text-start" href="#address-blocks">Address Blocks</a></li>
                 <li class="nav-item"><a class="nav-link py-1 px-2 text-start" href="#domains">Domains</a></li>
@@ -76,6 +75,7 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
                 <tbody>
                     <tr><td><code>200</code></td><td>Success — returns the resource or a list.</td></tr>
                     <tr><td><code>201</code></td><td>Created — returns the new resource.</td></tr>
+                    <tr><td><code>202</code></td><td>Accepted — the request has been queued for async processing.</td></tr>
                     <tr><td><code>204</code></td><td>No Content — successful delete, empty body.</td></tr>
                     <tr><td><code>401</code></td><td>Unauthorized — token missing or invalid.</td></tr>
                     <tr><td><code>403</code></td><td>Forbidden — token valid but not permitted on this endpoint, or request originates from a disallowed IP address.</td></tr>
@@ -184,8 +184,9 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
 
             {% include 'api_docs/_endpoint.html.twig' with {
                 method: 'POST', path: '/api/dns-servers/{id}/push', name: 'Push config to DNS server',
-                notes: 'Generates zone files and deploys them to the server via SSH, then reloads BIND.',
-                response_example: '{\n  "views": {\n    "internal": {"success": true, "zones_written": 3}\n  },\n  "reload": {"success": true, "output": ""}\n}',
+                notes: 'Queues a zone file generation and deploy via the async worker. Returns immediately; deployment result is logged in Servers → Push Logs.',
+                response_example: '{"queued": true}',
+                response_status: '202',
             } %}
         </section>
 
@@ -243,8 +244,9 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
 
             {% include 'api_docs/_endpoint.html.twig' with {
                 method: 'POST', path: '/api/dhcp-servers/{id}/push', name: 'Push config to DHCP server',
-                notes: 'Generates Kea config files and deploys them to the server via SSH, then signals Kea to reload via the control agent.',
-                response_example: '{\n  "dhcp4": {"success": true, "output": "", "file": "subnets4.json"},\n  "dhcp6": {"success": true, "output": "", "file": "subnets6.json"}\n}',
+                notes: 'Queues a Kea config generation and deploy via the async worker. Returns immediately; deployment result is logged in Servers → Push Logs.',
+                response_example: '{"queued": true}',
+                response_status: '202',
             } %}
         </section>
 
@@ -376,56 +378,6 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
         </section>
 
         {# ═══════════════════════════════════════════════════════════════════
-           INTERFACE NAMES
-           ═══════════════════════════════════════════════════════════════════ #}
-        <section id="interface-names" class="mb-5">
-            <h2 class="h5 border-bottom pb-2 mb-3">Interface Names <code class="small fw-normal text-muted">/api/interface-names</code></h2>
-
-            {% include 'api_docs/_endpoint.html.twig' with {
-                method: 'GET', path: '/api/interface-names', name: 'List interface names',
-                query: [
-                    {name: 'interface_id', type: 'integer', desc: 'Filter by interface ID.'},
-                    {name: 'domain_id', type: 'integer', desc: 'Filter by domain ID.'},
-                ],
-                response_example: '[\n  {\n    "id": 1,\n    "name": "server01",\n    "fqdn": "server01.example.com",\n    "interface_id": 1,\n    "domain_id": 2,\n    "ttl": 3600,\n    "is_canonical": true,\n    "view_ids": [1]\n  }\n]',
-            } %}
-
-            {% include 'api_docs/_endpoint.html.twig' with {
-                method: 'GET', path: '/api/interface-names/{id}', name: 'Get interface name',
-            } %}
-
-            {% include 'api_docs/_endpoint.html.twig' with {
-                method: 'POST', path: '/api/interface-names', name: 'Create interface name',
-                body: [
-                    {name: 'interface_id', type: 'integer', required: true, desc: 'Interface this name belongs to.'},
-                    {name: 'name', type: 'string', required: true, desc: 'Hostname label (without domain).'},
-                    {name: 'domain_id', type: 'integer', required: false, desc: 'Domain ID.'},
-                    {name: 'ttl', type: 'integer', required: false, desc: 'DNS TTL in seconds.'},
-                    {name: 'is_canonical', type: 'boolean', required: false, desc: 'Whether this is the canonical (PTR) name. Default: false.'},
-                    {name: 'view_ids', type: 'integer[]', required: false, desc: 'DNS view IDs.'},
-                ],
-                response_status: '201',
-            } %}
-
-            {% include 'api_docs/_endpoint.html.twig' with {
-                method: 'PATCH', path: '/api/interface-names/{id}', name: 'Update interface name',
-                notes: 'Only include fields you want to change.',
-                body: [
-                    {name: 'name', type: 'string', required: false, desc: 'Hostname label.'},
-                    {name: 'domain_id', type: 'integer|null', required: false, desc: 'Domain ID, or null to clear.'},
-                    {name: 'ttl', type: 'integer|null', required: false, desc: 'DNS TTL, or null to clear.'},
-                    {name: 'is_canonical', type: 'boolean', required: false, desc: 'Canonical name flag.'},
-                    {name: 'view_ids', type: 'integer[]', required: false, desc: 'Replaces all current views.'},
-                ],
-            } %}
-
-            {% include 'api_docs/_endpoint.html.twig' with {
-                method: 'DELETE', path: '/api/interface-names/{id}', name: 'Delete interface name',
-                response_status: '204',
-            } %}
-        </section>
-
-        {# ═══════════════════════════════════════════════════════════════════
            SUBNETS
            ═══════════════════════════════════════════════════════════════════ #}
         <section id="subnets" class="mb-5">
@@ -547,7 +499,7 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
                 query: [
                     {name: 'name', type: 'string', desc: 'Partial name match.'},
                 ],
-                response_example: '[\n  {\n    "id": 1,\n    "name": "example.com",\n    "description": null,\n    "soa_nameserver": "ns1.example.com",\n    "soa_email": "hostmaster.example.com",\n    "soa_refresh": 3600,\n    "soa_retry": 900,\n    "soa_expire": 604800,\n    "soa_ttl": 300,\n    "view_ids": [1],\n    "created_at": "2024-01-01T00:00:00+00:00",\n    "updated_at": "2024-01-01T00:00:00+00:00",\n    "created_by": "user@example.com",\n    "updated_by": "user@example.com"\n  }\n]',
+                response_example: '[\n  {\n    "id": 1,\n    "name": "example.com",\n    "description": null,\n    "soa_nameserver": "ns1.example.com",\n    "soa_email": "hostmaster.example.com",\n    "soa_refresh": 3600,\n    "soa_retry": 900,\n    "soa_expire": 604800,\n    "soa_ttl": 300,\n    "exclude_from_interfaces": false,\n    "view_ids": [1],\n    "created_at": "2024-01-01T00:00:00+00:00",\n    "updated_at": "2024-01-01T00:00:00+00:00",\n    "created_by": "user@example.com",\n    "updated_by": "user@example.com"\n  }\n]',
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
@@ -565,6 +517,7 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
                     {name: 'soa_retry', type: 'integer', required: false, desc: 'SOA retry interval (seconds).'},
                     {name: 'soa_expire', type: 'integer', required: false, desc: 'SOA expire value (seconds).'},
                     {name: 'soa_ttl', type: 'integer', required: false, desc: 'SOA minimum/negative-cache TTL (seconds).'},
+                    {name: 'exclude_from_interfaces', type: 'boolean', required: false, desc: 'When true, this domain is excluded from the interface-linked record dropdowns in the UI. Default: false.'},
                     {name: 'view_ids', type: 'integer[]', required: false, desc: 'DNS view IDs.'},
                 ],
                 response_status: '201',
@@ -582,6 +535,7 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
                     {name: 'soa_retry', type: 'integer|null', required: false, desc: 'Retry interval, or null to clear.'},
                     {name: 'soa_expire', type: 'integer|null', required: false, desc: 'Expire value, or null to clear.'},
                     {name: 'soa_ttl', type: 'integer|null', required: false, desc: 'Minimum TTL, or null to clear.'},
+                    {name: 'exclude_from_interfaces', type: 'boolean', required: false, desc: 'Exclude from interface-linked record dropdowns in the UI.'},
                     {name: 'view_ids', type: 'integer[]', required: false, desc: 'Replaces all current views.'},
                 ],
             } %}
@@ -602,9 +556,10 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
                 method: 'GET', path: '/api/domain-records', name: 'List domain records',
                 query: [
                     {name: 'domain_id', type: 'integer', desc: 'Filter by domain ID.'},
+                    {name: 'interface_id', type: 'integer', desc: 'Filter by interface ID (returns all records linked to that interface).'},
                     {name: 'type', type: 'string', desc: 'Filter by record type (A, AAAA, CNAME, MX, NS, TXT, PTR, SRV).'},
                 ],
-                response_example: '[\n  {\n    "id": 1,\n    "domain_id": 1,\n    "hostname": "www",\n    "type": "A",\n    "value": "10.0.0.5",\n    "ttl": 3600,\n    "view_ids": [1],\n    "created_at": "2024-01-01T00:00:00+00:00",\n    "updated_at": "2024-01-01T00:00:00+00:00",\n    "created_by": "user@example.com",\n    "updated_by": "user@example.com"\n  }\n]',
+                response_example: '[\n  {\n    "id": 1,\n    "domain_id": 1,\n    "interface_id": null,\n    "hostname": "www",\n    "fqdn": "www.example.com",\n    "type": "A",\n    "value": "10.0.0.5",\n    "ttl": 3600,\n    "is_canonical": false,\n    "view_ids": [1],\n    "created_at": "2024-01-01T00:00:00+00:00",\n    "updated_at": "2024-01-01T00:00:00+00:00",\n    "created_by": "user@example.com",\n    "updated_by": "user@example.com"\n  }\n]',
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
@@ -613,11 +568,14 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
 
             {% include 'api_docs/_endpoint.html.twig' with {
                 method: 'POST', path: '/api/domain-records', name: 'Create domain record',
+                notes: 'When creating an interface-linked A or AAAA record, the <code>value</code> field is derived automatically from the interface IP and may be omitted. <code>domain_id</code> is required for standalone records but optional for interface-linked records.',
                 body: [
-                    {name: 'domain_id', type: 'integer', required: true, desc: 'Domain this record belongs to.'},
                     {name: 'hostname', type: 'string', required: true, desc: 'Hostname label (without domain, e.g. www).'},
                     {name: 'type', type: 'string', required: true, desc: 'Record type: A, AAAA, CNAME, MX, NS, TXT, PTR, or SRV (case-insensitive).'},
-                    {name: 'value', type: 'string', required: true, desc: 'Record value (IP, hostname, or text depending on type).'},
+                    {name: 'domain_id', type: 'integer', required: false, desc: 'Domain this record belongs to. Required when <code>interface_id</code> is not set.'},
+                    {name: 'interface_id', type: 'integer', required: false, desc: 'Link this record to a network interface. For A/AAAA records, <code>value</code> is auto-derived from the interface IP.'},
+                    {name: 'is_canonical', type: 'boolean', required: false, desc: 'Mark this as the canonical (PTR) name for the interface. Only valid on interface-linked A/AAAA records. Default: false.'},
+                    {name: 'value', type: 'string', required: false, desc: 'Record value (IP, hostname, or text depending on type). Required for non-interface records and all non-A/AAAA types.'},
                     {name: 'ttl', type: 'integer', required: false, desc: 'TTL in seconds.'},
                     {name: 'view_ids', type: 'integer[]', required: false, desc: 'DNS view IDs.'},
                 ],
@@ -632,6 +590,7 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
                     {name: 'hostname', type: 'string', required: false, desc: 'Hostname label.'},
                     {name: 'type', type: 'string', required: false, desc: 'Record type (A, AAAA, CNAME, MX, NS, TXT, PTR, SRV).'},
                     {name: 'value', type: 'string', required: false, desc: 'Record value.'},
+                    {name: 'is_canonical', type: 'boolean', required: false, desc: 'Canonical name flag. Only valid on interface-linked A/AAAA records.'},
                     {name: 'ttl', type: 'integer|null', required: false, desc: 'TTL in seconds, or null to clear.'},
                     {name: 'view_ids', type: 'integer[]', required: false, desc: 'Replaces all current views.'},
                 ],
@@ -697,26 +656,23 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
             <p class="text-muted small">Query live port-access client data and trigger port actions on Aruba CX switches. All endpoints require Aruba CX credentials to be configured in the application.</p>
 
             <h3 class="h6 mt-3 mb-2">Port resolution</h3>
-            <p class="small">All four endpoints accept the same three ways to identify the target port:</p>
+            <p class="small">All four endpoints accept the same two ways to identify the target port:</p>
             <table class="table table-sm table-bordered mb-3 small">
-                <thead class="table-light"><tr><th>Field(s)</th><th>Description</th></tr></thead>
+                <thead class="table-light"><tr><th>Field</th><th>Description</th></tr></thead>
                 <tbody>
                     <tr><td><code>mac</code></td><td>MAC address of the client (any format — <code>aa:bb:cc:dd:ee:ff</code>, <code>aa-bb-cc-dd-ee-ff</code>, or bare <code>aabbccddeeff</code>). Looks up the switch IP and port from the most recent ClearPass auth log for this MAC.</td></tr>
                     <tr><td><code>ip</code></td><td>IPv4 address of the client. Resolves to the interface's MAC address, then performs the same ClearPass lookup as above.</td></tr>
-                    <tr><td><code>switch_ip</code> + <code>port_id</code></td><td>Explicit switch management IP and port ID (e.g. <code>10.254.19.2</code> and <code>1/1/18</code>). Skips the database lookup entirely.</td></tr>
                 </tbody>
             </table>
-            <p class="small text-muted">The MAC/IP lookup is subject to the switch info max-age setting — if the most recent auth log for that address is older than the configured limit, a <code>404</code> is returned.</p>
+            <p class="small text-muted">The lookup is subject to the switch info max-age setting — if the most recent auth log for that address is older than the configured limit, a <code>404</code> is returned.</p>
             <p class="small text-muted mb-4">Port actions (reauthenticate, bounce, PoE bounce) connect to the switch over SSH and may take up to 15–20 seconds to complete due to the built-in pause between down and up states.</p>
 
             {% include 'api_docs/_endpoint.html.twig' with {
                 method: 'GET', path: '/api/switch/port-status', name: 'Get port-access clients',
                 notes: 'Returns live port-access client data for the specified port. Tries the REST API first; falls back to SSH if REST is unavailable.',
                 query: [
-                    {name: 'mac', type: 'string', desc: 'Client MAC address (any common format). Mutually exclusive with <code>switch_ip</code>/<code>port_id</code>.'},
-                    {name: 'ip', type: 'string', desc: 'Client IPv4 address. Mutually exclusive with <code>switch_ip</code>/<code>port_id</code>.'},
-                    {name: 'switch_ip', type: 'string', desc: 'Switch management IP. Must be used together with <code>port_id</code>.'},
-                    {name: 'port_id', type: 'string', desc: 'Switch port ID (e.g. <code>1/1/18</code>). Must be used together with <code>switch_ip</code>.'},
+                    {name: 'mac', type: 'string', desc: 'Client MAC address (any common format).'},
+                    {name: 'ip', type: 'string', desc: 'Client IPv4 address.'},
                 ],
                 response_example: '{\n  "clients": [\n    {\n      "mac": "20:4c:03:d7:c0:bf",\n      "vlan": "44",\n      "role": "CX_DUR_Local_VLAN44-3050-9",\n      "status": "Success",\n      "auth_method": "MAC-Auth"\n    }\n  ],\n  "raw": "...",\n  "via": "rest",\n  "error": null\n}',
             } %}
@@ -725,10 +681,8 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
                 method: 'POST', path: '/api/switch/port-reauthenticate', name: 'Reauthenticate port',
                 notes: 'Sends a <code>port-access reauthenticate interface</code> command to the switch via SSH, forcing the connected client to re-run 802.1X or MAC-auth.',
                 body: [
-                    {name: 'mac', type: 'string', required: false, desc: 'Client MAC address. One of <code>mac</code>, <code>ip</code>, or <code>switch_ip</code>+<code>port_id</code> is required.'},
+                    {name: 'mac', type: 'string', required: false, desc: 'Client MAC address. One of <code>mac</code> or <code>ip</code> is required.'},
                     {name: 'ip', type: 'string', required: false, desc: 'Client IPv4 address.'},
-                    {name: 'switch_ip', type: 'string', required: false, desc: 'Switch management IP (use with <code>port_id</code>).'},
-                    {name: 'port_id', type: 'string', required: false, desc: 'Switch port ID (use with <code>switch_ip</code>).'},
                 ],
                 response_example: '{\n  "success": true,\n  "error": null,\n  "output": "Last login: 2026-05-21 17:00:57 from 192.168.60.134\ncx-sas# port-access reauthenticate interface 1\/1\/18\ncx-sas#"\n}',
             } %}
@@ -737,10 +691,8 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
                 method: 'POST', path: '/api/switch/port-bounce', name: 'Bounce port',
                 notes: 'Administratively shuts the port down, waits 10 seconds, then brings it back up. Tries the REST API first; falls back to SSH. Disconnects and reconnects any client on the port.',
                 body: [
-                    {name: 'mac', type: 'string', required: false, desc: 'Client MAC address. One of <code>mac</code>, <code>ip</code>, or <code>switch_ip</code>+<code>port_id</code> is required.'},
+                    {name: 'mac', type: 'string', required: false, desc: 'Client MAC address. One of <code>mac</code> or <code>ip</code> is required.'},
                     {name: 'ip', type: 'string', required: false, desc: 'Client IPv4 address.'},
-                    {name: 'switch_ip', type: 'string', required: false, desc: 'Switch management IP (use with <code>port_id</code>).'},
-                    {name: 'port_id', type: 'string', required: false, desc: 'Switch port ID (use with <code>switch_ip</code>).'},
                 ],
                 response_example: '{\n  "success": true,\n  "error": null,\n  "output": "Last login: 2026-05-21 17:00:57 from 192.168.60.134\ncx-sas# configure terminal\ncx-sas(config)# interface 1\/1\/18\ncx-sas(config-if)# shutdown\ncx-sas(config-if)# no shutdown\ncx-sas(config-if)# end\ncx-sas#"\n}',
             } %}
@@ -749,10 +701,8 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
                 method: 'POST', path: '/api/switch/port-poe-bounce', name: 'PoE bounce port',
                 notes: 'Cuts PoE power to the port (<code>no power-over-ethernet</code>), shuts it down, waits 10 seconds, then restores both. Forces a full power cycle of any PoE-powered device (e.g. an AP or IP phone).',
                 body: [
-                    {name: 'mac', type: 'string', required: false, desc: 'Client MAC address. One of <code>mac</code>, <code>ip</code>, or <code>switch_ip</code>+<code>port_id</code> is required.'},
+                    {name: 'mac', type: 'string', required: false, desc: 'Client MAC address. One of <code>mac</code> or <code>ip</code> is required.'},
                     {name: 'ip', type: 'string', required: false, desc: 'Client IPv4 address.'},
-                    {name: 'switch_ip', type: 'string', required: false, desc: 'Switch management IP (use with <code>port_id</code>).'},
-                    {name: 'port_id', type: 'string', required: false, desc: 'Switch port ID (use with <code>switch_ip</code>).'},
                 ],
                 response_example: '{\n  "success": true,\n  "error": null,\n  "output": "Last login: 2026-05-21 17:00:57 from 192.168.60.134\ncx-sas# configure terminal\ncx-sas(config)# interface 1\/1\/18\ncx-sas(config-if)# no power-over-ethernet\ncx-sas(config-if)# shutdown\ncx-sas(config-if)# no shutdown\ncx-sas(config-if)# power-over-ethernet\ncx-sas(config-if)# end\ncx-sas#"\n}',
             } %}

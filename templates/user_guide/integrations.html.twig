@@ -86,7 +86,7 @@
             <li><strong>Reverse zones</strong> — one file per subnet (e.g. <code>10.0.1.0.zone</code> for IPv4, <code>ip6.arpa</code> zone for IPv6)</li>
             <li><strong><code>dashddi.conf</code></strong> — ACL definitions and all <code>view {}</code> blocks with <code>zone {}</code> stanzas</li>
         </ul>
-        <p class="mb-3">Each zone includes SOA records, A/AAAA records from interface names, PTR records, and DNSSEC inline-signing directives when a policy is configured. IPv4 reverse zones use RFC 2317 classless delegation where applicable.</p>
+        <p class="mb-3">Each zone includes SOA records, A/AAAA records from domain records (including interface-linked records), PTR records, and DNSSEC inline-signing directives when a policy is configured. IPv4 reverse zones use RFC 2317 classless delegation where applicable.</p>
 
         <hr class="my-3">
         <h6>Console command</h6>
