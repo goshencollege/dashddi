@@ -271,6 +271,24 @@ else
     DB_ROOT_PASSWORD=$(openssl rand -hex 16)
 fi
 
+# ── Container log forwarding ──────────────────────────────────────────────────
+header "Container log forwarding"
+echo
+echo "  Container stdout/stderr (Docker logs) can be forwarded to a remote syslog server."
+echo "  This is separate from the in-app audit-log syslog setting."
+echo
+CONTAINER_SYSLOG_ENABLED=false
+if ask_yn "Forward container logs to a remote syslog server?" "n"; then
+    CONTAINER_SYSLOG_ENABLED=true
+    ask CONTAINER_SYSLOG_PROTOCOL "Protocol (udp or tcp)" "udp"
+    ask CONTAINER_SYSLOG_HOST     "Syslog server hostname or IP"
+    ask CONTAINER_SYSLOG_PORT     "Port" "514"
+    CONTAINER_SYSLOG_ADDRESS="${CONTAINER_SYSLOG_PROTOCOL}://${CONTAINER_SYSLOG_HOST}:${CONTAINER_SYSLOG_PORT}"
+    ok "Container logs → $CONTAINER_SYSLOG_ADDRESS"
+else
+    ok "Container logs will be stored locally (json-file driver)"
+fi
+
 # ── 6. Write compose file ─────────────────────────────────────────────────────
 if [[ "$APP_ENV" == "dev" ]]; then
     header "Writing docker-compose.dev.yml"
@@ -311,6 +329,11 @@ else
       interval: 5s
       timeout: 5s
       retries: 12
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
 
 YAML
 
@@ -453,6 +476,25 @@ ${VOLUMES_BLOCK}
 EOF
 
     ok "docker-compose.prod.yml written"
+fi
+
+# Replace json-file logging with syslog if configured
+if [[ "$CONTAINER_SYSLOG_ENABLED" == "true" ]]; then
+    awk -v addr="$CONTAINER_SYSLOG_ADDRESS" '
+/^[[:space:]]+logging:[[:space:]]*$/ {
+    ind = $0; gsub(/logging:.*/, "", ind)
+    si = ind "  "; ssi = si "  "
+    print ind "logging:"
+    print si "driver: syslog"
+    print si "options:"
+    print ssi "syslog-address: \"" addr "\""
+    print ssi "tag: \"dashddi/{{.Name}}\""
+    skip = 4; next
+}
+skip > 0 { skip--; next }
+{ print }
+' "$COMPOSE_FILE" > "${COMPOSE_FILE}.tmp" && mv "${COMPOSE_FILE}.tmp" "$COMPOSE_FILE"
+    ok "Logging driver set to syslog ($CONTAINER_SYSLOG_ADDRESS)"
 fi
 
 # ── 7. Build image(s) ─────────────────────────────────────────────────────────
