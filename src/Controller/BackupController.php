@@ -201,6 +201,7 @@ class BackupController extends AbstractController
         }
 
         $response = new BinaryFileResponse($filePath);
+        $response->headers->set('Content-Type', 'application/octet-stream');
         $response->setContentDisposition(ResponseHeaderBag::DISPOSITION_ATTACHMENT, $filename);
         return $response;
     }
