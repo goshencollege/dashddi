@@ -3,7 +3,6 @@
 namespace App\Command;
 
 use App\Repository\DnsServerRepository;
-use App\Service\DnsConfigGenerator;
 use App\Service\DnsDeployService;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -39,7 +38,6 @@ class BumpDnsSerialCommand extends Command
     private const MAX_SAFE_STEP = 2147483647; // 2^31 - 1
 
     public function __construct(
-        private readonly DnsConfigGenerator  $generator,
         private readonly DnsDeployService    $deployer,
         private readonly DnsServerRepository $serverRepo,
     ) {
@@ -137,12 +135,11 @@ class BumpDnsSerialCommand extends Command
 
             $io->section("Iteration $iteration — serial $current");
 
-            $this->generator->forceSerial($current);
             $failed = false;
 
             foreach ($servers as $server) {
                 try {
-                    $results = $this->deployer->deployToServer($server);
+                    $results = $this->deployer->deployToServer($server, $current);
                 } catch (\Throwable $e) {
                     $io->writeln('  <error>Failed</error>  ' . $server->getName() . ': ' . $e->getMessage());
                     $failed = true;
@@ -160,8 +157,6 @@ class BumpDnsSerialCommand extends Command
                     }
                 }
             }
-
-            $this->generator->forceSerial(null);
 
             if ($failed) {
                 $io->error('Deploy failed — aborting to avoid pushing an intermediate serial without the secondary accepting it.');

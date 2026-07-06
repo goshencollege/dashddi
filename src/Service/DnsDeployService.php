@@ -25,8 +25,19 @@ class DnsDeployService
      *   'reload' => [ 'success' => bool, 'output' => string ] | null,
      * ]
      */
-    public function deployToServer(DnsServer $server): array
+    /**
+     * When $overrideSerial is provided (serial bump mode):
+     *   - Non-dynamic zones get a zone file written with the forced serial.
+     *   - Dynamic zones (managed by BIND internally) use rndc freeze + sed + rndc thaw,
+     *     because BIND silently ignores explicit SOA updates sent via nsupdate.
+     */
+    public function deployToServer(DnsServer $server, ?int $overrideSerial = null): array
     {
+        if ($overrideSerial !== null) {
+            $this->generator->forceSerial($overrideSerial);
+        }
+
+        try {
         $sftp       = $this->getSftp($server);
         $results    = ['views' => [], 'conf' => null, 'reload' => null];
         $zonePath   = rtrim($server->getRemoteZonePath(), '/');
@@ -63,12 +74,21 @@ class DnsDeployService
                     if ($isDynamic) {
                         $sftp->exec('test -f ' . escapeshellarg($remotePath));
                         if ($sftp->getExitStatus() === 0) {
-                            $nsu = $this->execNsUpdate($this->generator->generateDomainApexNsUpdate($domain, $view), $server, $sftp);
-                            $viewResult['zones'][$domain->getName()] = [
-                                'success' => $nsu['success'],
-                                'file'    => $displayFile,
-                                'output'  => $nsu['success'] ? 'SOA/NS updated via nsupdate' : ('nsupdate failed: ' . $nsu['output']),
-                            ];
+                            if ($overrideSerial !== null) {
+                                $ok = $this->freezeBumpThaw($domain->getName(), $viewName, $remotePath, $overrideSerial, $sftp);
+                                $viewResult['zones'][$domain->getName()] = [
+                                    'success' => $ok,
+                                    'file'    => $displayFile,
+                                    'output'  => $ok ? 'Serial bumped via freeze/thaw' : 'freeze/thaw failed',
+                                ];
+                            } else {
+                                $nsu = $this->execNsUpdate($this->generator->generateDomainApexNsUpdate($domain, $view), $server, $sftp);
+                                $viewResult['zones'][$domain->getName()] = [
+                                    'success' => $nsu['success'],
+                                    'file'    => $displayFile,
+                                    'output'  => $nsu['success'] ? 'SOA/NS updated via nsupdate' : ('nsupdate failed: ' . $nsu['output']),
+                                ];
+                            }
                         } else {
                             $ok = $sftp->put($remotePath, $this->generator->generateZoneFile($domain, $view));
                             $viewResult['zones'][$domain->getName()] = [
@@ -125,12 +145,21 @@ class DnsDeployService
                         if ($isDynamic) {
                             $sftp->exec('test -f ' . escapeshellarg($remotePath));
                             if ($sftp->getExitStatus() === 0) {
-                                $nsu = $this->execNsUpdate($this->generator->generateSubnetApexNsUpdate($subnet, $cidr, $view), $server, $sftp);
-                                $viewResult['zones'][$zoneName] = [
-                                    'success' => $nsu['success'],
-                                    'file'    => $displayFile,
-                                    'output'  => $nsu['success'] ? 'SOA/NS updated via nsupdate' : ('nsupdate failed: ' . $nsu['output']),
-                                ];
+                                if ($overrideSerial !== null) {
+                                    $ok = $this->freezeBumpThaw($zoneName, $viewName, $remotePath, $overrideSerial, $sftp);
+                                    $viewResult['zones'][$zoneName] = [
+                                        'success' => $ok,
+                                        'file'    => $displayFile,
+                                        'output'  => $ok ? 'Serial bumped via freeze/thaw' : 'freeze/thaw failed',
+                                    ];
+                                } else {
+                                    $nsu = $this->execNsUpdate($this->generator->generateSubnetApexNsUpdate($subnet, $cidr, $view), $server, $sftp);
+                                    $viewResult['zones'][$zoneName] = [
+                                        'success' => $nsu['success'],
+                                        'file'    => $displayFile,
+                                        'output'  => $nsu['success'] ? 'SOA/NS updated via nsupdate' : ('nsupdate failed: ' . $nsu['output']),
+                                    ];
+                                }
                             } else {
                                 $ok = $sftp->put($remotePath, $this->generator->generateReverseZoneFile($subnet, $cidr, $view));
                                 $viewResult['zones'][$zoneName] = [
@@ -163,6 +192,28 @@ class DnsDeployService
         }
 
         return $results;
+        } finally {
+            if ($overrideSerial !== null) {
+                $this->generator->forceSerial(null);
+            }
+        }
+    }
+
+    private function freezeBumpThaw(string $zoneName, string $viewName, string $zoneFilePath, int $serial, SFTP $sftp): bool
+    {
+        $sftp->exec('rndc freeze ' . escapeshellarg($zoneName) . ' in ' . escapeshellarg($viewName));
+        if ($sftp->getExitStatus() !== 0) {
+            return false;
+        }
+
+        // BIND 9 writes the SOA serial on its own indented line followed by "; serial"
+        $sedCmd = "sed -i -E 's/([[:space:]]*)[0-9]+([[:space:]]*;[[:space:]]*[Ss]erial)/\\1" . (int) $serial . "\\2/' " . escapeshellarg($zoneFilePath);
+        $sftp->exec($sedCmd);
+        $sedOk = $sftp->getExitStatus() === 0;
+
+        $sftp->exec('rndc thaw ' . escapeshellarg($zoneName) . ' in ' . escapeshellarg($viewName));
+
+        return $sedOk && $sftp->getExitStatus() === 0;
     }
 
     private function execNsUpdate(string $script, DnsServer $server, SFTP $sftp): array
