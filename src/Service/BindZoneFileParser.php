@@ -71,6 +71,15 @@ class BindZoneFileParser
 
             $lastName = $record['raw_name'];
 
+            if (str_ends_with($record['name'], '.')) {
+                $result['errors'][] = sprintf(
+                    'Record name "%s" is outside zone "%s" and cannot be imported.',
+                    $record['name'],
+                    rtrim($origin, '.')
+                );
+                continue;
+            }
+
             if (!in_array($record['type'], self::SUPPORTED_TYPES, true)) {
                 continue;
             }
@@ -222,7 +231,7 @@ class BindZoneFileParser
             return null;
         }
         $value = implode(' ', array_slice($tokens, $pos));
-        $value = $this->normalizeValue($type, $value);
+        $value = $this->normalizeValue($type, $value, $origin);
 
         $label = $this->normalizeLabel($rawName, $origin);
 
@@ -249,16 +258,16 @@ class BindZoneFileParser
                 $label = rtrim($label, '.');
                 return $label === '' ? '@' : $label;
             }
-            return $fqdn;
+            // Preserve trailing dot: this is an absolute name outside the zone.
+            return $name;
         }
 
         return $name;
     }
 
-    private function normalizeValue(string $type, string $value): string
+    private function normalizeValue(string $type, string $value, string $origin): string
     {
         if ($type === 'TXT') {
-            $parts = [];
             preg_match_all('/"((?:[^"\\\\]|\\\\.)*)"/', $value, $matches);
             if (!empty($matches[1])) {
                 return implode('', array_map(
@@ -270,7 +279,24 @@ class BindZoneFileParser
         }
 
         if (in_array($type, ['CNAME', 'NS', 'PTR', 'MX', 'SRV'], true)) {
-            return rtrim($value, '.');
+            // For MX the value is "priority target" — only the target (last token) has a trailing dot.
+            $parts  = explode(' ', $value, 2);
+            $target = count($parts) === 2 ? $parts[1] : $parts[0];
+            $prefix = count($parts) === 2 ? $parts[0] . ' ' : '';
+
+            if (str_ends_with($target, '.')) {
+                $fqdn   = rtrim($target, '.');
+                $domain = rtrim($origin, '.');
+                if ($domain !== '' && strcasecmp(substr($fqdn, -strlen($domain)), $domain) === 0) {
+                    // In-zone absolute: strip to relative label.
+                    $label = rtrim(substr($fqdn, 0, strlen($fqdn) - strlen($domain)), '.');
+                    return $prefix . ($label === '' ? '@' : $label);
+                }
+                // External absolute: preserve trailing dot.
+                return $prefix . $target;
+            }
+
+            return $value;
         }
 
         return $value;
