@@ -3,6 +3,7 @@
 namespace App\Service;
 
 use App\Entity\DnsServer;
+use App\Repository\SubnetRepository;
 use phpseclib3\Net\SFTP;
 
 class DnsDeployService
@@ -10,6 +11,7 @@ class DnsDeployService
     public function __construct(
         private readonly DnsConfigGenerator $generator,
         private readonly SshKeyService $sshKeys,
+        private readonly SubnetRepository $subnetRepo,
     ) {}
 
     /**
@@ -121,6 +123,10 @@ class DnsDeployService
 
                 foreach ($subnets as $subnet) {
                     foreach (array_filter([$subnet->getIpv4Cidr(), $subnet->getIpv6Cidr()]) as $cidr) {
+                        $isIpv6 = str_contains($cidr, ':');
+                        if ($this->generator->isAbsorbedFor($subnet, $subnets, $isIpv6)) {
+                            continue;
+                        }
                         $hasDomains = true;
                         try {
                             $zoneName = $this->generator->reverseZoneName($cidr);
@@ -132,6 +138,14 @@ class DnsDeployService
                             ];
                             continue;
                         }
+                        $isAggregating = $isIpv6
+                            ? $subnet->isReverseZoneAggregatesV6()
+                            : $subnet->isReverseZoneAggregatesV4();
+                        $extraSubnets = $isAggregating
+                            ? ($isIpv6
+                                ? $this->subnetRepo->findV6ContainedBy($cidr, $subnet->getId())
+                                : $this->subnetRepo->findV4ContainedBy($cidr, $subnet->getId()))
+                            : [];
                         if ($keyDirBase && $subnet->getDnssecPolicy()) {
                             $dir = $keyDirBase . '/' . $zoneName;
                             $sftp->exec('mkdir -p ' . escapeshellarg($dir));
@@ -161,7 +175,7 @@ class DnsDeployService
                                     ];
                                 }
                             } else {
-                                $ok = $sftp->put($remotePath, $this->generator->generateReverseZoneFile($subnet, $cidr, $view));
+                                $ok = $sftp->put($remotePath, $this->generator->generateReverseZoneFile($subnet, $cidr, $view, $extraSubnets));
                                 $viewResult['zones'][$zoneName] = [
                                     'success' => $ok,
                                     'file'    => $displayFile,
@@ -169,7 +183,7 @@ class DnsDeployService
                                 ];
                             }
                         } else {
-                            $ok = $sftp->put($remotePath, $this->generator->generateReverseZoneFile($subnet, $cidr, $view));
+                            $ok = $sftp->put($remotePath, $this->generator->generateReverseZoneFile($subnet, $cidr, $view, $extraSubnets));
                             $viewResult['zones'][$zoneName] = [
                                 'success' => $ok,
                                 'file'    => $displayFile,

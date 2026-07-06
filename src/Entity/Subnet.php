@@ -121,6 +121,12 @@ class Subnet
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
     private ?Domain $ddnsDomain = null;
 
+    #[ORM\Column(options: ['default' => false])]
+    private bool $reverseZoneAggregatesV4 = false;
+
+    #[ORM\Column(options: ['default' => false])]
+    private bool $reverseZoneAggregatesV6 = false;
+
     public function __construct()
     {
         $this->ipAddresses = new ArrayCollection();
@@ -225,6 +231,12 @@ class Subnet
         $this->views->removeElement($view);
         return $this;
     }
+
+    public function isReverseZoneAggregatesV4(): bool { return $this->reverseZoneAggregatesV4; }
+    public function setReverseZoneAggregatesV4(bool $v): static { $this->reverseZoneAggregatesV4 = $v; return $this; }
+
+    public function isReverseZoneAggregatesV6(): bool { return $this->reverseZoneAggregatesV6; }
+    public function setReverseZoneAggregatesV6(bool $v): static { $this->reverseZoneAggregatesV6 = $v; return $this; }
 
     public function getReverseZoneName(): ?string
     {

@@ -168,8 +168,11 @@ class DnsConfigGenerator
     /**
      * Generates a BIND reverse zone file for a subnet CIDR (IPv4 or IPv6).
      * PTR records are derived from interface DNS names filtered to the given view.
+     * $extraSubnets: additional subnets whose interfaces are included (reverse zone aggregation).
+     *
+     * @param Subnet[] $extraSubnets
      */
-    public function generateReverseZoneFile(Subnet $subnet, string $cidr, ?DnsView $view = null): string
+    public function generateReverseZoneFile(Subnet $subnet, string $cidr, ?DnsView $view = null, array $extraSubnets = []): string
     {
         [$address, $prefixStr] = explode('/', $cidr);
         $prefix  = (int)$prefixStr;
@@ -213,24 +216,26 @@ class DnsConfigGenerator
         $lines[] = '';
 
         $ptrLines = [];
-        foreach ($subnet->getInterfaces() as $iface) {
-            if ($iface->isDeleted()) {
-                continue;
-            }
-            $ip = $isIpv6 ? $iface->getIpv6Address() : $iface->getIpAddress();
-            if (!$ip) {
-                continue;
-            }
+        foreach ([$subnet, ...$extraSubnets] as $ptrSubnet) {
+            foreach ($ptrSubnet->getInterfaces() as $iface) {
+                if ($iface->isDeleted()) {
+                    continue;
+                }
+                $ip = $isIpv6 ? $iface->getIpv6Address() : $iface->getIpAddress();
+                if (!$ip) {
+                    continue;
+                }
 
-            $hostname = $this->ptrHostname($iface, $view, $isIpv6);
-            if (!$hostname) {
-                continue;
-            }
+                $hostname = $this->ptrHostname($iface, $view, $isIpv6);
+                if (!$hostname) {
+                    continue;
+                }
 
-            $label      = $isIpv6
-                ? $this->ipv6PtrLabel($ip->getAddress(), $prefix)
-                : $this->ipv4PtrLabel($ip->getAddress(), $prefix);
-            $ptrLines[] = sprintf('%s IN PTR %s', $label, $hostname);
+                $label      = $isIpv6
+                    ? $this->ipv6PtrLabel($ip->getAddress(), $prefix)
+                    : $this->ipv4PtrLabel($ip->getAddress(), $prefix);
+                $ptrLines[] = sprintf('%s IN PTR %s', $label, $hostname);
+            }
         }
 
         if (!empty($ptrLines)) {
@@ -413,6 +418,10 @@ class DnsConfigGenerator
 
             foreach ($subnets as $subnet) {
                 foreach (array_filter([$subnet->getIpv4Cidr(), $subnet->getIpv6Cidr()]) as $cidr) {
+                    $isIpv6 = str_contains($cidr, ':');
+                    if ($this->isAbsorbedFor($subnet, $subnets, $isIpv6)) {
+                        continue;
+                    }
                     $zoneName = $this->reverseZoneName($cidr);
                     $file     = $zonePath . '/' . $view->getName() . '/' . $zoneName . '.zone';
                     $lines[] = '    zone "' . $zoneName . '" IN {';
@@ -484,6 +493,36 @@ class DnsConfigGenerator
         return $this->buildApexNsUpdate($zone, $nameserver, $email, $ttl, $refresh, $retry, $expire, $view?->getNsUpdateSourceAddress());
     }
 
+    /**
+     * Returns true if the given subnet's CIDR for the specified address family
+     * is fully contained within any aggregating subnet in $allSubnets.
+     *
+     * @param Subnet[] $allSubnets
+     */
+    public function isAbsorbedFor(Subnet $subnet, array $allSubnets, bool $isIpv6): bool
+    {
+        $cidr = $isIpv6 ? $subnet->getIpv6Cidr() : $subnet->getIpv4Cidr();
+        if (!$cidr) {
+            return false;
+        }
+        foreach ($allSubnets as $candidate) {
+            if ($candidate === $subnet) {
+                continue;
+            }
+            $candidateCidr = $isIpv6 ? $candidate->getIpv6Cidr() : $candidate->getIpv4Cidr();
+            if (!$candidateCidr) {
+                continue;
+            }
+            $isAggregating = $isIpv6
+                ? $candidate->isReverseZoneAggregatesV6()
+                : $candidate->isReverseZoneAggregatesV4();
+            if ($isAggregating && $this->subnetRepo->cidrContains($candidateCidr, $cidr)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public function reverseZoneName(string $cidr): string
     {
         [$address, $prefix] = explode('/', $cidr);
@@ -538,6 +577,10 @@ class DnsConfigGenerator
 
             foreach ($subnets as $subnet) {
                 foreach (array_filter([$subnet->getIpv4Cidr(), $subnet->getIpv6Cidr()]) as $cidr) {
+                    $isIpv6 = str_contains($cidr, ':');
+                    if ($this->isAbsorbedFor($subnet, $subnets, $isIpv6)) {
+                        continue;
+                    }
                     $zoneName = $this->reverseZoneName($cidr);
                     $file     = $zonePath . '/' . $view->getName() . '/' . $zoneName . '.zone';
                     $lines[] = 'zone "' . $zoneName . '" IN {';

@@ -165,6 +165,8 @@ class SubnetController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
+            $this->enforceReverseZoneAggregation($subnet, $subnetRepo);
+
             $errors = [];
 
             if (!$subnet->isContainer()) {
@@ -252,6 +254,8 @@ class SubnetController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
+            $this->enforceReverseZoneAggregation($subnet, $subnetRepo);
+
             if (!$subnet->isContainer()) {
                 foreach ([4 => $subnet->getIpv4Cidr(), 6 => $subnet->getIpv6Cidr()] as $version => $cidr) {
                     if ($cidr && ($overlap = $subnetRepo->findTerminalCidrOverlap($cidr, $subnet->getId()))) {
@@ -277,6 +281,41 @@ class SubnetController extends AbstractController
             'title'        => 'Edit Subnet: ' . $subnet->getName(),
             'embed_blocks' => false,
         ]);
+    }
+
+    private function enforceReverseZoneAggregation(Subnet $subnet, SubnetRepository $subnetRepo): void
+    {
+        // v4: clear flag if inside an aggregating ancestor; otherwise clear it from any aggregating descendants
+        if ($subnet->isReverseZoneAggregatesV4() && $subnet->getIpv4Cidr()) {
+            if ($subnetRepo->findAggregatingV4AncestorFor($subnet->getIpv4Cidr())) {
+                $subnet->setReverseZoneAggregatesV4(false);
+                $this->addFlash('warning', 'IPv4 reverse zone aggregation was cleared: this subnet is inside an existing aggregating IPv4 subnet.');
+            } else {
+                $cleared = $subnetRepo->findAggregatingV4DescendantsOf($subnet->getIpv4Cidr(), $subnet->getId());
+                foreach ($cleared as $child) {
+                    $child->setReverseZoneAggregatesV4(false);
+                }
+                if ($cleared) {
+                    $this->addFlash('notice', count($cleared) . ' child subnet(s) had their IPv4 aggregation flag cleared.');
+                }
+            }
+        }
+
+        // v6: same logic
+        if ($subnet->isReverseZoneAggregatesV6() && $subnet->getIpv6Cidr()) {
+            if ($subnetRepo->findAggregatingV6AncestorFor($subnet->getIpv6Cidr())) {
+                $subnet->setReverseZoneAggregatesV6(false);
+                $this->addFlash('warning', 'IPv6 reverse zone aggregation was cleared: this subnet is inside an existing aggregating IPv6 subnet.');
+            } else {
+                $cleared = $subnetRepo->findAggregatingV6DescendantsOf($subnet->getIpv6Cidr(), $subnet->getId());
+                foreach ($cleared as $child) {
+                    $child->setReverseZoneAggregatesV6(false);
+                }
+                if ($cleared) {
+                    $this->addFlash('notice', count($cleared) . ' child subnet(s) had their IPv6 aggregation flag cleared.');
+                }
+            }
+        }
     }
 
     private function validateBlock(AddressBlock $block, Subnet $subnet): ?string

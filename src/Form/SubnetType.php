@@ -117,6 +117,16 @@ class SubnetType extends AbstractType
                 'label'        => 'DNS Views (reverse zone)',
                 'by_reference' => false,
             ])
+            ->add('reverseZoneAggregatesV4', CheckboxType::class, [
+                'label'    => 'Aggregate IPv4 PTRs from contained subnets',
+                'help'     => 'When checked, PTR records for all subnets whose IPv4 CIDR falls within this subnet\'s IPv4 CIDR are published in this reverse zone instead of separate zones.',
+                'required' => false,
+            ])
+            ->add('reverseZoneAggregatesV6', CheckboxType::class, [
+                'label'    => 'Aggregate IPv6 PTRs from contained subnets',
+                'help'     => 'When checked, PTR records for all subnets whose IPv6 CIDR falls within this subnet\'s IPv6 CIDR are published in this reverse zone instead of separate zones.',
+                'required' => false,
+            ])
             ->add('dnssecPolicy', EntityType::class, [
                 'class'        => DnssecPolicy::class,
                 'choice_label' => 'name',
