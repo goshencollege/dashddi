@@ -18,18 +18,18 @@ class DnsServerFixtures extends Fixture
         $servers = $this->loadLocalConfig()['dns_servers'] ?? [
             [
                 'name'             => 'ns1.example.com',
-                'hostname'         => 'ns1.example.com',
+                'hostname'         => '192.0.2.1',
                 'ssh_user'         => 'root',
                 'remote_zone_path' => '/etc/bind/zones',
                 'server_type'      => 'primary',
             ],
             [
                 'name'             => 'ns2.example.com',
-                'hostname'         => 'ns2.example.com',
+                'hostname'         => '192.0.2.2',
                 'ssh_user'         => 'root',
                 'remote_zone_path' => '/etc/bind/zones',
                 'server_type'      => 'secondary',
-                'primary_hostname' => 'ns1.example.com',
+                'primary_hostname' => '192.0.2.1',
             ],
         ];
 

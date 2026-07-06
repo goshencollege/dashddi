@@ -28,6 +28,7 @@ class DnsServer
 
     #[ORM\Column(length: 255)]
     #[Assert\NotBlank]
+    #[Assert\Ip(version: 'all', message: 'Please enter a valid IPv4 or IPv6 address.')]
     private string $hostname = '';
 
     #[ORM\Column(length: 64)]

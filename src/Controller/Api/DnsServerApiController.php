@@ -48,6 +48,9 @@ class DnsServerApiController extends AbstractController
         if (empty($data['hostname'])) {
             return $this->json(['error' => 'hostname is required'], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
+        if (!filter_var($data['hostname'], FILTER_VALIDATE_IP)) {
+            return $this->json(['error' => 'hostname must be a valid IPv4 or IPv6 address'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
 
         $serverType = $data['server_type'] ?? 'primary';
         if (!in_array($serverType, ['primary', 'secondary'], true)) {
@@ -102,6 +105,9 @@ class DnsServerApiController extends AbstractController
         if (array_key_exists('hostname', $data)) {
             if (empty($data['hostname'])) {
                 return $this->json(['error' => 'hostname cannot be empty'], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+            if (!filter_var($data['hostname'], FILTER_VALIDATE_IP)) {
+                return $this->json(['error' => 'hostname must be a valid IPv4 or IPv6 address'], Response::HTTP_UNPROCESSABLE_ENTITY);
             }
             $server->setHostname($data['hostname']);
         }

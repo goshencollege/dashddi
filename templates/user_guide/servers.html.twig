@@ -37,8 +37,8 @@
         <dl class="row mb-0">
             <dt class="col-sm-3">Name</dt>
             <dd class="col-sm-9">A label for the server (e.g. <code>ns1</code>)</dd>
-            <dt class="col-sm-3">Hostname</dt>
-            <dd class="col-sm-9">The IP or DNS name of the server</dd>
+            <dt class="col-sm-3">IP Address</dt>
+            <dd class="col-sm-9">The IPv4 or IPv6 address of the server. An IP address is required (not a hostname) because secondary servers reference this value directly in their BIND <code>primaries</code> configuration — if a hostname were used, secondary servers could not pull zone transfers during a DNS outage.</dd>
             <dt class="col-sm-3">SSH Username</dt>
             <dd class="col-sm-9">The account DashDDI connects as</dd>
             <dt class="col-sm-3">SSH Public Key</dt>
