@@ -47,7 +47,8 @@ class DnsServerType extends AbstractType
                 'attr' => ['placeholder' => 'e.g. ns1-internal'],
             ])
             ->add('hostname', TextType::class, [
-                'label' => 'Hostname / IP',
+                'label' => 'IP Address',
+                'help'  => 'Must be an IPv4 or IPv6 address. Used for both SSH access and BIND zone transfer configuration.',
                 'attr'  => ['placeholder' => 'e.g. 192.168.1.5'],
             ])
             ->add('sshUser', TextType::class, [

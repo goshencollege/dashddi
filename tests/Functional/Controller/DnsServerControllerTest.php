@@ -13,7 +13,7 @@ class DnsServerControllerTest extends AppWebTestCase
         $view   = (new DnsView())->setName("view-for-$name");
         $server = (new DnsServer())
             ->setName($name)
-            ->setHostname('ns.functional.example.com')
+            ->setHostname('192.0.2.10')
             ->setSshUser('root')
             ->setRemoteZonePath('/etc/bind/zones')
             ->setServerType('primary')
@@ -41,7 +41,7 @@ class DnsServerControllerTest extends AppWebTestCase
         $crawler = $this->client->request('GET', '/dns-servers/new');
         $this->client->submit($crawler->filter('form')->form(), [
             'dns_server[name]'           => 'New Functional DNS Server',
-            'dns_server[hostname]'       => 'ns2.functional.example.com',
+            'dns_server[hostname]'       => '192.0.2.11',
             'dns_server[sshUser]'        => 'root',
             'dns_server[remoteZonePath]' => '/etc/bind/zones',
             'dns_server[serverType]'     => 'primary',
