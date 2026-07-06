@@ -59,6 +59,10 @@ class BackupSetting
     #[ORM\Column]
     private bool $excludeActivityLog = false;
 
+    /** Omit the clearpass_auth_log table from backups */
+    #[ORM\Column]
+    private bool $excludeClearpassAuthLogs = false;
+
     /** Number of backup files to retain (0 = unlimited) */
     #[ORM\Column]
     private int $retentionCount = 10;
@@ -100,6 +104,9 @@ class BackupSetting
 
     public function isExcludeActivityLog(): bool { return $this->excludeActivityLog; }
     public function setExcludeActivityLog(bool $v): static { $this->excludeActivityLog = $v; return $this; }
+
+    public function isExcludeClearpassAuthLogs(): bool { return $this->excludeClearpassAuthLogs; }
+    public function setExcludeClearpassAuthLogs(bool $v): static { $this->excludeClearpassAuthLogs = $v; return $this; }
 
     public function getRetentionCount(): int { return $this->retentionCount; }
     public function setRetentionCount(int $n): static { $this->retentionCount = $n; return $this; }

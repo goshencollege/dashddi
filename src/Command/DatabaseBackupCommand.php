@@ -44,6 +44,7 @@ class DatabaseBackupCommand extends Command
             ->addOption('retention', null, InputOption::VALUE_REQUIRED, 'Number of backups to keep (0 = unlimited, overrides settings)')
             ->addOption('exclude-dhcp-leases', null, InputOption::VALUE_NONE, 'Omit the dhcp_lease table from the backup')
             ->addOption('exclude-activity-log', null, InputOption::VALUE_NONE, 'Omit the activity_log table from the backup')
+            ->addOption('exclude-clearpass-auth-logs', null, InputOption::VALUE_NONE, 'Omit the clearpass_auth_log table from the backup')
         ;
     }
 
@@ -73,8 +74,9 @@ class DatabaseBackupCommand extends Command
         $decryptFields      = $input->getOption('decrypt-fields')      || $settings->isDecryptFields();
         $includeKey         = $input->getOption('include-key')         || $settings->isIncludeEncryptionKey();
         $encryptBackup      = $input->getOption('encrypt-backup')      || $settings->isEncryptBackup();
-        $excludeDhcpLeases  = $input->getOption('exclude-dhcp-leases') || $settings->isExcludeDhcpLeases();
-        $excludeActivityLog = $input->getOption('exclude-activity-log') || $settings->isExcludeActivityLog();
+        $excludeDhcpLeases       = $input->getOption('exclude-dhcp-leases') || $settings->isExcludeDhcpLeases();
+        $excludeActivityLog      = $input->getOption('exclude-activity-log') || $settings->isExcludeActivityLog();
+        $excludeClearpassAuthLogs = $input->getOption('exclude-clearpass-auth-logs') || $settings->isExcludeClearpassAuthLogs();
         $backupPassword = $input->getOption('backup-password') ?? $settings->getBackupPassword() ?? '';
         $retention      = $input->getOption('retention') !== null
             ? (int) $input->getOption('retention')
@@ -103,6 +105,9 @@ class DatabaseBackupCommand extends Command
         }
         if ($excludeActivityLog) {
             $excludeTables[] = 'activity_log';
+        }
+        if ($excludeClearpassAuthLogs) {
+            $excludeTables[] = 'clearpass_auth_log';
         }
 
         $tmpFile = null;

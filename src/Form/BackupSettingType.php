@@ -89,6 +89,12 @@ class BackupSettingType extends AbstractType
                 'help'     => 'Omits the <code>activity_log</code> table from the backup. The activity log can grow large over time; exclude it if the audit trail is not required for a restore.',
                 'help_html' => true,
             ])
+            ->add('excludeClearpassAuthLogs', CheckboxType::class, [
+                'label'    => 'Exclude ClearPass auth logs',
+                'required' => false,
+                'help'     => 'Omits the <code>clearpass_auth_log</code> table from the backup. ClearPass auth logs can grow large; exclude them if the authentication history is not required for a restore.',
+                'help_html' => true,
+            ])
             ->add('retentionCount', IntegerType::class, [
                 'label' => 'Backups to Keep',
                 'attr'  => ['placeholder' => '10', 'min' => '0'],

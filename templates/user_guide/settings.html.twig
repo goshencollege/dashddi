@@ -60,6 +60,7 @@
         </ul>
         <h6>What's included</h6>
         <p>Each backup is an encrypted MySQL dump of the entire application database. Optionally, the backup can embed the <code>APP_ENCRYPTION_KEY</code> so encrypted fields (SSH keys, passwords) remain readable after a restore to a different server.</p>
+        <p>Three tables can be excluded to keep backup files smaller: <strong>DHCP lease log</strong> (<code>dhcp_lease</code>), <strong>Activity log</strong> (<code>activity_log</code>), and <strong>ClearPass auth logs</strong> (<code>clearpass_auth_log</code>). Enable the corresponding checkboxes in Backup Settings if this data is not needed for a restore.</p>
         <h6>Restoring a backup</h6>
         <ol class="mb-0">
             <li>On the Backup page, click <strong>Restore</strong> next to the backup you want, or upload a backup file from another server</li>
