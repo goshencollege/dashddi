@@ -142,11 +142,22 @@ class BumpDnsSerialCommand extends Command
 
             foreach ($servers as $server) {
                 try {
-                    $this->deployer->deployToServer($server);
-                    $io->writeln('  <info>Deployed</info> to ' . $server->getName());
+                    $results = $this->deployer->deployToServer($server);
                 } catch (\Throwable $e) {
                     $io->writeln('  <error>Failed</error>  ' . $server->getName() . ': ' . $e->getMessage());
                     $failed = true;
+                    continue;
+                }
+
+                foreach ($results['views'] ?? [] as $viewName => $viewResult) {
+                    foreach ($viewResult['zones'] ?? [] as $zoneName => $zone) {
+                        if ($zone['success']) {
+                            $io->writeln('  <info>OK</info>    ' . $zone['file']);
+                        } else {
+                            $io->writeln('  <error>FAIL</error>  ' . $zone['file'] . ': ' . $zone['output']);
+                            $failed = true;
+                        }
+                    }
                 }
             }
 
