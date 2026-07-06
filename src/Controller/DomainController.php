@@ -6,12 +6,15 @@ use App\Entity\Domain;
 use App\Entity\DomainAlias;
 use App\Enum\RecordType;
 use App\Form\DomainType;
+use App\Repository\DnsServerRepository;
 use App\Repository\DnsViewRepository;
 use App\Repository\DomainAliasRepository;
 use App\Repository\DomainRecordRepository;
 use App\Repository\DomainRepository;
+use App\Service\KskRolloverService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -119,6 +122,59 @@ class DomainController extends AbstractController
                 'link_params' => $baseParams,
                 'page_param'  => 'page',
             ],
+        ]);
+    }
+
+    #[Route('/{id}/ds-record', name: 'domain_ds_record', methods: ['GET'])]
+    public function dsRecord(
+        Domain $domain,
+        DnsServerRepository $serverRepo,
+        KskRolloverService $kskService,
+    ): JsonResponse {
+        if (!$domain->getDnssecPolicy()) {
+            return $this->json(['error' => 'This domain does not have a DNSSEC policy.'], 400);
+        }
+
+        $domainViewIds = array_map(fn($v) => $v->getId(), $domain->getViews()->toArray());
+        if (empty($domainViewIds)) {
+            return $this->json(['error' => 'This domain is not assigned to any DNS views.'], 400);
+        }
+
+        $servers = array_filter(
+            $serverRepo->findAll(),
+            fn($s) => $s->isPrimary()
+                && $s->getKeyDirectory()
+                && !empty(array_intersect(
+                    array_map(fn($v) => $v->getId(), $s->getViews()->toArray()),
+                    $domainViewIds
+                ))
+        );
+
+        if (empty($servers)) {
+            return $this->json(['error' => 'No primary DNS server with a configured key directory serves this domain.'], 400);
+        }
+
+        $allDs  = [];
+        $errors = [];
+        foreach ($servers as $server) {
+            try {
+                foreach ($kskService->fetchCurrentDsRecords($domain, $server) as $record) {
+                    $allDs[] = $record;
+                }
+            } catch (\Throwable $e) {
+                $errors[] = $server->getName() . ': ' . $e->getMessage();
+            }
+        }
+
+        $allDs = array_values(array_unique($allDs));
+
+        if (empty($allDs) && !empty($errors)) {
+            return $this->json(['error' => implode('; ', $errors)], 500);
+        }
+
+        return $this->json([
+            'ds_records' => $allDs,
+            'errors'     => $errors,
         ]);
     }
 

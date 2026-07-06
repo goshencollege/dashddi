@@ -3,6 +3,8 @@
 namespace App\Service;
 
 use App\Entity\DnssecKskRollover;
+use App\Entity\DnsServer;
+use App\Entity\Domain;
 use App\Enum\KskRolloverStatus;
 use phpseclib3\Net\SFTP;
 
@@ -159,10 +161,52 @@ class KskRolloverService
         if (!$server) {
             throw new \RuntimeException('No DNS server associated with this rollover.');
         }
+        return $this->connectServer($server);
+    }
+
+    private function connectServer(DnsServer $server): SFTP
+    {
         if (!$server->getSshPrivateKey()) {
             throw new \RuntimeException('No SSH key configured for server "' . $server->getName() . '".');
         }
         return $this->sshKeys->connect($server->getHostname(), $server->getSshUser(), $server->getSshPrivateKey());
+    }
+
+    /**
+     * Returns DS record lines for all current KSKs for a domain.
+     * Returns an empty array when BIND has not yet generated any keys.
+     *
+     * @return string[]
+     */
+    public function fetchCurrentDsRecords(Domain $domain, DnsServer $server): array
+    {
+        $sftp   = $this->connectServer($server);
+        $zone   = $domain->getName();
+        $keyDir = rtrim($server->getKeyDirectory() ?? '', '/') . '/' . $zone;
+
+        $out = (string)$sftp->exec(sprintf('dig +short DNSKEY %s 2>/dev/null', escapeshellarg($zone)));
+
+        $dsRecords = [];
+        foreach (explode("\n", $out) as $line) {
+            $line  = trim($line);
+            $parts = preg_split('/\s+/', $line, 4);
+            if (!isset($parts[3])) {
+                continue;
+            }
+            [$flagStr, $protoStr, $algStr, $pubKey] = $parts;
+            if ((int)$flagStr !== 257) {
+                continue;
+            }
+            $alg     = (int)$algStr;
+            $tag     = $this->computeKeyTag((int)$flagStr, (int)$protoStr, $alg, $pubKey);
+            $keyFile = sprintf('K%s.+%03d+%05d', $zone, $alg, $tag);
+            $ds      = $this->fetchDsRecord($sftp, $keyDir, $keyFile);
+            if ($ds !== '') {
+                $dsRecords[] = $ds;
+            }
+        }
+
+        return array_values(array_unique($dsRecords));
     }
 
     /**
