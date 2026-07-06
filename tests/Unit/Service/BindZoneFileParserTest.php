@@ -67,8 +67,24 @@ ZONE;
         $record = $this->findRecord($result['records'], 'alias', 'CNAME');
 
         $this->assertNotNull($record);
-        // Trailing dot stripped by normalizeValue
-        $this->assertSame('www.example.com', $record['value']);
+        // In-zone absolute FQDN is stripped to the relative label.
+        $this->assertSame('www', $record['value']);
+    }
+
+    public function testParsesCnameToExternalAbsoluteTarget(): void
+    {
+        $zone = <<<ZONE
+\$ORIGIN example.com.
+\$TTL 3600
+alias IN CNAME target.external.org.
+ZONE;
+
+        $result = $this->parser->parse($zone, 'example.com');
+        $record = $this->findRecord($result['records'], 'alias', 'CNAME');
+
+        $this->assertNotNull($record);
+        // External absolute target: trailing dot must be preserved so BIND treats it as absolute.
+        $this->assertSame('target.external.org.', $record['value']);
     }
 
     public function testParsesMxRecord(): void
@@ -83,7 +99,24 @@ ZONE;
         $record = $this->findRecord($result['records'], '@', 'MX');
 
         $this->assertNotNull($record);
-        $this->assertStringContainsString('mail.example.com', $record['value']);
+        // In-zone absolute FQDN is stripped to the relative label; priority is preserved.
+        $this->assertSame('10 mail', $record['value']);
+    }
+
+    public function testParsesMxRecordWithExternalAbsoluteTarget(): void
+    {
+        $zone = <<<ZONE
+\$ORIGIN example.com.
+\$TTL 3600
+@ IN MX 10 mail.otherdomain.org.
+ZONE;
+
+        $result = $this->parser->parse($zone, 'example.com');
+        $record = $this->findRecord($result['records'], '@', 'MX');
+
+        $this->assertNotNull($record);
+        // External absolute target: trailing dot preserved.
+        $this->assertSame('10 mail.otherdomain.org.', $record['value']);
     }
 
     public function testParsesTxtRecord(): void
@@ -226,8 +259,39 @@ ZONE;
         $record = $this->findRecord($result['records'], '@', 'NS');
 
         $this->assertNotNull($record);
-        // Trailing dot stripped
-        $this->assertSame('ns1.example.com', $record['value']);
+        // In-zone absolute FQDN is stripped to the relative label.
+        $this->assertSame('ns1', $record['value']);
+    }
+
+    public function testParsesNsRecordWithExternalAbsoluteTarget(): void
+    {
+        $zone = <<<ZONE
+\$ORIGIN example.com.
+\$TTL 3600
+@ IN NS ns1.registrar.net.
+ZONE;
+
+        $result = $this->parser->parse($zone, 'example.com');
+        $record = $this->findRecord($result['records'], '@', 'NS');
+
+        $this->assertNotNull($record);
+        // External absolute target: trailing dot preserved.
+        $this->assertSame('ns1.registrar.net.', $record['value']);
+    }
+
+    public function testReportsErrorForOutOfZoneAbsoluteLabel(): void
+    {
+        $zone = <<<ZONE
+\$ORIGIN example.com.
+\$TTL 3600
+external.org. IN A 1.2.3.4
+ZONE;
+
+        $result = $this->parser->parse($zone, 'example.com');
+
+        $this->assertNotEmpty($result['errors'], 'Out-of-zone absolute label must produce a parse error');
+        $this->assertStringContainsString('external.org.', $result['errors'][0]);
+        $this->assertEmpty($this->findRecord($result['records'], 'external.org.', 'A'), 'Out-of-zone record must not appear in results');
     }
 
     public function testParsesDsRecord(): void
