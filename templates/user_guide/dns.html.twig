@@ -171,6 +171,28 @@
     </div>
 </div>
 
+<div class="card mb-4" id="reverse-zone-aggregation">
+    <div class="card-header fw-semibold"><i class="bi bi-diagram-2 me-1"></i>Reverse Zone Aggregation</div>
+    <div class="card-body">
+        <p>By default, every subnet with a CIDR gets its own reverse DNS zone. Subnets smaller than <code>/24</code> generate RFC 2317 classless delegation zones (e.g. <code>0/26.1.168.192.in-addr.arpa</code>), which requires a separately managed parent <code>/24</code> zone with CNAME delegation records.</p>
+        <p>If you own the full address block and only subdivide it for management purposes, you can skip the RFC 2317 complexity by enabling <strong>reverse zone aggregation</strong> on the parent subnet. When aggregation is enabled, all contained subnets' PTR records are folded into the parent's reverse zone — no separate zone files or CNAME delegations needed.</p>
+
+        <h6 class="mt-3">How to enable</h6>
+        <p>Edit the subnet that should be the reverse zone apex. In the <strong>DNS</strong> section, check <strong>Aggregate IPv4 PTRs from contained subnets</strong> and/or <strong>Aggregate IPv6 PTRs from contained subnets</strong> as appropriate. Push DNS config to apply the change.</p>
+        <ul class="mb-3">
+            <li><strong>IPv4 and IPv6 are independent.</strong> A dual-stack subnet can aggregate its IPv4 descendants without affecting its IPv6 reverse zone, or vice versa.</li>
+            <li><strong>No configuration needed on child subnets.</strong> Any subnet whose CIDR falls within the parent's CIDR will have its PTR records included automatically, at any depth of nesting.</li>
+            <li><strong>Child subnets do not appear in <code>dashddi.conf</code></strong> for the aggregated address family — only the parent zone is declared in BIND.</li>
+        </ul>
+
+        <h6 class="mt-3">IPv6 deep nesting</h6>
+        <p>Aggregation works at any depth, making it especially useful for IPv6 hierarchies. For example, a single <code>/32</code> subnet with aggregation enabled will collect PTR records from all <code>/48</code>, <code>/56</code>, <code>/64</code>, and deeper subnets within it into one <code>ip6.arpa</code> zone.</p>
+
+        <h6 class="mt-3">Restrictions</h6>
+        <p class="mb-0">An aggregating subnet may not be nested inside another aggregating subnet for the same address family. If you enable aggregation on a subnet that is already inside an aggregating parent, the flag will be automatically cleared with a warning. Similarly, if you enable aggregation on a subnet that has aggregating descendants, their flags will be cleared.</p>
+    </div>
+</div>
+
 <div class="card mb-4" id="zone-import">
     <div class="card-header fw-semibold"><i class="bi bi-upload me-1"></i>Importing a Zone File</div>
     <div class="card-body">
@@ -194,6 +216,7 @@
             <a href="#ddns" class="list-group-item list-group-item-action py-1">Dynamic DNS (DDNS)</a>
             <a href="#push" class="list-group-item list-group-item-action py-1">Pushing Config</a>
             <a href="#domain-aliases" class="list-group-item list-group-item-action py-1">Domain Aliases</a>
+            <a href="#reverse-zone-aggregation" class="list-group-item list-group-item-action py-1">Reverse Zone Aggregation</a>
             <a href="#zone-import" class="list-group-item list-group-item-action py-1">Importing Zone Files</a>
         </div>
     </div>

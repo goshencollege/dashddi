@@ -75,6 +75,22 @@
             </div>
         </div>
     {% endif %}
+    {% if subnet.reverseZoneAggregatesV4 %}
+        <div class="col-auto">
+            <div class="card px-3 py-2 text-center">
+                <div class="small text-muted">IPv4 Reverse Zone</div>
+                <div><span class="badge bg-info text-dark"><i class="bi bi-diagram-2 me-1"></i>Aggregates child PTRs</span></div>
+            </div>
+        </div>
+    {% endif %}
+    {% if subnet.reverseZoneAggregatesV6 %}
+        <div class="col-auto">
+            <div class="card px-3 py-2 text-center">
+                <div class="small text-muted">IPv6 Reverse Zone</div>
+                <div><span class="badge bg-info text-dark"><i class="bi bi-diagram-2 me-1"></i>Aggregates child PTRs</span></div>
+            </div>
+        </div>
+    {% endif %}
     {% if subnet.tags is not empty %}
         <div class="col-12">
             <div>

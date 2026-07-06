@@ -372,7 +372,7 @@ class SubnetRepository extends ServiceEntityRepository
         });
     }
 
-    private function cidrContains(string $containerCidr, string $childCidr): bool
+    public function cidrContains(string $containerCidr, string $childCidr): bool
     {
         if ($containerCidr === $childCidr) {
             return false;
@@ -384,5 +384,107 @@ class SubnetRepository extends ServiceEntityRepository
         }
         return $container->contains($child->getStartAddress())
             && $container->contains($child->getEndAddress());
+    }
+
+    // -------------------------------------------------------------------------
+    // Reverse zone aggregation helpers
+    // -------------------------------------------------------------------------
+
+    /**
+     * Find any subnet with reverseZoneAggregatesV4=true whose IPv4 CIDR fully contains $ipv4Cidr.
+     */
+    public function findAggregatingV4AncestorFor(string $ipv4Cidr): ?Subnet
+    {
+        $candidates = $this->createQueryBuilder('s')
+            ->where('s.reverseZoneAggregatesV4 = true')
+            ->andWhere('s.ipv4Cidr IS NOT NULL')
+            ->getQuery()->getResult();
+        foreach ($candidates as $candidate) {
+            if ($this->cidrContains($candidate->getIpv4Cidr(), $ipv4Cidr)) {
+                return $candidate;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Find all subnets with reverseZoneAggregatesV4=true whose IPv4 CIDR is contained within $ipv4Cidr.
+     *
+     * @return Subnet[]
+     */
+    public function findAggregatingV4DescendantsOf(string $ipv4Cidr, ?int $excludeId = null): array
+    {
+        $qb = $this->createQueryBuilder('s')
+            ->where('s.reverseZoneAggregatesV4 = true')
+            ->andWhere('s.ipv4Cidr IS NOT NULL');
+        if ($excludeId !== null) {
+            $qb->andWhere('s.id != :id')->setParameter('id', $excludeId);
+        }
+        $candidates = $qb->getQuery()->getResult();
+        return array_values(array_filter($candidates, fn(Subnet $s) => $this->cidrContains($ipv4Cidr, $s->getIpv4Cidr())));
+    }
+
+    /**
+     * Find any subnet with reverseZoneAggregatesV6=true whose IPv6 CIDR fully contains $ipv6Cidr.
+     */
+    public function findAggregatingV6AncestorFor(string $ipv6Cidr): ?Subnet
+    {
+        $candidates = $this->createQueryBuilder('s')
+            ->where('s.reverseZoneAggregatesV6 = true')
+            ->andWhere('s.ipv6Cidr IS NOT NULL')
+            ->getQuery()->getResult();
+        foreach ($candidates as $candidate) {
+            if ($this->cidrContains($candidate->getIpv6Cidr(), $ipv6Cidr)) {
+                return $candidate;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Find all subnets with reverseZoneAggregatesV6=true whose IPv6 CIDR is contained within $ipv6Cidr.
+     *
+     * @return Subnet[]
+     */
+    public function findAggregatingV6DescendantsOf(string $ipv6Cidr, ?int $excludeId = null): array
+    {
+        $qb = $this->createQueryBuilder('s')
+            ->where('s.reverseZoneAggregatesV6 = true')
+            ->andWhere('s.ipv6Cidr IS NOT NULL');
+        if ($excludeId !== null) {
+            $qb->andWhere('s.id != :id')->setParameter('id', $excludeId);
+        }
+        $candidates = $qb->getQuery()->getResult();
+        return array_values(array_filter($candidates, fn(Subnet $s) => $this->cidrContains($ipv6Cidr, $s->getIpv6Cidr())));
+    }
+
+    /**
+     * Find all subnets (any flags) whose IPv4 CIDR is strictly contained within $ipv4Cidr.
+     *
+     * @return Subnet[]
+     */
+    public function findV4ContainedBy(string $ipv4Cidr, ?int $excludeId = null): array
+    {
+        $qb = $this->createQueryBuilder('s')->where('s.ipv4Cidr IS NOT NULL');
+        if ($excludeId !== null) {
+            $qb->andWhere('s.id != :id')->setParameter('id', $excludeId);
+        }
+        $candidates = $qb->getQuery()->getResult();
+        return array_values(array_filter($candidates, fn(Subnet $s) => $this->cidrContains($ipv4Cidr, $s->getIpv4Cidr())));
+    }
+
+    /**
+     * Find all subnets (any flags) whose IPv6 CIDR is strictly contained within $ipv6Cidr.
+     *
+     * @return Subnet[]
+     */
+    public function findV6ContainedBy(string $ipv6Cidr, ?int $excludeId = null): array
+    {
+        $qb = $this->createQueryBuilder('s')->where('s.ipv6Cidr IS NOT NULL');
+        if ($excludeId !== null) {
+            $qb->andWhere('s.id != :id')->setParameter('id', $excludeId);
+        }
+        $candidates = $qb->getQuery()->getResult();
+        return array_values(array_filter($candidates, fn(Subnet $s) => $this->cidrContains($ipv6Cidr, $s->getIpv6Cidr())));
     }
 }
