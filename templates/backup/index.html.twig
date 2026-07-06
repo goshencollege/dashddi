@@ -129,6 +129,14 @@
                     {{ form_help(form.excludeActivityLog) }}
                 </div>
 
+                <div class="mb-3">
+                    <div class="form-check mb-1">
+                        {{ form_widget(form.excludeClearpassAuthLogs, {attr: {class: 'form-check-input'}}) }}
+                        {{ form_label(form.excludeClearpassAuthLogs, null, {label_attr: {class: 'form-check-label fw-semibold'}}) }}
+                    </div>
+                    {{ form_help(form.excludeClearpassAuthLogs) }}
+                </div>
+
                 <hr>
 
                 <div class="mb-0">
