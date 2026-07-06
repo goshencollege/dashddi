@@ -73,6 +73,51 @@
         </ol>
 
         <hr class="my-3">
+        <h6 id="dns-sudoers">Sudoers configuration</h6>
+        <p>DashDDI connects via SSH and runs several commands on the BIND server that require elevated privileges. The SSH user (default: <code>root</code>) needs:</p>
+        <div class="table-responsive mb-3">
+            <table class="table table-sm table-bordered mb-0">
+                <thead><tr><th>Feature</th><th>Commands run on the DNS server</th></tr></thead>
+                <tbody>
+                    <tr>
+                        <td>Zone deployment (all servers)</td>
+                        <td><code>mkdir</code>, <code>chown</code>, SFTP writes to zone path, <code>rndc reload</code></td>
+                    </tr>
+                    <tr>
+                        <td>Fetch DS Record</td>
+                        <td><code>dig</code> (no sudo), <code>sudo -u bind dnssec-dsfromkey</code></td>
+                    </tr>
+                    <tr>
+                        <td>KSK Rollover</td>
+                        <td><code>sudo -u bind dnssec-keygen</code>, <code>sudo -u bind dnssec-settime</code>, <code>sudo -u bind dnssec-dsfromkey</code>, <code>sudo rndc loadkeys</code>, <code>sudo rndc sign</code></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <p>Create <code>/etc/sudoers.d/dashddi</code> on each DNS server. Replace <code>dashddi</code> with your configured SSH user:</p>
+        <pre class="bg-body-secondary rounded p-3 small mb-2"><code># /etc/sudoers.d/dashddi
+#
+# Required for rndc commands (zone reload, DNSSEC key loading and signing).
+# Note: basic zone deployment runs "rndc reload" without sudo, so this entry
+# is only strictly required for DNSSEC features. However, it is also needed
+# if the SSH user is non-root and cannot reach the rndc socket directly.
+dashddi ALL=(root) NOPASSWD: /usr/sbin/rndc
+
+# Required for DNSSEC key operations (Fetch DS Record and KSK Rollover).
+# dnssec-* tools must run as the bind service user to read/write key files.
+dashddi ALL=(bind) NOPASSWD: /usr/sbin/dnssec-dsfromkey, \
+                              /usr/sbin/dnssec-keygen, \
+                              /usr/sbin/dnssec-settime</code></pre>
+
+        <div class="alert alert-info py-2 small mb-3">
+            <i class="bi bi-lightbulb me-1"></i>The paths above are for Debian/Ubuntu. Verify the actual paths on your server with
+            <code>which rndc dnssec-dsfromkey dnssec-keygen dnssec-settime</code> and adjust the sudoers file accordingly.
+            These entries are required even when the SSH user is <code>root</code>, because DashDDI runs commands over a
+            non-interactive SSH session which does not have a TTY — sudo will refuse to prompt for a password in that context.
+        </div>
+
+        <hr class="my-3">
         <h6>BIND <code>named.conf</code> include</h6>
         <p>DashDDI writes all ACLs, views, and zone stanzas into a single file called <code>dashddi.conf</code> in the configured remote zone path. Add one line to your BIND <code>named.conf</code> to load it:</p>
         <pre class="bg-body-secondary rounded p-3 small mb-3"><code>include "/etc/bind/zones/dashddi.conf";</code></pre>
@@ -454,6 +499,7 @@ curl -s -X POST https://dashddi.example.com/api/dhcp/lease \
         <div class="list-group list-group-flush small">
             <a href="#overview" class="list-group-item list-group-item-action py-1">Overview</a>
             <a href="#dns-integration" class="list-group-item list-group-item-action py-1">DNS / BIND</a>
+            <a href="#dns-sudoers" class="list-group-item list-group-item-action py-1 ps-4">↳ Sudoers configuration</a>
             <a href="#dhcp-integration" class="list-group-item list-group-item-action py-1">DHCP / Kea</a>
             <a href="#kea-ddns" class="list-group-item list-group-item-action py-1 ps-4">↳ Dynamic DNS (D2)</a>
             <a href="#kea-lease-notifications" class="list-group-item list-group-item-action py-1 ps-4">↳ Lease notifications</a>
