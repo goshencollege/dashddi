@@ -12,6 +12,7 @@ use App\Repository\TagRepository;
 use App\Entity\UserPreference;
 use App\Repository\UserPreferenceRepository;
 use App\Service\IpAddressManager;
+use App\Service\ReservedTagPrefixService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -24,6 +25,7 @@ class HostController extends AbstractController
 {
     public function __construct(
         private readonly IpAddressManager $ipManager,
+        private readonly ReservedTagPrefixService $reservedPrefixes,
     ) {}
 
     private const PER_PAGE = 50;
@@ -330,10 +332,17 @@ class HostController extends AbstractController
     #[Route('/{id}/edit', name: 'host_edit', methods: ['GET', 'POST'], requirements: ['id' => '\d+'])]
     public function edit(Request $request, Host $host, EntityManagerInterface $em): Response
     {
+        $reservedTags = $host->getTags()->filter(
+            fn($tag) => $this->reservedPrefixes->matchingPrefix($tag->getName()) !== null
+        )->toArray();
+
         $form = $this->createForm(HostType::class, $host);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
+            foreach ($reservedTags as $tag) {
+                $host->addTag($tag);
+            }
             $em->flush();
             $this->addFlash('success', 'Host updated.');
             return $this->redirectToRoute('host_show', ['id' => $host->getId()]);

@@ -6,6 +6,7 @@ use App\Entity\Host;
 use App\Repository\BuildingRepository;
 use App\Repository\HostRepository;
 use App\Repository\TagRepository;
+use App\Service\ReservedTagPrefixService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -16,6 +17,8 @@ use Symfony\Component\Routing\Attribute\Route;
 #[Route('/api/hosts')]
 class HostApiController extends AbstractController
 {
+    public function __construct(private readonly ReservedTagPrefixService $reservedPrefixes) {}
+
     #[Route('', name: 'api_hosts_index', methods: ['GET'])]
     public function index(Request $request, HostRepository $repo): JsonResponse
     {
@@ -122,7 +125,9 @@ class HostApiController extends AbstractController
 
         if (array_key_exists('tag_ids', $data)) {
             foreach ($host->getTags()->toArray() as $tag) {
-                $host->removeTag($tag);
+                if ($this->reservedPrefixes->matchingPrefix($tag->getName()) === null) {
+                    $host->removeTag($tag);
+                }
             }
             foreach ($data['tag_ids'] as $tagId) {
                 $tag = $tagRepo->find($tagId);
