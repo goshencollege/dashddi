@@ -40,12 +40,12 @@
                         <tr>
                             <th>MAC Address</th>
                             <th>Host</th>
-                            <th class="table-warning">Pre-cutover Subnet</th>
-                            <th class="table-warning">Pre VLAN</th>
-                            <th class="table-warning">Pre-cutover Lease</th>
-                            <th class="table-info">Post-cutover Subnet</th>
-                            <th class="table-info">Post VLAN</th>
-                            <th class="table-info">Post-cutover Lease</th>
+                            <th class="bg-warning-subtle text-warning-emphasis">Pre-cutover Subnet</th>
+                            <th class="bg-warning-subtle text-warning-emphasis">Pre VLAN</th>
+                            <th class="bg-warning-subtle text-warning-emphasis">Pre-cutover Lease</th>
+                            <th class="bg-info-subtle text-info-emphasis">Post-cutover Subnet</th>
+                            <th class="bg-info-subtle text-info-emphasis">Post VLAN</th>
+                            <th class="bg-info-subtle text-info-emphasis">Post-cutover Lease</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -59,12 +59,12 @@
                                 {% endif %}
                             </td>
                             <td>{{ row.host_name ?? '—' }}</td>
-                            <td class="table-warning">{{ row.pre_subnet_cidr ?? '—' }}</td>
-                            <td class="table-warning">{{ row.pre_vlan ?? '—' }}</td>
-                            <td class="table-warning text-muted small">{{ row.pre_ts ? row.pre_ts|date('Y-m-d H:i') : '—' }}</td>
-                            <td class="table-info">{{ row.post_subnet_cidr ?? '—' }}</td>
-                            <td class="table-info">{{ row.post_vlan ?? '—' }}</td>
-                            <td class="table-info text-muted small">{{ row.post_ts ? row.post_ts|date('Y-m-d H:i') : '—' }}</td>
+                            <td class="bg-warning-subtle text-warning-emphasis">{{ row.pre_subnet_cidr ?? '—' }}</td>
+                            <td class="bg-warning-subtle text-warning-emphasis">{{ row.pre_vlan ?? '—' }}</td>
+                            <td class="bg-warning-subtle text-warning-emphasis small">{{ row.pre_ts ? row.pre_ts|date('Y-m-d H:i') : '—' }}</td>
+                            <td class="bg-info-subtle text-info-emphasis">{{ row.post_subnet_cidr ?? '—' }}</td>
+                            <td class="bg-info-subtle text-info-emphasis">{{ row.post_vlan ?? '—' }}</td>
+                            <td class="bg-info-subtle text-info-emphasis small">{{ row.post_ts ? row.post_ts|date('Y-m-d H:i') : '—' }}</td>
                         </tr>
                         {% endfor %}
                     </tbody>
