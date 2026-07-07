@@ -4,6 +4,7 @@ namespace App\Service;
 
 use App\Entity\Domain;
 use App\Entity\DomainRecord;
+use App\Entity\Host;
 use App\Entity\IpAddress;
 use App\Entity\Ipv6Address;
 use App\Entity\NetworkInterface;
@@ -71,6 +72,27 @@ class PushScopeService
         }
 
         return [];
+    }
+
+    /**
+     * Returns the MAC addresses of all active, non-placeholder interfaces on a host.
+     * Used when host-level attributes (e.g. tags) change and all interfaces need re-pushing.
+     *
+     * @return string[]
+     */
+    public function clearpassMacsForHost(Host $host): array
+    {
+        $macs = [];
+        foreach ($host->getInterfaces() as $iface) {
+            if ($iface->isDeleted()) {
+                continue;
+            }
+            $mac = $iface->getMacAddress();
+            if ($mac !== '' && $mac !== '00:00:00:00:00:00') {
+                $macs[] = $mac;
+            }
+        }
+        return array_unique($macs);
     }
 
     /** @return int[] */
