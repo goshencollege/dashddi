@@ -336,6 +336,20 @@
                         </li>
                     </ul>
                 </li>
+                {% set reportsActive = app.request.attributes.get('_route') starts with 'report_' %}
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle {{ reportsActive ? 'active' }}" href="#" data-bs-toggle="dropdown">
+                        <i class="bi bi-bar-chart me-1"></i>Reports
+                    </a>
+                    <ul class="dropdown-menu">
+                        <li>
+                            <a class="dropdown-item {{ app.request.attributes.get('_route') == 'report_subnet_change' ? 'active' }}"
+                               href="{{ path('report_subnet_change') }}">
+                                <i class="bi bi-arrow-left-right me-1"></i>Subnet Change Report
+                            </a>
+                        </li>
+                    </ul>
+                </li>
                 {% set dnsActive = app.request.attributes.get('_route') starts with 'domain'
                     or app.request.attributes.get('_route') starts with 'dns_view'
                     or app.request.attributes.get('_route') starts with 'dns_acl'

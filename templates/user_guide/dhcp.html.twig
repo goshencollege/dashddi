@@ -116,6 +116,19 @@
     </div>
 </div>
 
+<div class="card mb-4" id="subnet-change-report">
+    <div class="card-header fw-semibold"><i class="bi bi-arrow-left-right me-1"></i>Subnet Change Report</div>
+    <div class="card-body">
+        <p>The <a href="{{ path('report_subnet_change') }}">Subnet Change Report</a> (under <strong>Reports</strong> in the nav) compares each device's last DHCP lease before a cutover time to its most recent lease after, highlighting any that landed in a different subnet.</p>
+        <p>Enter the date and time of your cutover in the <strong>Cutover Date/Time</strong> field and click <strong>Run Report</strong>. The table shows:</p>
+        <ul>
+            <li><strong>Pre-cutover Subnet / VLAN</strong> — the subnet and VLAN the device was in immediately before the cutover.</li>
+            <li><strong>Post-cutover Subnet / VLAN</strong> — the subnet and VLAN it is in now (most recent lease).</li>
+        </ul>
+        <p class="mb-0 text-muted small">Only devices that have DHCP lease records on both sides of the cutover time are included. Devices with no post-cutover lease (not yet re-connected) will not appear.</p>
+    </div>
+</div>
+
 </div>{# /col-lg-9 #}
 
 <div class="col-lg-3 d-none d-lg-block">
@@ -129,6 +142,7 @@
             <a href="#ddns" class="list-group-item list-group-item-action py-1">Dynamic DNS (DDNS)</a>
             <a href="#leases" class="list-group-item list-group-item-action py-1">DHCP Leases</a>
             <a href="#clearpass-auth-logs" class="list-group-item list-group-item-action py-1">Auth Logs</a>
+            <a href="#subnet-change-report" class="list-group-item list-group-item-action py-1">Subnet Change Report</a>
         </div>
     </div>
 </div>
