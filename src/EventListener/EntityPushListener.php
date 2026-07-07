@@ -2,6 +2,7 @@
 
 namespace App\EventListener;
 
+use App\Entity\Host;
 use App\Message\PushClearpassMessage;
 use App\Message\PushDhcpMessage;
 use App\Message\PushDnsMessage;
@@ -9,6 +10,7 @@ use App\Service\PushScopeService;
 use App\Service\PushSuppressionContext;
 use Doctrine\Bundle\DoctrineBundle\Attribute\AsDoctrineListener;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\Event\OnFlushEventArgs;
 use Doctrine\ORM\Event\PostFlushEventArgs;
 use Doctrine\ORM\Event\PostPersistEventArgs;
 use Doctrine\ORM\Event\PostUpdateEventArgs;
@@ -17,6 +19,7 @@ use Doctrine\ORM\Events;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\DeduplicateStamp;
 
+#[AsDoctrineListener(event: Events::onFlush)]
 #[AsDoctrineListener(event: Events::postPersist)]
 #[AsDoctrineListener(event: Events::postUpdate)]
 #[AsDoctrineListener(event: Events::preRemove)]
@@ -36,6 +39,26 @@ class EntityPushListener
         private readonly MessageBusInterface    $bus,
         private readonly PushSuppressionContext $suppression,
     ) {}
+
+    public function onFlush(OnFlushEventArgs $args): void
+    {
+        $uow = $args->getObjectManager()->getUnitOfWork();
+
+        $cols = array_merge(
+            $uow->getScheduledCollectionUpdates(),
+            $uow->getScheduledCollectionDeletions(),
+        );
+
+        foreach ($cols as $col) {
+            $owner = $col->getOwner();
+            if (!$owner instanceof Host || $col->getMapping()->fieldName !== 'tags') {
+                continue;
+            }
+            foreach ($this->scope->clearpassMacsForHost($owner) as $mac) {
+                $this->pendingClearpassMacs[$mac] = true;
+            }
+        }
+    }
 
     public function postPersist(PostPersistEventArgs $args): void
     {
