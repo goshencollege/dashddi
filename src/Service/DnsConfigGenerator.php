@@ -23,14 +23,9 @@ class DnsConfigGenerator
     ) {}
 
     /**
-     * Returns a YYYYMMDDNN serial, incrementing NN (01–99) if called multiple times
-     * within the same second on the same day. Uses a static counter so a single
-     * request that regenerates many zones still advances the counter correctly.
-     *
+     * Returns the current Unix timestamp as the zone serial.
      * Call forceSerial() to override with an explicit value (used by BumpDnsSerialCommand).
      */
-    private static int $serialCounter = 0;
-    private static string $serialDate  = '';
     private ?int $forcedSerial = null;
 
     public function forceSerial(?int $serial): void
@@ -40,17 +35,7 @@ class DnsConfigGenerator
 
     private function generateSerial(): int
     {
-        if ($this->forcedSerial !== null) {
-            return $this->forcedSerial;
-        }
-        $today = date('Ymd');
-        if ($today !== self::$serialDate) {
-            self::$serialDate    = $today;
-            self::$serialCounter = 1;
-        } else {
-            self::$serialCounter = min(self::$serialCounter + 1, 99);
-        }
-        return (int)($today . sprintf('%02d', self::$serialCounter));
+        return $this->forcedSerial ?? time();
     }
 
     /** @return Domain[] */

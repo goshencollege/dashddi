@@ -20,9 +20,9 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  * This means a small serial can be "greater than" a large one after a wrap.
  *
  * Strategy: push serials current+step, current+2*step, … (each mod 2^32).
- * Stop when the result drops below the target (today's YYYYMMDD01).  At that
- * point the wrapped value W satisfies (W - secondary_serial) mod 2^32 < 2^31,
- * so the secondary accepts it, and all subsequent date-based serials (which are
+ * Stop when the result drops below the target (current Unix timestamp by default).
+ * At that point the wrapped value W satisfies (W - secondary_serial) mod 2^32 < 2^31,
+ * so the secondary accepts it, and all subsequent Unix-timestamp serials (which are
  * numerically > W) are also valid.
  *
  * Step must be less than 2^31 so each intermediate serial is "greater than" the
@@ -57,7 +57,7 @@ class BumpDnsSerialCommand extends Command
                 'target-serial',
                 't',
                 InputOption::VALUE_REQUIRED,
-                'Stop when the serial drops below this value (default: today\'s YYYYMMDD01)',
+                'Stop when the serial drops below this value (default: current Unix timestamp)',
             )
             ->addOption(
                 'step',
@@ -91,7 +91,7 @@ class BumpDnsSerialCommand extends Command
 
         $target = $input->getOption('target-serial') !== null
             ? (int) $input->getOption('target-serial')
-            : (int)(date('Ymd') . '01');
+            : time();
 
         $step  = (int) $input->getOption('step');
         $delay = (int) $input->getOption('delay');
@@ -122,7 +122,7 @@ class BumpDnsSerialCommand extends Command
 
         $io->text([
             'Each pushed serial will be greater than the previous in RFC 1982 arithmetic.',
-            'Once the serial wraps below ' . $target . ', normal date-based pushes will be valid.',
+            'Once the serial wraps below ' . $target . ', normal Unix-timestamp pushes will be valid.',
         ]);
         $io->newLine();
 
