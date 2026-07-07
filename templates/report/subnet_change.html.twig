@@ -1,0 +1,77 @@
+{% extends 'base.html.twig' %}
+{% block title %}Subnet Change Report{% endblock %}
+{% block body_class %}page-list-view{% endblock %}
+
+{% block content %}
+<div class="list-page-content">
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0"><i class="bi bi-arrow-left-right me-2"></i>Subnet Change Report</h1>
+    <a href="{{ path('user_guide_dhcp') }}#subnet-change-report" class="btn btn-sm btn-outline-secondary" title="User Guide" target="_blank"><i class="bi bi-question-circle"></i></a>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" action="{{ path('report_subnet_change') }}" class="row g-2 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label small text-muted mb-1">Cutover Date/Time</label>
+                <input type="datetime-local" name="cutover" class="form-control form-control-sm"
+                       value="{{ cutover }}" required>
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-sm btn-primary">Run Report</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if rows is null %}
+    <p class="text-muted">Enter a cutover date/time above to compare DHCP subnet assignments before and after the cutover.</p>
+{% elseif rows is empty %}
+    <div class="alert alert-success">No subnet changes detected for this cutover time.</div>
+{% else %}
+    <div class="list-scroll-card">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>{{ rows|length }} device{{ rows|length != 1 ? 's' }} with subnet changes</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>MAC Address</th>
+                            <th>Host</th>
+                            <th class="table-warning">Pre-cutover Subnet</th>
+                            <th class="table-warning">Pre VLAN</th>
+                            <th class="table-warning">Pre-cutover Lease</th>
+                            <th class="table-info">Post-cutover Subnet</th>
+                            <th class="table-info">Post VLAN</th>
+                            <th class="table-info">Post-cutover Lease</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in rows %}
+                        <tr>
+                            <td class="font-monospace">
+                                {% if row.iface_id %}
+                                    <a href="{{ path('interface_show', {id: row.iface_id}) }}">{{ row.mac_address }}</a>
+                                {% else %}
+                                    {{ row.mac_address }}
+                                {% endif %}
+                            </td>
+                            <td>{{ row.host_name ?? '—' }}</td>
+                            <td class="table-warning">{{ row.pre_subnet_cidr ?? '—' }}</td>
+                            <td class="table-warning">{{ row.pre_vlan ?? '—' }}</td>
+                            <td class="table-warning text-muted small">{{ row.pre_ts ? row.pre_ts|date('Y-m-d H:i') : '—' }}</td>
+                            <td class="table-info">{{ row.post_subnet_cidr ?? '—' }}</td>
+                            <td class="table-info">{{ row.post_vlan ?? '—' }}</td>
+                            <td class="table-info text-muted small">{{ row.post_ts ? row.post_ts|date('Y-m-d H:i') : '—' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+{% endif %}
+</div>
+{% endblock %}

@@ -409,11 +409,26 @@
                         </li>
                     </ul>
                 </li>
-                <li class="nav-item">
-                    <a class="nav-link {{ app.request.attributes.get('_route') starts with 'activity_log' ? 'active' }}"
-                       href="{{ path('activity_log_index') }}">
-                        <i class="bi bi-shield-check me-1"></i>Activity Log
+                {% set reportsActive = app.request.attributes.get('_route') starts with 'report_'
+                    or app.request.attributes.get('_route') starts with 'activity_log' %}
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle {{ reportsActive ? 'active' }}" href="#" data-bs-toggle="dropdown">
+                        <i class="bi bi-bar-chart me-1"></i>Reports
                     </a>
+                    <ul class="dropdown-menu">
+                        <li>
+                            <a class="dropdown-item {{ app.request.attributes.get('_route') starts with 'activity_log' ? 'active' }}"
+                               href="{{ path('activity_log_index') }}">
+                                <i class="bi bi-shield-check me-1"></i>Activity Log
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item {{ app.request.attributes.get('_route') == 'report_subnet_change' ? 'active' }}"
+                               href="{{ path('report_subnet_change') }}">
+                                <i class="bi bi-arrow-left-right me-1"></i>Subnet Change Report
+                            </a>
+                        </li>
+                    </ul>
                 </li>
                 {% set settingsActive = app.request.attributes.get('_route') starts with 'building'
                     or app.request.attributes.get('_route') starts with 'tag'
