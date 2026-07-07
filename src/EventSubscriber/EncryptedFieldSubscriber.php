@@ -56,16 +56,43 @@ class EncryptedFieldSubscriber
     public function preUpdate(PreUpdateEventArgs $args): void
     {
         $entity = $args->getObject();
+        $class  = $this->entityClass($entity);
 
-        if (!isset(self::FIELDS[$this->entityClass($entity)])) {
+        if (!isset(self::FIELDS[$class])) {
             return;
         }
 
-        if ($this->encryptEntity($entity)) {
-            $em       = $args->getObjectManager();
-            $metadata = $em->getClassMetadata($this->entityClass($entity));
-            $em->getUnitOfWork()->recomputeSingleEntityChangeSet($metadata, $entity);
+        // Record which encrypted fields are genuinely dirty *before* we touch them.
+        // Fields not in the changeset here have the same plaintext value as in the DB
+        // and should not appear as changed after we re-encrypt them.
+        $genuinelyChanged = [];
+        foreach (self::FIELDS[$class] as $property) {
+            if ($args->hasChangedField($property)) {
+                $genuinelyChanged[$property] = true;
+            }
         }
+
+        if (!$this->encryptEntity($entity)) {
+            return;
+        }
+
+        $em  = $args->getObjectManager();
+        $uow = $em->getUnitOfWork();
+
+        // For fields that were NOT genuinely changed, advance originalEntityData to the
+        // new ciphertext so recomputeSingleEntityChangeSet does not mark them as dirty
+        // (it would otherwise diff plaintext-original vs ciphertext-current and log a
+        // spurious "[redacted] → [redacted]" audit entry on every flush).
+        $originalData = $uow->getOriginalEntityData($entity);
+        foreach (self::FIELDS[$class] as $property) {
+            if (!isset($genuinelyChanged[$property])) {
+                $getter = 'get' . ucfirst($property);
+                $originalData[$property] = $entity->$getter();
+            }
+        }
+        $uow->setOriginalEntityData($entity, $originalData);
+
+        $uow->recomputeSingleEntityChangeSet($em->getClassMetadata($class), $entity);
     }
 
     public function postUpdate(PostUpdateEventArgs $args): void
