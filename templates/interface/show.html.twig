@@ -191,7 +191,7 @@
 <div class="card mb-4">
     <div class="card-header fw-semibold"><i class="bi bi-layers me-1"></i>Participates in Virtual IPs</div>
     <table class="table table-sm mb-0">
-        <thead><tr><th>Label</th><th>Protocol</th><th>VRID</th><th>IPv4</th><th>IPv6</th></tr></thead>
+        <thead><tr><th>Label</th><th>Protocol</th><th>VRID</th><th>IPv4</th><th>IPv6</th><th></th></tr></thead>
         <tbody>
             {% for vip in virtualIps %}
             <tr>
@@ -200,6 +200,25 @@
                 <td class="text-muted">{{ vip.vrid ?: '—' }}</td>
                 <td class="ip-address">{{ vip.ipAddress ? vip.ipAddress.address : '—' }}</td>
                 <td class="ip-address small">{{ vip.ipv6Address ? vip.ipv6Address.address : '—' }}</td>
+                <td class="text-end" style="white-space:nowrap">
+                    <a href="{{ path('virtual_ip_edit', {id: vip.id}) }}" class="btn btn-sm btn-outline-secondary me-1">
+                        <i class="bi bi-pencil"></i>
+                    </a>
+                    <form method="post" action="{{ path('virtual_ip_remove_member', {id: vip.id, interfaceId: interface.id}) }}" class="d-inline"
+                          onsubmit="return confirm('Remove this interface from {{ vip.label|e('js') }}?')">
+                        <input type="hidden" name="_token" value="{{ csrf_token('remove_member_' ~ vip.id ~ '_' ~ interface.id) }}">
+                        <button type="submit" class="btn btn-sm btn-outline-warning me-1" title="Unlink from this VIP">
+                            <i class="bi bi-unlink"></i>
+                        </button>
+                    </form>
+                    <form method="post" action="{{ path('virtual_ip_delete', {id: vip.id}) }}" class="d-inline"
+                          onsubmit="return confirm('Delete {{ vip.label|e('js') }}?')">
+                        <input type="hidden" name="_token" value="{{ csrf_token('delete_vip_' ~ vip.id) }}">
+                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete this VIP">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </form>
+                </td>
             </tr>
             {% endfor %}
         </tbody>

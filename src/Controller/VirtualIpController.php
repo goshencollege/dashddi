@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\IpAddress;
 use App\Entity\Ipv6Address;
+use App\Entity\NetworkInterface;
 use App\Entity\Subnet;
 use App\Entity\VirtualIp;
 use App\Form\VirtualIpType;
@@ -108,6 +109,19 @@ class VirtualIpController extends AbstractController
             $this->addFlash('success', 'Virtual IP deleted.');
         }
         return $this->redirectToRoute('subnet_show', ['id' => $subnetId]);
+    }
+
+    #[Route('/virtual-ips/{id}/remove-member/{interfaceId}', name: 'virtual_ip_remove_member', methods: ['POST'])]
+    public function removeMember(Request $request, VirtualIp $vip, int $interfaceId, EntityManagerInterface $em): Response
+    {
+        if ($this->isCsrfTokenValid('remove_member_' . $vip->getId() . '_' . $interfaceId, $request->request->get('_token'))) {
+            $interface = $em->find(NetworkInterface::class, $interfaceId);
+            if ($interface) {
+                $vip->removeMemberInterface($interface);
+                $em->flush();
+            }
+        }
+        return $this->redirectToRoute('interface_show', ['id' => $interfaceId]);
     }
 
     #[Route('/virtual-ips/{id}/restore', name: 'virtual_ip_restore', methods: ['POST'])]
