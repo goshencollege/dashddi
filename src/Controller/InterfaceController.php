@@ -14,6 +14,7 @@ use App\Repository\DhcpLeaseRepository;
 use App\Repository\DomainRepository;
 use App\Repository\NetworkInterfaceRepository;
 use App\Repository\SubnetRepository;
+use App\Repository\VirtualIpRepository;
 use App\Repository\UserPreferenceRepository;
 use App\Service\DnsViewResolver;
 use App\Service\IpAddressManager;
@@ -73,7 +74,7 @@ class InterfaceController extends AbstractController
     }
 
     #[Route('/interfaces/{id}', name: 'interface_show', methods: ['GET'])]
-    public function show(NetworkInterface $interface, DhcpLeaseRepository $leaseRepo, ClearpassAuthLogRepository $authLogRepo, AppSettingRepository $settingRepo, NetworkInterfaceRepository $ifaceRepo, ArubaSwitchRepository $arubaSwitchRepo): Response
+    public function show(NetworkInterface $interface, DhcpLeaseRepository $leaseRepo, ClearpassAuthLogRepository $authLogRepo, AppSettingRepository $settingRepo, NetworkInterfaceRepository $ifaceRepo, ArubaSwitchRepository $arubaSwitchRepo, VirtualIpRepository $vipRepo): Response
     {
         $events = [];
 
@@ -99,6 +100,8 @@ class InterfaceController extends AbstractController
             'switchInfo'  => $switchInfo,
             'switchIface' => $switchIface,
             'arubaSwitch' => $arubaSwitch,
+            'virtualIps'     => $vipRepo->findByMemberInterface($interface),
+            'linkableVips'   => $vipRepo->findLinkableForInterface($interface),
         ]);
     }
 

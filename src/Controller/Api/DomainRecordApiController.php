@@ -8,6 +8,7 @@ use App\Repository\DnsViewRepository;
 use App\Repository\DomainRecordRepository;
 use App\Repository\DomainRepository;
 use App\Repository\NetworkInterfaceRepository;
+use App\Repository\VirtualIpRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -31,6 +32,9 @@ class DomainRecordApiController extends AbstractController
         if ($interfaceId = $request->query->getInt('interface_id')) {
             $qb->andWhere('r.networkInterface = :iid')->setParameter('iid', $interfaceId);
         }
+        if ($virtualIpId = $request->query->getInt('virtual_ip_id')) {
+            $qb->andWhere('r.virtualIp = :vid')->setParameter('vid', $virtualIpId);
+        }
         if ($type = $request->query->get('type')) {
             $qb->andWhere('r.type = :type')->setParameter('type', $type);
         }
@@ -52,6 +56,7 @@ class DomainRecordApiController extends AbstractController
         EntityManagerInterface $em,
         DomainRepository $domainRepo,
         NetworkInterfaceRepository $interfaceRepo,
+        VirtualIpRepository $vipRepo,
         DnsViewRepository $viewRepo,
         ValidatorInterface $validator,
     ): JsonResponse {
@@ -81,11 +86,28 @@ class DomainRecordApiController extends AbstractController
                 return $this->json(['error' => 'interface_id not found'], Response::HTTP_UNPROCESSABLE_ENTITY);
             }
             $record->setNetworkInterface($interface);
-            if (in_array($type, [RecordType::A, RecordType::AAAA], true)) {
-                $record->setIsCanonical((bool) ($data['is_canonical'] ?? false));
-            } elseif (!empty($data['is_canonical'])) {
-                return $this->json(['error' => 'is_canonical is only valid for A and AAAA records'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        // VIP-linked record
+        if (!empty($data['virtual_ip_id'])) {
+            if ($record->getNetworkInterface() !== null) {
+                return $this->json(['error' => 'interface_id and virtual_ip_id cannot both be set'], Response::HTTP_UNPROCESSABLE_ENTITY);
             }
+            $vip = $vipRepo->find($data['virtual_ip_id']);
+            if (!$vip) {
+                return $this->json(['error' => 'virtual_ip_id not found'], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+            $record->setVirtualIp($vip);
+        }
+
+        // is_canonical only applies to interface- or VIP-linked A/AAAA records
+        $isLinkedAorAAAA = ($record->getNetworkInterface() !== null || $record->getVirtualIp() !== null)
+            && in_array($type, [RecordType::A, RecordType::AAAA], true);
+        if (!empty($data['is_canonical'])) {
+            if (!$isLinkedAorAAAA) {
+                return $this->json(['error' => 'is_canonical is only valid for interface- or VIP-linked A and AAAA records'], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+            $record->setIsCanonical(true);
         }
 
         // Domain association
@@ -95,15 +117,12 @@ class DomainRecordApiController extends AbstractController
                 return $this->json(['error' => 'domain_id not found'], Response::HTTP_UNPROCESSABLE_ENTITY);
             }
             $record->setDomain($domain);
-        } elseif ($record->getNetworkInterface() === null) {
-            return $this->json(['error' => 'domain_id is required for records not linked to an interface'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        } elseif ($record->getNetworkInterface() === null && $record->getVirtualIp() === null) {
+            return $this->json(['error' => 'domain_id is required for records not linked to an interface or virtual IP'], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        // Value required for non-interface records, or for record types other than A/AAAA
-        $isInterfaceAorAAAA = $record->getNetworkInterface() !== null
-            && in_array($type, [RecordType::A, RecordType::AAAA], true);
-
-        if (!$isInterfaceAorAAAA) {
+        // Value required unless this is a linked A/AAAA record (IP is derived from the linked entity)
+        if (!$isLinkedAorAAAA) {
             if (empty($data['value'])) {
                 return $this->json(['error' => 'value is required'], Response::HTTP_UNPROCESSABLE_ENTITY);
             }
@@ -138,10 +157,44 @@ class DomainRecordApiController extends AbstractController
         DomainRecord $domainRecord,
         EntityManagerInterface $em,
         DomainRepository $domainRepo,
+        NetworkInterfaceRepository $interfaceRepo,
+        VirtualIpRepository $vipRepo,
         DnsViewRepository $viewRepo,
         ValidatorInterface $validator,
     ): JsonResponse {
         $data = json_decode($request->getContent(), true) ?? [];
+
+        if (array_key_exists('interface_id', $data) && array_key_exists('virtual_ip_id', $data)
+            && $data['interface_id'] !== null && $data['interface_id'] !== ''
+            && $data['virtual_ip_id'] !== null && $data['virtual_ip_id'] !== '') {
+            return $this->json(['error' => 'interface_id and virtual_ip_id cannot both be set'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        if (array_key_exists('interface_id', $data)) {
+            if ($data['interface_id'] === null || $data['interface_id'] === '') {
+                $domainRecord->setNetworkInterface(null);
+            } else {
+                $interface = $interfaceRepo->find((int) $data['interface_id']);
+                if (!$interface) {
+                    return $this->json(['error' => 'interface_id not found'], Response::HTTP_UNPROCESSABLE_ENTITY);
+                }
+                $domainRecord->setVirtualIp(null);
+                $domainRecord->setNetworkInterface($interface);
+            }
+        }
+
+        if (array_key_exists('virtual_ip_id', $data)) {
+            if ($data['virtual_ip_id'] === null || $data['virtual_ip_id'] === '') {
+                $domainRecord->setVirtualIp(null);
+            } else {
+                $vip = $vipRepo->find((int) $data['virtual_ip_id']);
+                if (!$vip) {
+                    return $this->json(['error' => 'virtual_ip_id not found'], Response::HTTP_UNPROCESSABLE_ENTITY);
+                }
+                $domainRecord->setNetworkInterface(null);
+                $domainRecord->setVirtualIp($vip);
+            }
+        }
 
         if (array_key_exists('domain_id', $data)) {
             $domain = $domainRepo->find($data['domain_id']);
@@ -234,10 +287,11 @@ class DomainRecordApiController extends AbstractController
     private function serialize(DomainRecord $record): array
     {
         return [
-            'id'           => $record->getId(),
-            'domain_id'    => $record->getDomain()?->getId(),
-            'interface_id' => $record->getNetworkInterface()?->getId(),
-            'hostname'     => $record->getHostname(),
+            'id'             => $record->getId(),
+            'domain_id'      => $record->getDomain()?->getId(),
+            'interface_id'   => $record->getNetworkInterface()?->getId(),
+            'virtual_ip_id'  => $record->getVirtualIp()?->getId(),
+            'hostname'       => $record->getHostname(),
             'fqdn'         => $record->getDomain() ? $record->getFullyQualifiedHostname() . '.' . $record->getDomain()->getName() : $record->getHostname(),
             'type'         => $record->getType()->value,
             'value'        => $record->getValue(),

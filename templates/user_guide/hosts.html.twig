@@ -24,6 +24,7 @@
         <ul class="mt-2 mb-0">
             <li><strong>Host</strong> → name, location (building + room), tags, notes</li>
             <li><strong>Network Interface</strong> → MAC address, subnet assignment, IPv4/IPv6 addresses, DNS names</li>
+            <li><strong>Virtual IP</strong> → floating IP address shared by member interfaces for VRRP/HSRP/Active-Gateway failover groups</li>
         </ul>
     </div>
 </div>
@@ -38,7 +39,7 @@
             <li>Use the <strong>Collapse All</strong> and <strong>Expand All</strong> buttons (top-right of the action bar) to collapse or expand every host at once.</li>
             <li>Collapse state is <strong>saved in your browser</strong> and persists across page navigations.</li>
         </ul>
-        <p>Each host row shows the host name, optional location and Snipe-IT asset label, tags, last-modified date, and action buttons. Interface sub-rows show the interface name (with MAC address in parentheses), subnet, IPv4, IPv6, and DNS names.</p>
+        <p>Each host row shows the host name, optional location and Snipe-IT asset label, tags, last-modified date, and action buttons. Interface sub-rows show the interface name (with MAC address in parentheses), subnet, IPv4, IPv6, and DNS names. Interfaces that belong to a virtual IP group show an additional indented sub-row displaying the VIP label, protocol badge, and VIP IP address.</p>
         <p class="mb-0 text-muted small">Interfaces without a name display the MAC address as their identifier.</p>
     </div>
 </div>
@@ -222,6 +223,44 @@
     </div>
 </div>
 
+{# Virtual IPs #}
+<div class="card mb-4" id="virtual-ips">
+    <div class="card-header fw-semibold"><i class="bi bi-layers me-1"></i>Virtual IPs (VRRP / HSRP / Active-Gateway)</div>
+    <div class="card-body">
+        <p>A <strong>Virtual IP</strong> (VIP) is a floating IP address shared by a group of physical routers using a redundancy protocol such as VRRP, HSRP, or an Active-Gateway (as used in Aruba CX). Unlike a regular interface address, a VIP is not bound to a single host — it moves automatically between the member routers when a failover occurs.</p>
+
+        <h6 class="mt-3">Creating a Virtual IP</h6>
+        <p>Navigate to a subnet and click <strong>Add Virtual IP</strong>. Fill in:</p>
+        <ul>
+            <li><strong>Label</strong> — a descriptive name, e.g. <em>core-switch-gateway</em></li>
+            <li><strong>Protocol</strong> — VRRP, HSRP, Active-Gateway, or Other</li>
+            <li><strong>VRID / Group ID</strong> — optional group number (1–255)</li>
+            <li><strong>Member Interfaces</strong> — the physical interfaces that participate in the redundancy group; select multiple with Ctrl/Cmd</li>
+            <li><strong>IPv4 / IPv6 Address</strong> — assign automatically from the available pool, enter a specific address, or leave unassigned</li>
+            <li><strong>Notes</strong> — any free-form notes</li>
+        </ul>
+        <p class="text-muted small">VIP IP addresses are tracked in IPAM the same way as interface addresses — they are excluded from the "available" pool and will not be auto-assigned to new interfaces.</p>
+
+        <h6 class="mt-3">Managing VIPs from the subnet page</h6>
+        <p>The subnet detail page lists all VIPs in a <strong>Virtual IPs</strong> section. Each row has an edit button (<i class="bi bi-pencil"></i>) to open the VIP edit form and a delete button (<i class="bi bi-trash"></i>) to soft-delete the VIP.</p>
+
+        <h6 class="mt-3">Managing VIPs from the interface page</h6>
+        <p>The interface detail page has a <strong>Virtual IPs</strong> section listing every VIP group that interface belongs to. Actions on each row:</p>
+        <ul>
+            <li><strong>Edit</strong> (<i class="bi bi-pencil"></i>) — open the VIP edit form</li>
+            <li><strong>Unlink</strong> (<i class="bi bi-dash-circle"></i>) — remove this interface from the VIP group without deleting the VIP</li>
+            <li><strong>Delete</strong> (<i class="bi bi-trash"></i>) — soft-delete the VIP entirely</li>
+        </ul>
+        <p>You can also add the interface to an existing VIP or create a new VIP directly from the interface page using the <strong>Link to existing VIP</strong> and <strong>Create new VIP</strong> buttons.</p>
+
+        <h6 class="mt-3">DNS Records for Virtual IPs</h6>
+        <p>The VIP detail page has a <strong>DNS Records</strong> section. Click <strong>Add Record</strong> to attach a new DNS record to the VIP, or link an existing record using the <strong>Linked to</strong> search field on the record edit form. For <strong>A</strong> and <strong>AAAA</strong> records the value is derived automatically from the VIP's assigned IP — you leave the value blank. Marking a record as <strong>Canonical</strong> causes it to be used as the PTR hostname in reverse DNS zones, exactly as it works for interface records. Each record row has an unlink button (<i class="bi bi-slash-circle"></i>) to detach the record from the VIP without deleting it, and a delete button (<i class="bi bi-trash"></i>) to remove the record entirely.</p>
+
+        <h6 class="mt-3">Audit trail</h6>
+        <p class="mb-0">The VIP detail page shows a <strong>Last Modified</strong> line with the date, time, and username of the last change — the same audit information shown on hosts and interfaces.</p>
+    </div>
+</div>
+
 </div>{# /col-lg-9 #}
 
 {# On-page nav #}
@@ -238,6 +277,7 @@
             <a href="#bulk" class="list-group-item list-group-item-action py-1">Bulk Operations</a>
             <a href="#csv-import" class="list-group-item list-group-item-action py-1">Importing from CSV</a>
             <a href="#soft-delete" class="list-group-item list-group-item-action py-1">Deleted Hosts</a>
+            <a href="#virtual-ips" class="list-group-item list-group-item-action py-1">Virtual IPs (VRRP)</a>
         </div>
     </div>
 </div>

@@ -9,6 +9,7 @@ use App\Repository\DhcpLeaseRepository;
 use App\Repository\HostRepository;
 use App\Repository\SubnetRepository;
 use App\Repository\TagRepository;
+use App\Repository\VirtualIpRepository;
 use App\Entity\UserPreference;
 use App\Repository\UserPreferenceRepository;
 use App\Service\IpAddressManager;
@@ -31,7 +32,7 @@ class HostController extends AbstractController
     private const PER_PAGE = 50;
 
     #[Route('', name: 'host_index', methods: ['GET'])]
-    public function index(Request $request, HostRepository $repo, SubnetRepository $subnetRepo, BuildingRepository $buildingRepo, TagRepository $tagRepo, UserPreferenceRepository $prefRepo, DhcpLeaseRepository $leaseRepo, EntityManagerInterface $em): Response
+    public function index(Request $request, HostRepository $repo, SubnetRepository $subnetRepo, BuildingRepository $buildingRepo, TagRepository $tagRepo, UserPreferenceRepository $prefRepo, DhcpLeaseRepository $leaseRepo, VirtualIpRepository $vipRepo, EntityManagerInterface $em): Response
     {
         $user        = $this->getUser();
         $pref        = $user ? $prefRepo->findByIdentifier($user->getUserIdentifier()) : null;
@@ -103,9 +104,11 @@ class HostController extends AbstractController
         $hostViewMode = $pref?->getHostViewMode() ?? 'host';
 
         $macs = [];
+        $ifaceIds = [];
         foreach ($hosts as $host) {
             foreach ($host->getInterfaces() as $iface) {
-                $macs[] = $iface->getMacAddress();
+                $macs[]     = $iface->getMacAddress();
+                $ifaceIds[] = $iface->getId();
             }
         }
 
@@ -138,6 +141,7 @@ class HostController extends AbstractController
             'tags'               => $tagRepo->findBy([], ['name' => 'ASC']),
             'hostViewMode'       => $hostViewMode,
             'lease_map'          => $leaseRepo->findLatestByMacs($macs),
+            'vip_map'            => $vipRepo->findMapByInterfaceIds($ifaceIds),
             'containerSubnetIds' => $containerSubnetIds,
             'pagination'         => [
                 'page'       => $page,

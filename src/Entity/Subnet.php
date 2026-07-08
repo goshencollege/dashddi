@@ -64,6 +64,9 @@ class Subnet
     #[ORM\OneToMany(targetEntity: NetworkInterface::class, mappedBy: 'subnet')]
     private Collection $interfaces;
 
+    #[ORM\OneToMany(targetEntity: VirtualIp::class, mappedBy: 'subnet', cascade: ['remove'], orphanRemoval: true)]
+    private Collection $virtualIps;
+
     #[ORM\OneToMany(targetEntity: AddressBlock::class, mappedBy: 'subnet', cascade: ['persist', 'remove'], orphanRemoval: true)]
     #[ORM\OrderBy(['startIp' => 'ASC'])]
     private Collection $addressBlocks;
@@ -131,7 +134,8 @@ class Subnet
     {
         $this->ipAddresses = new ArrayCollection();
         $this->ipv6Addresses = new ArrayCollection();
-        $this->interfaces = new ArrayCollection();
+        $this->interfaces  = new ArrayCollection();
+        $this->virtualIps  = new ArrayCollection();
         $this->addressBlocks = new ArrayCollection();
         $this->tags    = new ArrayCollection();
         $this->views   = new ArrayCollection();
@@ -164,6 +168,7 @@ class Subnet
     public function getIpAddresses(): Collection { return $this->ipAddresses; }
     public function getIpv6Addresses(): Collection { return $this->ipv6Addresses; }
     public function getInterfaces(): Collection { return $this->interfaces; }
+    public function getVirtualIps(): Collection { return $this->virtualIps; }
     public function getAddressBlocks(): Collection { return $this->addressBlocks; }
     public function getRecords(): Collection { return $this->records; }
     public function getSoaNameserver(): ?string { return $this->soaNameserver; }

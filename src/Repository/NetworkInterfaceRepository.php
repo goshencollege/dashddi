@@ -135,10 +135,10 @@ class NetworkInterfaceRepository extends ServiceEntityRepository
      *
      * @return NetworkInterface[]
      */
-    public function search(string $q, int $limit = 20): array
+    public function search(string $q, int $limit = 20, ?\App\Entity\Subnet $subnet = null): array
     {
         $like = '%' . $q . '%';
-        return $this->createQueryBuilder('i')
+        $qb = $this->createQueryBuilder('i')
             ->leftJoin('i.host', 'h')
             ->leftJoin('i.ipAddress', 'ip')
             ->leftJoin('i.ipv6Address', 'ip6')
@@ -147,9 +147,11 @@ class NetworkInterfaceRepository extends ServiceEntityRepository
             ->setParameter('q', $like)
             ->orderBy('h.name', 'ASC')
             ->addOrderBy('i.id', 'ASC')
-            ->setMaxResults($limit)
-            ->getQuery()
-            ->getResult();
+            ->setMaxResults($limit);
+        if ($subnet !== null) {
+            $qb->andWhere('i.subnet = :subnet')->setParameter('subnet', $subnet);
+        }
+        return $qb->getQuery()->getResult();
     }
 
     public function purgeDeletedBefore(\DateTimeImmutable $before): int

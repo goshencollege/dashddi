@@ -5,6 +5,7 @@ namespace App\Repository;
 use App\Entity\Domain;
 use App\Entity\DomainRecord;
 use App\Entity\NetworkInterface;
+use App\Entity\VirtualIp;
 use App\Enum\RecordType;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
@@ -156,6 +157,19 @@ class DomainRecordRepository extends ServiceEntityRepository
             ->where('r.networkInterface = :iface')
             ->andWhere('r.type = :type')
             ->setParameter('iface', $iface)
+            ->setParameter('type', $type)
+            ->getQuery()
+            ->getSingleScalarResult();
+        return $count > 0;
+    }
+
+    public function hasAnyForVirtualIp(VirtualIp $vip, RecordType $type): bool
+    {
+        $count = (int) $this->createQueryBuilder('r')
+            ->select('COUNT(r.id)')
+            ->where('r.virtualIp = :vip')
+            ->andWhere('r.type = :type')
+            ->setParameter('vip', $vip)
             ->setParameter('type', $type)
             ->getQuery()
             ->getSingleScalarResult();

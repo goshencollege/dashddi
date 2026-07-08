@@ -8,11 +8,13 @@
 /* Theme-aware custom properties (dark covers: dark, purple, green, rainbow) */
 .host-tree-table {
     --tree-iface-bg:      rgba(0,0,0,.025);
+    --tree-vip-bg:        rgba(0,0,0,.05);
     --tree-group-hover:   rgba(0,0,0,.1);
     --tree-row-hover:     rgba(0,0,0,.18);
 }
 [data-bs-theme="dark"] .host-tree-table {
     --tree-iface-bg:      rgba(255,255,255,.025);
+    --tree-vip-bg:        rgba(255,255,255,.05);
     --tree-group-hover:   rgba(255,255,255,.12);
     --tree-row-hover:     rgba(255,255,255,.22);
 }
@@ -26,6 +28,8 @@
 .host-tree-table .tree-toggle:hover { color: var(--bs-body-color); }
 .host-tree-table .iface-row { --bs-table-bg: var(--tree-iface-bg); }
 .host-tree-table .iface-name-cell { padding-left: 2rem !important; }
+.host-tree-table .vip-row { --bs-table-bg: var(--tree-vip-bg); }
+.host-tree-table .vip-row > td:nth-child(3) { padding-left: 3.5rem !important; }
 .host-tree-table td:nth-child(3) { white-space: nowrap; }
 .host-tree-table td:nth-last-child(2) { white-space: nowrap; }
 .host-tree-table .iface-row > td:nth-child(2) { padding-left: 2rem !important; }
@@ -433,6 +437,44 @@
                                         </div>
                                     </td>
                                 </tr>
+                                {% for vip in vip_map[iface.id] ?? [] %}
+                                <tr class="iface-row vip-row" data-parent-host="{{ host.id }}">
+                                    <td class="toggle-cell"></td>
+                                    <td></td>
+                                    <td class="small">
+                                        <i class="bi bi-layers text-muted me-1"></i>
+                                        <a href="{{ path('virtual_ip_show', {id: vip.id}) }}" class="text-decoration-none">{{ vip.label }}</a>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-secondary">{{ vip.protocol.label() }}</span>
+                                        {% if vip.vrid %}<span class="text-muted small ms-1">VRID&nbsp;{{ vip.vrid }}</span>{% endif %}
+                                    </td>
+                                    <td></td>
+                                    <td class="ip-address small">{{ vip.ipAddress ? vip.ipAddress.address : '—' }}</td>
+                                    <td class="ip-address small">{{ vip.ipv6Address ? vip.ipv6Address.address : '—' }}</td>
+                                    <td class="small font-monospace">
+                                        {% set fqdns = [] %}
+                                        {% for record in vip.domainRecords %}
+                                            {% if record.domain %}
+                                                {% set fqdns = fqdns|merge([record.fullyQualifiedHostname]) %}
+                                            {% endif %}
+                                        {% endfor %}
+                                        {% if fqdns is empty %}
+                                            <span class="text-muted">—</span>
+                                        {% else %}
+                                            {% for fqdn in fqdns %}<div>{{ fqdn }}</div>{% endfor %}
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-muted small">
+                                        {{ vip.updatedAt|date('Y-m-d') }}{% if vip.updatedBy %} · {{ vip.updatedBy }}{% endif %}
+                                    </td>
+                                    <td class="text-end">
+                                        <a href="{{ path('virtual_ip_edit', {id: vip.id}) }}" class="btn btn-sm btn-outline-secondary">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
                             {% endfor %}
                         {% endfor %}
                     </tbody>
