@@ -95,11 +95,7 @@ class HostRepository extends ServiceEntityRepository
         $key  = 'host_search_' . md5($query . '|' . $page . '|' . $perPage);
         $data = $this->cache->get($key, function (ItemInterface $item) use ($query, $page, $perPage) {
             $item->expiresAfter(60);
-            $result = $this->paginateFilterQuery($this->buildSearchQb($query), $page, $perPage);
-            return [
-                'ids'   => array_map(fn(Host $h) => $h->getId(), $result['hosts']),
-                'total' => $result['total'],
-            ];
+            return $this->paginateFilterQuery($this->buildSearchQb($query), $page, $perPage);
         });
         return ['hosts' => $this->fetchByIds($data['ids']), 'total' => $data['total']];
     }
@@ -110,11 +106,7 @@ class HostRepository extends ServiceEntityRepository
         $key  = 'host_advsearch_' . md5(serialize($criteria) . '|' . $page . '|' . $perPage);
         $data = $this->cache->get($key, function (ItemInterface $item) use ($criteria, $page, $perPage) {
             $item->expiresAfter(60);
-            $result = $this->paginateFilterQuery($this->buildAdvancedQb($criteria), $page, $perPage);
-            return [
-                'ids'   => array_map(fn(Host $h) => $h->getId(), $result['hosts']),
-                'total' => $result['total'],
-            ];
+            return $this->paginateFilterQuery($this->buildAdvancedQb($criteria), $page, $perPage);
         });
         return ['hosts' => $this->fetchByIds($data['ids']), 'total' => $data['total']];
     }
@@ -323,11 +315,10 @@ class HostRepository extends ServiceEntityRepository
     // -------------------------------------------------------------------------
 
     /**
-     * Count + ID-page + entity fetch for any filter QueryBuilder.
-     * Uses a two-step approach (IDs first, then full hydration) so that LIMIT/OFFSET
-     * operates on host rows rather than join-multiplied rows.
+     * Count + ID-page for any filter QueryBuilder.
+     * Returns IDs only — callers call fetchByIds() separately after caching.
      *
-     * @return array{hosts: Host[], total: int}
+     * @return array{ids: int[], total: int}
      */
     private function paginateFilterQuery(QueryBuilder $filterQb, int $page, int $perPage): array
     {
@@ -339,7 +330,7 @@ class HostRepository extends ServiceEntityRepository
             ->getSingleScalarResult();
 
         if ($total === 0) {
-            return ['hosts' => [], 'total' => 0];
+            return ['ids' => [], 'total' => 0];
         }
 
         $ids = $this->idsForPage(
@@ -348,7 +339,7 @@ class HostRepository extends ServiceEntityRepository
             $perPage
         );
 
-        return ['hosts' => $this->fetchByIds($ids), 'total' => $total];
+        return ['ids' => $ids, 'total' => $total];
     }
 
     /** Returns a page of host IDs from the given QueryBuilder. */
@@ -368,6 +359,12 @@ class HostRepository extends ServiceEntityRepository
      * Fetch full Host entities by ID with all associations the list template needs
      * eagerly loaded to prevent N+1 queries.
      *
+     * Domain records are fetched in a second query to avoid a Cartesian-product row
+     * explosion: joining both h.tags (multi-valued) and i.domainRecords (multi-valued)
+     * in one query multiplies rows as interfaces × tags × domainRecords per host.
+     * The second query shares the same UnitOfWork, so Doctrine populates the already-
+     * loaded NetworkInterface::$domainRecords collections from the identity map.
+     *
      * @return Host[]
      */
     private function fetchByIds(array $ids): array
@@ -376,19 +373,39 @@ class HostRepository extends ServiceEntityRepository
             return [];
         }
 
-        return $this->createQueryBuilder('h')
+        $hosts = $this->createQueryBuilder('h')
             ->leftJoin('h.interfaces', 'i')->addSelect('i')
             ->leftJoin('h.tags', 'tg')->addSelect('tg')
             ->leftJoin('i.ipAddress', 'ip4')->addSelect('ip4')
             ->leftJoin('i.ipv6Address', 'ip6')->addSelect('ip6')
             ->leftJoin('i.subnet', 's')->addSelect('s')
-            ->leftJoin('i.domainRecords', 'n')->addSelect('n')
-            ->leftJoin('n.domain', 'nd')->addSelect('nd')
             ->where('h.id IN (:ids)')
             ->setParameter('ids', $ids)
             ->orderBy('h.name', 'ASC')
             ->getQuery()
             ->getResult();
+
+        // Separately populate domainRecords on each interface to avoid the
+        // Cartesian product that occurs when joining tags AND domainRecords together.
+        $ifaceIds = [];
+        foreach ($hosts as $host) {
+            foreach ($host->getInterfaces() as $iface) {
+                $ifaceIds[] = $iface->getId();
+            }
+        }
+        if (!empty($ifaceIds)) {
+            $this->getEntityManager()->createQueryBuilder()
+                ->select('i', 'n', 'nd')
+                ->from(\App\Entity\NetworkInterface::class, 'i')
+                ->leftJoin('i.domainRecords', 'n')
+                ->leftJoin('n.domain', 'nd')
+                ->where('i.id IN (:ifaceIds)')
+                ->setParameter('ifaceIds', $ifaceIds)
+                ->getQuery()
+                ->getResult();
+        }
+
+        return $hosts;
     }
 
     public function purgeDeletedBefore(\DateTimeImmutable $before): int
