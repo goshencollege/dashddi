@@ -899,10 +899,10 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
            ═══════════════════════════════════════════════════════════════════ #}
         <section id="domain-records" class="mb-5">
             <h2 class="h5 border-bottom pb-2 mb-3">Domain Records <code class="small fw-normal text-muted">/api/domain-records</code></h2>
-            <p class="text-muted small mb-1">DNS records within a domain. Records can be standalone (with an explicit <code>value</code>) or linked to a network interface — for interface-linked A/AAAA records the value is derived automatically from the interface IP.</p>
+            <p class="text-muted small mb-1">DNS records within a domain. Records can be standalone (with an explicit <code>value</code>), linked to a network interface, or linked to a virtual IP. For interface- or VIP-linked A/AAAA records the value is derived automatically from the live IP.</p>
             <table class="table table-sm table-borderless mb-4 small">
                 <tbody>
-                    <tr><td style="width:3.5rem"><span class="badge bg-primary font-monospace">GET</span></td><td><code>/api/domain-records</code></td><td class="text-muted">List records (filterable by domain, interface, or type)</td></tr>
+                    <tr><td style="width:3.5rem"><span class="badge bg-primary font-monospace">GET</span></td><td><code>/api/domain-records</code></td><td class="text-muted">List records (filterable by domain, interface, VIP, or type)</td></tr>
                     <tr><td><span class="badge bg-primary font-monospace">GET</span></td><td><code>/api/domain-records/{id}</code></td><td class="text-muted">Get a record</td></tr>
                     <tr><td><span class="badge bg-success font-monospace">POST</span></td><td><code>/api/domain-records</code></td><td class="text-muted">Create a record</td></tr>
                     <tr><td><span class="badge bg-warning text-dark font-monospace">PATCH</span></td><td><code>/api/domain-records/{id}</code></td><td class="text-muted">Update a record</td></tr>
@@ -916,9 +916,10 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
                 query: [
                     {name: 'domain_id', type: 'integer', desc: 'Filter by domain ID.'},
                     {name: 'interface_id', type: 'integer', desc: 'Filter by interface ID (returns all records linked to that interface).'},
+                    {name: 'virtual_ip_id', type: 'integer', desc: 'Filter by virtual IP ID (returns all records linked to that VIP).'},
                     {name: 'type', type: 'string', desc: 'Filter by record type (A, AAAA, CNAME, MX, NS, TXT, PTR, SRV).'},
                 ],
-                response_example: '[\n  {\n    "id": 1,\n    "domain_id": 1,\n    "interface_id": null,\n    "hostname": "www",\n    "fqdn": "www.example.com",\n    "type": "A",\n    "value": "10.0.0.5",\n    "ttl": 3600,\n    "is_canonical": false,\n    "view_ids": [1],\n    "created_at": "2024-01-01T00:00:00+00:00",\n    "updated_at": "2024-01-01T00:00:00+00:00",\n    "created_by": "user@example.com",\n    "updated_by": "user@example.com"\n  }\n]',
+                response_example: '[\n  {\n    "id": 1,\n    "domain_id": 1,\n    "interface_id": null,\n    "virtual_ip_id": 3,\n    "hostname": "gw",\n    "fqdn": "gw.example.com",\n    "type": "A",\n    "value": "",\n    "ttl": null,\n    "is_canonical": true,\n    "view_ids": [],\n    "created_at": "2024-01-01T00:00:00+00:00",\n    "updated_at": "2024-01-01T00:00:00+00:00",\n    "created_by": "user@example.com",\n    "updated_by": "user@example.com"\n  }\n]',
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
@@ -929,14 +930,15 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
             {% include 'api_docs/_endpoint.html.twig' with {
                 anchor_id: 'ep-domain-records-create',
                 method: 'POST', path: '/api/domain-records', name: 'Create domain record',
-                notes: 'When creating an interface-linked A or AAAA record, the <code>value</code> field is derived automatically from the interface IP and may be omitted. <code>domain_id</code> is required for standalone records but optional for interface-linked records.',
+                notes: 'A record can be linked to an interface (<code>interface_id</code>) or a virtual IP (<code>virtual_ip_id</code>), but not both. For linked A/AAAA records the <code>value</code> field is derived automatically from the live IP and may be omitted. <code>domain_id</code> is required for standalone records but optional when a link is provided.',
                 body: [
                     {name: 'hostname', type: 'string', required: true, desc: 'Hostname label (without domain, e.g. www).'},
                     {name: 'type', type: 'string', required: true, desc: 'Record type: A, AAAA, CNAME, MX, NS, TXT, PTR, or SRV (case-insensitive).'},
-                    {name: 'domain_id', type: 'integer', required: false, desc: 'Domain this record belongs to. Required when <code>interface_id</code> is not set.'},
-                    {name: 'interface_id', type: 'integer', required: false, desc: 'Link this record to a network interface. For A/AAAA records, <code>value</code> is auto-derived from the interface IP.'},
-                    {name: 'is_canonical', type: 'boolean', required: false, desc: 'Mark this as the canonical (PTR) name for the interface. Only valid on interface-linked A/AAAA records. Default: false.'},
-                    {name: 'value', type: 'string', required: false, desc: 'Record value (IP, hostname, or text depending on type). Required for non-interface records and all non-A/AAAA types.'},
+                    {name: 'domain_id', type: 'integer', required: false, desc: 'Domain this record belongs to. Required when neither <code>interface_id</code> nor <code>virtual_ip_id</code> is set.'},
+                    {name: 'interface_id', type: 'integer', required: false, desc: 'Link to a network interface. Mutually exclusive with <code>virtual_ip_id</code>.'},
+                    {name: 'virtual_ip_id', type: 'integer', required: false, desc: 'Link to a virtual IP. Mutually exclusive with <code>interface_id</code>.'},
+                    {name: 'is_canonical', type: 'boolean', required: false, desc: 'Mark as the canonical (PTR) name. Only valid on interface- or VIP-linked A/AAAA records. Default: false.'},
+                    {name: 'value', type: 'string', required: false, desc: 'Record value. Required for standalone records and all non-A/AAAA types.'},
                     {name: 'ttl', type: 'integer', required: false, desc: 'TTL in seconds.'},
                     {name: 'view_ids', type: 'integer[]', required: false, desc: 'DNS view IDs.'},
                 ],
@@ -946,13 +948,15 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
             {% include 'api_docs/_endpoint.html.twig' with {
                 anchor_id: 'ep-domain-records-update',
                 method: 'PATCH', path: '/api/domain-records/{id}', name: 'Update domain record',
-                notes: 'Only include fields you want to change.',
+                notes: 'Only include fields you want to change. Pass <code>interface_id: null</code> or <code>virtual_ip_id: null</code> to unlink. Setting one automatically clears the other. <code>interface_id</code> and <code>virtual_ip_id</code> cannot both be non-null in the same request.',
                 body: [
                     {name: 'domain_id', type: 'integer', required: false, desc: 'Move to a different domain.'},
                     {name: 'hostname', type: 'string', required: false, desc: 'Hostname label.'},
                     {name: 'type', type: 'string', required: false, desc: 'Record type (A, AAAA, CNAME, MX, NS, TXT, PTR, SRV).'},
+                    {name: 'interface_id', type: 'integer|null', required: false, desc: 'Link to a network interface, or null to unlink. Mutually exclusive with <code>virtual_ip_id</code>.'},
+                    {name: 'virtual_ip_id', type: 'integer|null', required: false, desc: 'Link to a virtual IP, or null to unlink. Mutually exclusive with <code>interface_id</code>.'},
                     {name: 'value', type: 'string', required: false, desc: 'Record value.'},
-                    {name: 'is_canonical', type: 'boolean', required: false, desc: 'Canonical name flag. Only valid on interface-linked A/AAAA records.'},
+                    {name: 'is_canonical', type: 'boolean', required: false, desc: 'Canonical name flag. Only valid on interface- or VIP-linked A/AAAA records.'},
                     {name: 'ttl', type: 'integer|null', required: false, desc: 'TTL in seconds, or null to clear.'},
                     {name: 'view_ids', type: 'integer[]', required: false, desc: 'Replaces all current views.'},
                 ],
