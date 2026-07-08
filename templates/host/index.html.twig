@@ -465,7 +465,9 @@
                                             {% for fqdn in fqdns %}<div>{{ fqdn }}</div>{% endfor %}
                                         {% endif %}
                                     </td>
-                                    <td></td>
+                                    <td class="text-muted small">
+                                        {{ vip.updatedAt|date('Y-m-d') }}{% if vip.updatedBy %} · {{ vip.updatedBy }}{% endif %}
+                                    </td>
                                     <td class="text-end">
                                         <a href="{{ path('virtual_ip_edit', {id: vip.id}) }}" class="btn btn-sm btn-outline-secondary">
                                             <i class="bi bi-pencil"></i>
