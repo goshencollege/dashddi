@@ -452,7 +452,19 @@
                                     <td></td>
                                     <td class="ip-address small">{{ vip.ipAddress ? vip.ipAddress.address : '—' }}</td>
                                     <td class="ip-address small">{{ vip.ipv6Address ? vip.ipv6Address.address : '—' }}</td>
-                                    <td></td>
+                                    <td class="small font-monospace">
+                                        {% set fqdns = [] %}
+                                        {% for record in vip.domainRecords %}
+                                            {% if record.domain %}
+                                                {% set fqdns = fqdns|merge([record.fullyQualifiedHostname]) %}
+                                            {% endif %}
+                                        {% endfor %}
+                                        {% if fqdns is empty %}
+                                            <span class="text-muted">—</span>
+                                        {% else %}
+                                            {% for fqdn in fqdns %}<div>{{ fqdn }}</div>{% endfor %}
+                                        {% endif %}
+                                    </td>
                                     <td></td>
                                     <td class="text-end">
                                         <a href="{{ path('virtual_ip_edit', {id: vip.id}) }}" class="btn btn-sm btn-outline-secondary">
