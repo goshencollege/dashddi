@@ -27,6 +27,49 @@ class VirtualIpRepository extends ServiceEntityRepository
     }
 
     /**
+     * Returns a map of interface_id => VirtualIp[] for the given interface IDs.
+     * Uses two focused queries to avoid N+1: one scalar query for pairs, one
+     * entity query for the VIP objects.
+     *
+     * @param  int[]  $interfaceIds
+     * @return array<int, VirtualIp[]>
+     */
+    public function findMapByInterfaceIds(array $interfaceIds): array
+    {
+        if (empty($interfaceIds)) {
+            return [];
+        }
+
+        $pairs = $this->getEntityManager()->createQuery(
+            'SELECT v.id AS vip_id, m.id AS iface_id
+             FROM App\Entity\VirtualIp v
+             JOIN v.memberInterfaces m
+             WHERE m.id IN (:ids) AND v.deletedAt IS NULL
+             ORDER BY v.label ASC'
+        )
+            ->setParameter('ids', $interfaceIds)
+            ->getScalarResult();
+
+        if (empty($pairs)) {
+            return [];
+        }
+
+        $vipIds  = array_unique(array_column($pairs, 'vip_id'));
+        $vipObjs = $this->findBy(['id' => $vipIds]);
+        $vipById = [];
+        foreach ($vipObjs as $v) {
+            $vipById[$v->getId()] = $v;
+        }
+
+        $map = [];
+        foreach ($pairs as $pair) {
+            $map[(int) $pair['iface_id']][] = $vipById[(int) $pair['vip_id']];
+        }
+
+        return $map;
+    }
+
+    /**
      * Returns non-deleted VIPs on the same subnet as $interface that do not
      * already have $interface as a member.
      *
