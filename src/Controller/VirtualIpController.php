@@ -31,6 +31,12 @@ class VirtualIpController extends AbstractController
             throw $this->createNotFoundException();
         }
 
+        $from        = $request->query->get('from');
+        $interfaceId = (int) $request->query->get('interfaceId', 0);
+        $interface   = ($from === 'interface' && $interfaceId)
+            ? $em->find(NetworkInterface::class, $interfaceId)
+            : null;
+
         $vip = new VirtualIp();
         $vip->setSubnet($subnet);
 
@@ -48,28 +54,49 @@ class VirtualIpController extends AbstractController
                 $em->persist($vip);
                 $em->flush();
                 $this->addFlash('success', 'Virtual IP added.');
+                if ($interface) {
+                    return $this->redirectToRoute('interface_show', ['id' => $interface->getId()]);
+                }
                 return $this->redirectToRoute('virtual_ip_show', ['id' => $vip->getId()]);
             }
         }
 
         return $this->render('virtual_ip/form.html.twig', [
-            'form'   => $form,
-            'vip'    => $vip,
-            'subnet' => $subnet,
-            'title'  => 'Add Virtual IP',
+            'form'      => $form,
+            'vip'       => $vip,
+            'subnet'    => $subnet,
+            'title'     => 'Add Virtual IP',
+            'from'      => $from,
+            'interface' => $interface,
         ]);
     }
 
     #[Route('/virtual-ips/{id}', name: 'virtual_ip_show', methods: ['GET'])]
-    public function show(VirtualIp $vip): Response
+    public function show(Request $request, VirtualIp $vip, EntityManagerInterface $em): Response
     {
-        return $this->render('virtual_ip/show.html.twig', ['vip' => $vip]);
+        $from        = $request->query->get('from');
+        $interfaceId = (int) $request->query->get('interfaceId', 0);
+        $interface   = ($from === 'interface' && $interfaceId)
+            ? $em->find(NetworkInterface::class, $interfaceId)
+            : null;
+
+        return $this->render('virtual_ip/show.html.twig', [
+            'vip'       => $vip,
+            'from'      => $from,
+            'interface' => $interface,
+        ]);
     }
 
     #[Route('/virtual-ips/{id}/edit', name: 'virtual_ip_edit', methods: ['GET', 'POST'])]
     public function edit(Request $request, VirtualIp $vip, EntityManagerInterface $em): Response
     {
         $subnet = $vip->getSubnet();
+
+        $from        = $request->query->get('from');
+        $interfaceId = (int) $request->query->get('interfaceId', 0);
+        $interface   = ($from === 'interface' && $interfaceId)
+            ? $em->find(NetworkInterface::class, $interfaceId)
+            : null;
 
         $form = $this->createForm(VirtualIpType::class, $vip, [
             'is_edit' => true,
@@ -87,15 +114,20 @@ class VirtualIpController extends AbstractController
                 $this->handleIpAssignment($form, $vip, $em, isEdit: true);
                 $em->flush();
                 $this->addFlash('success', 'Virtual IP updated.');
+                if ($interface) {
+                    return $this->redirectToRoute('interface_show', ['id' => $interface->getId()]);
+                }
                 return $this->redirectToRoute('virtual_ip_show', ['id' => $vip->getId()]);
             }
         }
 
         return $this->render('virtual_ip/form.html.twig', [
-            'form'   => $form,
-            'vip'    => $vip,
-            'subnet' => $subnet,
-            'title'  => 'Edit Virtual IP',
+            'form'      => $form,
+            'vip'       => $vip,
+            'subnet'    => $subnet,
+            'title'     => 'Edit Virtual IP',
+            'from'      => $from,
+            'interface' => $interface,
         ]);
     }
 
