@@ -217,7 +217,7 @@
         <tbody>
             {% for vip in virtualIps %}
             <tr>
-                <td><a href="{{ path('virtual_ip_show', {id: vip.id}) }}">{{ vip.label }}</a></td>
+                <td><a href="{{ path('virtual_ip_show', {id: vip.id, from: 'interface', interfaceId: interface.id}) }}">{{ vip.label }}</a></td>
                 <td><span class="badge bg-secondary">{{ vip.protocol.label() }}</span></td>
                 <td class="text-muted">{{ vip.vrid ?: '—' }}</td>
                 <td class="ip-address">{{ vip.ipAddress ? vip.ipAddress.address : '—' }}</td>

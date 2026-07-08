@@ -443,7 +443,7 @@
                                     <td></td>
                                     <td class="small">
                                         <i class="bi bi-layers text-muted me-1"></i>
-                                        <a href="{{ path('virtual_ip_show', {id: vip.id}) }}" class="text-decoration-none">{{ vip.label }}</a>
+                                        <a href="{{ path('virtual_ip_show', {id: vip.id, from: 'interface', interfaceId: iface.id}) }}" class="text-decoration-none">{{ vip.label }}</a>
                                     </td>
                                     <td>
                                         <span class="badge bg-secondary">{{ vip.protocol.label() }}</span>

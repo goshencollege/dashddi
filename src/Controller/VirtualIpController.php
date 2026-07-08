@@ -72,9 +72,19 @@ class VirtualIpController extends AbstractController
     }
 
     #[Route('/virtual-ips/{id}', name: 'virtual_ip_show', methods: ['GET'])]
-    public function show(VirtualIp $vip): Response
+    public function show(Request $request, VirtualIp $vip, EntityManagerInterface $em): Response
     {
-        return $this->render('virtual_ip/show.html.twig', ['vip' => $vip]);
+        $from        = $request->query->get('from');
+        $interfaceId = (int) $request->query->get('interfaceId', 0);
+        $interface   = ($from === 'interface' && $interfaceId)
+            ? $em->find(NetworkInterface::class, $interfaceId)
+            : null;
+
+        return $this->render('virtual_ip/show.html.twig', [
+            'vip'       => $vip,
+            'from'      => $from,
+            'interface' => $interface,
+        ]);
     }
 
     #[Route('/virtual-ips/{id}/edit', name: 'virtual_ip_edit', methods: ['GET', 'POST'])]
