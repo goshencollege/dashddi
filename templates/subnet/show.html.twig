@@ -319,7 +319,7 @@
                                             </a>
                                         {% elseif vip %}
                                             <a href="{{ path('virtual_ip_show', {id: vip.id}) }}">
-                                                <span class="badge bg-secondary me-1">VIP</span>{{ vip.label }}
+                                                <i class="bi bi-layers text-muted me-1"></i>{{ vip.label }}
                                             </a>
                                         {% else %}—{% endif %}
                                     </td>
@@ -373,7 +373,7 @@
                                             </a>
                                         {% elseif vip %}
                                             <a href="{{ path('virtual_ip_show', {id: vip.id}) }}">
-                                                <span class="badge bg-secondary me-1">VIP</span>{{ vip.label }}
+                                                <i class="bi bi-layers text-muted me-1"></i>{{ vip.label }}
                                             </a>
                                         {% else %}—{% endif %}
                                     </td>
