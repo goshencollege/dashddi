@@ -469,7 +469,7 @@
                                         {{ vip.updatedAt|date('Y-m-d') }}{% if vip.updatedBy %} · {{ vip.updatedBy }}{% endif %}
                                     </td>
                                     <td class="text-end">
-                                        <a href="{{ path('virtual_ip_edit', {id: vip.id}) }}" class="btn btn-sm btn-outline-secondary">
+                                        <a href="{{ path('virtual_ip_edit', {id: vip.id, from: 'interface', interfaceId: iface.id}) }}" class="btn btn-sm btn-outline-secondary">
                                             <i class="bi bi-pencil"></i>
                                         </a>
                                     </td>
