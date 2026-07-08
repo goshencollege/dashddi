@@ -57,44 +57,65 @@
     </div>
 </div>
 
-<div class="card mb-4">
-    <div class="card-header fw-semibold"><i class="bi bi-4-square me-1"></i>IPv4 Address</div>
-    <div class="card-body">
-        <div id="ipv4-assignment-options">
-            {{ form_widget(form.ipv4Assignment) }}
-        </div>
-        <div id="ipv4-container-notice" class="text-muted small" style="display:none">
-            IPv4 addresses are not assigned to VIPs in container subnets.
-        </div>
-        {% if vip.ipAddress %}
-            <div class="mb-2" id="ipv4-current-badge">
-                Current: <code class="ip-address">{{ vip.ipAddress.address }}</code>
+<div class="row g-3 mb-4">
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header fw-semibold">
+                <i class="bi bi-4-square me-1"></i>IPv4 Assignment
+                {% if vip.ipAddress %}
+                    <span id="ipv4-current-badge" class="badge bg-success ms-2">Currently: <code class="text-white">{{ vip.ipAddress.address }}</code></span>
+                {% endif %}
             </div>
-        {% endif %}
-        <div id="ipv4-input-section" style="display:none">
-            {{ form_widget(form.ipv4AddressInput, {attr: {class: 'form-control font-monospace mt-2'}}) }}
-            <datalist id="available-ipv4-list"></datalist>
+            <div class="card-body">
+                <div id="ipv4-assignment-options">
+                    <div class="mb-2">
+                        {% for child in form.ipv4Assignment %}
+                            <div class="form-check">
+                                {{ form_widget(child, {attr: {class: 'form-check-input', id: 'ipv4_' ~ loop.index}}) }}
+                                {{ form_label(child, null, {label_attr: {class: 'form-check-label', for: 'ipv4_' ~ loop.index}}) }}
+                            </div>
+                        {% endfor %}
+                    </div>
+                    <div id="ipv4-input-section" class="mt-2" style="display:none">
+                        {{ form_label(form.ipv4AddressInput, null, {label_attr: {class: 'form-label small'}}) }}
+                        {{ form_widget(form.ipv4AddressInput, {attr: {class: 'form-control font-monospace'}}) }}
+                        <datalist id="available-ipv4-list"></datalist>
+                    </div>
+                </div>
+                <p id="ipv4-container-notice" class="text-muted small mb-0" style="display:none">
+                    IP assignment is not available for container subnets.
+                </p>
+            </div>
         </div>
     </div>
-</div>
-
-<div class="card mb-4">
-    <div class="card-header fw-semibold"><i class="bi bi-6-square me-1"></i>IPv6 Address</div>
-    <div class="card-body">
-        <div id="ipv6-assignment-options">
-            {{ form_widget(form.ipv6Assignment) }}
-        </div>
-        <div id="ipv6-container-notice" class="text-muted small" style="display:none">
-            IPv6 addresses are not assigned to VIPs in container subnets.
-        </div>
-        {% if vip.ipv6Address %}
-            <div class="mb-2" id="ipv6-current-badge">
-                Current: <code class="ip-address small">{{ vip.ipv6Address.address }}</code>
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header fw-semibold">
+                <i class="bi bi-6-square me-1"></i>IPv6 Assignment
+                {% if vip.ipv6Address %}
+                    <span id="ipv6-current-badge" class="badge bg-success ms-2">Currently: <code class="text-white">{{ vip.ipv6Address.address }}</code></span>
+                {% endif %}
             </div>
-        {% endif %}
-        <div id="ipv6-input-section" style="display:none">
-            {{ form_widget(form.ipv6AddressInput, {attr: {class: 'form-control font-monospace mt-2'}}) }}
-            <datalist id="available-ipv6-list"></datalist>
+            <div class="card-body">
+                <div id="ipv6-assignment-options">
+                    <div class="mb-2">
+                        {% for child in form.ipv6Assignment %}
+                            <div class="form-check">
+                                {{ form_widget(child, {attr: {class: 'form-check-input', id: 'ipv6_' ~ loop.index}}) }}
+                                {{ form_label(child, null, {label_attr: {class: 'form-check-label', for: 'ipv6_' ~ loop.index}}) }}
+                            </div>
+                        {% endfor %}
+                    </div>
+                    <div id="ipv6-input-section" class="mt-2" style="display:none">
+                        {{ form_label(form.ipv6AddressInput, null, {label_attr: {class: 'form-label small'}}) }}
+                        {{ form_widget(form.ipv6AddressInput, {attr: {class: 'form-control font-monospace'}}) }}
+                        <datalist id="available-ipv6-list"></datalist>
+                    </div>
+                </div>
+                <p id="ipv6-container-notice" class="text-muted small mb-0" style="display:none">
+                    IP assignment is not available for container subnets.
+                </p>
+            </div>
         </div>
     </div>
 </div>
