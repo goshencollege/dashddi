@@ -25,4 +25,28 @@ class VirtualIpRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
     }
+
+    /**
+     * Returns non-deleted VIPs on the same subnet as $interface that do not
+     * already have $interface as a member.
+     *
+     * @return VirtualIp[]
+     */
+    public function findLinkableForInterface(NetworkInterface $interface): array
+    {
+        if (!$interface->getSubnet()) {
+            return [];
+        }
+
+        return $this->createQueryBuilder('v')
+            ->leftJoin('v.memberInterfaces', 'm')
+            ->andWhere('v.subnet = :subnet')
+            ->andWhere('v.deletedAt IS NULL')
+            ->andWhere(':iface NOT MEMBER OF v.memberInterfaces')
+            ->setParameter('subnet', $interface->getSubnet())
+            ->setParameter('iface', $interface)
+            ->orderBy('v.label', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
 }

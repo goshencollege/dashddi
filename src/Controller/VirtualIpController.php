@@ -111,6 +111,26 @@ class VirtualIpController extends AbstractController
         return $this->redirectToRoute('subnet_show', ['id' => $subnetId]);
     }
 
+    #[Route('/interfaces/{interfaceId}/link-vip', name: 'virtual_ip_link_interface', methods: ['POST'])]
+    public function linkInterface(Request $request, int $interfaceId, EntityManagerInterface $em): Response
+    {
+        $interface = $em->find(NetworkInterface::class, $interfaceId);
+        if (!$interface) {
+            throw $this->createNotFoundException();
+        }
+
+        $vipId = (int) $request->request->get('vip_id');
+        if ($this->isCsrfTokenValid('link_vip_' . $interfaceId, $request->request->get('_token'))) {
+            $vip = $em->find(VirtualIp::class, $vipId);
+            if ($vip && !$vip->isDeleted()) {
+                $vip->addMemberInterface($interface);
+                $em->flush();
+            }
+        }
+
+        return $this->redirectToRoute('interface_show', ['id' => $interfaceId]);
+    }
+
     #[Route('/virtual-ips/{id}/remove-member/{interfaceId}', name: 'virtual_ip_remove_member', methods: ['POST'])]
     public function removeMember(Request $request, VirtualIp $vip, int $interfaceId, EntityManagerInterface $em): Response
     {

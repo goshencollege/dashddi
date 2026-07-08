@@ -100,7 +100,8 @@ class InterfaceController extends AbstractController
             'switchInfo'  => $switchInfo,
             'switchIface' => $switchIface,
             'arubaSwitch' => $arubaSwitch,
-            'virtualIps'  => $vipRepo->findByMemberInterface($interface),
+            'virtualIps'     => $vipRepo->findByMemberInterface($interface),
+            'linkableVips'   => $vipRepo->findLinkableForInterface($interface),
         ]);
     }
 
