@@ -359,12 +359,6 @@ class HostRepository extends ServiceEntityRepository
      * Fetch full Host entities by ID with all associations the list template needs
      * eagerly loaded to prevent N+1 queries.
      *
-     * Domain records are fetched in a second query to avoid a Cartesian-product row
-     * explosion: joining both h.tags (multi-valued) and i.domainRecords (multi-valued)
-     * in one query multiplies rows as interfaces × tags × domainRecords per host.
-     * The second query shares the same UnitOfWork, so Doctrine populates the already-
-     * loaded NetworkInterface::$domainRecords collections from the identity map.
-     *
      * @return Host[]
      */
     private function fetchByIds(array $ids): array
@@ -373,39 +367,19 @@ class HostRepository extends ServiceEntityRepository
             return [];
         }
 
-        $hosts = $this->createQueryBuilder('h')
+        return $this->createQueryBuilder('h')
             ->leftJoin('h.interfaces', 'i')->addSelect('i')
             ->leftJoin('h.tags', 'tg')->addSelect('tg')
             ->leftJoin('i.ipAddress', 'ip4')->addSelect('ip4')
             ->leftJoin('i.ipv6Address', 'ip6')->addSelect('ip6')
             ->leftJoin('i.subnet', 's')->addSelect('s')
+            ->leftJoin('i.domainRecords', 'n')->addSelect('n')
+            ->leftJoin('n.domain', 'nd')->addSelect('nd')
             ->where('h.id IN (:ids)')
             ->setParameter('ids', $ids)
             ->orderBy('h.name', 'ASC')
             ->getQuery()
             ->getResult();
-
-        // Separately populate domainRecords on each interface to avoid the
-        // Cartesian product that occurs when joining tags AND domainRecords together.
-        $ifaceIds = [];
-        foreach ($hosts as $host) {
-            foreach ($host->getInterfaces() as $iface) {
-                $ifaceIds[] = $iface->getId();
-            }
-        }
-        if (!empty($ifaceIds)) {
-            $this->getEntityManager()->createQueryBuilder()
-                ->select('i', 'n', 'nd')
-                ->from(\App\Entity\NetworkInterface::class, 'i')
-                ->leftJoin('i.domainRecords', 'n')
-                ->leftJoin('n.domain', 'nd')
-                ->where('i.id IN (:ifaceIds)')
-                ->setParameter('ifaceIds', $ifaceIds)
-                ->getQuery()
-                ->getResult();
-        }
-
-        return $hosts;
     }
 
     public function purgeDeletedBefore(\DateTimeImmutable $before): int
