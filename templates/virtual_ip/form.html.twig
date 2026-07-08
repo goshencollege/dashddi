@@ -282,11 +282,13 @@
             if (query.length < 2) { callback(); return; }
             fetch('/api/interfaces/search?q=' + encodeURIComponent(query) + (subnetId ? '&subnet_id=' + subnetId : ''))
                 .then(r => r.json())
-                .then(results => callback(results.map(r => ({
-                    value: String(r.id),
-                    text:  (r.host_name ? r.host_name + ': ' : '') + (r.iface_name || r.mac)
-                           + (r.ip ? ' (' + r.ip + ')' : ''),
-                })))
+                .then(results => {
+                    callback(results.map(r => ({
+                        value: String(r.id),
+                        text:  (r.host_name ? r.host_name + ': ' : '') + (r.iface_name || r.mac)
+                               + (r.ip ? ' (' + r.ip + ')' : ''),
+                    })));
+                })
                 .catch(() => callback());
         },
         render: {
