@@ -310,6 +310,28 @@ class IpAddressManager
         return null;
     }
 
+    public function isIpv4ValidInSubnet(NetworkInterface $interface, Subnet $subnet): bool
+    {
+        $ipAddress = $interface->getIpAddress();
+        if (!$ipAddress || !$subnet->getIpv4Cidr()) {
+            return false;
+        }
+        $parsed = Factory::parseAddressString($ipAddress->getAddress());
+        $range  = Factory::parseRangeString($subnet->getIpv4Cidr());
+        return $parsed !== null && $range !== null && $range->contains($parsed);
+    }
+
+    public function isIpv6ValidInSubnet(NetworkInterface $interface, Subnet $subnet): bool
+    {
+        $ipv6Address = $interface->getIpv6Address();
+        if (!$ipv6Address || !$subnet->getIpv6Cidr()) {
+            return false;
+        }
+        $parsed = Factory::parseAddressString($ipv6Address->getAddress());
+        $range  = Factory::parseRangeString($subnet->getIpv6Cidr());
+        return $parsed !== null && $range !== null && $range->contains($parsed);
+    }
+
     public function assignIpv4(NetworkInterface $interface, string $address): IpAddress
     {
         $ip = new IpAddress();
