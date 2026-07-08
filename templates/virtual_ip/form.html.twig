@@ -1,6 +1,12 @@
 {% extends 'base.html.twig' %}
 {% block title %}{{ title }}{% endblock %}
 
+{% block stylesheets %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css">
+{% endblock %}
+
+{% block page_styles %}{{ include('_tom_select_dark.html.twig') }}{% endblock %}
+
 {% block content %}
 <nav aria-label="breadcrumb" class="mb-3">
     <ol class="breadcrumb">
@@ -49,11 +55,9 @@
 <div class="card mb-4">
     <div class="card-header fw-semibold"><i class="bi bi-hdd-network me-1"></i>Member Interfaces</div>
     <div class="card-body">
-        <div class="mb-0">
-            {{ form_widget(form.memberInterfaces, {attr: {class: 'form-select', size: 8}}) }}
-            {{ form_errors(form.memberInterfaces) }}
-            <div class="form-text">Hold Ctrl/Cmd to select multiple interfaces.</div>
-        </div>
+        {{ form_widget(form.memberInterfaces, {attr: {id: 'member-interfaces-select'}}) }}
+        {{ form_errors(form.memberInterfaces) }}
+        <div class="form-text">Search by host name, interface name, MAC, or IP address.</div>
     </div>
 </div>
 
@@ -223,6 +227,8 @@
 {% endblock %}
 
 {% block scripts %}
+{{ parent() }}
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
 <script>
 (function () {
     function bindIpRadios(prefix, sectionId) {
@@ -253,6 +259,42 @@
                 if (dl) dl.innerHTML = ips.map(ip => '<option value="' + ip + '">').join('');
             });
     }
+})();
+</script>
+
+<script>
+(function () {
+    const select = document.getElementById('member-interfaces-select');
+    if (!select) return;
+
+    // Keep only currently-selected options; Tom Select loads the rest via search
+    Array.from(select.options).forEach(opt => { if (!opt.selected) opt.remove(); });
+
+    const subnetId = {{ subnet.id }};
+
+    new TomSelect(select, {
+        plugins: ['remove_button'],
+        valueField: 'value',
+        labelField: 'text',
+        searchField: 'text',
+        persist: false,
+        load: function (query, callback) {
+            if (query.length < 2) { callback(); return; }
+            fetch('/api/interfaces/search?q=' + encodeURIComponent(query) + (subnetId ? '&subnet_id=' + subnetId : ''))
+                .then(r => r.json())
+                .then(results => callback(results.map(r => ({
+                    value: String(r.id),
+                    text:  (r.host_name ? r.host_name + ': ' : '') + (r.iface_name || r.mac)
+                           + (r.ip ? ' (' + r.ip + ')' : ''),
+                })))
+                .catch(() => callback());
+        },
+        render: {
+            no_results: function (data, escape) {
+                return '<div class="no-results">No interfaces matching <strong>' + escape(data.input) + '</strong></div>';
+            },
+        },
+    });
 })();
 </script>
 

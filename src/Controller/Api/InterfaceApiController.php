@@ -42,14 +42,16 @@ class InterfaceApiController extends AbstractController
     }
 
     #[Route('/search', name: 'api_interfaces_search', methods: ['GET'])]
-    public function search(Request $request, NetworkInterfaceRepository $repo): JsonResponse
+    public function search(Request $request, NetworkInterfaceRepository $repo, SubnetRepository $subnetRepo): JsonResponse
     {
         $q = trim($request->query->get('q', ''));
         if (strlen($q) < 2) {
             return $this->json([]);
         }
-        $limit = min(50, max(1, (int) $request->query->get('limit', 20)));
-        $results = $repo->search($q, $limit);
+        $limit    = min(50, max(1, (int) $request->query->get('limit', 20)));
+        $subnetId = $request->query->get('subnet_id');
+        $subnet   = $subnetId ? $subnetRepo->find((int) $subnetId) : null;
+        $results  = $repo->search($q, $limit, $subnet);
         return $this->json(array_map(function (NetworkInterface $iface) {
             $host = $iface->getHost();
             return [
