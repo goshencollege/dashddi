@@ -45,6 +45,10 @@ class DhcpLeaseRepository extends ServiceEntityRepository
      * Returns a map of macAddress => most-recent DhcpLease for the given MAC list.
      * Used to display DHCP-assigned IPs alongside static IPs in list views.
      *
+     * Uses a correlated subquery so only one lease per MAC is returned — without
+     * this, the query loads every historical lease for each MAC address, which can
+     * be tens of thousands of rows for long-lived hosts.
+     *
      * @param  string[] $macs
      * @return array<string, DhcpLease>
      */
@@ -56,17 +60,14 @@ class DhcpLeaseRepository extends ServiceEntityRepository
 
         $leases = $this->createQueryBuilder('l')
             ->where('l.macAddress IN (:macs)')
+            ->andWhere('l.leaseStart = (SELECT MAX(l2.leaseStart) FROM App\Entity\DhcpLease l2 WHERE l2.macAddress = l.macAddress)')
             ->setParameter('macs', array_map('strtolower', $macs))
-            ->orderBy('l.leaseStart', 'DESC')
             ->getQuery()
             ->getResult();
 
         $map = [];
         foreach ($leases as $lease) {
-            $mac = $lease->getMacAddress();
-            if (!isset($map[$mac])) {
-                $map[$mac] = $lease;
-            }
+            $map[$lease->getMacAddress()] = $lease;
         }
         return $map;
     }

@@ -88,7 +88,7 @@ class EntityPushListener
             // Activity-timestamp updates don't affect DNS, DHCP, or ClearPass config.
             // AuditListener also stamps updatedAt/updatedBy on every preUpdate, so
             // exclude those audit fields before checking whether anything real changed.
-            $ignoredFields = ['lastAuthAt', 'lastDhcpAt', 'updatedAt', 'updatedBy'];
+            $ignoredFields = ['lastAuthAt', 'lastDhcpAt', 'lastDhcpIp', 'updatedAt', 'updatedBy'];
             if (!empty($changeset) && empty(array_diff(array_keys($changeset), $ignoredFields))) {
                 return;
             }

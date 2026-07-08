@@ -117,15 +117,13 @@
                             </td>
                             <td>{{ iface.subnet ? iface.subnet.name : '—' }}</td>
                             <td class="ip-address">
-                                {% set lease = lease_map[iface.macAddress] ?? null %}
-                                {% set lease_ip = lease ? lease.ipAddress : null %}
                                 {% if iface.ipAddress %}
                                     {{ iface.ipAddress.address }}
-                                    {% if lease_ip and lease_ip != iface.ipAddress.address %}
-                                        <span class="text-muted">({{ lease_ip }})</span>
+                                    {% if iface.lastDhcpIp and iface.lastDhcpIp != iface.ipAddress.address %}
+                                        <span class="text-muted">({{ iface.lastDhcpIp }})</span>
                                     {% endif %}
-                                {% elseif lease_ip %}
-                                    <span class="text-muted">({{ lease_ip }})</span>
+                                {% elseif iface.lastDhcpIp %}
+                                    <span class="text-muted">({{ iface.lastDhcpIp }})</span>
                                 {% else %}
                                     —
                                 {% endif %}

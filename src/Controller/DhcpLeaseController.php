@@ -82,6 +82,7 @@ class DhcpLeaseController extends AbstractController
         $iface = $ifaceRepo->findByMacs([$lease->getMacAddress()])[$lease->getMacAddress()] ?? null;
         if ($iface !== null) {
             $iface->setLastDhcpAt($lease->getLeaseStart());
+            $iface->setLastDhcpIp($ipStr);
         }
 
         $em->persist($lease);

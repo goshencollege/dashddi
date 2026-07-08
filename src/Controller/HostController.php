@@ -5,7 +5,6 @@ namespace App\Controller;
 use App\Entity\Host;
 use App\Form\HostType;
 use App\Repository\BuildingRepository;
-use App\Repository\DhcpLeaseRepository;
 use App\Repository\HostRepository;
 use App\Repository\SubnetRepository;
 use App\Repository\TagRepository;
@@ -32,7 +31,7 @@ class HostController extends AbstractController
     private const PER_PAGE = 50;
 
     #[Route('', name: 'host_index', methods: ['GET'])]
-    public function index(Request $request, HostRepository $repo, SubnetRepository $subnetRepo, BuildingRepository $buildingRepo, TagRepository $tagRepo, UserPreferenceRepository $prefRepo, DhcpLeaseRepository $leaseRepo, VirtualIpRepository $vipRepo, EntityManagerInterface $em): Response
+    public function index(Request $request, HostRepository $repo, SubnetRepository $subnetRepo, BuildingRepository $buildingRepo, TagRepository $tagRepo, UserPreferenceRepository $prefRepo, VirtualIpRepository $vipRepo, EntityManagerInterface $em): Response
     {
         $user        = $this->getUser();
         $pref        = $user ? $prefRepo->findByIdentifier($user->getUserIdentifier()) : null;
@@ -103,11 +102,9 @@ class HostController extends AbstractController
 
         $hostViewMode = $pref?->getHostViewMode() ?? 'host';
 
-        $macs = [];
         $ifaceIds = [];
         foreach ($hosts as $host) {
             foreach ($host->getInterfaces() as $iface) {
-                $macs[]     = $iface->getMacAddress();
                 $ifaceIds[] = $iface->getId();
             }
         }
@@ -140,7 +137,6 @@ class HostController extends AbstractController
             'buildings'          => $buildingRepo->findBy([], ['name' => 'ASC']),
             'tags'               => $tagRepo->findBy([], ['name' => 'ASC']),
             'hostViewMode'       => $hostViewMode,
-            'lease_map'          => $leaseRepo->findLatestByMacs($macs),
             'vip_map'            => $vipRepo->findMapByInterfaceIds($ifaceIds),
             'containerSubnetIds' => $containerSubnetIds,
             'pagination'         => [
@@ -321,15 +317,10 @@ class HostController extends AbstractController
     }
 
     #[Route('/{id}', name: 'host_show', methods: ['GET'], requirements: ['id' => '\d+'])]
-    public function show(Host $host, DhcpLeaseRepository $leaseRepo): Response
+    public function show(Host $host): Response
     {
-        $macs = array_map(
-            fn($i) => $i->getMacAddress(),
-            $host->getInterfaces()->toArray()
-        );
         return $this->render('host/show.html.twig', [
-            'host'      => $host,
-            'lease_map' => $leaseRepo->findLatestByMacs($macs),
+            'host' => $host,
         ]);
     }
 
