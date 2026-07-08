@@ -55,7 +55,7 @@
 <div class="card mb-4">
     <div class="card-header fw-semibold"><i class="bi bi-hdd-network me-1"></i>Member Interfaces</div>
     <div class="card-body">
-        {{ form_widget(form.memberInterfaces, {attr: {id: 'member-interfaces-select'}}) }}
+        {{ form_widget(form.memberInterfaces) }}
         {{ form_errors(form.memberInterfaces) }}
         <div class="form-text">Search by host name, interface name, MAC, or IP address.</div>
     </div>
@@ -264,7 +264,7 @@
 
 <script>
 (function () {
-    const select = document.getElementById('member-interfaces-select');
+    const select = document.querySelector('select[name="virtual_ip[memberInterfaces][]"]');
     if (!select) return;
 
     // Keep only currently-selected options; Tom Select loads the rest via search
