@@ -170,6 +170,13 @@
                         <a href="{{ path('domain_record_edit', {id: record.id, from: 'virtual-ip'}) }}" class="btn btn-sm btn-outline-secondary me-1">
                             <i class="bi bi-pencil"></i>
                         </a>
+                        <form method="post" action="{{ path('domain_record_unlink', {id: record.id}) }}"
+                              class="d-inline" onsubmit="return confirm('Unlink this record from the VIP? The record will remain in the domain.')">
+                            <input type="hidden" name="_token" value="{{ csrf_token('unlink_record_' ~ record.id) }}">
+                            <button type="submit" class="btn btn-sm btn-outline-warning me-1" title="Unlink from VIP">
+                                <i class="bi bi-slash-circle"></i>
+                            </button>
+                        </form>
                         <form method="post" action="{{ path('domain_record_delete', {id: record.id}) }}" class="d-inline"
                               onsubmit="return confirm('Delete this DNS record?')">
                             <input type="hidden" name="_token" value="{{ csrf_token('delete_record_' ~ record.id) }}">
