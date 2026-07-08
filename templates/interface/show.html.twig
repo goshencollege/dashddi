@@ -8,7 +8,7 @@
         {% if interface.host %}
             <li class="breadcrumb-item"><a href="{{ path('host_show', {id: interface.host.id}) }}">{{ interface.host.name }}</a></li>
         {% endif %}
-        <li class="breadcrumb-item active"><code>{{ interface.macAddress }}</code></li>
+        <li class="breadcrumb-item active">{% if interface.name %}{{ interface.name }}{% else %}<code>{{ interface.macAddress }}</code>{% endif %}</li>
     </ol>
 </nav>
 
