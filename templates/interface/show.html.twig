@@ -190,7 +190,7 @@
 {% if interface.subnet and not interface.deleted %}
 <div class="card mb-4">
     <div class="card-header d-flex justify-content-between align-items-center">
-        <span class="fw-semibold"><i class="bi bi-layers me-1"></i>Participates in Virtual IPs</span>
+        <span class="fw-semibold"><i class="bi bi-layers me-1"></i>Virtual IPs</span>
         <div class="d-flex gap-2 align-items-center">
             {% if linkableVips is defined and linkableVips|length > 0 %}
             <form method="post" action="{{ path('virtual_ip_link_interface', {interfaceId: interface.id}) }}" class="d-flex gap-1">
