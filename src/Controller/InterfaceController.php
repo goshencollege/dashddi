@@ -28,8 +28,9 @@ use Symfony\Component\Routing\Attribute\Route;
 class InterfaceController extends AbstractController
 {
     public function __construct(
-        private readonly IpAddressManager $ipManager,
-        private readonly DnsViewResolver  $viewResolver,
+        private readonly IpAddressManager    $ipManager,
+        private readonly DnsViewResolver     $viewResolver,
+        private readonly VirtualIpRepository $vipRepo,
     ) {}
 
     #[Route('/hosts/{id}/interfaces/new', name: 'interface_new', methods: ['GET', 'POST'])]
@@ -300,6 +301,7 @@ class InterfaceController extends AbstractController
             if ($newSubnet !== null && $newSubnet !== $iface->getSubnet()) {
                 $this->ipManager->releaseIpv4($iface);
                 $this->ipManager->releaseIpv6($iface);
+                $this->unlinkInvalidVips($iface, $newSubnet);
                 $iface->setSubnet($newSubnet);
                 $subnetChanged = true;
             }
@@ -432,6 +434,21 @@ class InterfaceController extends AbstractController
                 $interface->getIpv6Address()?->setSubnet($subnet);
             } else {
                 $this->ipManager->releaseIpv6($interface);
+            }
+        }
+
+        if ($subnetChanged) {
+            $this->unlinkInvalidVips($interface, $subnet);
+        }
+    }
+
+    private function unlinkInvalidVips(NetworkInterface $interface, ?Subnet $subnet): void
+    {
+        foreach ($this->vipRepo->findByMemberInterface($interface) as $vip) {
+            if (!$subnet
+                || (!$this->ipManager->isVipIpv4ValidInSubnet($vip, $subnet)
+                    && !$this->ipManager->isVipIpv6ValidInSubnet($vip, $subnet))) {
+                $vip->removeMemberInterface($interface);
             }
         }
     }
