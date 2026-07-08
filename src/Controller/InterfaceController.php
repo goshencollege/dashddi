@@ -124,11 +124,7 @@ class InterfaceController extends AbstractController
                     $this->addFlash('danger', $error);
                 }
             } else {
-                if ($subnetChanged) {
-                    $this->ipManager->releaseIpv4($interface);
-                    $this->ipManager->releaseIpv6($interface);
-                }
-                $this->handleIpAssignment($form, $interface, isEdit: true);
+                $this->handleIpAssignment($form, $interface, isEdit: true, subnetChanged: $subnetChanged);
                 $em->flush();
                 $this->addFlash('success', 'Interface updated.');
                 return $this->redirectToRoute('interface_show', ['id' => $interface->getId()]);
@@ -384,7 +380,7 @@ class InterfaceController extends AbstractController
         return $errors;
     }
 
-    private function handleIpAssignment(\Symfony\Component\Form\FormInterface $form, NetworkInterface $interface, bool $isEdit = false): void
+    private function handleIpAssignment(\Symfony\Component\Form\FormInterface $form, NetworkInterface $interface, bool $isEdit = false, bool $subnetChanged = false): void
     {
         $subnet = $interface->getSubnet();
 
@@ -401,6 +397,13 @@ class InterfaceController extends AbstractController
             } elseif ($ipv4Mode === 'select') {
                 $ip = trim((string) $form->get('ipv4AddressInput')->getData());
                 if ($ip !== '' && $subnet) $this->ipManager->assignIpv4($interface, $ip);
+            }
+        } elseif ($subnetChanged && $subnet) {
+            // 'keep' selected but subnet changed — preserve only if still within the new CIDR
+            if ($this->ipManager->isIpv4ValidInSubnet($interface, $subnet)) {
+                $interface->getIpAddress()?->setSubnet($subnet);
+            } else {
+                $this->ipManager->releaseIpv4($interface);
             }
         }
 
@@ -419,6 +422,13 @@ class InterfaceController extends AbstractController
             } elseif ($ipv6Mode === 'select') {
                 $ip = trim((string) $form->get('ipv6AddressInput')->getData());
                 if ($ip !== '' && $subnet) $this->ipManager->assignIpv6($interface, $ip);
+            }
+        } elseif ($subnetChanged && $subnet) {
+            // 'keep' selected but subnet changed — preserve only if still within the new CIDR
+            if ($this->ipManager->isIpv6ValidInSubnet($interface, $subnet)) {
+                $interface->getIpv6Address()?->setSubnet($subnet);
+            } else {
+                $this->ipManager->releaseIpv6($interface);
             }
         }
     }
