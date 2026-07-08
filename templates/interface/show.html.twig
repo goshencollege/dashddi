@@ -208,7 +208,7 @@
                           onsubmit="return confirm('Remove this interface from {{ vip.label|e('js') }}?')">
                         <input type="hidden" name="_token" value="{{ csrf_token('remove_member_' ~ vip.id ~ '_' ~ interface.id) }}">
                         <button type="submit" class="btn btn-sm btn-outline-warning me-1" title="Unlink from this VIP">
-                            <i class="bi bi-unlink"></i>
+                            <i class="bi bi-x-circle"></i>
                         </button>
                     </form>
                     <form method="post" action="{{ path('virtual_ip_delete', {id: vip.id}) }}" class="d-inline"
