@@ -19,13 +19,14 @@
     <div class="card-header fw-semibold"><i class="bi bi-info-circle me-1"></i>Overview</div>
     <div class="card-body">
         <p>DashDDI acts as the authoritative source for your DNS zones. You define domains (zones) and records here; DashDDI generates BIND-format zone files and deploys them to your DNS servers via SSH.</p>
-        <p class="mb-0">DNS records can come from two sources:</p>
+        <p class="mb-0">DNS records can come from three sources:</p>
         <ul class="mt-2 mb-3">
-            <li><strong>Host interface records</strong> — A/AAAA (and other types) linked to a specific host interface. The IP address for A/AAAA records is derived automatically from the interface. These appear in the domain record list with a <em>Host</em> column.</li>
+            <li><strong>Host interface records</strong> — A/AAAA (and other types) linked to a specific host interface. The IP address for A/AAAA records is derived automatically from the interface. These appear in the domain record list with a <em>Host</em> column linking to the host.</li>
+            <li><strong>Virtual IP records</strong> — A/AAAA (and other types) linked to a Virtual IP (VRRP/HSRP/Active-Gateway). The IP address for A/AAAA records is derived from the VIP's assigned address. These appear in the domain record list with a <em>Host</em> column linking to the VIP detail page.</li>
             <li><strong>Manual records</strong> — MX, CNAME, TXT, NS, or any other records added directly from the domain detail page.</li>
         </ul>
-        <p>Records can be linked to an interface in two ways: by adding them from the interface detail page, or by editing an existing record from the domain detail page and using the <strong>Linked Interface</strong> search field. Linking an existing A or AAAA record to an interface clears its stored value so the live IP is derived from the interface going forward.</p>
-        <p class="mb-0">To unlink a record, open its edit form (from either the domain or interface detail page) and clear the <strong>Linked Interface</strong> field, or use the unlink button on the interface detail page. When an A or AAAA record is unlinked, its value is automatically populated with the interface's current IP address so the record remains valid.</p>
+        <p>Records can be linked to an interface or VIP in two ways: by adding them from the interface or VIP detail page, or by editing an existing record from the domain detail page and using the <strong>Linked to</strong> search field. Linking an existing A or AAAA record to an interface or VIP clears its stored value so the live IP is derived from the linked entity going forward.</p>
+        <p class="mb-0">To unlink a record, open its edit form (from either the domain or interface/VIP detail page) and clear the <strong>Linked to</strong> field, or use the unlink button (<i class="bi bi-slash-circle"></i>) on the interface or VIP detail page. When an A or AAAA record is unlinked, its value is automatically populated with the current IP address so the record remains valid.</p>
     </div>
 </div>
 
@@ -49,7 +50,7 @@
             <dt class="col-sm-3">Exclude from interface forms</dt>
             <dd class="col-sm-9">When checked, this domain will not appear in the domain selector when adding or editing DNS records from a host interface. Use this for zones that are managed exclusively through manual records — e.g. reverse zones, external zones, or infrastructure zones that should never have interface A/AAAA records assigned to them.</dd>
         </dl>
-        <p class="mb-0">The domain detail page shows all DNS records in the zone in a single unified table. Records linked to host interfaces include a <em>Host</em> column with a link to the host, and canonical records carry a <span class="badge bg-primary">PTR</span> badge indicating they are used as the reverse DNS name for their interface's IP.</p>
+        <p class="mb-0">The domain detail page shows all DNS records in the zone in a single unified table. Records linked to a host interface or Virtual IP include a <em>Host</em> column with a link to the host or VIP, and canonical records carry a <span class="badge bg-primary">PTR</span> badge indicating they are used as the reverse DNS name for their IP.</p>
     </div>
 </div>
 
