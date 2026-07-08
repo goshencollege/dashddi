@@ -306,12 +306,20 @@
                         <tbody>
                             {% for ip in ipv4_addresses %}
                                 {% set iface = subnet.interfaces|filter(i => i.ipAddress and i.ipAddress.id == ip.id)|first %}
+                                {% set vip = null %}
+                                {% if not iface %}
+                                    {% set vip = subnet.virtualIps|filter(v => not v.deleted and v.ipAddress and v.ipAddress.id == ip.id)|first %}
+                                {% endif %}
                                 <tr>
                                     <td class="ip-address">{{ ip.address }}</td>
                                     <td>
                                         {% if iface %}
                                             <a href="{{ path('interface_show', {id: iface.id}) }}">
-                                                <code>{{ iface.macAddress }}</code>
+                                                <code>{{ iface.name ?: iface.macAddress }}</code>
+                                            </a>
+                                        {% elseif vip %}
+                                            <a href="{{ path('virtual_ip_show', {id: vip.id}) }}">
+                                                <i class="bi bi-layers text-muted me-1"></i>{{ vip.label }}
                                             </a>
                                         {% else %}—{% endif %}
                                     </td>
@@ -352,12 +360,20 @@
                         <tbody>
                             {% for ip in ipv6_addresses %}
                                 {% set iface = subnet.interfaces|filter(i => i.ipv6Address and i.ipv6Address.id == ip.id)|first %}
+                                {% set vip = null %}
+                                {% if not iface %}
+                                    {% set vip = subnet.virtualIps|filter(v => not v.deleted and v.ipv6Address and v.ipv6Address.id == ip.id)|first %}
+                                {% endif %}
                                 <tr>
                                     <td class="ip-address small">{{ ip.address }}</td>
                                     <td>
                                         {% if iface %}
                                             <a href="{{ path('interface_show', {id: iface.id}) }}">
-                                                <code>{{ iface.macAddress }}</code>
+                                                <code>{{ iface.name ?: iface.macAddress }}</code>
+                                            </a>
+                                        {% elseif vip %}
+                                            <a href="{{ path('virtual_ip_show', {id: vip.id}) }}">
+                                                <i class="bi bi-layers text-muted me-1"></i>{{ vip.label }}
                                             </a>
                                         {% else %}—{% endif %}
                                     </td>
