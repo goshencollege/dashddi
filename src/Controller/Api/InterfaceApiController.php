@@ -6,6 +6,7 @@ use App\Entity\NetworkInterface;
 use App\Repository\HostRepository;
 use App\Repository\NetworkInterfaceRepository;
 use App\Repository\SubnetRepository;
+use App\Repository\VirtualIpRepository;
 use App\Service\IpAddressManager;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -132,6 +133,7 @@ class InterfaceApiController extends AbstractController
         HostRepository $hostRepo,
         SubnetRepository $subnetRepo,
         IpAddressManager $ipManager,
+        VirtualIpRepository $vipRepo,
     ): JsonResponse {
         if ($interface->isDeleted()) {
             return $this->json(['error' => 'Not found'], Response::HTTP_NOT_FOUND);
@@ -167,6 +169,13 @@ class InterfaceApiController extends AbstractController
             if ($subnetChanged) {
                 $ipManager->releaseIpv4($interface);
                 $ipManager->releaseIpv6($interface);
+                foreach ($vipRepo->findByMemberInterface($interface) as $vip) {
+                    if (!$subnet
+                        || (!$ipManager->isVipIpv4ValidInSubnet($vip, $subnet)
+                            && !$ipManager->isVipIpv6ValidInSubnet($vip, $subnet))) {
+                        $vip->removeMemberInterface($interface);
+                    }
+                }
             }
             $interface->setSubnet($subnet);
         }
