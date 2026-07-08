@@ -69,6 +69,9 @@ class NetworkInterface
     #[ORM\Column(nullable: true)]
     private ?\DateTimeImmutable $lastDhcpAt = null;
 
+    #[ORM\Column(length: 45, nullable: true)]
+    private ?string $lastDhcpIp = null;
+
     public function __construct()
     {
         $this->domainRecords = new ArrayCollection();
@@ -114,6 +117,9 @@ class NetworkInterface
 
     public function getLastDhcpAt(): ?\DateTimeImmutable { return $this->lastDhcpAt; }
     public function setLastDhcpAt(?\DateTimeImmutable $dt): static { $this->lastDhcpAt = $dt; return $this; }
+
+    public function getLastDhcpIp(): ?string { return $this->lastDhcpIp; }
+    public function setLastDhcpIp(?string $ip): static { $this->lastDhcpIp = $ip; return $this; }
 
     public function getPrimaryName(): ?string
     {
