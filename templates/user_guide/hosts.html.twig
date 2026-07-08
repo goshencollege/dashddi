@@ -222,6 +222,32 @@
     </div>
 </div>
 
+{# Virtual IPs #}
+<div class="card mb-4" id="virtual-ips">
+    <div class="card-header fw-semibold"><i class="bi bi-layers me-1"></i>Virtual IPs (VRRP / HSRP / Active-Gateway)</div>
+    <div class="card-body">
+        <p>A <strong>Virtual IP</strong> (VIP) is a floating IP address shared by a group of physical routers using a redundancy protocol such as VRRP, HSRP, or an Active-Gateway (as used in Aruba CX). Unlike a regular interface address, a VIP is not bound to a single host — it moves automatically between the member routers when a failover occurs.</p>
+
+        <h6 class="mt-3">Creating a Virtual IP</h6>
+        <p>Navigate to a subnet and click <strong>Add Virtual IP</strong>. Fill in:</p>
+        <ul>
+            <li><strong>Label</strong> — a descriptive name, e.g. <em>core-switch-gateway</em></li>
+            <li><strong>Protocol</strong> — VRRP, HSRP, Active-Gateway, or Other</li>
+            <li><strong>VRID / Group ID</strong> — optional group number (1–255)</li>
+            <li><strong>Member Interfaces</strong> — the physical interfaces that participate in the redundancy group; select multiple with Ctrl/Cmd</li>
+            <li><strong>IPv4 / IPv6 Address</strong> — assign automatically from the available pool, enter a specific address, or leave unassigned</li>
+            <li><strong>Notes</strong> — any free-form notes</li>
+        </ul>
+        <p class="mb-0 text-muted small">VIP IP addresses are tracked in IPAM the same way as interface addresses — they are excluded from the "available" pool and will not be auto-assigned to new interfaces.</p>
+
+        <h6 class="mt-3">DNS Records for Virtual IPs</h6>
+        <p>Once a VIP is saved, a <strong>DNS Records</strong> section appears on both the VIP detail page and the edit form. Click <strong>Add Record</strong> to attach a DNS record to the VIP. For <strong>A</strong> and <strong>AAAA</strong> records the value is derived automatically from the VIP's assigned IP — you leave the value blank. Marking a record as <strong>Canonical</strong> causes it to be used as the PTR hostname in reverse DNS zones, exactly as it works for interface records.</p>
+
+        <h6 class="mt-3">Member interface view</h6>
+        <p class="mb-0">Each physical interface's detail page shows a <strong>Participates in Virtual IPs</strong> table listing any VIPs where that interface is a member, with a link to the VIP detail page.</p>
+    </div>
+</div>
+
 </div>{# /col-lg-9 #}
 
 {# On-page nav #}
@@ -238,6 +264,7 @@
             <a href="#bulk" class="list-group-item list-group-item-action py-1">Bulk Operations</a>
             <a href="#csv-import" class="list-group-item list-group-item-action py-1">Importing from CSV</a>
             <a href="#soft-delete" class="list-group-item list-group-item-action py-1">Deleted Hosts</a>
+            <a href="#virtual-ips" class="list-group-item list-group-item-action py-1">Virtual IPs (VRRP)</a>
         </div>
     </div>
 </div>

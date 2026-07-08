@@ -19,6 +19,7 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
 #[ORM\Table(name: 'domain_record')]
 #[ORM\Index(columns: ['domain_id'], name: 'idx_domain_record_domain_id')]
 #[ORM\Index(columns: ['network_interface_id'], name: 'idx_domain_record_network_interface_id')]
+#[ORM\Index(columns: ['virtual_ip_id'], name: 'idx_domain_record_virtual_ip_id')]
 #[NoCnameConflict]
 #[NoMultipleSpfTxt]
 #[ViewsAllowedForDomainRecord]
@@ -38,6 +39,10 @@ class DomainRecord
     #[ORM\ManyToOne(targetEntity: NetworkInterface::class, inversedBy: 'domainRecords')]
     #[ORM\JoinColumn(nullable: true)]
     private ?NetworkInterface $networkInterface = null;
+
+    #[ORM\ManyToOne(targetEntity: VirtualIp::class, inversedBy: 'domainRecords')]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?VirtualIp $virtualIp = null;
 
     #[ORM\Column(length: 255)]
     #[Assert\NotBlank]
@@ -80,6 +85,9 @@ class DomainRecord
 
     public function getNetworkInterface(): ?NetworkInterface { return $this->networkInterface; }
     public function setNetworkInterface(?NetworkInterface $networkInterface): static { $this->networkInterface = $networkInterface; return $this; }
+
+    public function getVirtualIp(): ?VirtualIp { return $this->virtualIp; }
+    public function setVirtualIp(?VirtualIp $virtualIp): static { $this->virtualIp = $virtualIp; return $this; }
 
     public function getHostname(): string { return $this->hostname; }
     public function setHostname(string $hostname): static { $this->hostname = $hostname; return $this; }
@@ -126,7 +134,7 @@ class DomainRecord
     #[Assert\Callback]
     public function validateValue(ExecutionContextInterface $context, mixed $payload): void
     {
-        if ($this->networkInterface === null || !in_array($this->type, [RecordType::A, RecordType::AAAA], true)) {
+        if (($this->networkInterface === null && $this->virtualIp === null) || !in_array($this->type, [RecordType::A, RecordType::AAAA], true)) {
             if ($this->value === '') {
                 $context->buildViolation('This value should not be blank.')
                     ->atPath('value')

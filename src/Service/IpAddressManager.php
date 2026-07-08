@@ -240,9 +240,9 @@ class IpAddressManager
 
     /**
      * Validates a manually-specified IPv4 address. Returns an error string or null.
-     * Passes if the address belongs to $currentInterface (edit keeping same IP).
+     * Passes if the address belongs to $currentInterface or $currentIp (edit keeping same IP).
      */
-    public function validateSpecifiedIpv4(string $ip, Subnet $subnet, ?NetworkInterface $currentInterface = null): ?string
+    public function validateSpecifiedIpv4(string $ip, Subnet $subnet, ?NetworkInterface $currentInterface = null, ?IpAddress $currentIp = null): ?string
     {
         $parsed = Factory::parseAddressString($ip);
         if (!$parsed || $parsed->getAddressType() !== 4) {
@@ -266,8 +266,9 @@ class IpAddressManager
             }
         }
 
+        $currentIpId = $currentIp?->getId() ?? $currentInterface?->getIpAddress()?->getId();
         $existing = $this->ipRepo->findOneBy(['address' => $normalized]);
-        if ($existing && $existing->getId() !== $currentInterface?->getIpAddress()?->getId()) {
+        if ($existing && $existing->getId() !== $currentIpId) {
             return sprintf('"%s" is already assigned to another interface.', $normalized);
         }
 
@@ -276,9 +277,9 @@ class IpAddressManager
 
     /**
      * Validates a manually-specified IPv6 address. Returns an error string or null.
-     * Passes if the address belongs to $currentInterface (edit keeping same IP).
+     * Passes if the address belongs to $currentInterface or $currentIp (edit keeping same IP).
      */
-    public function validateSpecifiedIpv6(string $ip, Subnet $subnet, ?NetworkInterface $currentInterface = null): ?string
+    public function validateSpecifiedIpv6(string $ip, Subnet $subnet, ?NetworkInterface $currentInterface = null, ?Ipv6Address $currentIp = null): ?string
     {
         $parsed = Factory::parseAddressString($ip);
         if (!$parsed || $parsed->getAddressType() !== 6) {
@@ -302,8 +303,9 @@ class IpAddressManager
             }
         }
 
+        $currentIpId = $currentIp?->getId() ?? $currentInterface?->getIpv6Address()?->getId();
         $existing = $this->ipv6Repo->findOneBy(['address' => $normalized]);
-        if ($existing && $existing->getId() !== $currentInterface?->getIpv6Address()?->getId()) {
+        if ($existing && $existing->getId() !== $currentIpId) {
             return sprintf('"%s" is already assigned to another interface.', $normalized);
         }
 

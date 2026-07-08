@@ -187,6 +187,26 @@
     {% endif %}
 </div>
 
+{% if virtualIps is defined and virtualIps|length > 0 %}
+<div class="card mb-4">
+    <div class="card-header fw-semibold"><i class="bi bi-layers me-1"></i>Participates in Virtual IPs</div>
+    <table class="table table-sm mb-0">
+        <thead><tr><th>Label</th><th>Protocol</th><th>VRID</th><th>IPv4</th><th>IPv6</th></tr></thead>
+        <tbody>
+            {% for vip in virtualIps %}
+            <tr>
+                <td><a href="{{ path('virtual_ip_show', {id: vip.id}) }}">{{ vip.label }}</a></td>
+                <td><span class="badge bg-secondary">{{ vip.protocol.label() }}</span></td>
+                <td class="text-muted">{{ vip.vrid ?: '—' }}</td>
+                <td class="ip-address">{{ vip.ipAddress ? vip.ipAddress.address : '—' }}</td>
+                <td class="ip-address small">{{ vip.ipv6Address ? vip.ipv6Address.address : '—' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
 {% if arubaSwitch and switchInfo and switchInfo.nasPortId %}
 {% set portId = switchInfo.nasPortId %}
 <div class="card mt-3">

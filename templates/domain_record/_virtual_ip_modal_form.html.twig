@@ -1,0 +1,89 @@
+{{ form_start(form, {action: app.request.uri}) }}
+
+{% if virtualIp.ipAddress or virtualIp.ipv6Address %}
+<div class="alert alert-secondary py-2 small mb-3">
+    <i class="bi bi-info-circle me-1"></i>
+    For <strong>A</strong>/<strong>AAAA</strong> records the value is derived automatically.
+    {% if virtualIp.ipAddress %}IPv4: <code>{{ virtualIp.ipAddress.address }}</code>{% endif %}
+    {% if virtualIp.ipv6Address %}IPv6: <code>{{ virtualIp.ipv6Address.address }}</code>{% endif %}
+</div>
+{% endif %}
+
+{% if form.domain is defined %}
+<div class="mb-3">
+    {{ form_label(form.domain) }}
+    {{ form_widget(form.domain, {attr: {class: 'form-select'}}) }}
+    {{ form_errors(form.domain) }}
+</div>
+{% endif %}
+
+<div class="mb-3">
+    {{ form_label(form.hostname) }}
+    {{ form_widget(form.hostname, {attr: {class: 'form-control font-monospace'}}) }}
+    {{ form_errors(form.hostname) }}
+</div>
+
+<div class="mb-3">
+    {{ form_label(form.type) }}
+    {{ form_widget(form.type, {attr: {class: 'form-select'}}) }}
+    {{ form_errors(form.type) }}
+</div>
+
+<div class="mb-3">
+    {{ form_label(form.value) }}
+    {{ form_widget(form.value, {attr: {class: 'form-control font-monospace'}}) }}
+    <div class="form-text">Leave blank for A/AAAA — the virtual IP address is used automatically.</div>
+    {{ form_errors(form.value) }}
+</div>
+
+<div class="mb-3">
+    {{ form_label(form.ttl) }}
+    {{ form_widget(form.ttl, {attr: {class: 'form-control'}}) }}
+    {{ form_errors(form.ttl) }}
+</div>
+
+<div class="mb-3">
+    {{ form_label(form.comment, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+    {{ form_widget(form.comment, {attr: {class: 'form-control'}}) }}
+    {{ form_errors(form.comment) }}
+</div>
+
+{% if form.isCanonical is defined %}
+<div id="canonical-field" class="mb-3 form-check">
+    {{ form_widget(form.isCanonical, {attr: {class: 'form-check-input'}}) }}
+    {{ form_label(form.isCanonical, null, {label_attr: {class: 'form-check-label'}}) }}
+    <div class="form-text">Canonical A/AAAA records are used as the PTR hostname in reverse DNS zones.</div>
+    {{ form_errors(form.isCanonical) }}
+</div>
+{% endif %}
+
+{% if form.views is defined %}
+<div class="mb-3">
+    {{ form_label(form.views, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+    <div id="modal-views-section">
+        {% if form.views|length > 0 %}
+            <div class="d-flex flex-wrap gap-3">
+                {% for viewWidget in form.views %}
+                    <div class="form-check">
+                        {{ form_widget(viewWidget, {attr: {class: 'form-check-input'}}) }}
+                        {{ form_label(viewWidget, null, {label_attr: {class: 'form-check-label'}}) }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p class="text-muted small mb-0">Select a domain first to see available views.</p>
+        {% endif %}
+    </div>
+    {{ form_errors(form.views) }}
+</div>
+{% endif %}
+
+<div class="d-flex justify-content-between mt-4">
+    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+    <button type="submit" class="btn btn-primary">
+        <i class="bi bi-check-lg me-1"></i>{{ record.id ? 'Save Changes' : 'Add Record' }}
+    </button>
+</div>
+
+{{ form_widget(form._token) }}
+{{ form_end(form, {render_rest: false}) }}

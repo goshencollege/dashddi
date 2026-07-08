@@ -7,6 +7,7 @@ use App\Entity\DnsServer;
 use App\Entity\DnsView;
 use App\Entity\NetworkInterface;
 use App\Entity\Subnet;
+use App\Entity\VirtualIp;
 use App\Enum\RecordType;
 use App\Repository\DnsAclRepository;
 use App\Repository\DnssecPolicyRepository;
@@ -117,6 +118,7 @@ class DnsConfigGenerator
             }
             $ttl = $record->getTtl() ? (' ' . $record->getTtl()) : '';
             $iface = $record->getNetworkInterface();
+            $vip   = $record->getVirtualIp();
             if ($iface !== null) {
                 if ($iface->isDeleted()) {
                     continue;
@@ -136,6 +138,26 @@ class DnsConfigGenerator
                     $recordLines[] = sprintf('%s%s IN AAAA %s', $record->getHostname(), $ttl, $ip->getAddress());
                 } else {
                     // Other types (TXT, HTTPS, etc.) linked to an interface use the stored value
+                    $recordLines[] = sprintf('%s%s IN %s %s', $record->getHostname(), $ttl, $record->getType()->value, $this->formatRecordValue($record->getType(), $record->getValue()));
+                }
+            } elseif ($vip !== null) {
+                if ($vip->isDeleted()) {
+                    continue;
+                }
+                // Derive value from VIP IP for A/AAAA records
+                if ($record->getType() === RecordType::A) {
+                    $ip = $vip->getIpAddress();
+                    if (!$ip) {
+                        continue;
+                    }
+                    $recordLines[] = sprintf('%s%s IN A %s', $record->getHostname(), $ttl, $ip->getAddress());
+                } elseif ($record->getType() === RecordType::AAAA) {
+                    $ip = $vip->getIpv6Address();
+                    if (!$ip) {
+                        continue;
+                    }
+                    $recordLines[] = sprintf('%s%s IN AAAA %s', $record->getHostname(), $ttl, $ip->getAddress());
+                } else {
                     $recordLines[] = sprintf('%s%s IN %s %s', $record->getHostname(), $ttl, $record->getType()->value, $this->formatRecordValue($record->getType(), $record->getValue()));
                 }
             } else {
@@ -212,6 +234,26 @@ class DnsConfigGenerator
                 }
 
                 $hostname = $this->ptrHostname($iface, $view, $isIpv6);
+                if (!$hostname) {
+                    continue;
+                }
+
+                $label      = $isIpv6
+                    ? $this->ipv6PtrLabel($ip->getAddress(), $prefix)
+                    : $this->ipv4PtrLabel($ip->getAddress(), $prefix);
+                $ptrLines[] = sprintf('%s IN PTR %s', $label, $hostname);
+            }
+
+            foreach ($ptrSubnet->getVirtualIps() as $vip) {
+                if ($vip->isDeleted()) {
+                    continue;
+                }
+                $ip = $isIpv6 ? $vip->getIpv6Address() : $vip->getIpAddress();
+                if (!$ip) {
+                    continue;
+                }
+
+                $hostname = $this->ptrHostnameForVip($vip, $view, $isIpv6);
                 if (!$hostname) {
                     continue;
                 }
@@ -627,6 +669,27 @@ class DnsConfigGenerator
     {
         $canonicalType = $isIpv6 ? RecordType::AAAA : RecordType::A;
         foreach ($iface->getDomainRecords() as $record) {
+            if (!$record->isCanonical()) {
+                continue;
+            }
+            if ($record->getType() !== $canonicalType) {
+                continue;
+            }
+            if (!$record->getDomain()) {
+                continue;
+            }
+            if ($view !== null && !$this->inView($view, $record->getViews()->toArray())) {
+                continue;
+            }
+            return $record->getFullyQualifiedHostname() . '.';
+        }
+        return null;
+    }
+
+    private function ptrHostnameForVip(VirtualIp $vip, ?DnsView $view, bool $isIpv6 = false): ?string
+    {
+        $canonicalType = $isIpv6 ? RecordType::AAAA : RecordType::A;
+        foreach ($vip->getDomainRecords() as $record) {
             if (!$record->isCanonical()) {
                 continue;
             }

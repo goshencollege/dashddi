@@ -242,6 +242,41 @@
     {% endif %}
 </div>
 
+{% if not subnet.isContainer %}
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-layers me-1"></i>Virtual IPs
+            {% set active_vips = subnet.virtualIps|filter(v => not v.deleted) %}
+            <span class="badge bg-secondary ms-1">{{ active_vips|length }}</span>
+        </span>
+        <a href="{{ path('virtual_ip_new', {subnetId: subnet.id}) }}" class="btn btn-sm btn-primary">
+            <i class="bi bi-plus-lg me-1"></i>Add Virtual IP
+        </a>
+    </div>
+    {% if active_vips is empty %}
+        <div class="card-body text-muted text-center py-3">No virtual IPs on this subnet.</div>
+    {% else %}
+        <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+            <thead><tr><th>Label</th><th>Protocol</th><th>VRID</th><th>IPv4</th><th>IPv6</th><th>Members</th></tr></thead>
+            <tbody>
+                {% for vip in active_vips %}
+                <tr>
+                    <td><a href="{{ path('virtual_ip_show', {id: vip.id}) }}">{{ vip.label }}</a></td>
+                    <td><span class="badge bg-secondary">{{ vip.protocol.label() }}</span></td>
+                    <td class="text-muted">{{ vip.vrid ?: '—' }}</td>
+                    <td class="ip-address">{{ vip.ipAddress ? vip.ipAddress.address : '—' }}</td>
+                    <td class="ip-address small">{{ vip.ipv6Address ? vip.ipv6Address.address : '—' }}</td>
+                    <td class="text-muted small">{{ vip.memberInterfaces|length }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    {% endif %}
+</div>
+{% endif %}
+
 <div class="row g-3">
     {% if subnet.ipv4Cidr %}
     <div class="col-lg-6">

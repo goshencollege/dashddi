@@ -1,0 +1,365 @@
+{% extends 'base.html.twig' %}
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ path('subnet_index') }}">Subnets</a></li>
+        <li class="breadcrumb-item"><a href="{{ path('subnet_show', {id: subnet.id}) }}">{{ subnet.name }}</a></li>
+        {% if vip.id %}
+            <li class="breadcrumb-item"><a href="{{ path('virtual_ip_show', {id: vip.id}) }}">{{ vip.label }}</a></li>
+        {% endif %}
+        <li class="breadcrumb-item active">{{ title }}</li>
+    </ol>
+</nav>
+
+<div class="row justify-content-center">
+<div class="col-xl-8">
+
+{{ form_start(form) }}
+
+<div class="card mb-4">
+    <div class="card-header fw-semibold"><i class="bi bi-layers me-1"></i>Virtual IP Details</div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label fw-semibold">{{ form_label(form.label) }}</label>
+                {{ form_widget(form.label, {attr: {class: 'form-control'}}) }}
+                {{ form_errors(form.label) }}
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-semibold">{{ form_label(form.protocol) }}</label>
+                {{ form_widget(form.protocol, {attr: {class: 'form-select'}}) }}
+                {{ form_errors(form.protocol) }}
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-semibold">{{ form_label(form.vrid) }}</label>
+                {{ form_widget(form.vrid, {attr: {class: 'form-control'}}) }}
+                {{ form_errors(form.vrid) }}
+            </div>
+            <div class="col-12">
+                <label class="form-label fw-semibold">{{ form_label(form.notes) }}</label>
+                {{ form_widget(form.notes, {attr: {class: 'form-control'}}) }}
+                {{ form_errors(form.notes) }}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header fw-semibold"><i class="bi bi-hdd-network me-1"></i>Member Interfaces</div>
+    <div class="card-body">
+        <div class="mb-0">
+            {{ form_widget(form.memberInterfaces, {attr: {class: 'form-select', size: 8}}) }}
+            {{ form_errors(form.memberInterfaces) }}
+            <div class="form-text">Hold Ctrl/Cmd to select multiple interfaces.</div>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header fw-semibold"><i class="bi bi-4-square me-1"></i>IPv4 Address</div>
+    <div class="card-body">
+        <div id="ipv4-assignment-options">
+            {{ form_widget(form.ipv4Assignment) }}
+        </div>
+        <div id="ipv4-container-notice" class="text-muted small" style="display:none">
+            IPv4 addresses are not assigned to VIPs in container subnets.
+        </div>
+        {% if vip.ipAddress %}
+            <div class="mb-2" id="ipv4-current-badge">
+                Current: <code class="ip-address">{{ vip.ipAddress.address }}</code>
+            </div>
+        {% endif %}
+        <div id="ipv4-input-section" style="display:none">
+            {{ form_widget(form.ipv4AddressInput, {attr: {class: 'form-control font-monospace mt-2'}}) }}
+            <datalist id="available-ipv4-list"></datalist>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header fw-semibold"><i class="bi bi-6-square me-1"></i>IPv6 Address</div>
+    <div class="card-body">
+        <div id="ipv6-assignment-options">
+            {{ form_widget(form.ipv6Assignment) }}
+        </div>
+        <div id="ipv6-container-notice" class="text-muted small" style="display:none">
+            IPv6 addresses are not assigned to VIPs in container subnets.
+        </div>
+        {% if vip.ipv6Address %}
+            <div class="mb-2" id="ipv6-current-badge">
+                Current: <code class="ip-address small">{{ vip.ipv6Address.address }}</code>
+            </div>
+        {% endif %}
+        <div id="ipv6-input-section" style="display:none">
+            {{ form_widget(form.ipv6AddressInput, {attr: {class: 'form-control font-monospace mt-2'}}) }}
+            <datalist id="available-ipv6-list"></datalist>
+        </div>
+    </div>
+</div>
+
+<div class="d-flex justify-content-between mb-4">
+    <a href="{{ vip.id ? path('virtual_ip_show', {id: vip.id}) : path('subnet_show', {id: subnet.id}) }}" class="btn btn-outline-secondary">Cancel</a>
+    <button type="submit" class="btn btn-primary">
+        <i class="bi bi-check-lg me-1"></i>{{ vip.id ? 'Save Changes' : 'Add Virtual IP' }}
+    </button>
+</div>
+
+{{ form_end(form) }}
+
+{% if vip.id %}
+<div class="card mb-4" id="dns-records-card">
+    <div class="card-header d-flex justify-content-between align-items-center fw-semibold">
+        <span><i class="bi bi-globe me-1"></i>DNS Records</span>
+        <button type="button" class="btn btn-sm btn-outline-primary" id="add-dns-record-btn">
+            <i class="bi bi-plus-lg me-1"></i>Add Record
+        </button>
+    </div>
+    {% set dns_records = vip.domainRecords %}
+    {% if dns_records is empty %}
+        <div class="card-body text-muted small py-2" id="dns-records-empty">No DNS records assigned.</div>
+    {% else %}
+        <div class="table-responsive">
+        <table class="table table-sm mb-0" id="dns-records-table">
+            <thead>
+                <tr>
+                    <th>Hostname</th>
+                    <th>Type</th>
+                    <th>Value</th>
+                    <th>View</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            {% set type_colors = {'A': 'bg-primary-subtle text-primary-emphasis border border-primary-subtle', 'AAAA': 'bg-info-subtle text-info-emphasis border border-info-subtle', 'CNAME': 'bg-success-subtle text-success-emphasis border border-success-subtle', 'MX': 'bg-warning-subtle text-warning-emphasis border border-warning-subtle', 'NS': 'bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle', 'TXT': 'badge-orange-subtle', 'PTR': 'bg-primary-subtle text-primary-emphasis border border-primary-subtle', 'SRV': 'bg-danger-subtle text-danger-emphasis border border-danger-subtle', 'DS': 'bg-danger-subtle text-danger-emphasis border border-danger-subtle', 'CAA': 'bg-warning-subtle text-warning-emphasis border border-warning-subtle', 'HTTPS': 'badge-purple-subtle'} %}
+            <tbody>
+                {% for record in dns_records %}
+                <tr data-record-id="{{ record.id }}">
+                    <td class="font-monospace small">
+                        {{ record.fullyQualifiedHostname }}
+                        {% if record.canonical %}
+                            <span class="badge bg-primary ms-1" title="Canonical — used for PTR reverse DNS">PTR</span>
+                        {% endif %}
+                    </td>
+                    <td><span class="badge {{ type_colors[record.type.value] ?? 'bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle' }}">{{ record.type.value }}</span></td>
+                    <td class="font-monospace small text-muted">
+                        {% if record.type.value == 'A' %}
+                            {{ vip.ipAddress ? vip.ipAddress.address : '—' }}
+                        {% elseif record.type.value == 'AAAA' %}
+                            {{ vip.ipv6Address ? vip.ipv6Address.address : '—' }}
+                        {% else %}
+                            {{ record.value }}
+                        {% endif %}
+                    </td>
+                    <td class="small">
+                        {% if record.views is empty %}
+                            <span class="text-muted">All views</span>
+                        {% else %}
+                            {% set view_palettes = ['bg-primary-subtle text-primary-emphasis border border-primary-subtle', 'bg-success-subtle text-success-emphasis border border-success-subtle', 'bg-danger-subtle text-danger-emphasis border border-danger-subtle', 'bg-warning-subtle text-warning-emphasis border border-warning-subtle', 'bg-info-subtle text-info-emphasis border border-info-subtle', 'bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle'] %}
+                            {% for view in record.views %}
+                                <span class="badge {{ view_palettes[view.id % (view_palettes|length)] }}">{{ view.name }}</span>
+                            {% endfor %}
+                        {% endif %}
+                    </td>
+                    <td class="text-end" style="white-space:nowrap">
+                        <button type="button" class="btn btn-sm btn-outline-secondary me-1 dns-edit-btn"
+                                data-url="{{ path('domain_record_edit', {id: record.id, from: 'virtual-ip'}) }}">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <form method="post" action="{{ path('domain_record_delete', {id: record.id}) }}"
+                              class="d-inline dns-delete-form">
+                            <input type="hidden" name="_token" value="{{ csrf_token('delete_record_' ~ record.id) }}">
+                            <button type="submit" class="btn btn-sm btn-outline-danger">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    {% endif %}
+</div>
+
+<div class="modal fade" id="dns-record-modal" tabindex="-1" aria-labelledby="dns-record-modal-title" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="dns-record-modal-title">DNS Record</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="dns-record-modal-body">
+                <div class="text-center py-3"><span class="spinner-border spinner-border-sm"></span></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    function bindIpRadios(prefix, sectionId) {
+        const radios  = document.querySelectorAll('input[name$="[' + prefix + 'Assignment]"]');
+        const section = document.getElementById(sectionId);
+        function update() {
+            const val = document.querySelector('input[name$="[' + prefix + 'Assignment]"]:checked')?.value;
+            section.style.display = val === 'select' ? '' : 'none';
+        }
+        radios.forEach(r => r.addEventListener('change', update));
+        update();
+    }
+    bindIpRadios('ipv4', 'ipv4-input-section');
+    bindIpRadios('ipv6', 'ipv6-input-section');
+
+    const subnetId = {{ subnet.id }};
+    if (subnetId) {
+        fetch('/api/subnets/' + subnetId + '/available-ips')
+            .then(r => r.json())
+            .then(ips => {
+                const dl = document.getElementById('available-ipv4-list');
+                if (dl) dl.innerHTML = ips.map(ip => '<option value="' + ip + '">').join('');
+            });
+        fetch('/api/subnets/' + subnetId + '/available-ipv6')
+            .then(r => r.json())
+            .then(ips => {
+                const dl = document.getElementById('available-ipv6-list');
+                if (dl) dl.innerHTML = ips.map(ip => '<option value="' + ip + '">').join('');
+            });
+    }
+})();
+</script>
+
+{% if vip.id %}
+<script>
+(function () {
+    const modalEl  = document.getElementById('dns-record-modal');
+    if (!modalEl) return;
+    const modal     = new bootstrap.Modal(modalEl);
+    const modalBody = document.getElementById('dns-record-modal-body');
+    const modalTitle = document.getElementById('dns-record-modal-title');
+    const addNewUrl         = {{ path('virtual_ip_domain_record_new', {id: vip.id})|json_encode|raw }};
+    const availableViewsUrl = {{ path('virtual_ip_domain_record_views', {id: vip.id})|json_encode|raw }};
+
+    function showSpinner() {
+        modalBody.innerHTML = '<div class="text-center py-3"><span class="spinner-border spinner-border-sm"></span></div>';
+    }
+
+    function bindDomainViewsUpdater() {
+        const domainSelect = modalBody.querySelector('[name="domain_record[domain]"]');
+        const viewsSection = modalBody.querySelector('#modal-views-section');
+        if (!domainSelect || !viewsSection) return;
+
+        domainSelect.addEventListener('change', async function () {
+            const domainId = domainSelect.value;
+            if (!domainId) {
+                viewsSection.innerHTML = '<p class="text-muted small mb-0">Select a domain first to see available views.</p>';
+                return;
+            }
+            try {
+                const res   = await fetch(availableViewsUrl + '?domain_id=' + encodeURIComponent(domainId));
+                const views = await res.json();
+                if (views.length === 0) {
+                    viewsSection.innerHTML = '<p class="text-muted small mb-0">No views configured for this domain.</p>';
+                } else {
+                    viewsSection.innerHTML = '<div class="d-flex flex-wrap gap-3">' +
+                        views.map(v =>
+                            `<div class="form-check">` +
+                            `<input class="form-check-input" type="checkbox" name="domain_record[views][]" value="${v.id}" id="modal_view_${v.id}" checked>` +
+                            `<label class="form-check-label" for="modal_view_${v.id}">${v.name}</label>` +
+                            `</div>`
+                        ).join('') + '</div>';
+                }
+            } catch {
+                viewsSection.innerHTML = '<p class="text-danger small mb-0">Failed to load views.</p>';
+            }
+        });
+    }
+
+    function bindCanonicalVisibility() {
+        const typeSelect     = modalBody.querySelector('[name="domain_record[type]"]');
+        const canonicalField = modalBody.querySelector('#canonical-field');
+        if (!typeSelect || !canonicalField) return;
+        function update() {
+            const show = typeSelect.value === 'A' || typeSelect.value === 'AAAA';
+            canonicalField.style.display = show ? '' : 'none';
+            if (!show) {
+                const cb = canonicalField.querySelector('input[type="checkbox"]');
+                if (cb) cb.checked = false;
+            }
+        }
+        typeSelect.addEventListener('change', update);
+        update();
+    }
+
+    async function openModal(url, title) {
+        modalTitle.textContent = title;
+        showSpinner();
+        modal.show();
+        try {
+            const res  = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+            const data = await res.json();
+            modalBody.innerHTML = data.html;
+            bindDomainViewsUpdater();
+            bindCanonicalVisibility();
+        } catch {
+            modalBody.innerHTML = '<div class="alert alert-danger mb-0">Failed to load form.</div>';
+        }
+    }
+
+    document.getElementById('add-dns-record-btn').addEventListener('click', () => {
+        openModal(addNewUrl, 'Add DNS Record');
+    });
+
+    document.getElementById('dns-records-card').addEventListener('click', e => {
+        const editBtn = e.target.closest('.dns-edit-btn');
+        if (editBtn) openModal(editBtn.dataset.url, 'Edit DNS Record');
+    });
+
+    modalEl.addEventListener('submit', async function (e) {
+        const form = e.target.closest('form');
+        if (!modalBody.contains(form)) return;
+        e.preventDefault();
+        const submitBtn = form.querySelector('[type="submit"]');
+        if (submitBtn) submitBtn.disabled = true;
+        try {
+            const res  = await fetch(form.action, {
+                method:  'POST',
+                body:    new FormData(form),
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            });
+            const data = await res.json();
+            if (data.success) {
+                modal.hide();
+                window.location.reload();
+            } else {
+                modalBody.innerHTML = data.html;
+                bindDomainViewsUpdater();
+                bindCanonicalVisibility();
+            }
+        } catch {
+            if (submitBtn) submitBtn.disabled = false;
+        }
+    });
+
+    document.getElementById('dns-records-card').addEventListener('submit', async function (e) {
+        const form = e.target.closest('.dns-delete-form');
+        if (!form) return;
+        e.preventDefault();
+        if (!confirm('Delete this DNS record?')) return;
+        await fetch(form.action, {
+            method:  'POST',
+            body:    new FormData(form),
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        });
+        window.location.reload();
+    });
+})();
+</script>
+{% endif %}
+{% endblock %}

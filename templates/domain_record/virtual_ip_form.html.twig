@@ -1,0 +1,178 @@
+{% extends 'base.html.twig' %}
+{% block title %}{{ title }} – {{ virtualIp.label }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ path('subnet_index') }}">Subnets</a></li>
+        {% if virtualIp.subnet %}
+            <li class="breadcrumb-item"><a href="{{ path('subnet_show', {id: virtualIp.subnet.id}) }}">{{ virtualIp.subnet.name }}</a></li>
+        {% endif %}
+        <li class="breadcrumb-item"><a href="{{ path('virtual_ip_show', {id: virtualIp.id}) }}">{{ virtualIp.label }}</a></li>
+        <li class="breadcrumb-item active">{{ title }}</li>
+    </ol>
+</nav>
+
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-globe me-1"></i>{{ title }}
+                <span class="text-muted ms-1">– {{ virtualIp.label }}</span>
+            </div>
+            <div class="card-body">
+                {{ form_start(form) }}
+
+                {% if virtualIp.ipAddress or virtualIp.ipv6Address %}
+                <div class="alert alert-secondary py-2 small mb-3">
+                    <i class="bi bi-info-circle me-1"></i>
+                    For <strong>A</strong> or <strong>AAAA</strong> records the value is derived automatically from the virtual IP.
+                    {% if virtualIp.ipAddress %}
+                        IPv4: <code>{{ virtualIp.ipAddress.address }}</code>
+                    {% endif %}
+                    {% if virtualIp.ipv6Address %}
+                        IPv6: <code>{{ virtualIp.ipv6Address.address }}</code>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+                {% if form.domain is defined %}
+                <div class="mb-3">
+                    {{ form_label(form.domain) }}
+                    {{ form_widget(form.domain, {attr: {class: 'form-select'}}) }}
+                    {{ form_errors(form.domain) }}
+                </div>
+                {% endif %}
+
+                <div class="mb-3">
+                    {{ form_label(form.hostname) }}
+                    {{ form_widget(form.hostname, {attr: {class: 'form-control font-monospace'}}) }}
+                    {{ form_errors(form.hostname) }}
+                </div>
+
+                <div class="mb-3">
+                    {{ form_label(form.type) }}
+                    {{ form_widget(form.type, {attr: {class: 'form-select'}}) }}
+                    {{ form_errors(form.type) }}
+                </div>
+
+                <div class="mb-3">
+                    {{ form_label(form.value) }}
+                    {{ form_widget(form.value, {attr: {class: 'form-control font-monospace'}}) }}
+                    <div class="form-text text-muted">Leave blank for A/AAAA records — the virtual IP is used automatically.</div>
+                    {{ form_errors(form.value) }}
+                </div>
+
+                <div class="mb-3">
+                    {{ form_label(form.ttl) }}
+                    {{ form_widget(form.ttl, {attr: {class: 'form-control'}}) }}
+                    {{ form_errors(form.ttl) }}
+                </div>
+
+                <div class="mb-3">
+                    {{ form_label(form.comment, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                    {{ form_widget(form.comment, {attr: {class: 'form-control'}}) }}
+                    {{ form_errors(form.comment) }}
+                </div>
+
+                {% if form.isCanonical is defined %}
+                <div id="canonical-field" class="mb-3 form-check">
+                    {{ form_widget(form.isCanonical, {attr: {class: 'form-check-input'}}) }}
+                    {{ form_label(form.isCanonical, null, {label_attr: {class: 'form-check-label'}}) }}
+                    <div class="form-text text-muted">Canonical A/AAAA records are used as the PTR hostname in reverse DNS zones.</div>
+                    {{ form_errors(form.isCanonical) }}
+                </div>
+                {% endif %}
+
+                {% if form.views is defined %}
+                <div class="mb-4">
+                    {{ form_label(form.views, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                    <div id="views-section">
+                        {% if form.views|length > 0 %}
+                            <div class="d-flex flex-wrap gap-3">
+                                {% for viewWidget in form.views %}
+                                    <div class="form-check">
+                                        {{ form_widget(viewWidget, {attr: {class: 'form-check-input'}}) }}
+                                        {{ form_label(viewWidget, null, {label_attr: {class: 'form-check-label'}}) }}
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <p class="text-muted small mb-0">Select a domain first to see available views.</p>
+                        {% endif %}
+                    </div>
+                    {{ form_errors(form.views) }}
+                </div>
+                {% endif %}
+
+                <div class="d-flex justify-content-between">
+                    <a href="{{ path('virtual_ip_show', {id: virtualIp.id}) }}" class="btn btn-outline-secondary">Cancel</a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg me-1"></i>{{ record.id ? 'Save Changes' : 'Add Record' }}
+                    </button>
+                </div>
+                {{ form_widget(form._token) }}
+                {{ form_end(form, {render_rest: false}) }}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if form.isCanonical is defined %}
+<script>
+(function () {
+    const typeSelect     = document.querySelector('[name="domain_record[type]"]');
+    const canonicalField = document.getElementById('canonical-field');
+    if (!typeSelect || !canonicalField) return;
+    function update() {
+        const show = typeSelect.value === 'A' || typeSelect.value === 'AAAA';
+        canonicalField.style.display = show ? '' : 'none';
+        if (!show) {
+            const cb = canonicalField.querySelector('input[type="checkbox"]');
+            if (cb) cb.checked = false;
+        }
+    }
+    typeSelect.addEventListener('change', update);
+    update();
+})();
+</script>
+{% endif %}
+{% if form.domain is defined %}
+<script>
+(function () {
+    const domainSelect      = document.querySelector('[name="domain_record[domain]"]');
+    const viewsSection      = document.getElementById('views-section');
+    const availableViewsUrl = {{ path('virtual_ip_domain_record_views', {id: virtualIp.id})|json_encode|raw }};
+
+    if (!domainSelect || !viewsSection) return;
+
+    domainSelect.addEventListener('change', async function () {
+        const domainId = domainSelect.value;
+        if (!domainId) {
+            viewsSection.innerHTML = '<p class="text-muted small mb-0">Select a domain first to see available views.</p>';
+            return;
+        }
+        try {
+            const res   = await fetch(availableViewsUrl + '?domain_id=' + encodeURIComponent(domainId));
+            const views = await res.json();
+            if (views.length === 0) {
+                viewsSection.innerHTML = '<p class="text-muted small mb-0">No views configured for this domain.</p>';
+            } else {
+                viewsSection.innerHTML = '<div class="d-flex flex-wrap gap-3">' +
+                    views.map(v =>
+                        `<div class="form-check">` +
+                        `<input class="form-check-input" type="checkbox" name="domain_record[views][]" value="${v.id}" id="view_${v.id}" checked>` +
+                        `<label class="form-check-label" for="view_${v.id}">${v.name}</label>` +
+                        `</div>`
+                    ).join('') + '</div>';
+            }
+        } catch {
+            viewsSection.innerHTML = '<p class="text-danger small mb-0">Failed to load views.</p>';
+        }
+    });
+})();
+</script>
+{% endif %}
+{% endblock %}

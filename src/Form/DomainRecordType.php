@@ -6,6 +6,8 @@ use App\Entity\DnsView;
 use App\Entity\Domain;
 use App\Entity\DomainRecord;
 use App\Entity\NetworkInterface;
+use App\Entity\Subnet;
+use App\Entity\VirtualIp;
 use App\Enum\RecordType;
 use App\Validator\TxtRecordValueValidator;
 use App\Repository\DnsViewRepository;
@@ -36,6 +38,11 @@ class DomainRecordType extends AbstractType
     {
         /** @var NetworkInterface|null $interface */
         $interface = $options['network_interface'];
+        /** @var VirtualIp|null $virtualIp */
+        $virtualIp = $options['virtual_ip'];
+
+        $subnet = $interface?->getSubnet() ?? $virtualIp?->getSubnet();
+        $hasContext = $interface !== null || $virtualIp !== null;
 
         $builder
             ->add('hostname', TextType::class, [
@@ -62,9 +69,8 @@ class DomainRecordType extends AbstractType
                 'label'    => 'Comment',
             ]);
 
-        // When creating/editing from an interface context, add domain selection and isCanonical
-        if ($interface !== null) {
-            $subnet = $interface->getSubnet();
+        // When creating/editing from an interface or virtual IP context, add domain and isCanonical
+        if ($hasContext) {
             $builder->add('domain', EntityType::class, [
                 'class'         => Domain::class,
                 'choice_label'  => 'name',
@@ -92,18 +98,15 @@ class DomainRecordType extends AbstractType
 
         $domainFromPreSetData = null;
 
-        $builder->addEventListener(FormEvents::PRE_SET_DATA, function (FormEvent $event) use ($interface, &$domainFromPreSetData) {
+        $builder->addEventListener(FormEvents::PRE_SET_DATA, function (FormEvent $event) use ($hasContext, $subnet, &$domainFromPreSetData) {
             $record = $event->getData();
             $domain = ($record instanceof DomainRecord) ? $record->getDomain() : null;
             $domainFromPreSetData = $domain;
-            $this->addViewsField($event->getForm(), $domain, $interface);
+            $this->addViewsField($event->getForm(), $domain, $hasContext ? $subnet : null);
         });
 
         // Rebuild views choices before validation so submitted view IDs remain valid.
-        // When an interface is present the domain can change via the form, so resolve
-        // it from the submitted domain ID.  Without an interface the domain field is
-        // absent from the form and is fixed, so reuse the value captured in PRE_SET_DATA.
-        $builder->addEventListener(FormEvents::PRE_SUBMIT, function (FormEvent $event) use ($interface, &$domainFromPreSetData) {
+        $builder->addEventListener(FormEvents::PRE_SUBMIT, function (FormEvent $event) use ($hasContext, $subnet, &$domainFromPreSetData) {
             $data = $event->getData();
 
             if (($data['type'] ?? '') === 'TXT' && isset($data['value'])) {
@@ -111,21 +114,19 @@ class DomainRecordType extends AbstractType
                 $event->setData($data);
             }
 
-            if ($interface !== null) {
+            if ($hasContext) {
                 $domainId = isset($data['domain']) ? (int) $data['domain'] : null;
                 $domain   = $domainId ? $this->domainRepo->find($domainId) : null;
             } else {
                 $domain = $domainFromPreSetData;
             }
-            $this->addViewsField($event->getForm(), $domain, $interface);
+            $this->addViewsField($event->getForm(), $domain, $hasContext ? $subnet : null);
         });
     }
 
-    private function addViewsField(FormInterface $form, ?Domain $domain, ?NetworkInterface $interface): void
+    private function addViewsField(FormInterface $form, ?Domain $domain, ?Subnet $subnet): void
     {
-        if ($interface !== null) {
-            // Limit view choices to what's available for domain+subnet combination
-            $subnet  = $interface->getSubnet();
+        if ($subnet !== null) {
             $choices = $domain ? $this->viewResolver->availableViewsFor($domain, $subnet) : [];
         } else {
             $choices = $domain ? $domain->getViews()->toArray() : [];
@@ -148,7 +149,9 @@ class DomainRecordType extends AbstractType
         $resolver->setDefaults([
             'data_class'        => DomainRecord::class,
             'network_interface' => null,
+            'virtual_ip'        => null,
         ]);
         $resolver->setAllowedTypes('network_interface', ['null', NetworkInterface::class]);
+        $resolver->setAllowedTypes('virtual_ip', ['null', VirtualIp::class]);
     }
 }
