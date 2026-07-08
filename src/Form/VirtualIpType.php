@@ -68,7 +68,7 @@ class VirtualIpType extends AbstractType
                 'required'     => false,
                 'label'        => 'Member Interfaces',
                 'by_reference' => false,
-                'attr'         => ['class' => 'form-select', 'size' => 6],
+                'attr'         => [],
             ] + ($subnet !== null
                 ? ['query_builder' => fn($repo) => $repo->createQueryBuilder('i')
                         ->where('i.subnet = :subnet')
