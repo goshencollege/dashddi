@@ -62,52 +62,70 @@
                 </div>
                 {% endif %}
                 <hr class="my-3">
-                {# ── Interface link ─────────────────────────────────────────── #}
-                {% set linked = record.networkInterface %}
-                {% if linked %}
+                {# ── Interface / VIP link ────────────────────────────────────── #}
+                {% set linkedIface = record.networkInterface %}
+                {% set linkedVip   = record.virtualIp %}
+                {% set hasLinked   = linkedIface or linkedVip %}
+                {% if linkedIface %}
                     {% set linkedIp = record.type.value == 'A'
-                        ? linked.ipAddress?.address
-                        : (record.type.value == 'AAAA' ? linked.ipv6Address?.address : null) %}
+                        ? linkedIface.ipAddress?.address
+                        : (record.type.value == 'AAAA' ? linkedIface.ipv6Address?.address : null) %}
+                    {% set hasMismatch = linkedIp and record.value and record.value != linkedIp %}
+                {% elseif linkedVip %}
+                    {% set linkedIp = record.type.value == 'A'
+                        ? linkedVip.ipAddress?.address
+                        : (record.type.value == 'AAAA' ? linkedVip.ipv6Address?.address : null) %}
                     {% set hasMismatch = linkedIp and record.value and record.value != linkedIp %}
                 {% else %}
                     {% set hasMismatch = false %}
                 {% endif %}
                 <div class="mb-4">
-                    <label class="form-label fw-semibold">Linked Interface</label>
-                    <input type="hidden" name="interface_id" id="interface_id" value="{{ linked ? linked.id : '' }}">
-                    {% if linked %}
-                    <div id="iface-selected" class="d-flex align-items-center gap-2 p-2 border rounded bg-body-secondary mb-2">
-                        <i class="bi bi-hdd-network text-secondary"></i>
-                        <span id="iface-label" class="flex-grow-1 small">
-                            {% if linked.host %}{{ linked.host.name }}: {% endif %}{{ linked.name ?: linked.macAddress }}
-                            {% if linked.ipAddress %}<span class="text-muted ms-1">({{ linked.ipAddress.address }})</span>{% endif %}
-                        </span>
-                        <button type="button" class="btn btn-sm btn-outline-danger" id="iface-clear" title="Unlink interface">
+                    <label class="form-label fw-semibold">Linked to</label>
+                    <input type="hidden" name="interface_id" id="interface_id"
+                           value="{{ linkedIface ? linkedIface.id : '' }}">
+                    <input type="hidden" name="virtual_ip_id" id="virtual_ip_id"
+                           value="{{ linkedVip ? linkedVip.id : '' }}">
+                    {% if hasLinked %}
+                    <div id="link-selected" class="d-flex align-items-center gap-2 p-2 border rounded bg-body-secondary mb-2">
+                        {% if linkedIface %}
+                            <i class="bi bi-hdd-network text-secondary"></i>
+                            <span id="link-label" class="flex-grow-1 small">
+                                {% if linkedIface.host %}{{ linkedIface.host.name }}: {% endif %}{{ linkedIface.name ?: linkedIface.macAddress }}
+                                {% if linkedIface.ipAddress %}<span class="text-muted ms-1">({{ linkedIface.ipAddress.address }})</span>{% endif %}
+                            </span>
+                        {% else %}
+                            <i class="bi bi-layers text-secondary"></i>
+                            <span id="link-label" class="flex-grow-1 small">
+                                {{ linkedVip.label }}
+                                {% if linkedVip.ipAddress %}<span class="text-muted ms-1">({{ linkedVip.ipAddress.address }})</span>{% endif %}
+                            </span>
+                        {% endif %}
+                        <button type="button" class="btn btn-sm btn-outline-danger" id="link-clear" title="Unlink">
                             <i class="bi bi-x-lg"></i>
                         </button>
                     </div>
                     {% if hasMismatch %}
                     <div class="alert alert-warning py-2 small mb-2">
                         <i class="bi bi-exclamation-triangle-fill me-1"></i>
-                        Stored value <code>{{ record.value }}</code> doesn't match the interface IP <code>{{ linkedIp }}</code>.
-                        Saving will clear the stored value so the live interface IP is used.
+                        Stored value <code>{{ record.value }}</code> doesn't match the linked IP <code>{{ linkedIp }}</code>.
+                        Saving will clear the stored value so the live IP is used.
                     </div>
                     {% endif %}
                     {% else %}
-                    <div id="iface-selected" class="d-none d-flex align-items-center gap-2 p-2 border rounded bg-body-secondary mb-2">
-                        <i class="bi bi-hdd-network text-secondary"></i>
-                        <span id="iface-label" class="flex-grow-1 small"></span>
-                        <button type="button" class="btn btn-sm btn-outline-danger" id="iface-clear" title="Unlink interface">
+                    <div id="link-selected" class="d-none d-flex align-items-center gap-2 p-2 border rounded bg-body-secondary mb-2">
+                        <i id="link-icon" class="bi bi-hdd-network text-secondary"></i>
+                        <span id="link-label" class="flex-grow-1 small"></span>
+                        <button type="button" class="btn btn-sm btn-outline-danger" id="link-clear" title="Unlink">
                             <i class="bi bi-x-lg"></i>
                         </button>
                     </div>
                     {% endif %}
-                    <div id="iface-search-wrap" class="{{ linked ? 'd-none' : '' }} position-relative">
-                        <input type="text" id="iface-search" class="form-control form-control-sm"
-                               placeholder="Search by host name, interface name, or IP…" autocomplete="off">
-                        <ul id="iface-results" class="list-group position-absolute w-100 shadow-sm d-none" style="z-index:1000; top:100%; max-height:240px; overflow-y:auto;"></ul>
+                    <div id="link-search-wrap" class="{{ hasLinked ? 'd-none' : '' }} position-relative">
+                        <input type="text" id="link-search" class="form-control form-control-sm"
+                               placeholder="Search by host name, interface name, VIP label, or IP…" autocomplete="off">
+                        <ul id="link-results" class="list-group position-absolute w-100 shadow-sm d-none" style="z-index:1000; top:100%; max-height:240px; overflow-y:auto;"></ul>
                     </div>
-                    <div class="form-text">Link this record to a host interface so A/AAAA values are derived from the interface IP.</div>
+                    <div class="form-text">Link this record to a host interface or virtual IP so A/AAAA values are derived from the live IP.</div>
                 </div>
                 <div class="d-flex justify-content-between">
                     <a href="{{ path('domain_show', {id: domain.id}) }}" class="btn btn-outline-secondary">Cancel</a>
@@ -123,18 +141,21 @@
 
 <script>
 (function () {
-    const searchInput  = document.getElementById('iface-search');
-    const resultsList  = document.getElementById('iface-results');
-    const hiddenField  = document.getElementById('interface_id');
-    const selectedWrap = document.getElementById('iface-selected');
-    const selectedLabel= document.getElementById('iface-label');
-    const clearBtn     = document.getElementById('iface-clear');
-    const searchWrap   = document.getElementById('iface-search-wrap');
+    const searchInput   = document.getElementById('link-search');
+    const resultsList   = document.getElementById('link-results');
+    const ifaceField    = document.getElementById('interface_id');
+    const vipField      = document.getElementById('virtual_ip_id');
+    const selectedWrap  = document.getElementById('link-selected');
+    const selectedLabel = document.getElementById('link-label');
+    const clearBtn      = document.getElementById('link-clear');
+    const searchWrap    = document.getElementById('link-search-wrap');
+    const linkIcon      = document.getElementById('link-icon');
 
     let debounce = null;
 
     clearBtn.addEventListener('click', function () {
-        hiddenField.value = '';
+        ifaceField.value = '';
+        vipField.value   = '';
         selectedLabel.textContent = '';
         selectedWrap.classList.add('d-none');
         searchWrap.classList.remove('d-none');
@@ -154,28 +175,45 @@
     });
 
     function fetchResults(q) {
-        fetch('/api/interfaces/search?q=' + encodeURIComponent(q))
-            .then(r => r.json())
-            .then(data => {
-                resultsList.innerHTML = '';
-                if (!data.length) {
-                    resultsList.innerHTML = '<li class="list-group-item list-group-item-action text-muted small disabled">No results</li>';
-                } else {
-                    data.forEach(function (item) {
-                        const li = document.createElement('li');
-                        li.className = 'list-group-item list-group-item-action small py-1';
-                        const ip = item.ip ? ' <span class="text-muted">(' + item.ip + ')</span>' : '';
-                        li.innerHTML = item.label + ip;
-                        li.addEventListener('mousedown', function () { selectInterface(item); });
-                        resultsList.appendChild(li);
-                    });
-                }
-                resultsList.classList.remove('d-none');
-            });
+        const enc = encodeURIComponent(q);
+        Promise.all([
+            fetch('/api/interfaces/search?q=' + enc).then(r => r.json()),
+            fetch('/api/virtual-ips/search?q=' + enc).then(r => r.json()),
+        ]).then(function ([ifaces, vips]) {
+            resultsList.innerHTML = '';
+            const items = [
+                ...ifaces.map(i => ({ type: 'iface', id: i.id, label: i.label, ip: i.ip })),
+                ...vips.map(v => ({ type: 'vip',   id: v.id, label: v.label, ip: v.ip_address })),
+            ];
+            if (!items.length) {
+                resultsList.innerHTML = '<li class="list-group-item list-group-item-action text-muted small disabled">No results</li>';
+            } else {
+                items.forEach(function (item) {
+                    const li = document.createElement('li');
+                    li.className = 'list-group-item list-group-item-action small py-1 d-flex align-items-center gap-2';
+                    const icon = item.type === 'vip'
+                        ? '<i class="bi bi-layers text-muted" title="Virtual IP"></i>'
+                        : '<i class="bi bi-hdd-network text-muted" title="Interface"></i>';
+                    const ip = item.ip ? ' <span class="text-muted">(' + item.ip + ')</span>' : '';
+                    li.innerHTML = icon + '<span>' + item.label + ip + '</span>';
+                    li.addEventListener('mousedown', function () { selectItem(item); });
+                    resultsList.appendChild(li);
+                });
+            }
+            resultsList.classList.remove('d-none');
+        });
     }
 
-    function selectInterface(item) {
-        hiddenField.value = item.id;
+    function selectItem(item) {
+        if (item.type === 'vip') {
+            vipField.value   = item.id;
+            ifaceField.value = '';
+            if (linkIcon) { linkIcon.className = 'bi bi-layers text-secondary'; }
+        } else {
+            ifaceField.value = item.id;
+            vipField.value   = '';
+            if (linkIcon) { linkIcon.className = 'bi bi-hdd-network text-secondary'; }
+        }
         const ip = item.ip ? ' (' + item.ip + ')' : '';
         selectedLabel.textContent = item.label + ip;
         selectedWrap.classList.remove('d-none');

@@ -10,6 +10,7 @@ use App\Enum\RecordType;
 use App\Form\DomainRecordType;
 use App\Repository\DomainRecordRepository;
 use App\Repository\NetworkInterfaceRepository;
+use App\Repository\VirtualIpRepository;
 use App\Service\DnsViewResolver;
 use App\Service\FcrdnsChecker;
 use Doctrine\ORM\EntityManagerInterface;
@@ -27,6 +28,7 @@ class DomainRecordController extends AbstractController
         private readonly DomainRecordRepository      $recordRepo,
         private readonly DnsViewResolver             $viewResolver,
         private readonly NetworkInterfaceRepository  $ifaceRepo,
+        private readonly VirtualIpRepository         $vipRepo,
     ) {}
 
     #[Route('/domain/{domainId}/records/new', name: 'domain_record_new')]
@@ -202,21 +204,32 @@ class DomainRecordController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            // Handle interface linking/unlinking from the domain-context form.
+            // Handle interface/VIP linking from the domain-context form.
             if ($formInterface === null && $formVip === null) {
-                $rawId = $request->request->get('interface_id', '');
-                if ($rawId === '' || $rawId === null) {
-                    $this->restoreValueFromLinked($record);
-                    $record->setNetworkInterface(null);
-                } else {
-                    $linked = $this->ifaceRepo->find((int) $rawId);
+                $rawIfaceId = $request->request->get('interface_id', '');
+                $rawVipId   = $request->request->get('virtual_ip_id', '');
+                if ($rawIfaceId !== '' && $rawIfaceId !== null) {
+                    $linked = $this->ifaceRepo->find((int) $rawIfaceId);
                     if ($linked !== null && !$linked->isDeleted()) {
+                        $record->setVirtualIp(null);
                         $record->setNetworkInterface($linked);
-                        // Clear stored value for A/AAAA so the live IP is used.
                         if (in_array($record->getType()->value, ['A', 'AAAA'], true)) {
                             $record->setValue('');
                         }
                     }
+                } elseif ($rawVipId !== '' && $rawVipId !== null) {
+                    $linkedVip = $this->vipRepo->find((int) $rawVipId);
+                    if ($linkedVip !== null && !$linkedVip->isDeleted()) {
+                        $record->setNetworkInterface(null);
+                        $record->setVirtualIp($linkedVip);
+                        if (in_array($record->getType()->value, ['A', 'AAAA'], true)) {
+                            $record->setValue('');
+                        }
+                    }
+                } else {
+                    $this->restoreValueFromLinked($record);
+                    $record->setNetworkInterface(null);
+                    $record->setVirtualIp(null);
                 }
             }
 

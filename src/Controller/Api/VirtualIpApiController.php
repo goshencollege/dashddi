@@ -40,6 +40,26 @@ class VirtualIpApiController extends AbstractController
         return $this->json(array_map($this->serialize(...), $vips));
     }
 
+    #[Route('/search', name: 'api_virtual_ips_search', methods: ['GET'])]
+    public function search(Request $request, VirtualIpRepository $repo): JsonResponse
+    {
+        $q = trim($request->query->get('q', ''));
+        if (strlen($q) < 2) {
+            return $this->json([]);
+        }
+        $limit   = min(50, max(1, (int) $request->query->get('limit', 20)));
+        $results = $repo->search($q, $limit);
+        return $this->json(array_map(function (VirtualIp $vip) {
+            return [
+                'id'           => $vip->getId(),
+                'label'        => $vip->getLabel(),
+                'protocol'     => $vip->getProtocol()->value,
+                'ip_address'   => $vip->getIpAddress()?->getAddress(),
+                'ipv6_address' => $vip->getIpv6Address()?->getAddress(),
+            ];
+        }, $results));
+    }
+
     #[Route('/{id}', name: 'api_virtual_ips_show', methods: ['GET'])]
     public function show(VirtualIp $virtualIp): JsonResponse
     {

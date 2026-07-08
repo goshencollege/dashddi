@@ -70,6 +70,25 @@ class VirtualIpRepository extends ServiceEntityRepository
     }
 
     /**
+     * Full-text search across label and IP addresses. Returns non-deleted VIPs only.
+     *
+     * @return VirtualIp[]
+     */
+    public function search(string $q, int $limit = 20): array
+    {
+        return $this->createQueryBuilder('v')
+            ->leftJoin('v.ipAddress', 'ip')
+            ->leftJoin('v.ipv6Address', 'ip6')
+            ->andWhere('v.deletedAt IS NULL')
+            ->andWhere('v.label LIKE :q OR ip.address LIKE :q OR ip6.address LIKE :q')
+            ->setParameter('q', '%' . $q . '%')
+            ->orderBy('v.label', 'ASC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
      * Returns non-deleted VIPs on the same subnet as $interface that do not
      * already have $interface as a member.
      *
