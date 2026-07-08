@@ -226,6 +226,26 @@
                         </ul>
                     </div>
                 </li>
+
+                {# Virtual IPs #}
+                <li class="nav-item">
+                    <div class="d-flex align-items-center">
+                        <a class="nav-link flex-grow-1 py-1 px-2 text-start" href="#virtual-ips">Virtual IPs</a>
+                        <button class="btn btn-link btn-sm py-0 px-2 border-0 text-muted api-nav-toggle collapsed" data-bs-toggle="collapse" data-bs-target="#nav-virtual-ips" aria-expanded="false"><i class="bi bi-chevron-down" style="font-size:.65rem"></i></button>
+                    </div>
+                    <div class="collapse" id="nav-virtual-ips">
+                        <ul class="nav flex-column gap-0 ms-2 ps-2 border-start api-sub-nav">
+                            <li><a class="nav-link px-2 text-start" href="#ep-virtual-ips-list"><span class="method-get me-1">GET</span>List</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-virtual-ips-get"><span class="method-get me-1">GET</span>Get</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-virtual-ips-create"><span class="method-post me-1">POST</span>Create</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-virtual-ips-update"><span class="method-patch me-1">PATCH</span>Update</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-virtual-ips-delete"><span class="method-delete me-1">DEL</span>Delete</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-virtual-ips-restore"><span class="method-post me-1">POST</span>Restore</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-virtual-ips-add-member"><span class="method-post me-1">POST</span>Add member</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-virtual-ips-remove-member"><span class="method-delete me-1">DEL</span>Remove member</a></li>
+                        </ul>
+                    </div>
+                </li>
             </ul>
         </nav>
     </div>
@@ -1075,6 +1095,101 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
                     {name: 'ip', type: 'string', required: false, desc: 'Client IPv4 address.'},
                 ],
                 response_example: '{\n  "success": true,\n  "error": null,\n  "output": "Last login: 2026-05-21 17:00:57 from 192.168.60.134\ncx-sas# configure terminal\ncx-sas(config)# interface 1\/1\/18\ncx-sas(config-if)# no power-over-ethernet\ncx-sas(config-if)# shutdown\ncx-sas(config-if)# no shutdown\ncx-sas(config-if)# power-over-ethernet\ncx-sas(config-if)# end\ncx-sas#"\n}',
+            } %}
+        </section>
+
+        {# ═══════════════════════════════════════════════════════════════════
+           VIRTUAL IPs
+           ═══════════════════════════════════════════════════════════════════ #}
+        <section id="virtual-ips" class="mb-5">
+            <h2 class="h5 border-bottom pb-2 mb-3">Virtual IPs <code class="small fw-normal text-muted">/api/virtual-ips</code></h2>
+            <p class="text-muted small mb-1">Virtual IPs represent VRRP, HSRP, or active-gateway addresses that float across physical interfaces. They belong to a subnet, hold an optional IPv4/IPv6 address, and track the member interfaces that participate in the redundancy group. Supports soft-delete and restore.</p>
+            <table class="table table-sm table-borderless mb-4 small">
+                <tbody>
+                    <tr><td style="width:3.5rem"><span class="badge bg-primary font-monospace">GET</span></td><td><code>/api/virtual-ips</code></td><td class="text-muted">List virtual IPs (filterable, includes deleted)</td></tr>
+                    <tr><td><span class="badge bg-primary font-monospace">GET</span></td><td><code>/api/virtual-ips/{id}</code></td><td class="text-muted">Get a virtual IP</td></tr>
+                    <tr><td><span class="badge bg-success font-monospace">POST</span></td><td><code>/api/virtual-ips</code></td><td class="text-muted">Create a virtual IP (supports auto IP assignment)</td></tr>
+                    <tr><td><span class="badge bg-warning text-dark font-monospace">PATCH</span></td><td><code>/api/virtual-ips/{id}</code></td><td class="text-muted">Update a virtual IP</td></tr>
+                    <tr><td><span class="badge bg-danger font-monospace">DELETE</span></td><td><code>/api/virtual-ips/{id}</code></td><td class="text-muted">Soft-delete a virtual IP</td></tr>
+                    <tr><td><span class="badge bg-success font-monospace">POST</span></td><td><code>/api/virtual-ips/{id}/restore</code></td><td class="text-muted">Restore a soft-deleted virtual IP</td></tr>
+                    <tr><td><span class="badge bg-success font-monospace">POST</span></td><td><code>/api/virtual-ips/{id}/members</code></td><td class="text-muted">Add a member interface</td></tr>
+                    <tr><td><span class="badge bg-danger font-monospace">DELETE</span></td><td><code>/api/virtual-ips/{id}/members/{interfaceId}</code></td><td class="text-muted">Remove a member interface</td></tr>
+                </tbody>
+            </table>
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-virtual-ips-list',
+                method: 'GET', path: '/api/virtual-ips', name: 'List virtual IPs',
+                query: [
+                    {name: 'subnet_id', type: 'integer', desc: 'Filter by subnet ID.'},
+                    {name: 'deleted', type: 'string', desc: 'Omit or pass <code>false</code> for active VIPs only (default). Pass <code>true</code> for deleted VIPs only. Pass <code>all</code> to return both.'},
+                ],
+                response_example: '[\n  {\n    "id": 1,\n    "label": "core-gw-vrrp",\n    "protocol": "vrrp",\n    "vrid": 10,\n    "notes": null,\n    "subnet_id": 2,\n    "ip_address": "10.0.0.1",\n    "ipv6_address": null,\n    "member_interface_ids": [3, 7],\n    "deleted_at": null,\n    "created_at": "2024-01-01T00:00:00+00:00",\n    "updated_at": "2024-01-01T00:00:00+00:00",\n    "created_by": "user@example.com",\n    "updated_by": "user@example.com"\n  }\n]',
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-virtual-ips-get',
+                method: 'GET', path: '/api/virtual-ips/{id}', name: 'Get virtual IP',
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-virtual-ips-create',
+                method: 'POST', path: '/api/virtual-ips', name: 'Create virtual IP',
+                notes: 'For <code>ip_address</code> and <code>ipv6_address</code>, pass <code>"auto"</code> to auto-assign the next available address from the subnet, a specific IP string to assign that address, or omit to leave unassigned. For IPv6 only, <code>"auto_v4"</code> derives the address from the VIP\'s IPv4 assignment.',
+                body: [
+                    {name: 'label', type: 'string', required: true, desc: 'Human-readable label (e.g. <code>core-gw-vrrp</code>).'},
+                    {name: 'subnet_id', type: 'integer', required: true, desc: 'Subnet this VIP belongs to.'},
+                    {name: 'protocol', type: 'string', required: false, desc: 'Redundancy protocol: <code>vrrp</code>, <code>hsrp</code>, <code>active_gateway</code>, or <code>other</code>. Defaults to <code>vrrp</code>.'},
+                    {name: 'vrid', type: 'integer|null', required: false, desc: 'Virtual Router ID / group number (1–255). Applies to VRRP and HSRP.'},
+                    {name: 'notes', type: 'string|null', required: false, desc: 'Free-text notes.'},
+                    {name: 'ip_address', type: 'string|null', required: false, desc: '<code>"auto"</code> to auto-assign, a specific IPv4, or omit to leave unassigned.'},
+                    {name: 'ipv6_address', type: 'string|null', required: false, desc: '<code>"auto"</code> to auto-assign, <code>"auto_v4"</code> to derive from IPv4, a specific IPv6, or omit to leave unassigned.'},
+                ],
+                response_status: '201',
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-virtual-ips-update',
+                method: 'PATCH', path: '/api/virtual-ips/{id}', name: 'Update virtual IP',
+                notes: 'Only include fields you want to change. Sending <code>ip_address</code> or <code>ipv6_address</code> always releases the existing address first, then applies the new value. Pass <code>null</code> or <code>""</code> to clear without reassigning. Changing <code>subnet_id</code> automatically releases both IP assignments.',
+                body: [
+                    {name: 'label', type: 'string', required: false, desc: 'Human-readable label.'},
+                    {name: 'subnet_id', type: 'integer', required: false, desc: 'Move to a different subnet (releases IP assignments).'},
+                    {name: 'protocol', type: 'string', required: false, desc: 'Redundancy protocol: <code>vrrp</code>, <code>hsrp</code>, <code>active_gateway</code>, or <code>other</code>.'},
+                    {name: 'vrid', type: 'integer|null', required: false, desc: 'Virtual Router ID, or null to clear.'},
+                    {name: 'notes', type: 'string|null', required: false, desc: 'Free-text notes, or null to clear.'},
+                    {name: 'ip_address', type: 'string|null', required: false, desc: '<code>"auto"</code> to auto-assign, a specific IPv4, or null/empty to clear.'},
+                    {name: 'ipv6_address', type: 'string|null', required: false, desc: '<code>"auto"</code> to auto-assign, <code>"auto_v4"</code> to derive from IPv4, a specific IPv6, or null/empty to clear.'},
+                ],
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-virtual-ips-delete',
+                method: 'DELETE', path: '/api/virtual-ips/{id}', name: 'Delete virtual IP',
+                notes: 'Soft-deletes the virtual IP. The record is retained and can be restored. Returns <code>204</code> even if the VIP was already deleted.',
+                response_status: '204',
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-virtual-ips-restore',
+                method: 'POST', path: '/api/virtual-ips/{id}/restore', name: 'Restore virtual IP',
+                notes: 'Restores a soft-deleted virtual IP. If the VIP is not deleted, the current state is returned unchanged.',
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-virtual-ips-add-member',
+                method: 'POST', path: '/api/virtual-ips/{id}/members', name: 'Add member interface',
+                notes: 'Adds an interface to the VIP\'s member list. If the interface is already a member, the request is idempotent.',
+                body: [
+                    {name: 'interface_id', type: 'integer', required: true, desc: 'ID of the interface to add as a member.'},
+                ],
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-virtual-ips-remove-member',
+                method: 'DELETE', path: '/api/virtual-ips/{id}/members/{interfaceId}', name: 'Remove member interface',
+                notes: 'Removes an interface from the VIP\'s member list. If the interface is not a member, the request is silently ignored. Returns <code>204</code> on success.',
+                response_status: '204',
             } %}
         </section>
 
