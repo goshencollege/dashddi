@@ -6,10 +6,12 @@ use App\Entity\Domain;
 use App\Entity\DnsServer;
 use App\Entity\DnsView;
 use App\Entity\IpAddress;
+use App\Entity\Ipv6Address;
 use App\Entity\NetworkInterface;
 use App\Entity\DomainRecord;
 use App\Entity\Subnet;
 use App\Entity\SubnetRecord;
+use App\Entity\VirtualIp;
 use App\Enum\RecordType;
 use App\Enum\TsigAlgorithm;
 use App\Repository\DnsAclRepository;
@@ -466,6 +468,105 @@ class DnsConfigGeneratorTest extends TestCase
         $this->assertStringNotContainsString('0/26.1.168.192.in-addr.arpa', $output);
     }
 
+    // ── generateSubnetApexNsUpdate — PTR records in nsupdate ─────────────────
+
+    public function testApexNsUpdateIncludesVipPtrRecord(): void
+    {
+        $subnet = $this->makeSubnetWithVip('10.0.0.0/24', '10.0.0.100', 'vip1.example.com.');
+        $this->generator->forceSerial(2026010101);
+        $output = $this->generator->generateSubnetApexNsUpdate($subnet, '10.0.0.0/24');
+        $this->assertStringContainsString('update delete 100.0.0.10.in-addr.arpa. IN PTR', $output);
+        $this->assertStringContainsString('update add 100.0.0.10.in-addr.arpa.', $output);
+        $this->assertStringContainsString('IN PTR vip1.example.com.', $output);
+    }
+
+    public function testApexNsUpdateIncludesInterfacePtrRecord(): void
+    {
+        $subnet = $this->makeSubnetWithInterface('10.0.0.0/24', '10.0.0.5', 'host.example.com.');
+        $this->generator->forceSerial(2026010101);
+        $output = $this->generator->generateSubnetApexNsUpdate($subnet, '10.0.0.0/24');
+        $this->assertStringContainsString('update delete 5.0.0.10.in-addr.arpa. IN PTR', $output);
+        $this->assertStringContainsString('update add 5.0.0.10.in-addr.arpa.', $output);
+        $this->assertStringContainsString('IN PTR host.example.com.', $output);
+    }
+
+    public function testApexNsUpdateDeletedVipExcluded(): void
+    {
+        $subnet = $this->makeSubnetWithVip('10.0.0.0/24', '10.0.0.50', 'deleted.example.com.');
+        foreach ($subnet->getVirtualIps() as $vip) {
+            $vip->softDelete();
+        }
+        $this->generator->forceSerial(2026010101);
+        $output = $this->generator->generateSubnetApexNsUpdate($subnet, '10.0.0.0/24');
+        $this->assertStringNotContainsString('deleted.example.com.', $output);
+    }
+
+    public function testApexNsUpdatePtrAppearsBeforeSoaNs(): void
+    {
+        $subnet = $this->makeSubnetWithVip('10.0.0.0/24', '10.0.0.10', 'vip.example.com.');
+        $this->generator->forceSerial(2026010101);
+        $output = $this->generator->generateSubnetApexNsUpdate($subnet, '10.0.0.0/24');
+        $ptrPos = strpos($output, 'update delete 10.0.0.10.in-addr.arpa.');
+        $soaPos = strpos($output, 'update delete 0.0.10.in-addr.arpa. IN SOA');
+        $this->assertNotFalse($ptrPos);
+        $this->assertNotFalse($soaPos);
+        $this->assertLessThan($soaPos, $ptrPos);
+    }
+
+    public function testApexNsUpdateStillContainsSoaAndNs(): void
+    {
+        $subnet = $this->makeSubnet('10.0.0.0/24');
+        $this->generator->forceSerial(2026010101);
+        $output = $this->generator->generateSubnetApexNsUpdate($subnet, '10.0.0.0/24');
+        $this->assertStringContainsString('update delete 0.0.10.in-addr.arpa. IN NS', $output);
+        $this->assertStringContainsString('update delete 0.0.10.in-addr.arpa. IN SOA', $output);
+        $this->assertStringContainsString('send', $output);
+    }
+
+    // ── VIP PTR records in reverse zones ─────────────────────────────────────
+
+    public function testVipIpv4PtrAppearsInReverseZone(): void
+    {
+        $subnet = $this->makeSubnetWithVip('10.0.0.0/24', '10.0.0.100', 'vip1.example.com.');
+        $output = $this->generator->generateReverseZoneFile($subnet, '10.0.0.0/24', null);
+        $this->assertStringContainsString('100 IN PTR vip1.example.com.', $output);
+    }
+
+    public function testVipIpv6PtrAppearsInReverseZone(): void
+    {
+        $subnet = $this->makeSubnetWithVipIpv6('2001:db8::/64', '2001:db8::1', 'vip6.example.com.');
+        $output = $this->generator->generateReverseZoneFile($subnet, '2001:db8::/64', null);
+        $this->assertStringContainsString('IN PTR vip6.example.com.', $output);
+    }
+
+    public function testDeletedVipIsExcludedFromReverseZone(): void
+    {
+        $subnet = $this->makeSubnetWithVip('10.0.0.0/24', '10.0.0.50', 'deleted-vip.example.com.');
+        // Soft-delete the VIP inside the subnet
+        foreach ($subnet->getVirtualIps() as $vip) {
+            $vip->softDelete();
+        }
+        $output = $this->generator->generateReverseZoneFile($subnet, '10.0.0.0/24', null);
+        $this->assertStringNotContainsString('IN PTR deleted-vip.example.com.', $output);
+    }
+
+    public function testVipWithoutCanonicalRecordIsExcludedFromReverseZone(): void
+    {
+        $subnet = $this->makeSubnetWithVip('10.0.0.0/24', '10.0.0.75', 'non-canonical.example.com.', canonical: false);
+        $output = $this->generator->generateReverseZoneFile($subnet, '10.0.0.0/24', null);
+        $this->assertStringNotContainsString('IN PTR non-canonical.example.com.', $output);
+    }
+
+    public function testVipPtrFilteredByView(): void
+    {
+        $view1 = $this->makeView(1, 'internal');
+        $view2 = $this->makeView(2, 'external');
+
+        $subnet = $this->makeSubnetWithVip('10.0.0.0/24', '10.0.0.200', 'vip-internal.example.com.', view: $view1);
+        $output = $this->generator->generateReverseZoneFile($subnet, '10.0.0.0/24', $view2);
+        $this->assertStringNotContainsString('IN PTR vip-internal.example.com.', $output);
+    }
+
     // ── generateViewsConf helpers ─────────────────────────────────────────────
 
     /**
@@ -611,5 +712,59 @@ class DnsConfigGeneratorTest extends TestCase
         $aclRepo->method('findBy')->willReturn([]);
 
         return new DnsConfigGenerator($domainRepo, $subnetRepo, $policyRepo, $aclRepo);
+    }
+
+    private function makeSubnetWithVip(string $cidr, string $ip, string $fqdn, bool $canonical = true, ?DnsView $view = null): Subnet
+    {
+        $subnet = $this->makeSubnet($cidr);
+
+        $ipAddr = new IpAddress();
+        (new \ReflectionProperty(IpAddress::class, 'address'))->setValue($ipAddr, $ip);
+
+        $domain = (new Domain())->setName('example.com');
+
+        $record = (new DomainRecord())
+            ->setHostname(explode('.example.com.', $fqdn)[0])
+            ->setType(RecordType::A)
+            ->setIsCanonical($canonical)
+            ->setDomain($domain);
+        if ($view !== null) {
+            $record->addView($view);
+        }
+
+        $vip = new VirtualIp();
+        $vip->setLabel('test-vip');
+        (new \ReflectionProperty(VirtualIp::class, 'ipAddress'))->setValue($vip, $ipAddr);
+        (new \ReflectionProperty(VirtualIp::class, 'domainRecords'))->setValue($vip, new ArrayCollection([$record]));
+
+        (new \ReflectionProperty(Subnet::class, 'virtualIps'))->setValue($subnet, new ArrayCollection([$vip]));
+
+        return $subnet;
+    }
+
+    private function makeSubnetWithVipIpv6(string $cidr, string $ip, string $fqdn): Subnet
+    {
+        $subnet = new Subnet();
+        $subnet->setName('Test')->setIpv6Cidr($cidr)->setSoaNameserver('ns1.example.com')->setSoaEmail('hostmaster@example.com');
+
+        $ipAddr = new Ipv6Address();
+        (new \ReflectionProperty(Ipv6Address::class, 'address'))->setValue($ipAddr, $ip);
+
+        $domain = (new Domain())->setName('example.com');
+
+        $record = (new DomainRecord())
+            ->setHostname(explode('.example.com.', $fqdn)[0])
+            ->setType(RecordType::AAAA)
+            ->setIsCanonical(true)
+            ->setDomain($domain);
+
+        $vip = new VirtualIp();
+        $vip->setLabel('test-vip6');
+        (new \ReflectionProperty(VirtualIp::class, 'ipv6Address'))->setValue($vip, $ipAddr);
+        (new \ReflectionProperty(VirtualIp::class, 'domainRecords'))->setValue($vip, new ArrayCollection([$record]));
+
+        (new \ReflectionProperty(Subnet::class, 'virtualIps'))->setValue($subnet, new ArrayCollection([$vip]));
+
+        return $subnet;
     }
 }

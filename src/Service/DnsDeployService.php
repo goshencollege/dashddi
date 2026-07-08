@@ -167,11 +167,11 @@ class DnsDeployService
                                         'output'  => $ok ? 'Serial bumped via freeze/thaw' : 'freeze/thaw failed',
                                     ];
                                 } else {
-                                    $nsu = $this->execNsUpdate($this->generator->generateSubnetApexNsUpdate($subnet, $cidr, $view), $server, $sftp);
+                                    $nsu = $this->execNsUpdate($this->generator->generateSubnetApexNsUpdate($subnet, $cidr, $view, $extraSubnets), $server, $sftp);
                                     $viewResult['zones'][$zoneName] = [
                                         'success' => $nsu['success'],
                                         'file'    => $displayFile,
-                                        'output'  => $nsu['success'] ? 'SOA/NS updated via nsupdate' : ('nsupdate failed: ' . $nsu['output']),
+                                        'output'  => $nsu['success'] ? 'PTR/SOA/NS updated via nsupdate' : ('nsupdate failed: ' . $nsu['output']),
                                     ];
                                 }
                             } else {

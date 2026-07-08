@@ -504,10 +504,13 @@ class DnsConfigGenerator
     }
 
     /**
-     * Builds an nsupdate script that replaces the SOA and NS apex records for a reverse zone.
-     * Used to propagate SOA/NS changes to dynamic zones without overwriting the zone file.
+     * Builds an nsupdate script for a dynamic reverse zone: replaces all static PTR records
+     * (from interfaces and VIPs) plus the SOA/NS apex records in a single atomic transaction.
+     * Used to propagate changes to dynamic zones without overwriting the zone file.
+     *
+     * @param Subnet[] $extraSubnets
      */
-    public function generateSubnetApexNsUpdate(Subnet $subnet, string $cidr, ?DnsView $view = null): string
+    public function generateSubnetApexNsUpdate(Subnet $subnet, string $cidr, ?DnsView $view = null, array $extraSubnets = []): string
     {
         $ttl        = $subnet->getSoaTtl()      ?? 3600;
         $nameserver = $this->ensureTrailingDot($subnet->getSoaNameserver() ?? $this->defaultNs($view));
@@ -516,8 +519,70 @@ class DnsConfigGenerator
         $retry      = $subnet->getSoaRetry()    ?? 900;
         $expire     = $subnet->getSoaExpire()   ?? 604800;
         $zone       = $this->reverseZoneName($cidr) . '.';
+        $serial     = $this->generateSerial();
+        $soa        = implode(' ', [$nameserver, $email, $serial, $refresh, $retry, $expire, $ttl]);
 
-        return $this->buildApexNsUpdate($zone, $nameserver, $email, $ttl, $refresh, $retry, $expire, $view?->getNsUpdateSourceAddress());
+        [$address, $prefixStr] = explode('/', $cidr);
+        $prefix = (int) $prefixStr;
+        $isIpv6 = str_contains($address, ':');
+
+        $lines = [];
+        if ($view?->getNsUpdateSourceAddress() !== null) {
+            $lines[] = 'local ' . $view->getNsUpdateSourceAddress();
+        }
+        array_push($lines, 'server 127.0.0.1', 'zone ' . $zone);
+
+        foreach ([$subnet, ...$extraSubnets] as $ptrSubnet) {
+            foreach ($ptrSubnet->getInterfaces() as $iface) {
+                if ($iface->isDeleted()) {
+                    continue;
+                }
+                $ip = $isIpv6 ? $iface->getIpv6Address() : $iface->getIpAddress();
+                if (!$ip) {
+                    continue;
+                }
+                $hostname = $this->ptrHostname($iface, $view, $isIpv6);
+                if (!$hostname) {
+                    continue;
+                }
+                $label = $isIpv6
+                    ? $this->ipv6PtrLabel($ip->getAddress(), $prefix)
+                    : $this->ipv4PtrLabel($ip->getAddress(), $prefix);
+                $fqdn = $label . '.' . $zone;
+                $lines[] = 'update delete ' . $fqdn . ' IN PTR';
+                $lines[] = 'update add ' . $fqdn . ' ' . $ttl . ' IN PTR ' . $hostname;
+            }
+            foreach ($ptrSubnet->getVirtualIps() as $vip) {
+                if ($vip->isDeleted()) {
+                    continue;
+                }
+                $ip = $isIpv6 ? $vip->getIpv6Address() : $vip->getIpAddress();
+                if (!$ip) {
+                    continue;
+                }
+                $hostname = $this->ptrHostnameForVip($vip, $view, $isIpv6);
+                if (!$hostname) {
+                    continue;
+                }
+                $label = $isIpv6
+                    ? $this->ipv6PtrLabel($ip->getAddress(), $prefix)
+                    : $this->ipv4PtrLabel($ip->getAddress(), $prefix);
+                $fqdn = $label . '.' . $zone;
+                $lines[] = 'update delete ' . $fqdn . ' IN PTR';
+                $lines[] = 'update add ' . $fqdn . ' ' . $ttl . ' IN PTR ' . $hostname;
+            }
+        }
+
+        array_push($lines,
+            'update delete ' . $zone . ' IN NS',
+            'update add ' . $zone . ' ' . $ttl . ' IN NS ' . $nameserver,
+            'update delete ' . $zone . ' IN SOA',
+            'update add ' . $zone . ' ' . $ttl . ' IN SOA ' . $soa,
+            'send',
+            '',
+        );
+
+        return implode("\n", $lines);
     }
 
     /**
