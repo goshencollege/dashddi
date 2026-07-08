@@ -39,6 +39,9 @@ class VirtualIpController extends AbstractController
 
         $vip = new VirtualIp();
         $vip->setSubnet($subnet);
+        if ($interface) {
+            $vip->addMemberInterface($interface);
+        }
 
         $form = $this->createForm(VirtualIpType::class, $vip, ['subnet' => $subnet]);
         $form->handleRequest($request);
