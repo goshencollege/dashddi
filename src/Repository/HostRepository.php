@@ -576,13 +576,17 @@ class HostRepository extends ServiceEntityRepository
                 break;
 
             case 'ip':
-                // Sort by the host's lowest assigned IPv4. Hosts without any IP sort last.
+                // Sort by the host's lowest assigned IPv4 (numeric). Hosts without any IP sort last.
+                // DQL doesn't support correlated subqueries in COALESCE, so use LEFT JOINs + GROUP BY.
                 $nullFallback = $dir === 'ASC' ? '4294967295' : '0';
                 $qb->select('h.id as hid', 'h.name as hname')
                    ->addSelect(sprintf(
-                       'COALESCE((SELECT MIN(INET_ATON(ip_s.address)) FROM App\Entity\NetworkInterface i_s LEFT JOIN i_s.ipAddress ip_s WHERE i_s.host = h AND i_s.deletedAt IS NULL), %s) AS HIDDEN ip_sort',
+                       'COALESCE(MIN(INET_ATON(ip_sort.address)), %s) AS HIDDEN ip_sort',
                        $nullFallback
                    ))
+                   ->leftJoin('h.interfaces', 'i_sort', 'WITH', 'i_sort.deletedAt IS NULL')
+                   ->leftJoin('i_sort.ipAddress', 'ip_sort')
+                   ->addGroupBy('h.id')
                    ->orderBy('ip_sort', $dir)
                    ->addOrderBy('h.name', 'ASC');
                 break;
