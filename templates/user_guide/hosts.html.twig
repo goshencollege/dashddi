@@ -49,35 +49,83 @@
     <div class="card-header fw-semibold"><i class="bi bi-search me-1"></i>Searching for Hosts</div>
     <div class="card-body">
         <h6>Simple Search</h6>
-        <p>Type in the search bar at the top of the host list. The simple search matches against:</p>
+        <p>Type in the search bar at the top of the host list. The simple search matches against host name, location (building / room), subnet name, IP address (IPv4 or IPv6), MAC address, and DNS name. Use <code>*</code> as a wildcard (e.g. <code>web*</code>, <code>10.0.*</code>).</p>
+
+        <h6 class="mt-3">Condition Builder</h6>
+        <p>Click <strong>Advanced</strong> to open the condition builder. The builder lets you compose precise filters using multiple fields, operators, and values — with full AND / OR support.</p>
+
+        <p><strong>Structure:</strong> conditions within a group are AND'd together; groups are OR'd against each other.</p>
         <ul>
-            <li>Host name</li>
-            <li>Location (building / room)</li>
-            <li>Subnet name</li>
-            <li>IP address (IPv4 or IPv6)</li>
-            <li>MAC address</li>
-            <li>DNS name</li>
+            <li>Add more conditions to a group with <strong>+ Add condition</strong>.</li>
+            <li>Add a second group with <strong>+ Add OR group</strong> — results matching <em>any</em> group are returned.</li>
+            <li>Remove a condition with the <i class="bi bi-x text-danger"></i> button. Remove an entire group with <strong>× Remove group</strong>.</li>
+            <li>Click <strong>Search</strong> to apply the builder. Click <strong>Clear</strong> to reset everything.</li>
         </ul>
 
-        <h6>Advanced Search</h6>
-        <p>Click the <strong>Advanced</strong> button to expand additional filter fields:</p>
+        <h6 class="mt-3">Available Fields</h6>
         <div class="table-responsive">
             <table class="table table-sm table-bordered">
-                <thead><tr><th>Field</th><th>Description</th><th>Example</th></tr></thead>
+                <thead><tr><th>Field</th><th>Operators</th><th>Notes</th></tr></thead>
                 <tbody>
-                    <tr><td>Host Name</td><td>Filter by hostname, supports wildcards</td><td><code>web*</code>, <code>server-01</code></td></tr>
-                    <tr><td>Building</td><td>Select a building from the dropdown</td><td>—</td></tr>
-                    <tr><td>Room</td><td>Filter by room number, supports wildcards</td><td><code>1*</code>, <code>101</code></td></tr>
-                    <tr><td>Subnet</td><td>Filter to hosts with interfaces in a specific subnet, or choose <em>No subnet</em></td><td>—</td></tr>
-                    <tr><td>IP Address</td><td>Filter by IPv4 or IPv6 address, supports wildcards</td><td><code>10.0.1.*</code></td></tr>
-                    <tr><td>MAC Address</td><td>Filter by MAC address, supports wildcards</td><td><code>aa:bb:*</code></td></tr>
-                    <tr><td>DNS Name</td><td>Filter by FQDN, supports wildcards</td><td><code>*.example.com</code></td></tr>
-                    <tr><td>Tag</td><td>Filter to hosts with a specific tag</td><td>—</td></tr>
-                    <tr><td>DHCP Subnet Mismatch</td><td>Show only hosts with at least one interface whose last recorded DHCP IP falls outside its assigned subnet's CIDR</td><td>—</td></tr>
+                    <tr>
+                        <td>Host Name</td>
+                        <td>contains, does not contain, starts with, does not start with, ends with, does not end with, equals, does not equal</td>
+                        <td>Use <code>*</code> as a wildcard in the value (e.g. <code>web*</code>)</td>
+                    </tr>
+                    <tr>
+                        <td>Building</td>
+                        <td>is, is not</td>
+                        <td>Select from a dropdown of buildings</td>
+                    </tr>
+                    <tr>
+                        <td>Room</td>
+                        <td>contains, starts with, ends with, equals, and negatives</td>
+                        <td>Free-text, supports wildcards</td>
+                    </tr>
+                    <tr>
+                        <td>Subnet</td>
+                        <td>is, is not</td>
+                        <td>Select from a dropdown; includes <em>— No subnet —</em> to find unassigned interfaces</td>
+                    </tr>
+                    <tr>
+                        <td>IP Address</td>
+                        <td>contains, starts with, ends with, equals, and negatives</td>
+                        <td>Matches IPv4 or IPv6; use <code>10.0.*</code> to match a range</td>
+                    </tr>
+                    <tr>
+                        <td>MAC Address</td>
+                        <td>contains, starts with, ends with, equals, and negatives</td>
+                        <td>Use <code>aa:bb:*</code> to match by OUI prefix</td>
+                    </tr>
+                    <tr>
+                        <td>DNS Name</td>
+                        <td>contains, starts with, ends with, equals, and negatives</td>
+                        <td>Matches both hostname and FQDN; use <code>*.example.com</code></td>
+                    </tr>
+                    <tr>
+                        <td>Tag</td>
+                        <td>is, is not (dropdown) <em>and</em> contains, starts with, ends with, equals, and negatives (text)</td>
+                        <td><em>is / is not</em> lets you pick a known tag from a dropdown; text operators match against the tag name with wildcard support</td>
+                    </tr>
+                    <tr>
+                        <td>DHCP Mismatch</td>
+                        <td>is true, is false</td>
+                        <td><em>is true</em> returns hosts with at least one interface whose last DHCP lease IP falls outside its assigned subnet's CIDR; <em>is false</em> excludes those hosts</td>
+                    </tr>
+                    <tr>
+                        <td>Last DHCP</td>
+                        <td>after, before, between, never, has value</td>
+                        <td>Matches against the most recent DHCP lease timestamp on any interface; <em>never</em> finds hosts that have never received a DHCP lease</td>
+                    </tr>
+                    <tr>
+                        <td>Last Auth</td>
+                        <td>after, before, between, never, has value</td>
+                        <td>Matches against the most recent ClearPass authentication timestamp on any interface</td>
+                    </tr>
                 </tbody>
             </table>
         </div>
-        <p class="mb-0 text-muted small">Use <code>*</code> as a wildcard anywhere in a text field. Search state is preserved across page navigations per user.</p>
+        <p class="mb-0 text-muted small">Search state (including the full condition builder query) is saved per user and restored automatically on your next visit.</p>
     </div>
 </div>
 
