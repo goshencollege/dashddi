@@ -581,11 +581,11 @@ class HostRepository extends ServiceEntityRepository
                 $nullFallback = $dir === 'ASC' ? '4294967295' : '0';
                 $qb->select('h.id as hid', 'h.name as hname')
                    ->addSelect(sprintf(
-                       'COALESCE(MIN(INET_ATON(ip_sort.address)), %s) AS HIDDEN ip_sort',
+                       'COALESCE(MIN(INET_ATON(ipa_sort.address)), %s) AS HIDDEN ip_sort',
                        $nullFallback
                    ))
                    ->leftJoin('h.interfaces', 'i_sort', 'WITH', 'i_sort.deletedAt IS NULL')
-                   ->leftJoin('i_sort.ipAddress', 'ip_sort')
+                   ->leftJoin('i_sort.ipAddress', 'ipa_sort')
                    ->addGroupBy('h.id')
                    ->orderBy('ip_sort', $dir)
                    ->addOrderBy('h.name', 'ASC');
