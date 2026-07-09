@@ -113,7 +113,7 @@ class HostControllerTest extends AppWebTestCase
         $this->em->persist($subnet);
         $this->makeHostWithInterface('mismatch-host', $subnet, '10.1.0.5');
 
-        $this->client->request('GET', '/hosts?' . http_build_query(['dhcp_mismatch' => '1']));
+        $this->client->request('GET', '/hosts?' . http_build_query(['q' => 'dhcp_mismatch:1']));
         $this->assertResponseIsSuccessful();
         $this->assertStringContainsString('mismatch-host', $this->client->getResponse()->getContent());
     }
@@ -124,7 +124,7 @@ class HostControllerTest extends AppWebTestCase
         $this->em->persist($subnet);
         $this->makeHostWithInterface('matched-host', $subnet, '10.0.0.50');
 
-        $this->client->request('GET', '/hosts?' . http_build_query(['dhcp_mismatch' => '1']));
+        $this->client->request('GET', '/hosts?' . http_build_query(['q' => 'dhcp_mismatch:1']));
         $this->assertResponseIsSuccessful();
         $this->assertStringNotContainsString('matched-host', $this->client->getResponse()->getContent());
     }
@@ -135,7 +135,7 @@ class HostControllerTest extends AppWebTestCase
         $this->em->persist($subnet);
         $this->makeHostWithInterface('no-dhcp-host', $subnet, null);
 
-        $this->client->request('GET', '/hosts?' . http_build_query(['dhcp_mismatch' => '1']));
+        $this->client->request('GET', '/hosts?' . http_build_query(['q' => 'dhcp_mismatch:1']));
         $this->assertResponseIsSuccessful();
         $this->assertStringNotContainsString('no-dhcp-host', $this->client->getResponse()->getContent());
     }

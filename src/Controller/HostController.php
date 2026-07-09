@@ -39,17 +39,13 @@ class HostController extends AbstractController
         $reset       = $request->query->getBoolean('reset');
         $showDeleted = $request->query->getBoolean('deleted');
 
-        $advancedFields = ['name', 'building', 'room', 'subnet', 'ip', 'mac', 'dns', 'tag', 'dhcp_mismatch'];
-
         $query      = '';
-        $criteria   = [];
+        $orGroups   = [];
         $isAdvanced = false;
         $needsFlush = false;
 
         if (!$showDeleted) {
-            $hasExplicitState = $request->query->has('q')
-                || $request->query->has('page')
-                || (bool) array_filter($advancedFields, fn($f) => $request->query->has($f));
+            $hasExplicitState = $request->query->has('q') || $request->query->has('page');
 
             if ($reset) {
                 if ($user && $pref) {
@@ -58,32 +54,33 @@ class HostController extends AbstractController
                 }
             } elseif ($hasExplicitState) {
                 $query = trim($request->query->getString('q'));
-                foreach ($advancedFields as $field) {
-                    $val = trim($request->query->getString($field));
-                    if ($val !== '') {
-                        $criteria[$field] = $val;
-                    }
-                }
                 if ($user) {
                     if (!$pref) {
                         $pref = new UserPreference($user->getUserIdentifier());
                         $em->persist($pref);
                     }
-                    $saved = array_filter(['q' => $query] + $criteria, fn($v) => $v !== '');
-                    $pref->setHostSearch($saved ?: null);
+                    $pref->setHostSearch($query !== '' ? ['q' => $query] : null);
                     $needsFlush = true;
                 }
             } else {
                 $saved = $pref?->getHostSearch() ?? [];
-                $query = $saved['q'] ?? '';
-                foreach ($advancedFields as $field) {
-                    if (!empty($saved[$field])) {
-                        $criteria[$field] = $saved[$field];
+                if (isset($saved['q'])) {
+                    $query = $saved['q'];
+                } elseif (!empty($saved)) {
+                    // Backward compat: old format stored individual field keys
+                    $oldFields = ['name', 'building', 'room', 'subnet', 'ip', 'mac', 'dns', 'tag', 'dhcp_mismatch'];
+                    $parts = [];
+                    foreach ($oldFields as $f) {
+                        if (!empty($saved[$f])) {
+                            $parts[] = "$f:{$saved[$f]}";
+                        }
                     }
+                    $query = implode(' AND ', $parts);
                 }
             }
 
-            $isAdvanced = !empty($criteria);
+            $orGroups   = self::parseStructuredQuery($query);
+            $isAdvanced = !empty($orGroups);
         }
 
         if ($needsFlush) {
@@ -93,7 +90,7 @@ class HostController extends AbstractController
         if ($showDeleted) {
             ['hosts' => $hosts, 'total' => $total] = $repo->findDeletedPaginated($page, self::PER_PAGE);
         } elseif ($isAdvanced) {
-            ['hosts' => $hosts, 'total' => $total] = $repo->advancedSearchPaginated($criteria, $page, self::PER_PAGE);
+            ['hosts' => $hosts, 'total' => $total] = $repo->structuredSearchPaginated($orGroups, $page, self::PER_PAGE);
         } elseif ($query !== '') {
             ['hosts' => $hosts, 'total' => $total] = $repo->searchPaginated($query, $page, self::PER_PAGE);
         } else {
@@ -109,19 +106,9 @@ class HostController extends AbstractController
             }
         }
 
-        // Params for pagination link generation (everything except 'page')
         $linkParams = array_filter([
-            'deleted'  => $showDeleted ?: null,
-            'q'        => $query ?: null,
-            'name'     => $criteria['name'] ?? null,
-            'building' => $criteria['building'] ?? null,
-            'room'     => $criteria['room'] ?? null,
-            'subnet'   => $criteria['subnet'] ?? null,
-            'ip'       => $criteria['ip'] ?? null,
-            'mac'      => $criteria['mac'] ?? null,
-            'dns'      => $criteria['dns'] ?? null,
-            'tag'          => $criteria['tag'] ?? null,
-            'dhcp_mismatch'=> $criteria['dhcp_mismatch'] ?? null,
+            'deleted' => $showDeleted ?: null,
+            'q'       => $query ?: null,
         ]);
 
         $totalPages = max(1, (int) ceil($total / self::PER_PAGE));
@@ -131,7 +118,6 @@ class HostController extends AbstractController
         return $this->render('host/index.html.twig', [
             'hosts'              => $hosts,
             'query'              => $query,
-            'criteria'           => $criteria,
             'isAdvanced'         => $isAdvanced,
             'showDeleted'        => $showDeleted,
             'subnets'            => $subnetRepo->findBy([], ['name' => 'ASC']),
@@ -141,13 +127,101 @@ class HostController extends AbstractController
             'vip_map'            => $vipRepo->findMapByInterfaceIds($ifaceIds),
             'containerSubnetIds' => $containerSubnetIds,
             'pagination'         => [
-                'page'       => $page,
-                'per_page'   => self::PER_PAGE,
-                'total'      => $total,
-                'pages'      => $totalPages,
-                'link_params'=> $linkParams,
+                'page'        => $page,
+                'per_page'    => self::PER_PAGE,
+                'total'       => $total,
+                'pages'       => $totalPages,
+                'link_params' => $linkParams,
             ],
         ]);
+    }
+
+    /**
+     * Parse a structured query string into OR-groups of AND-conditions.
+     * Each condition: [field, value, negate].
+     * Returns [] for plain-text queries with no known field:value tokens.
+     *
+     * @return array<array<array{string, string, bool}>>
+     */
+    private static function parseStructuredQuery(string $q): array
+    {
+        $q = trim($q);
+        if ($q === '') {
+            return [];
+        }
+
+        $known = ['name', 'building', 'room', 'subnet', 'ip', 'mac', 'dns', 'tag',
+                  'dhcp_mismatch', 'last_dhcp', 'last_auth'];
+
+        $fieldPattern = implode('|', $known);
+        $orParts      = self::splitRespectingParens($q, ' OR ');
+        $orGroups     = [];
+
+        foreach ($orParts as $orPart) {
+            $orPart = trim($orPart);
+            if (str_starts_with($orPart, '(') && str_ends_with($orPart, ')')) {
+                $orPart = trim(substr($orPart, 1, -1));
+            }
+
+            $andConditions = [];
+            foreach (explode(' AND ', $orPart) as $token) {
+                $token = trim($token);
+                if (!preg_match('/^(' . $fieldPattern . '):(\"(?:[^\"\\\\]|\\\\.)*\"|[^\s]+)$/', $token, $m)) {
+                    continue;
+                }
+                $raw = $m[2];
+                if (str_starts_with($raw, '"') && str_ends_with($raw, '"')) {
+                    $raw = stripslashes(substr($raw, 1, -1));
+                }
+                $negate = false;
+                if (str_starts_with($raw, '!')) {
+                    $negate = true;
+                    $raw    = substr($raw, 1);
+                }
+                if ($raw !== '') {
+                    $andConditions[] = [$m[1], $raw, $negate];
+                }
+            }
+
+            if (!empty($andConditions)) {
+                $orGroups[] = $andConditions;
+            }
+        }
+
+        return $orGroups;
+    }
+
+    /** Split $str on $sep, ignoring occurrences inside parentheses. */
+    private static function splitRespectingParens(string $str, string $sep): array
+    {
+        $parts   = [];
+        $depth   = 0;
+        $current = '';
+        $sepLen  = strlen($sep);
+        $len     = strlen($str);
+
+        for ($i = 0; $i < $len; $i++) {
+            $c = $str[$i];
+            if ($c === '(') {
+                $depth++;
+                $current .= $c;
+            } elseif ($c === ')') {
+                $depth--;
+                $current .= $c;
+            } elseif ($depth === 0 && substr($str, $i, $sepLen) === $sep) {
+                $parts[] = $current;
+                $current = '';
+                $i += $sepLen - 1;
+            } else {
+                $current .= $c;
+            }
+        }
+
+        if ($current !== '') {
+            $parts[] = $current;
+        }
+
+        return $parts;
     }
 
     #[Route('/new', name: 'host_new', methods: ['GET', 'POST'])]

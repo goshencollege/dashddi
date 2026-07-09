@@ -126,7 +126,7 @@
     <form method="get" action="{{ path('host_index') }}" class="mb-2" id="simple-search-form">
         <div class="input-group">
             <span class="input-group-text"><i class="bi bi-search"></i></span>
-            <input type="search" name="q" class="form-control" placeholder="Search by name, location, subnet, IP address, MAC, or DNS name…" value="{{ query }}">
+            <input type="search" name="q" id="q-input" class="form-control" placeholder="Search by name, location, subnet, IP address, MAC, or DNS name…" value="{{ query }}">
             <button type="submit" class="btn btn-outline-secondary">Search</button>
             {% if query or isAdvanced %}
                 <a href="{{ path('host_index', {reset: 1}) }}" class="btn btn-outline-secondary">Clear</a>
@@ -138,85 +138,23 @@
         </div>
     </form>
 
-    {# Advanced search #}
-    <div class="collapse {{ isAdvanced ? 'show' : '' }}" id="advanced-search">
-        <form method="get" action="{{ path('host_index') }}">
-            <div class="card card-body">
-                <div class="row g-2 mb-2">
-                    <div class="col-md-3">
-                        <label class="form-label small fw-semibold mb-1">Host Name</label>
-                        <input type="text" name="name" class="form-control form-control-sm" value="{{ criteria.name ?? '' }}" placeholder="e.g. web* or server-01">
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label small fw-semibold mb-1">Building</label>
-                        <select name="building" class="form-select form-select-sm">
-                            <option value="">— Any —</option>
-                            {% for b in buildings %}
-                                <option value="{{ b.id }}" {{ (criteria.building ?? '') == (b.id ~ '') ? 'selected' }}>{{ b.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="col-md-2">
-                        <label class="form-label small fw-semibold mb-1">Room</label>
-                        <input type="text" name="room" class="form-control form-control-sm" value="{{ criteria.room ?? '' }}" placeholder="e.g. 101 or 1*">
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label small fw-semibold mb-1">Subnet</label>
-                        <select name="subnet" class="form-select form-select-sm">
-                            <option value="">— Any —</option>
-                            <option value="none" {{ (criteria.subnet ?? '') == 'none' ? 'selected' }}>— No subnet —</option>
-                            {% for subnet in subnets %}
-                                <option value="{{ subnet.id }}" {{ (criteria.subnet ?? '') == (subnet.id ~ '') ? 'selected' }}>
-                                    {{ subnet }}
-                                </option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                </div>
-                <div class="row g-2 mb-3">
-                    <div class="col-md-3">
-                        <label class="form-label small fw-semibold mb-1">IP Address</label>
-                        <input type="text" name="ip" class="form-control form-control-sm font-monospace" value="{{ criteria.ip ?? '' }}" placeholder="e.g. 10.0.1.*">
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label small fw-semibold mb-1">MAC Address</label>
-                        <input type="text" name="mac" class="form-control form-control-sm font-monospace" value="{{ criteria.mac ?? '' }}" placeholder="e.g. aa:bb:*">
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label small fw-semibold mb-1">DNS Name</label>
-                        <input type="text" name="dns" class="form-control form-control-sm font-monospace" value="{{ criteria.dns ?? '' }}" placeholder="e.g. web*.example.com">
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label small fw-semibold mb-1">Tag</label>
-                        <select name="tag" class="form-select form-select-sm">
-                            <option value="">— Any —</option>
-                            {% for tag in tags %}
-                                <option value="{{ tag.id }}" {{ (criteria.tag ?? '') == (tag.id ~ '') ? 'selected' }}>{{ tag.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                </div>
-                <div class="row g-2 mb-2">
-                    <div class="col-12">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" name="dhcp_mismatch" value="1" id="dhcp_mismatch"
-                                {{ (criteria.dhcp_mismatch ?? '') == '1' ? 'checked' }}>
-                            <label class="form-check-label small" for="dhcp_mismatch">
-                                Only hosts with a DHCP subnet mismatch
-                                <span class="text-muted">(interface last DHCP'd on a different subnet than its assigned one)</span>
-                            </label>
-                        </div>
-                    </div>
-                </div>
-                <div class="d-flex gap-2 align-items-center">
-                    <button type="submit" class="btn btn-sm btn-primary">
-                        <i class="bi bi-search me-1"></i>Search
-                    </button>
-                    <a href="{{ path('host_index', {reset: 1}) }}" class="btn btn-sm btn-outline-secondary">Clear</a>
-                    <span class="text-muted small ms-2">Use <code>*</code> as a wildcard (e.g. <code>web*</code>, <code>*.example.com</code>)</span>
-                </div>
+    {# Advanced search — OR-groups condition builder #}
+    <div class="collapse" id="advanced-search">
+        <div class="card card-body p-3">
+            <div id="filter-builder">
+                {# Condition groups rendered by JavaScript #}
             </div>
-        </form>
+            <div class="mt-2 d-flex gap-2 align-items-center flex-wrap">
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="add-group-btn">
+                    <i class="bi bi-plus-circle me-1"></i>Add OR group
+                </button>
+                <button type="button" class="btn btn-sm btn-primary" onclick="builderSearch()">
+                    <i class="bi bi-search me-1"></i>Search
+                </button>
+                <a href="{{ path('host_index', {reset: 1}) }}" class="btn btn-sm btn-outline-secondary">Clear</a>
+                <span class="text-muted small ms-2">Use <code>*</code> as a wildcard in text fields (e.g. <code>web*</code>, <code>*.example.com</code>)</span>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -623,6 +561,480 @@
 
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
+<script>
+// ============================================================
+// Filter Builder — OR-groups condition builder
+// ============================================================
+
+const FILTER_BUILDINGS = [{% for b in buildings %}{"id":{{ b.id }},"name":{{ b.name|json_encode|raw }}}{% if not loop.last %},{% endif %}{% endfor %}];
+const FILTER_SUBNETS   = [{"id":"none","name":"— No subnet —"}{% for s in subnets %},{"id":{{ s.id }},"name":{{ s.name|json_encode|raw }}}{% endfor %}];
+const FILTER_TAGS      = [{% for t in tags %}{"id":{{ t.id }},"name":{{ t.name|json_encode|raw }}}{% if not loop.last %},{% endif %}{% endfor %}];
+
+const FIELDS = {
+    name:          { label: 'Host Name',     type: 'text' },
+    building:      { label: 'Building',      type: 'select', options: FILTER_BUILDINGS },
+    room:          { label: 'Room',          type: 'text' },
+    subnet:        { label: 'Subnet',        type: 'select', options: FILTER_SUBNETS },
+    ip:            { label: 'IP Address',    type: 'text' },
+    mac:           { label: 'MAC Address',   type: 'text' },
+    dns:           { label: 'DNS Name',      type: 'text' },
+    tag:           { label: 'Tag',           type: 'tag', options: FILTER_TAGS },
+    dhcp_mismatch: { label: 'DHCP Mismatch', type: 'bool' },
+    last_dhcp:     { label: 'Last DHCP',     type: 'date' },
+    last_auth:     { label: 'Last Auth',     type: 'date' },
+};
+
+const TEXT_OPS = [
+    { value: 'contains',         label: 'contains',             wrap: v => `*${v}*` },
+    { value: 'not_contains',     label: 'does not contain',     wrap: v => `!*${v}*` },
+    { value: 'starts_with',      label: 'starts with',          wrap: v => `${v}*` },
+    { value: 'not_starts_with',  label: 'does not start with',  wrap: v => `!${v}*` },
+    { value: 'ends_with',        label: 'ends with',            wrap: v => `*${v}` },
+    { value: 'not_ends_with',    label: 'does not end with',    wrap: v => `!*${v}` },
+    { value: 'equals',           label: 'equals',               wrap: v => v },
+    { value: 'not_equals',       label: 'does not equal',       wrap: v => `!${v}` },
+];
+
+const SELECT_OPS = [
+    { value: 'is',     label: 'is',     wrap: v => v },
+    { value: 'is_not', label: 'is not', wrap: v => `!${v}` },
+];
+
+const DATE_OPS = [
+    { value: 'after',     label: 'after',     inputs: 1, wrap: v => `>${v[0]}` },
+    { value: 'before',    label: 'before',    inputs: 1, wrap: v => `<${v[0]}` },
+    { value: 'between',   label: 'between',   inputs: 2, wrap: v => `${v[0]}..${v[1]}` },
+    { value: 'never',     label: 'never',     inputs: 0, wrap: () => 'null' },
+    { value: 'has_value', label: 'has value', inputs: 0, wrap: () => '!null' },
+];
+
+const BOOL_OPS = [
+    { value: 'true',  label: 'is true'  },
+    { value: 'false', label: 'is false' },
+];
+
+// Tag field: "is/is not" show a dropdown; text ops show a free-text input.
+// Both serialise to a name string and match via LIKE in the repository.
+const TAG_OPS = [
+    { value: 'is',              label: 'is',                  inputType: 'select', wrap: v => `${v}` },
+    { value: 'is_not',          label: 'is not',              inputType: 'select', wrap: v => `!${v}` },
+    { value: 'contains',        label: 'contains',            inputType: 'text',   wrap: v => `*${v}*` },
+    { value: 'not_contains',    label: 'does not contain',    inputType: 'text',   wrap: v => `!*${v}*` },
+    { value: 'starts_with',     label: 'starts with',         inputType: 'text',   wrap: v => `${v}*` },
+    { value: 'not_starts_with', label: 'does not start with', inputType: 'text',   wrap: v => `!${v}*` },
+    { value: 'ends_with',       label: 'ends with',           inputType: 'text',   wrap: v => `*${v}` },
+    { value: 'not_ends_with',   label: 'does not end with',   inputType: 'text',   wrap: v => `!*${v}` },
+    { value: 'equals',          label: 'equals',              inputType: 'text',   wrap: v => `${v}` },
+    { value: 'not_equals',      label: 'does not equal',      inputType: 'text',   wrap: v => `!${v}` },
+];
+
+function getOps(type) {
+    if (type === 'text')   return TEXT_OPS;
+    if (type === 'select') return SELECT_OPS;
+    if (type === 'date')   return DATE_OPS;
+    if (type === 'tag')    return TAG_OPS;
+    if (type === 'bool')   return BOOL_OPS;
+    return [];
+}
+
+// Parse a rawValue back into {op, bareValues[]} for pre-filling the builder UI.
+function parseRawValue(type, raw) {
+    if (type === 'flag') return { op: 'is_set', bareValues: [] };
+    if (type === 'bool') return { op: raw === '!1' ? 'false' : 'true', bareValues: [] };
+    if (type === 'date') {
+        if (raw === 'null')  return { op: 'never',     bareValues: [] };
+        if (raw === '!null') return { op: 'has_value', bareValues: [] };
+        if (raw.startsWith('>')) return { op: 'after',  bareValues: [raw.slice(1)] };
+        if (raw.startsWith('<')) return { op: 'before', bareValues: [raw.slice(1)] };
+        if (raw.includes('..')) {
+            const [d1, d2] = raw.split('..', 2);
+            return { op: 'between', bareValues: [d1, d2] };
+        }
+        return { op: 'after', bareValues: [raw] };
+    }
+    if (type === 'select') {
+        if (raw.startsWith('!')) return { op: 'is_not', bareValues: [raw.slice(1)] };
+        return { op: 'is', bareValues: [raw] };
+    }
+    if (type === 'tag') {
+        const neg = raw.startsWith('!');
+        const v   = neg ? raw.slice(1) : raw;
+        const sw  = v.startsWith('*'), ew = v.endsWith('*');
+        if (sw && ew && v.length > 2) return { op: neg ? 'not_contains'    : 'contains',    bareValues: [v.slice(1, -1)] };
+        if (ew && !sw)                 return { op: neg ? 'not_starts_with' : 'starts_with', bareValues: [v.slice(0, -1)] };
+        if (sw && !ew)                 return { op: neg ? 'not_ends_with'   : 'ends_with',   bareValues: [v.slice(1)] };
+        // no wildcards: use dropdown if name matches a known tag, otherwise text equals
+        const knownTag = (FILTER_TAGS || []).some(t => String(t.name) === v);
+        if (knownTag) return { op: neg ? 'is_not' : 'is', bareValues: [v] };
+        return { op: neg ? 'not_equals' : 'equals', bareValues: [v] };
+    }
+    // text
+    const neg = raw.startsWith('!');
+    const v   = neg ? raw.slice(1) : raw;
+    const sw  = v.startsWith('*'), ew = v.endsWith('*');
+    if (sw && ew && v.length > 2) return { op: neg ? 'not_contains'    : 'contains',    bareValues: [v.slice(1, -1)] };
+    if (ew && !sw)                 return { op: neg ? 'not_starts_with' : 'starts_with', bareValues: [v.slice(0, -1)] };
+    if (sw && !ew)                 return { op: neg ? 'not_ends_with'   : 'ends_with',   bareValues: [v.slice(1)] };
+    return { op: neg ? 'not_equals' : 'equals', bareValues: [v] };
+}
+
+// Serialize builder rows back to the raw q-token value.
+function buildRawValue(fieldKey, opValue, bareValues) {
+    const def = FIELDS[fieldKey];
+    if (!def) return '';
+    if (def.type === 'flag') return '1';
+    if (def.type === 'bool') return opValue === 'false' ? '!1' : '1';
+    const ops = getOps(def.type);
+    const op  = ops.find(o => o.value === opValue);
+    return op ? op.wrap(bareValues) : '';
+}
+
+// ------- q-string parse/build -------
+
+function splitOrRespectingParens(str) {
+    const sep = ' OR ', parts = [];
+    let depth = 0, cur = '';
+    for (let i = 0; i < str.length; i++) {
+        if      (str[i] === '(') { depth++; cur += str[i]; }
+        else if (str[i] === ')') { depth--; cur += str[i]; }
+        else if (depth === 0 && str.startsWith(sep, i)) { parts.push(cur); cur = ''; i += sep.length - 1; }
+        else { cur += str[i]; }
+    }
+    if (cur) parts.push(cur);
+    return parts;
+}
+
+function parseQ(q) {
+    if (!q || !q.trim()) return [];
+    const groups = [];
+    for (let part of splitOrRespectingParens(q)) {
+        part = part.trim();
+        if (part.startsWith('(') && part.endsWith(')')) part = part.slice(1, -1).trim();
+        const conditions = [];
+        for (const token of part.split(' AND ')) {
+            const t = token.trim();
+            const m = t.match(/^([a-z_]+):(\"[^\"]*\"|[^\s]+)$/);
+            if (!m || !FIELDS[m[1]]) continue;
+            let raw = m[2];
+            if (raw.startsWith('"') && raw.endsWith('"')) raw = raw.slice(1, -1);
+            conditions.push({ field: m[1], rawValue: raw });
+        }
+        if (conditions.length) groups.push(conditions);
+    }
+    return groups;
+}
+
+function buildQ(groups) {
+    if (!groups.length) return '';
+    const strs = groups.map(g =>
+        g.map(c => {
+            const v = c.rawValue.includes(' ') ? `"${c.rawValue}"` : c.rawValue;
+            return `${c.field}:${v}`;
+        }).join(' AND ')
+    );
+    if (strs.length === 1) return strs[0];
+    return strs.map((s, i) => groups[i].length > 1 ? `(${s})` : s).join(' OR ');
+}
+
+// ------- DOM helpers -------
+
+function getBuilderGroups() {
+    const groups = [];
+    document.querySelectorAll('#filter-builder .filter-group').forEach(groupEl => {
+        const conditions = [];
+        groupEl.querySelectorAll('.filter-row').forEach(rowEl => {
+            const fieldKey = rowEl.querySelector('.field-sel').value;
+            const def = FIELDS[fieldKey];
+            if (!def) return;
+            let rawValue;
+            if (def.type === 'flag') {
+                rawValue = '1';
+            } else if (def.type === 'bool') {
+                const opValue = rowEl.querySelector('.op-sel').value;
+                rawValue = opValue === 'false' ? '!1' : '1';
+            } else if (def.type === 'date') {
+                const opValue = rowEl.querySelector('.op-sel').value;
+                const inputs  = Array.from(rowEl.querySelectorAll('.date-input')).map(i => i.value).filter(Boolean);
+                rawValue = buildRawValue(fieldKey, opValue, inputs);
+                if (!rawValue) return;
+            } else if (def.type === 'select') {
+                const opValue = rowEl.querySelector('.op-sel').value;
+                const sel     = rowEl.querySelector('.val-sel');
+                if (!sel || !sel.value) return;
+                rawValue = buildRawValue(fieldKey, opValue, [sel.value]);
+            } else if (def.type === 'tag') {
+                const opValue = rowEl.querySelector('.op-sel').value;
+                const tagOp   = TAG_OPS.find(o => o.value === opValue);
+                if (tagOp && tagOp.inputType === 'select') {
+                    const sel = rowEl.querySelector('.val-sel');
+                    if (!sel || !sel.value) return;
+                    rawValue = buildRawValue(fieldKey, opValue, [sel.value]);
+                } else {
+                    const inp = rowEl.querySelector('.val-input');
+                    if (!inp || !inp.value.trim()) return;
+                    rawValue = buildRawValue(fieldKey, opValue, [inp.value.trim()]);
+                }
+            } else {
+                const opValue = rowEl.querySelector('.op-sel').value;
+                const inp     = rowEl.querySelector('.val-input');
+                if (!inp || !inp.value.trim()) return;
+                rawValue = buildRawValue(fieldKey, opValue, [inp.value.trim()]);
+            }
+            conditions.push({ field: fieldKey, rawValue });
+        });
+        if (conditions.length) groups.push(conditions);
+    });
+    return groups;
+}
+
+function builderSearch() {
+    const q = buildQ(getBuilderGroups());
+    document.getElementById('q-input').value = q;
+    document.getElementById('simple-search-form').submit();
+}
+
+function updateGroupSeparators() {
+    document.querySelectorAll('#filter-builder .filter-group').forEach((g, i) => {
+        const sep = g.querySelector('.filter-or-sep');
+        if (sep) sep.style.display = i === 0 ? 'none' : '';
+    });
+}
+
+function updateRemoveButtons() {
+    const builder    = document.getElementById('filter-builder');
+    const groupCount = builder.querySelectorAll('.filter-group').length;
+    builder.querySelectorAll('.filter-group').forEach(groupEl => {
+        const btn = groupEl.querySelector('.remove-group-btn');
+        if (btn) btn.style.display = groupCount <= 1 ? 'none' : '';
+    });
+}
+
+function updateValueArea(rowEl, fieldKey, opValue, bareValues) {
+    const def = FIELDS[fieldKey];
+    const area = rowEl.querySelector('.value-area');
+    area.innerHTML = '';
+
+    if (def.type === 'flag' || def.type === 'bool') return;
+
+    if (def.type === 'select') {
+        const sel = document.createElement('select');
+        sel.className = 'form-select form-select-sm val-sel';
+        sel.style.maxWidth = '220px';
+        const ph = new Option('— Select —', '');
+        sel.appendChild(ph);
+        (def.options || []).forEach(opt => sel.appendChild(new Option(opt.name, opt.id)));
+        if (bareValues && bareValues[0]) sel.value = String(bareValues[0]);
+        area.appendChild(sel);
+        return;
+    }
+
+    if (def.type === 'tag') {
+        const tagOp = TAG_OPS.find(o => o.value === opValue);
+        if (tagOp && tagOp.inputType === 'select') {
+            const sel = document.createElement('select');
+            sel.className = 'form-select form-select-sm val-sel';
+            sel.style.maxWidth = '220px';
+            sel.appendChild(new Option('— Select —', ''));
+            (def.options || []).forEach(opt => sel.appendChild(new Option(opt.name, opt.name)));
+            if (bareValues && bareValues[0]) sel.value = String(bareValues[0]);
+            area.appendChild(sel);
+        } else {
+            const inp = document.createElement('input');
+            inp.type = 'text'; inp.className = 'form-control form-control-sm val-input'; inp.style.maxWidth = '220px';
+            if (bareValues && bareValues[0] !== undefined) inp.value = bareValues[0];
+            inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); builderSearch(); } });
+            area.appendChild(inp);
+        }
+        return;
+    }
+
+    if (def.type === 'date') {
+        const dateOp = DATE_OPS.find(o => o.value === opValue);
+        if (!dateOp || dateOp.inputs === 0) return;
+        const makeDate = (val) => {
+            const inp = document.createElement('input');
+            inp.type = 'date'; inp.className = 'form-control form-control-sm date-input'; inp.style.maxWidth = '160px';
+            if (val) inp.value = val;
+            return inp;
+        };
+        if (dateOp.inputs === 1) {
+            area.appendChild(makeDate(bareValues?.[0]));
+        } else {
+            area.appendChild(makeDate(bareValues?.[0]));
+            const lbl = document.createElement('span');
+            lbl.className = 'small text-muted align-self-center'; lbl.textContent = 'and';
+            area.appendChild(lbl);
+            area.appendChild(makeDate(bareValues?.[1]));
+        }
+        return;
+    }
+
+    // text
+    const inp = document.createElement('input');
+    inp.type = 'text'; inp.className = 'form-control form-control-sm val-input'; inp.style.maxWidth = '220px';
+    if (bareValues && bareValues[0] !== undefined) inp.value = bareValues[0];
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); builderSearch(); } });
+    area.appendChild(inp);
+}
+
+function updateRow(rowEl, fieldKey, rawValue) {
+    const def = FIELDS[fieldKey];
+    if (!def) return;
+    rowEl.querySelector('.field-sel').value = fieldKey;
+
+    const opSel = rowEl.querySelector('.op-sel');
+    opSel.innerHTML = '';
+    opSel.style.display = (def.type === 'flag') ? 'none' : '';
+
+    let parsedOp = null, parsedBare = [];
+    if (rawValue != null) {
+        const p = parseRawValue(def.type, rawValue);
+        parsedOp = p.op; parsedBare = p.bareValues;
+    }
+
+    const ops     = getOps(def.type);
+    const defOp   = def.type === 'date' ? 'after' : (def.type === 'select' || def.type === 'tag' ? 'is' : def.type === 'bool' ? 'true' : 'contains');
+    ops.forEach(o => opSel.appendChild(new Option(o.label, o.value)));
+    opSel.value = parsedOp || defOp;
+
+    updateValueArea(rowEl, fieldKey, opSel.value, parsedBare);
+}
+
+function addCondition(groupEl, fieldKey, rawValue) {
+    const conditionsEl = groupEl.querySelector('.filter-conditions');
+    const rowEl = document.createElement('div');
+    rowEl.className = 'filter-row d-flex gap-2 align-items-center mb-1 flex-wrap';
+
+    const fieldSel = document.createElement('select');
+    fieldSel.className = 'form-select form-select-sm field-sel';
+    fieldSel.style.maxWidth = '155px';
+    Object.entries(FIELDS).forEach(([k, d]) => {
+        fieldSel.appendChild(new Option(d.label, k, false, k === (fieldKey || 'name')));
+    });
+
+    const opSel = document.createElement('select');
+    opSel.className = 'form-select form-select-sm op-sel';
+    opSel.style.maxWidth = '185px';
+
+    const valueArea = document.createElement('div');
+    valueArea.className = 'value-area d-flex gap-1 align-items-center';
+    valueArea.style.minWidth = '160px';
+
+    const andLabel = document.createElement('span');
+    andLabel.className = 'and-label text-muted small fw-bold';
+    andLabel.style.cssText = 'min-width:2.2rem;display:inline-block';
+
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'btn btn-sm btn-outline-danger remove-row-btn py-0';
+    removeBtn.title = 'Remove condition';
+    removeBtn.innerHTML = '<i class="bi bi-x"></i>';
+    removeBtn.addEventListener('click', () => {
+        conditionsEl.removeChild(rowEl);
+        const builder = document.getElementById('filter-builder');
+        if (!conditionsEl.querySelector('.filter-row')) {
+            builder.removeChild(groupEl);
+            updateGroupSeparators();
+            if (!builder.querySelector('.filter-group')) addGroup([]);
+        } else {
+            updateAndLabels(groupEl);
+        }
+        updateRemoveButtons();
+    });
+
+    rowEl.appendChild(removeBtn);
+    rowEl.appendChild(andLabel);
+    rowEl.appendChild(fieldSel);
+    rowEl.appendChild(opSel);
+    rowEl.appendChild(valueArea);
+    conditionsEl.appendChild(rowEl);
+
+    updateRow(rowEl, fieldKey || 'name', rawValue != null ? rawValue : null);
+
+    fieldSel.addEventListener('change', () => updateRow(rowEl, fieldSel.value, null));
+    opSel.addEventListener('change',    () => updateValueArea(rowEl, fieldSel.value, opSel.value, null));
+    updateAndLabels(groupEl);
+    updateRemoveButtons();
+}
+
+function updateAndLabels(groupEl) {
+    groupEl.querySelectorAll('.filter-row').forEach((row, i) => {
+        const lbl = row.querySelector('.and-label');
+        if (lbl) lbl.textContent = i === 0 ? '' : 'AND';
+    });
+}
+
+function addGroup(conditions) {
+    const builder  = document.getElementById('filter-builder');
+    const isFirst  = !builder.querySelector('.filter-group');
+    const groupEl  = document.createElement('div');
+    groupEl.className = 'filter-group mb-2';
+
+    const sep = document.createElement('div');
+    sep.className = 'text-muted small fw-bold my-1 filter-or-sep';
+    sep.textContent = 'OR';
+    sep.style.display = isFirst ? 'none' : '';
+
+    const card = document.createElement('div');
+    card.className = 'card';
+    const cardBody = document.createElement('div');
+    cardBody.className = 'card-body py-2 px-3';
+
+    const conditionsEl = document.createElement('div');
+    conditionsEl.className = 'filter-conditions';
+
+    const footer = document.createElement('div');
+    footer.className = 'd-flex align-items-center justify-content-between mt-1';
+
+    const addCondBtn = document.createElement('button');
+    addCondBtn.type = 'button';
+    addCondBtn.className = 'btn btn-link btn-sm p-0 text-secondary';
+    addCondBtn.innerHTML = '<i class="bi bi-plus-circle me-1"></i>Add condition';
+    addCondBtn.addEventListener('click', () => addCondition(groupEl));
+
+    const removeGroupBtn = document.createElement('button');
+    removeGroupBtn.type = 'button';
+    removeGroupBtn.className = 'btn btn-sm btn-link text-danger p-0 remove-group-btn';
+    removeGroupBtn.innerHTML = '<i class="bi bi-x-circle me-1"></i>Remove group';
+    removeGroupBtn.addEventListener('click', () => {
+        builder.removeChild(groupEl);
+        updateGroupSeparators();
+        updateRemoveButtons();
+    });
+
+    footer.appendChild(addCondBtn);
+    footer.appendChild(removeGroupBtn);
+
+    cardBody.appendChild(conditionsEl);
+    cardBody.appendChild(footer);
+    card.appendChild(cardBody);
+    groupEl.appendChild(sep);
+    groupEl.appendChild(card);
+    builder.appendChild(groupEl);
+
+    if (conditions && conditions.length) {
+        conditions.forEach(c => addCondition(groupEl, c.field, c.rawValue));
+    } else {
+        addCondition(groupEl);
+    }
+
+    updateRemoveButtons();
+}
+
+function initBuilder() {
+    const qInput = document.getElementById('q-input');
+    if (!qInput) return;
+    const groups = parseQ(qInput.value);
+    if (groups.length) {
+        groups.forEach(g => addGroup(g));
+    } else {
+        addGroup([]);
+    }
+}
+
+document.getElementById('add-group-btn').addEventListener('click', () => addGroup([]));
+initBuilder();
+</script>
 <script>
 // --- Tree expand/collapse (persisted in localStorage; default: expanded) ---
 const collapsedHosts = new Set(

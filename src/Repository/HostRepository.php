@@ -111,6 +111,17 @@ class HostRepository extends ServiceEntityRepository
         return ['hosts' => $this->fetchByIds($data['ids']), 'total' => $data['total']];
     }
 
+    /** @return array{hosts: Host[], total: int} */
+    public function structuredSearchPaginated(array $orGroups, int $page, int $perPage): array
+    {
+        $key  = 'host_structured_' . md5(serialize($orGroups) . '|' . $page . '|' . $perPage);
+        $data = $this->cache->get($key, function (ItemInterface $item) use ($orGroups, $page, $perPage) {
+            $item->expiresAfter(60);
+            return $this->paginateFilterQuery($this->buildStructuredQb($orGroups), $page, $perPage);
+        });
+        return ['hosts' => $this->fetchByIds($data['ids']), 'total' => $data['total']];
+    }
+
     // -------------------------------------------------------------------------
     // Private query builders
     // -------------------------------------------------------------------------
@@ -317,6 +328,168 @@ class HostRepository extends ServiceEntityRepository
         }
 
         return $qb;
+    }
+
+    private function buildStructuredQb(array $orGroups): QueryBuilder
+    {
+        $qb = $this->createQueryBuilder('h')->where('h.deletedAt IS NULL');
+        if (empty($orGroups)) {
+            return $qb;
+        }
+
+        $orX = $qb->expr()->orX();
+        $n   = 0;
+
+        foreach ($orGroups as $conditions) {
+            $andX = $qb->expr()->andX();
+            foreach ($conditions as [$field, $value, $negate]) {
+                $dql = $this->structuredConditionDql($field, (string) $value, (bool) $negate, $n, $qb);
+                if ($dql !== null) {
+                    $andX->add($dql);
+                }
+                $n++;
+            }
+            if ($andX->count() > 0) {
+                $orX->add($andX);
+            }
+        }
+
+        if ($orX->count() > 0) {
+            $qb->andWhere($orX);
+        }
+
+        return $qb;
+    }
+
+    private function structuredConditionDql(string $field, string $value, bool $negate, int $n, QueryBuilder $qb): ?string
+    {
+        if ($value === '' && !in_array($field, ['dhcp_mismatch', 'last_dhcp', 'last_auth'], true)) {
+            return null;
+        }
+
+        $not = $negate ? 'NOT ' : '';
+
+        switch ($field) {
+            case 'name':
+                $qb->setParameter("sp_$n", $this->toLike($value));
+                return "{$not}(h.name LIKE :sp_{$n})";
+
+            case 'room':
+                $qb->setParameter("sp_$n", $this->toLike($value));
+                return "{$not}(h.room LIKE :sp_{$n})";
+
+            case 'building':
+                $qb->setParameter("sp_$n", (int) $value);
+                return "{$not}(h.building = :sp_{$n})";
+
+            case 'subnet':
+                if ($value === 'none') {
+                    return "{$not}EXISTS (SELECT 1 FROM App\Entity\NetworkInterface i{$n} WHERE i{$n}.host = h AND i{$n}.subnet IS NULL)";
+                }
+                $qb->setParameter("sp_$n", (int) $value);
+                return "{$not}EXISTS (SELECT 1 FROM App\Entity\NetworkInterface i{$n} WHERE i{$n}.host = h AND i{$n}.subnet = :sp_{$n})";
+
+            case 'ip':
+                $qb->setParameter("sp_$n", $this->toLike($value));
+                return <<<DQL
+                    {$not}EXISTS (
+                        SELECT 1 FROM App\Entity\NetworkInterface i{$n}
+                        LEFT JOIN i{$n}.ipAddress ip4{$n}
+                        LEFT JOIN i{$n}.ipv6Address ip6{$n}
+                        WHERE i{$n}.host = h AND (
+                            ip4{$n}.address LIKE :sp_{$n}
+                            OR ip6{$n}.address LIKE :sp_{$n}
+                            OR EXISTS (
+                                SELECT 1 FROM App\Entity\DhcpLease dl{$n}
+                                WHERE dl{$n}.macAddress = i{$n}.macAddress AND dl{$n}.ipAddress LIKE :sp_{$n}
+                            )
+                        )
+                    )
+                    DQL;
+
+            case 'mac':
+                $qb->setParameter("sp_$n", $this->toLike($value));
+                return "{$not}EXISTS (SELECT 1 FROM App\Entity\NetworkInterface i{$n} WHERE i{$n}.host = h AND i{$n}.macAddress LIKE :sp_{$n})";
+
+            case 'tag':
+                $qb->setParameter("sp_$n", $this->toLike($value));
+                return "{$not}EXISTS (SELECT 1 FROM App\Entity\Host h{$n} JOIN h{$n}.tags tg{$n} WHERE h{$n} = h AND tg{$n}.name LIKE :sp_{$n})";
+
+            case 'dns':
+                $qb->setParameter("sp_$n", $this->toLike($value));
+                return <<<DQL
+                    {$not}EXISTS (
+                        SELECT 1 FROM App\Entity\NetworkInterface i{$n}
+                        LEFT JOIN i{$n}.domainRecords nr{$n}
+                        LEFT JOIN nr{$n}.domain nd{$n}
+                        WHERE i{$n}.host = h AND (
+                            nr{$n}.hostname LIKE :sp_{$n}
+                            OR nd{$n}.name LIKE :sp_{$n}
+                            OR CONCAT(nr{$n}.hostname, '.', nd{$n}.name) LIKE :sp_{$n}
+                        )
+                    )
+                    DQL;
+
+            case 'dhcp_mismatch':
+                $ids = $this->findDhcpMismatchHostIds();
+                if (empty($ids)) {
+                    return $negate ? null : '1 = 0';
+                }
+                $qb->setParameter("sp_{$n}_ids", $ids);
+                return $negate ? "h.id NOT IN (:sp_{$n}_ids)" : "h.id IN (:sp_{$n}_ids)";
+
+            case 'last_dhcp':
+                return $this->dateConditionDql('lastDhcpAt', $value, $negate, $n, $qb);
+
+            case 'last_auth':
+                return $this->dateConditionDql('lastAuthAt', $value, $negate, $n, $qb);
+        }
+
+        return null;
+    }
+
+    private function dateConditionDql(string $column, string $value, bool $negate, int $n, QueryBuilder $qb): ?string
+    {
+        if ($value === 'null') {
+            if ($negate) {
+                return "EXISTS (SELECT 1 FROM App\Entity\NetworkInterface i{$n} WHERE i{$n}.host = h AND i{$n}.{$column} IS NOT NULL)";
+            }
+            return "NOT EXISTS (SELECT 1 FROM App\Entity\NetworkInterface i{$n} WHERE i{$n}.host = h AND i{$n}.{$column} IS NOT NULL)";
+        }
+
+        $not = $negate ? 'NOT ' : '';
+
+        if (str_contains($value, '..')) {
+            [$d1, $d2] = explode('..', $value, 2);
+            $date1 = \DateTimeImmutable::createFromFormat('Y-m-d', trim($d1));
+            $date2 = \DateTimeImmutable::createFromFormat('Y-m-d', trim($d2));
+            if (!$date1 || !$date2) {
+                return null;
+            }
+            $qb->setParameter("sp_{$n}_d1", $date1);
+            $qb->setParameter("sp_{$n}_d2", $date2->setTime(23, 59, 59));
+            return "{$not}EXISTS (SELECT 1 FROM App\Entity\NetworkInterface i{$n} WHERE i{$n}.host = h AND i{$n}.{$column} BETWEEN :sp_{$n}_d1 AND :sp_{$n}_d2)";
+        }
+
+        if (str_starts_with($value, '>')) {
+            $date = \DateTimeImmutable::createFromFormat('Y-m-d', substr($value, 1));
+            if (!$date) {
+                return null;
+            }
+            $qb->setParameter("sp_$n", $date);
+            return "{$not}EXISTS (SELECT 1 FROM App\Entity\NetworkInterface i{$n} WHERE i{$n}.host = h AND i{$n}.{$column} > :sp_{$n})";
+        }
+
+        if (str_starts_with($value, '<')) {
+            $date = \DateTimeImmutable::createFromFormat('Y-m-d', substr($value, 1));
+            if (!$date) {
+                return null;
+            }
+            $qb->setParameter("sp_$n", $date);
+            return "{$not}EXISTS (SELECT 1 FROM App\Entity\NetworkInterface i{$n} WHERE i{$n}.host = h AND i{$n}.{$column} < :sp_{$n})";
+        }
+
+        return null;
     }
 
     private function findDhcpMismatchHostIds(): array
