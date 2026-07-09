@@ -892,7 +892,7 @@ function updateRow(rowEl, fieldKey, rawValue) {
 function addCondition(groupEl, fieldKey, rawValue) {
     const conditionsEl = groupEl.querySelector('.filter-conditions');
     const rowEl = document.createElement('div');
-    rowEl.className = 'filter-row d-flex gap-2 align-items-start mb-1 flex-wrap';
+    rowEl.className = 'filter-row d-flex gap-2 align-items-center mb-1 flex-wrap';
 
     const fieldSel = document.createElement('select');
     fieldSel.className = 'form-select form-select-sm field-sel';
