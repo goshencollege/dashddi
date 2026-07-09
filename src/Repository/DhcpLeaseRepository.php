@@ -3,6 +3,7 @@
 namespace App\Repository;
 
 use App\Entity\DhcpLease;
+use App\Entity\DhcpServer;
 use App\Entity\Subnet;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\ORM\Tools\Pagination\Paginator;
@@ -15,11 +16,13 @@ class DhcpLeaseRepository extends ServiceEntityRepository
         parent::__construct($registry, DhcpLease::class);
     }
 
-    public function search(string $mac, string $ip, ?Subnet $subnet, int $page, int $perPage = 50): Paginator
+    public function search(string $mac, string $ip, ?Subnet $subnet, ?DhcpServer $server, int $page, int $perPage = 50): Paginator
     {
         $qb = $this->createQueryBuilder('l')
             ->leftJoin('l.subnet', 's')
             ->addSelect('s')
+            ->leftJoin('l.dhcpServer', 'srv')
+            ->addSelect('srv')
             ->orderBy('l.leaseStart', 'DESC');
 
         if ($mac !== '') {
@@ -33,6 +36,10 @@ class DhcpLeaseRepository extends ServiceEntityRepository
         if ($subnet !== null) {
             $qb->andWhere('l.subnet = :subnet')
                ->setParameter('subnet', $subnet);
+        }
+        if ($server !== null) {
+            $qb->andWhere('l.dhcpServer = :server')
+               ->setParameter('server', $server);
         }
 
         $qb->setFirstResult(($page - 1) * $perPage)
@@ -77,6 +84,7 @@ class DhcpLeaseRepository extends ServiceEntityRepository
     {
         return $this->createQueryBuilder('l')
             ->leftJoin('l.subnet', 's')->addSelect('s')
+            ->leftJoin('l.dhcpServer', 'srv')->addSelect('srv')
             ->where('l.macAddress = :mac')
             ->setParameter('mac', strtolower($mac))
             ->orderBy('l.leaseStart', 'DESC')

@@ -33,6 +33,19 @@
                     {% endfor %}
                 </select>
             </div>
+            {% if servers|length > 1 %}
+            <div class="col-md-auto">
+                <label class="form-label small text-muted mb-1">DHCP Server</label>
+                <select name="server" class="form-select form-select-sm">
+                    <option value="">— All servers —</option>
+                    {% for srv in servers %}
+                        <option value="{{ srv.id }}" {{ filter_server == srv.id ? 'selected' : '' }}>
+                            {{ srv.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
             <div class="col-md-auto">
                 <button type="submit" class="btn btn-sm btn-primary">
                     <i class="bi bi-search me-1"></i>Search
@@ -61,6 +74,7 @@
                         <th>Hostname</th>
                         <th>Lease Start</th>
                         <th>Expires</th>
+                        {% if servers|length > 1 %}<th>Server</th>{% endif %}
                     </tr>
                 </thead>
                 <tbody>
@@ -91,6 +105,15 @@
                                     —
                                 {% endif %}
                             </td>
+                            {% if servers|length > 1 %}
+                            <td>
+                                {% if lease.dhcpServer %}
+                                    <span class="text-nowrap">{{ lease.dhcpServer.name }}</span>
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                            {% endif %}
                         </tr>
                     {% endfor %}
                 </tbody>
@@ -102,13 +125,13 @@
                 <span class="text-muted small">Page {{ page }} of {{ (total / per_page)|round(0, 'ceil') }}</span>
                 <div>
                     {% if page > 1 %}
-                        <a href="{{ path('dhcp_lease_index', {mac: filter_mac, ip: filter_ip, subnet: filter_subnet, page: page - 1}) }}"
+                        <a href="{{ path('dhcp_lease_index', {mac: filter_mac, ip: filter_ip, subnet: filter_subnet, server: filter_server, page: page - 1}) }}"
                            class="btn btn-sm btn-outline-secondary me-1">
                             <i class="bi bi-chevron-left"></i> Prev
                         </a>
                     {% endif %}
                     {% if page * per_page < total %}
-                        <a href="{{ path('dhcp_lease_index', {mac: filter_mac, ip: filter_ip, subnet: filter_subnet, page: page + 1}) }}"
+                        <a href="{{ path('dhcp_lease_index', {mac: filter_mac, ip: filter_ip, subnet: filter_subnet, server: filter_server, page: page + 1}) }}"
                            class="btn btn-sm btn-outline-secondary">
                             Next <i class="bi bi-chevron-right"></i>
                         </a>
