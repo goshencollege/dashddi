@@ -52,7 +52,7 @@ class DhcpConfigGenerator
                     'ip-address' => $iface->getIpAddress()->getAddress(),
                 ];
                 if ($hostname = $iface->getPrimaryName()) {
-                    $res['hostname'] = $hostname;
+                    $res['hostname'] = rtrim($hostname, '.') . '.';
                 }
                 $reservations[] = $res;
             }
@@ -107,7 +107,7 @@ class DhcpConfigGenerator
                     'ip-addresses' => [$iface->getIpv6Address()->getAddress()],
                 ];
                 if ($hostname = $iface->getPrimaryName()) {
-                    $res['hostname'] = $hostname;
+                    $res['hostname'] = rtrim($hostname, '.') . '.';
                 }
                 $reservations[] = $res;
             }
