@@ -85,10 +85,12 @@ class EntityPushListener
                 return;
             }
 
-            // Activity-timestamp updates don't affect DNS, DHCP, or ClearPass config.
+            // These fields don't affect DNS, DHCP, or ClearPass config:
+            // - activity timestamps written by background jobs
+            // - switchIp/switchPort used only for switch management UI
             // AuditListener also stamps updatedAt/updatedBy on every preUpdate, so
             // exclude those audit fields before checking whether anything real changed.
-            $ignoredFields = ['lastAuthAt', 'lastDhcpAt', 'lastDhcpIp', 'updatedAt', 'updatedBy'];
+            $ignoredFields = ['lastAuthAt', 'lastDhcpAt', 'lastDhcpIp', 'switchIp', 'switchPort', 'updatedAt', 'updatedBy'];
             if (!empty($changeset) && empty(array_diff(array_keys($changeset), $ignoredFields))) {
                 return;
             }
