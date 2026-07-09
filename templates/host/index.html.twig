@@ -578,7 +578,7 @@ const FIELDS = {
     ip:            { label: 'IP Address',    type: 'text' },
     mac:           { label: 'MAC Address',   type: 'text' },
     dns:           { label: 'DNS Name',      type: 'text' },
-    tag:           { label: 'Tag',           type: 'select', options: FILTER_TAGS },
+    tag:           { label: 'Tag',           type: 'tag', options: FILTER_TAGS },
     dhcp_mismatch: { label: 'DHCP Mismatch', type: 'flag' },
     last_dhcp:     { label: 'Last DHCP',     type: 'date' },
     last_auth:     { label: 'Last Auth',     type: 'date' },
@@ -608,10 +608,26 @@ const DATE_OPS = [
     { value: 'has_value', label: 'has value', inputs: 0, wrap: () => '!null' },
 ];
 
+// Tag field: "is/is not" show a dropdown; text ops show a free-text input.
+// Both serialise to a name string and match via LIKE in the repository.
+const TAG_OPS = [
+    { value: 'is',              label: 'is',                  inputType: 'select', wrap: v => `${v}` },
+    { value: 'is_not',          label: 'is not',              inputType: 'select', wrap: v => `!${v}` },
+    { value: 'contains',        label: 'contains',            inputType: 'text',   wrap: v => `*${v}*` },
+    { value: 'not_contains',    label: 'does not contain',    inputType: 'text',   wrap: v => `!*${v}*` },
+    { value: 'starts_with',     label: 'starts with',         inputType: 'text',   wrap: v => `${v}*` },
+    { value: 'not_starts_with', label: 'does not start with', inputType: 'text',   wrap: v => `!${v}*` },
+    { value: 'ends_with',       label: 'ends with',           inputType: 'text',   wrap: v => `*${v}` },
+    { value: 'not_ends_with',   label: 'does not end with',   inputType: 'text',   wrap: v => `!*${v}` },
+    { value: 'equals',          label: 'equals',              inputType: 'text',   wrap: v => `${v}` },
+    { value: 'not_equals',      label: 'does not equal',      inputType: 'text',   wrap: v => `!${v}` },
+];
+
 function getOps(type) {
     if (type === 'text')   return TEXT_OPS;
     if (type === 'select') return SELECT_OPS;
     if (type === 'date')   return DATE_OPS;
+    if (type === 'tag')    return TAG_OPS;
     return [];
 }
 
@@ -632,6 +648,18 @@ function parseRawValue(type, raw) {
     if (type === 'select') {
         if (raw.startsWith('!')) return { op: 'is_not', bareValues: [raw.slice(1)] };
         return { op: 'is', bareValues: [raw] };
+    }
+    if (type === 'tag') {
+        const neg = raw.startsWith('!');
+        const v   = neg ? raw.slice(1) : raw;
+        const sw  = v.startsWith('*'), ew = v.endsWith('*');
+        if (sw && ew && v.length > 2) return { op: neg ? 'not_contains'    : 'contains',    bareValues: [v.slice(1, -1)] };
+        if (ew && !sw)                 return { op: neg ? 'not_starts_with' : 'starts_with', bareValues: [v.slice(0, -1)] };
+        if (sw && !ew)                 return { op: neg ? 'not_ends_with'   : 'ends_with',   bareValues: [v.slice(1)] };
+        // no wildcards: use dropdown if name matches a known tag, otherwise text equals
+        const knownTag = (FILTER_TAGS || []).some(t => String(t.name) === v);
+        if (knownTag) return { op: neg ? 'is_not' : 'is', bareValues: [v] };
+        return { op: neg ? 'not_equals' : 'equals', bareValues: [v] };
     }
     // text
     const neg = raw.startsWith('!');
@@ -723,6 +751,18 @@ function getBuilderGroups() {
                 const sel     = rowEl.querySelector('.val-sel');
                 if (!sel || !sel.value) return;
                 rawValue = buildRawValue(fieldKey, opValue, [sel.value]);
+            } else if (def.type === 'tag') {
+                const opValue = rowEl.querySelector('.op-sel').value;
+                const tagOp   = TAG_OPS.find(o => o.value === opValue);
+                if (tagOp && tagOp.inputType === 'select') {
+                    const sel = rowEl.querySelector('.val-sel');
+                    if (!sel || !sel.value) return;
+                    rawValue = buildRawValue(fieldKey, opValue, [sel.value]);
+                } else {
+                    const inp = rowEl.querySelector('.val-input');
+                    if (!inp || !inp.value.trim()) return;
+                    rawValue = buildRawValue(fieldKey, opValue, [inp.value.trim()]);
+                }
             } else {
                 const opValue = rowEl.querySelector('.op-sel').value;
                 const inp     = rowEl.querySelector('.val-input');
@@ -777,6 +817,26 @@ function updateValueArea(rowEl, fieldKey, opValue, bareValues) {
         return;
     }
 
+    if (def.type === 'tag') {
+        const tagOp = TAG_OPS.find(o => o.value === opValue);
+        if (tagOp && tagOp.inputType === 'select') {
+            const sel = document.createElement('select');
+            sel.className = 'form-select form-select-sm val-sel';
+            sel.style.maxWidth = '220px';
+            sel.appendChild(new Option('— Select —', ''));
+            (def.options || []).forEach(opt => sel.appendChild(new Option(opt.name, opt.name)));
+            if (bareValues && bareValues[0]) sel.value = String(bareValues[0]);
+            area.appendChild(sel);
+        } else {
+            const inp = document.createElement('input');
+            inp.type = 'text'; inp.className = 'form-control form-control-sm val-input'; inp.style.maxWidth = '220px';
+            if (bareValues && bareValues[0] !== undefined) inp.value = bareValues[0];
+            inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); builderSearch(); } });
+            area.appendChild(inp);
+        }
+        return;
+    }
+
     if (def.type === 'date') {
         const dateOp = DATE_OPS.find(o => o.value === opValue);
         if (!dateOp || dateOp.inputs === 0) return;
@@ -822,7 +882,7 @@ function updateRow(rowEl, fieldKey, rawValue) {
     }
 
     const ops     = getOps(def.type);
-    const defOp   = def.type === 'date' ? 'after' : (def.type === 'select' ? 'is' : 'contains');
+    const defOp   = def.type === 'date' ? 'after' : (def.type === 'select' || def.type === 'tag' ? 'is' : 'contains');
     ops.forEach(o => opSel.appendChild(new Option(o.label, o.value)));
     opSel.value = parsedOp || defOp;
 

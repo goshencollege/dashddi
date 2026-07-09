@@ -412,8 +412,8 @@ class HostRepository extends ServiceEntityRepository
                 return "{$not}EXISTS (SELECT 1 FROM App\Entity\NetworkInterface i{$n} WHERE i{$n}.host = h AND i{$n}.macAddress LIKE :sp_{$n})";
 
             case 'tag':
-                $qb->setParameter("sp_$n", (int) $value);
-                return "{$not}EXISTS (SELECT 1 FROM App\Entity\Host h{$n} JOIN h{$n}.tags tg{$n} WHERE h{$n} = h AND tg{$n}.id = :sp_{$n})";
+                $qb->setParameter("sp_$n", $this->toLike($value));
+                return "{$not}EXISTS (SELECT 1 FROM App\Entity\Host h{$n} JOIN h{$n}.tags tg{$n} WHERE h{$n} = h AND tg{$n}.name LIKE :sp_{$n})";
 
             case 'dns':
                 $qb->setParameter("sp_$n", $this->toLike($value));
