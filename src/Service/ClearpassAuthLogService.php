@@ -131,6 +131,8 @@ class ClearpassAuthLogService
 
                     if ($iface !== null && ($iface->getLastAuthAt() === null || $authTs > $iface->getLastAuthAt())) {
                         $iface->setLastAuthAt($authTs);
+                        $iface->setSwitchIp($log->getNasIp());
+                        $iface->setSwitchPort($log->getNasPortId());
                     }
 
                     $this->em->persist($log);

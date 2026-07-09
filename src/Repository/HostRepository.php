@@ -443,6 +443,14 @@ class HostRepository extends ServiceEntityRepository
 
             case 'last_auth':
                 return $this->dateConditionDql('lastAuthAt', $value, $negate, $n, $qb);
+
+            case 'switch_ip':
+                $qb->setParameter("sp_$n", $this->toLike($value));
+                return "{$not}EXISTS (SELECT 1 FROM App\Entity\NetworkInterface i{$n} WHERE i{$n}.host = h AND i{$n}.switchIp LIKE :sp_{$n})";
+
+            case 'switch_port':
+                $qb->setParameter("sp_$n", $this->toLike($value));
+                return "{$not}EXISTS (SELECT 1 FROM App\Entity\NetworkInterface i{$n} WHERE i{$n}.host = h AND i{$n}.switchPort LIKE :sp_{$n})";
         }
 
         return null;
