@@ -408,7 +408,7 @@ class HostRepository extends ServiceEntityRepository
                     DQL;
 
             case 'mac':
-                $qb->setParameter("sp_$n", $this->toLike($value));
+                $qb->setParameter("sp_$n", $this->normalizeMacLike($value));
                 return "{$not}EXISTS (SELECT 1 FROM App\Entity\NetworkInterface i{$n} WHERE i{$n}.host = h AND i{$n}.macAddress LIKE :sp_{$n})";
 
             case 'tag':
@@ -607,6 +607,40 @@ class HostRepository extends ServiceEntityRepository
         }
 
         return count($entities);
+    }
+
+    /**
+     * Normalise a user-supplied MAC search value to a LIKE pattern that matches
+     * the stored aa:bb:cc:dd:ee:ff format.  Delimiters (colons, dashes, dots,
+     * spaces) are stripped from each segment; remaining hex digits are re-paired
+     * with colons.  A bare 12-hex-digit string produces an exact pattern; any
+     * shorter input produces a substring pattern (%...%); explicit * wildcards
+     * are preserved and converted to % exactly as toLike() does for other fields.
+     */
+    private function normalizeMacLike(string $value): string
+    {
+        $hasStar = str_contains($value, '*');
+        $parts   = explode('*', $value);
+
+        $normalized = array_map(static function (string $part): string {
+            $hex = preg_replace('/[^0-9a-fA-F]/', '', $part);
+            if ($hex === '') {
+                return '';
+            }
+            return implode(':', str_split(strtolower($hex), 2));
+        }, $parts);
+
+        if ($hasStar) {
+            return implode('%', $normalized);
+        }
+
+        // No wildcard: full 12-hex-digit MAC → exact match; partial → substring.
+        $totalHex = preg_replace('/[^0-9a-fA-F]/', '', $value);
+        if (strlen($totalHex) === 12) {
+            return $normalized[0];
+        }
+
+        return '%' . $normalized[0] . '%';
     }
 
     private function toLike(string $value): string

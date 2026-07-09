@@ -900,6 +900,16 @@ function updateRow(rowEl, fieldKey, rawValue) {
     updateValueArea(rowEl, fieldKey, opSel.value, parsedBare);
 }
 
+function readCurrentBareValues(rowEl) {
+    const dates = Array.from(rowEl.querySelectorAll('.date-input')).map(i => i.value);
+    if (dates.length) return dates;
+    const sel = rowEl.querySelector('.val-sel');
+    if (sel) return [sel.value];
+    const inp = rowEl.querySelector('.val-input');
+    if (inp) return [inp.value];
+    return [];
+}
+
 function addCondition(groupEl, fieldKey, rawValue) {
     const conditionsEl = groupEl.querySelector('.filter-conditions');
     const rowEl = document.createElement('div');
@@ -952,7 +962,10 @@ function addCondition(groupEl, fieldKey, rawValue) {
     updateRow(rowEl, fieldKey || 'name', rawValue != null ? rawValue : null);
 
     fieldSel.addEventListener('change', () => updateRow(rowEl, fieldSel.value, null));
-    opSel.addEventListener('change',    () => updateValueArea(rowEl, fieldSel.value, opSel.value, null));
+    opSel.addEventListener('change', () => {
+        const bare = readCurrentBareValues(rowEl);
+        updateValueArea(rowEl, fieldSel.value, opSel.value, bare);
+    });
     updateAndLabels(groupEl);
     updateRemoveButtons();
 }
