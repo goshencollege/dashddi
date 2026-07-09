@@ -579,7 +579,7 @@ const FIELDS = {
     mac:           { label: 'MAC Address',   type: 'text' },
     dns:           { label: 'DNS Name',      type: 'text' },
     tag:           { label: 'Tag',           type: 'tag', options: FILTER_TAGS },
-    dhcp_mismatch: { label: 'DHCP Mismatch', type: 'flag' },
+    dhcp_mismatch: { label: 'DHCP Mismatch', type: 'bool' },
     last_dhcp:     { label: 'Last DHCP',     type: 'date' },
     last_auth:     { label: 'Last Auth',     type: 'date' },
 };
@@ -608,6 +608,11 @@ const DATE_OPS = [
     { value: 'has_value', label: 'has value', inputs: 0, wrap: () => '!null' },
 ];
 
+const BOOL_OPS = [
+    { value: 'true',  label: 'is true'  },
+    { value: 'false', label: 'is false' },
+];
+
 // Tag field: "is/is not" show a dropdown; text ops show a free-text input.
 // Both serialise to a name string and match via LIKE in the repository.
 const TAG_OPS = [
@@ -628,12 +633,14 @@ function getOps(type) {
     if (type === 'select') return SELECT_OPS;
     if (type === 'date')   return DATE_OPS;
     if (type === 'tag')    return TAG_OPS;
+    if (type === 'bool')   return BOOL_OPS;
     return [];
 }
 
 // Parse a rawValue back into {op, bareValues[]} for pre-filling the builder UI.
 function parseRawValue(type, raw) {
     if (type === 'flag') return { op: 'is_set', bareValues: [] };
+    if (type === 'bool') return { op: raw === '!1' ? 'false' : 'true', bareValues: [] };
     if (type === 'date') {
         if (raw === 'null')  return { op: 'never',     bareValues: [] };
         if (raw === '!null') return { op: 'has_value', bareValues: [] };
@@ -676,6 +683,7 @@ function buildRawValue(fieldKey, opValue, bareValues) {
     const def = FIELDS[fieldKey];
     if (!def) return '';
     if (def.type === 'flag') return '1';
+    if (def.type === 'bool') return opValue === 'false' ? '!1' : '1';
     const ops = getOps(def.type);
     const op  = ops.find(o => o.value === opValue);
     return op ? op.wrap(bareValues) : '';
@@ -741,6 +749,9 @@ function getBuilderGroups() {
             let rawValue;
             if (def.type === 'flag') {
                 rawValue = '1';
+            } else if (def.type === 'bool') {
+                const opValue = rowEl.querySelector('.op-sel').value;
+                rawValue = opValue === 'false' ? '!1' : '1';
             } else if (def.type === 'date') {
                 const opValue = rowEl.querySelector('.op-sel').value;
                 const inputs  = Array.from(rowEl.querySelectorAll('.date-input')).map(i => i.value).filter(Boolean);
@@ -803,7 +814,7 @@ function updateValueArea(rowEl, fieldKey, opValue, bareValues) {
     const area = rowEl.querySelector('.value-area');
     area.innerHTML = '';
 
-    if (def.type === 'flag') return;
+    if (def.type === 'flag' || def.type === 'bool') return;
 
     if (def.type === 'select') {
         const sel = document.createElement('select');
@@ -873,7 +884,7 @@ function updateRow(rowEl, fieldKey, rawValue) {
 
     const opSel = rowEl.querySelector('.op-sel');
     opSel.innerHTML = '';
-    opSel.style.display = def.type === 'flag' ? 'none' : '';
+    opSel.style.display = (def.type === 'flag') ? 'none' : '';
 
     let parsedOp = null, parsedBare = [];
     if (rawValue != null) {
@@ -882,7 +893,7 @@ function updateRow(rowEl, fieldKey, rawValue) {
     }
 
     const ops     = getOps(def.type);
-    const defOp   = def.type === 'date' ? 'after' : (def.type === 'select' || def.type === 'tag' ? 'is' : 'contains');
+    const defOp   = def.type === 'date' ? 'after' : (def.type === 'select' || def.type === 'tag' ? 'is' : def.type === 'bool' ? 'true' : 'contains');
     ops.forEach(o => opSel.appendChild(new Option(o.label, o.value)));
     opSel.value = parsedOp || defOp;
 
