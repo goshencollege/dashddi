@@ -329,6 +329,7 @@
                                 {% endif %}
                                 {{ event.entity.hostname ?: '—' }}
                                 {% if event.entity.leaseExpires %} · expires {{ event.entity.leaseExpires|date('Y-m-d H:i') }}{% endif %}
+                                {% if event.entity.dhcpServer %} · <span class="text-muted">{{ event.entity.dhcpServer.name }}</span>{% endif %}
                             {% endif %}
                         </td>
                     </tr>

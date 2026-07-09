@@ -10,6 +10,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Index(columns: ['mac_address'], name: 'idx_dhcp_lease_mac')]
 #[ORM\Index(columns: ['ip_address'], name: 'idx_dhcp_lease_ip')]
 #[ORM\Index(columns: ['subnet_id'],  name: 'idx_dhcp_lease_subnet_id')]
+#[ORM\Index(columns: ['dhcp_server_id'], name: 'idx_dhcp_lease_server_id')]
 class DhcpLease
 {
     #[ORM\Id]
@@ -26,6 +27,10 @@ class DhcpLease
     #[ORM\ManyToOne(targetEntity: Subnet::class)]
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
     private ?Subnet $subnet = null;
+
+    #[ORM\ManyToOne(targetEntity: DhcpServer::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?DhcpServer $dhcpServer = null;
 
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $hostname = null;
@@ -52,6 +57,8 @@ class DhcpLease
     public function getIpAddress(): string { return $this->ipAddress; }
     public function getSubnet(): ?Subnet { return $this->subnet; }
     public function setSubnet(?Subnet $subnet): static { $this->subnet = $subnet; return $this; }
+    public function getDhcpServer(): ?DhcpServer { return $this->dhcpServer; }
+    public function setDhcpServer(?DhcpServer $server): static { $this->dhcpServer = $server; return $this; }
     public function getHostname(): ?string { return $this->hostname; }
     public function setHostname(?string $hostname): static { $this->hostname = $hostname; return $this; }
     public function getLeaseStart(): \DateTimeImmutable { return $this->leaseStart; }
