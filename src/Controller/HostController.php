@@ -39,7 +39,7 @@ class HostController extends AbstractController
         $reset       = $request->query->getBoolean('reset');
         $showDeleted = $request->query->getBoolean('deleted');
 
-        $advancedFields = ['name', 'building', 'room', 'subnet', 'ip', 'mac', 'dns', 'tag'];
+        $advancedFields = ['name', 'building', 'room', 'subnet', 'ip', 'mac', 'dns', 'tag', 'dhcp_mismatch'];
 
         $query      = '';
         $criteria   = [];
@@ -120,7 +120,8 @@ class HostController extends AbstractController
             'ip'       => $criteria['ip'] ?? null,
             'mac'      => $criteria['mac'] ?? null,
             'dns'      => $criteria['dns'] ?? null,
-            'tag'      => $criteria['tag'] ?? null,
+            'tag'          => $criteria['tag'] ?? null,
+            'dhcp_mismatch'=> $criteria['dhcp_mismatch'] ?? null,
         ]);
 
         $totalPages = max(1, (int) ceil($total / self::PER_PAGE));
