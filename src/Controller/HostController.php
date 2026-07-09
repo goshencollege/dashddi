@@ -151,7 +151,7 @@ class HostController extends AbstractController
         }
 
         $known = ['name', 'building', 'room', 'subnet', 'ip', 'mac', 'dns', 'tag',
-                  'dhcp_mismatch', 'last_dhcp', 'last_auth'];
+                  'dhcp_mismatch', 'last_dhcp', 'last_auth', 'switch_ip', 'switch_port'];
 
         $fieldPattern = implode('|', $known);
         $orParts      = self::splitRespectingParens($q, ' OR ');

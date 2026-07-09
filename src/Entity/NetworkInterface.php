@@ -20,6 +20,8 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\Index(columns: ['ipv6_address_id'], name: 'idx_network_interface_ipv6_address_id')]
 #[ORM\Index(columns: ['last_auth_at'],    name: 'idx_network_interface_last_auth_at')]
 #[ORM\Index(columns: ['last_dhcp_at'],    name: 'idx_network_interface_last_dhcp_at')]
+#[ORM\Index(columns: ['switch_ip'],       name: 'idx_network_interface_switch_ip')]
+#[ORM\Index(columns: ['switch_port'],     name: 'idx_network_interface_switch_port')]
 #[UniqueMacAddress]
 class NetworkInterface
 {
@@ -72,6 +74,12 @@ class NetworkInterface
     #[ORM\Column(length: 45, nullable: true)]
     private ?string $lastDhcpIp = null;
 
+    #[ORM\Column(length: 45, nullable: true)]
+    private ?string $switchIp = null;
+
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $switchPort = null;
+
     public function __construct()
     {
         $this->domainRecords = new ArrayCollection();
@@ -120,6 +128,12 @@ class NetworkInterface
 
     public function getLastDhcpIp(): ?string { return $this->lastDhcpIp; }
     public function setLastDhcpIp(?string $ip): static { $this->lastDhcpIp = $ip; return $this; }
+
+    public function getSwitchIp(): ?string { return $this->switchIp; }
+    public function setSwitchIp(?string $ip): static { $this->switchIp = $ip; return $this; }
+
+    public function getSwitchPort(): ?string { return $this->switchPort; }
+    public function setSwitchPort(?string $port): static { $this->switchPort = $port; return $this; }
 
     public function getPrimaryName(): ?string
     {
