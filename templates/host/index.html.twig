@@ -196,6 +196,18 @@
                         </select>
                     </div>
                 </div>
+                <div class="row g-2 mb-2">
+                    <div class="col-12">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="dhcp_mismatch" value="1" id="dhcp_mismatch"
+                                {{ (criteria.dhcp_mismatch ?? '') == '1' ? 'checked' }}>
+                            <label class="form-check-label small" for="dhcp_mismatch">
+                                Only hosts with a DHCP subnet mismatch
+                                <span class="text-muted">(interface last DHCP'd on a different subnet than its assigned one)</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
                 <div class="d-flex gap-2 align-items-center">
                     <button type="submit" class="btn btn-sm btn-primary">
                         <i class="bi bi-search me-1"></i>Search

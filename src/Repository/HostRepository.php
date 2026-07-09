@@ -306,8 +306,43 @@ class HostRepository extends ServiceEntityRepository
                 DQL)
                ->setParameter('dns', $this->toLike($criteria['dns']));
         }
+        if (!empty($criteria['dhcp_mismatch'])) {
+            $ids = $this->findDhcpMismatchHostIds();
+            if (empty($ids)) {
+                $qb->andWhere('1 = 0');
+            } else {
+                $qb->andWhere('h.id IN (:dhcp_mismatch_ids)')
+                   ->setParameter('dhcp_mismatch_ids', $ids);
+            }
+        }
 
         return $qb;
+    }
+
+    private function findDhcpMismatchHostIds(): array
+    {
+        $sql = <<<SQL
+            SELECT DISTINCT h.id
+            FROM network_interface ni
+            JOIN host h ON h.id = ni.host_id
+            JOIN subnet s ON s.id = ni.subnet_id
+            WHERE ni.deleted_at IS NULL
+              AND h.deleted_at IS NULL
+              AND ni.last_dhcp_ip IS NOT NULL
+              AND s.ipv4_cidr IS NOT NULL
+              AND NOT (
+                  INET_ATON(ni.last_dhcp_ip) BETWEEN
+                      INET_ATON(SUBSTRING_INDEX(s.ipv4_cidr, '/', 1))
+                      AND (
+                          INET_ATON(SUBSTRING_INDEX(s.ipv4_cidr, '/', 1))
+                          + POW(2, 32 - CAST(SUBSTRING_INDEX(s.ipv4_cidr, '/', -1) AS UNSIGNED))
+                          - 1
+                      )
+              )
+        SQL;
+
+        $rows = $this->getEntityManager()->getConnection()->fetchAllAssociative($sql);
+        return array_column($rows, 'id');
     }
 
     // -------------------------------------------------------------------------

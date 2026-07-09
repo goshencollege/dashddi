@@ -3,6 +3,8 @@
 namespace App\Tests\Functional\Controller;
 
 use App\Entity\Host;
+use App\Entity\NetworkInterface;
+use App\Entity\Subnet;
 use App\Tests\Functional\AppWebTestCase;
 
 class HostControllerTest extends AppWebTestCase
@@ -85,5 +87,56 @@ class HostControllerTest extends AppWebTestCase
         $this->client->request('GET', '/hosts');
         $this->assertResponseIsSuccessful();
         $this->assertStringNotContainsString('soft-deleted-host', $this->client->getResponse()->getContent());
+    }
+
+    // -------------------------------------------------------------------------
+    // DHCP subnet mismatch filter
+    // -------------------------------------------------------------------------
+
+    private function makeHostWithInterface(string $hostName, Subnet $subnet, ?string $lastDhcpIp): Host
+    {
+        $host  = (new Host())->setName($hostName);
+        $this->em->persist($host);
+        $iface = (new NetworkInterface())
+            ->setHost($host)
+            ->setMacAddress('aa:bb:cc:dd:ee:01')
+            ->setSubnet($subnet)
+            ->setLastDhcpIp($lastDhcpIp);
+        $this->em->persist($iface);
+        $this->em->flush();
+        return $host;
+    }
+
+    public function testDhcpMismatchFilterReturnsHostWhoseDhcpIpIsOutsideAssignedSubnet(): void
+    {
+        $subnet = (new Subnet())->setName('test-subnet')->setIpv4Cidr('10.0.0.0/24');
+        $this->em->persist($subnet);
+        $this->makeHostWithInterface('mismatch-host', $subnet, '10.1.0.5');
+
+        $this->client->request('GET', '/hosts?' . http_build_query(['dhcp_mismatch' => '1']));
+        $this->assertResponseIsSuccessful();
+        $this->assertStringContainsString('mismatch-host', $this->client->getResponse()->getContent());
+    }
+
+    public function testDhcpMismatchFilterExcludesHostWhoseDhcpIpIsInsideAssignedSubnet(): void
+    {
+        $subnet = (new Subnet())->setName('test-subnet')->setIpv4Cidr('10.0.0.0/24');
+        $this->em->persist($subnet);
+        $this->makeHostWithInterface('matched-host', $subnet, '10.0.0.50');
+
+        $this->client->request('GET', '/hosts?' . http_build_query(['dhcp_mismatch' => '1']));
+        $this->assertResponseIsSuccessful();
+        $this->assertStringNotContainsString('matched-host', $this->client->getResponse()->getContent());
+    }
+
+    public function testDhcpMismatchFilterExcludesHostWithNoDhcpHistory(): void
+    {
+        $subnet = (new Subnet())->setName('test-subnet')->setIpv4Cidr('10.0.0.0/24');
+        $this->em->persist($subnet);
+        $this->makeHostWithInterface('no-dhcp-host', $subnet, null);
+
+        $this->client->request('GET', '/hosts?' . http_build_query(['dhcp_mismatch' => '1']));
+        $this->assertResponseIsSuccessful();
+        $this->assertStringNotContainsString('no-dhcp-host', $this->client->getResponse()->getContent());
     }
 }
