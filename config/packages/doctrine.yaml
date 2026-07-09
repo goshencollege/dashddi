@@ -8,6 +8,9 @@ doctrine:
 
         profiling_collect_backtrace: false
     orm:
+        dql:
+            numeric_functions:
+                INET_ATON: App\Doctrine\Function\InetAton
         auto_generate_proxy_classes: true
         enable_lazy_ghost_objects: true
         validate_xml_mapping: true

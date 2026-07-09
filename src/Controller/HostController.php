@@ -39,6 +39,13 @@ class HostController extends AbstractController
         $reset       = $request->query->getBoolean('reset');
         $showDeleted = $request->query->getBoolean('deleted');
 
+        $validSorts = ['name', 'updated', 'ip'];
+        $validDirs  = ['asc', 'desc'];
+        $sort = $request->query->getString('sort', 'name');
+        $dir  = $request->query->getString('dir', 'asc');
+        if (!in_array($sort, $validSorts, true)) { $sort = 'name'; }
+        if (!in_array($dir, $validDirs, true))   { $dir  = 'asc'; }
+
         $query      = '';
         $orGroups   = [];
         $isAdvanced = false;
@@ -90,11 +97,11 @@ class HostController extends AbstractController
         if ($showDeleted) {
             ['hosts' => $hosts, 'total' => $total] = $repo->findDeletedPaginated($page, self::PER_PAGE);
         } elseif ($isAdvanced) {
-            ['hosts' => $hosts, 'total' => $total] = $repo->structuredSearchPaginated($orGroups, $page, self::PER_PAGE);
+            ['hosts' => $hosts, 'total' => $total] = $repo->structuredSearchPaginated($orGroups, $page, self::PER_PAGE, $sort, $dir);
         } elseif ($query !== '') {
-            ['hosts' => $hosts, 'total' => $total] = $repo->searchPaginated($query, $page, self::PER_PAGE);
+            ['hosts' => $hosts, 'total' => $total] = $repo->searchPaginated($query, $page, self::PER_PAGE, $sort, $dir);
         } else {
-            ['hosts' => $hosts, 'total' => $total] = $repo->findAllPaginated($page, self::PER_PAGE);
+            ['hosts' => $hosts, 'total' => $total] = $repo->findAllPaginated($page, self::PER_PAGE, $sort, $dir);
         }
 
         $hostViewMode = $pref?->getHostViewMode() ?? 'host';
@@ -106,9 +113,12 @@ class HostController extends AbstractController
             }
         }
 
+        $hasCustomSort = ($sort !== 'name' || $dir !== 'asc');
         $linkParams = array_filter([
             'deleted' => $showDeleted ?: null,
             'q'       => $query ?: null,
+            'sort'    => $hasCustomSort ? $sort : null,
+            'dir'     => $hasCustomSort ? $dir : null,
         ]);
 
         $totalPages = max(1, (int) ceil($total / self::PER_PAGE));
@@ -120,6 +130,8 @@ class HostController extends AbstractController
             'query'              => $query,
             'isAdvanced'         => $isAdvanced,
             'showDeleted'        => $showDeleted,
+            'sort'               => $sort,
+            'dir'                => $dir,
             'subnets'            => $subnetRepo->findBy([], ['name' => 'ASC']),
             'buildings'          => $buildingRepo->findBy([], ['name' => 'ASC']),
             'tags'               => $tagRepo->findBy([], ['name' => 'ASC']),

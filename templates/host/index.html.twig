@@ -50,6 +50,20 @@
 {{ include('_tom_select_dark.html.twig') }}
 {% endblock %}
 
+{# Renders a sortable column header link with an active-sort indicator. #}
+{% macro sort_header(col, label, sort, dir, link_params) %}
+    {% set next_dir = (sort == col and dir == 'asc') ? 'desc' : 'asc' %}
+    <a href="{{ path('host_index', link_params|merge({sort: col, dir: next_dir, page: 1})) }}"
+       class="text-decoration-none text-reset d-inline-flex align-items-center gap-1">
+        {{- label -}}
+        {% if sort == col %}
+            <i class="bi bi-arrow-{{ dir == 'asc' ? 'up' : 'down' }}-short"></i>
+        {% else %}
+            <i class="bi bi-arrow-down-up text-muted" style="font-size:.75em;opacity:.4"></i>
+        {% endif %}
+    </a>
+{% endmacro %}
+
 {# Renders Bootstrap pagination controls and a result-count footer line. #}
 {% macro pager(pagination) %}
 {% set p = pagination %}
@@ -232,13 +246,13 @@
                                     <input type="checkbox" class="form-check-input" id="select-all-ifaces" title="Select all interfaces on this page">
                                 </div>
                             </th>
-                            <th style="min-width:13rem; width:1%">Name</th>
+                            <th style="min-width:13rem; width:1%">{{ _self.sort_header('name', 'Name', sort, dir, pagination.link_params) }}</th>
                             <th>Tags</th>
                             <th>Subnet</th>
-                            <th>IPv4</th>
+                            <th>{{ _self.sort_header('ip', 'IPv4', sort, dir, pagination.link_params) }}</th>
                             <th>IPv6</th>
                             <th>DNS Names</th>
-                            <th style="width:1%; white-space:nowrap">Last Modified</th>
+                            <th style="width:1%; white-space:nowrap">{{ _self.sort_header('updated', 'Last Modified', sort, dir, pagination.link_params) }}</th>
                             <th class="text-end">Actions</th>
                         </tr>
                     </thead>

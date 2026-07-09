@@ -70,7 +70,7 @@ class HostRepository extends ServiceEntityRepository
     }
 
     /** @return array{hosts: Host[], total: int} */
-    public function findAllPaginated(int $page, int $perPage): array
+    public function findAllPaginated(int $page, int $perPage, string $sort = 'name', string $dir = 'asc'): array
     {
         $offset = max(0, ($page - 1) * $perPage);
 
@@ -83,19 +83,21 @@ class HostRepository extends ServiceEntityRepository
         $ids = $this->idsForPage(
             $this->createQueryBuilder('h')->where('h.deletedAt IS NULL'),
             $offset,
-            $perPage
+            $perPage,
+            $sort,
+            $dir
         );
 
         return ['hosts' => $this->fetchByIds($ids), 'total' => $total];
     }
 
     /** @return array{hosts: Host[], total: int} */
-    public function searchPaginated(string $query, int $page, int $perPage): array
+    public function searchPaginated(string $query, int $page, int $perPage, string $sort = 'name', string $dir = 'asc'): array
     {
-        $key  = 'host_search_' . md5($query . '|' . $page . '|' . $perPage);
-        $data = $this->cache->get($key, function (ItemInterface $item) use ($query, $page, $perPage) {
+        $key  = 'host_search_' . md5($query . '|' . $page . '|' . $perPage . '|' . $sort . '|' . $dir);
+        $data = $this->cache->get($key, function (ItemInterface $item) use ($query, $page, $perPage, $sort, $dir) {
             $item->expiresAfter(60);
-            return $this->paginateFilterQuery($this->buildSearchQb($query), $page, $perPage);
+            return $this->paginateFilterQuery($this->buildSearchQb($query), $page, $perPage, $sort, $dir);
         });
         return ['hosts' => $this->fetchByIds($data['ids']), 'total' => $data['total']];
     }
@@ -112,12 +114,12 @@ class HostRepository extends ServiceEntityRepository
     }
 
     /** @return array{hosts: Host[], total: int} */
-    public function structuredSearchPaginated(array $orGroups, int $page, int $perPage): array
+    public function structuredSearchPaginated(array $orGroups, int $page, int $perPage, string $sort = 'name', string $dir = 'asc'): array
     {
-        $key  = 'host_structured_' . md5(serialize($orGroups) . '|' . $page . '|' . $perPage);
-        $data = $this->cache->get($key, function (ItemInterface $item) use ($orGroups, $page, $perPage) {
+        $key  = 'host_structured_' . md5(serialize($orGroups) . '|' . $page . '|' . $perPage . '|' . $sort . '|' . $dir);
+        $data = $this->cache->get($key, function (ItemInterface $item) use ($orGroups, $page, $perPage, $sort, $dir) {
             $item->expiresAfter(60);
-            return $this->paginateFilterQuery($this->buildStructuredQb($orGroups), $page, $perPage);
+            return $this->paginateFilterQuery($this->buildStructuredQb($orGroups), $page, $perPage, $sort, $dir);
         });
         return ['hosts' => $this->fetchByIds($data['ids']), 'total' => $data['total']];
     }
@@ -536,7 +538,7 @@ class HostRepository extends ServiceEntityRepository
      *
      * @return array{ids: int[], total: int}
      */
-    private function paginateFilterQuery(QueryBuilder $filterQb, int $page, int $perPage): array
+    private function paginateFilterQuery(QueryBuilder $filterQb, int $page, int $perPage, string $sort = 'name', string $dir = 'asc'): array
     {
         $offset = max(0, ($page - 1) * $perPage);
 
@@ -552,28 +554,56 @@ class HostRepository extends ServiceEntityRepository
         $ids = $this->idsForPage(
             (clone $filterQb)->distinct(),
             $offset,
-            $perPage
+            $perPage,
+            $sort,
+            $dir
         );
 
         return ['ids' => $ids, 'total' => $total];
     }
 
-    /** Returns a page of host IDs from the given QueryBuilder. */
-    private function idsForPage(QueryBuilder $qb, int $offset, int $perPage): array
+    /** Returns a page of host IDs from the given QueryBuilder, ordered by the requested column. */
+    private function idsForPage(QueryBuilder $qb, int $offset, int $perPage, string $sort = 'name', string $dir = 'asc'): array
     {
-        $rows = $qb->select('h.id as hid', 'h.name as hname')
-            ->orderBy('h.name', 'ASC')
-            ->setFirstResult($offset)
+        $dir = strtoupper($dir) === 'DESC' ? 'DESC' : 'ASC';
+
+        switch ($sort) {
+            case 'updated':
+                // Include both sort columns in SELECT so DISTINCT stays compatible with ORDER BY.
+                $qb->select('h.id as hid', 'h.updatedAt as hupdated', 'h.name as hname')
+                   ->orderBy('h.updatedAt', $dir)
+                   ->addOrderBy('h.name', 'ASC');
+                break;
+
+            case 'ip':
+                // Sort by the host's lowest assigned IPv4. Hosts without any IP sort last.
+                $nullFallback = $dir === 'ASC' ? '4294967295' : '0';
+                $qb->select('h.id as hid', 'h.name as hname')
+                   ->addSelect(sprintf(
+                       'COALESCE((SELECT MIN(INET_ATON(ip_s.address)) FROM App\Entity\NetworkInterface i_s LEFT JOIN i_s.ipAddress ip_s WHERE i_s.host = h AND i_s.deletedAt IS NULL), %s) AS HIDDEN ip_sort',
+                       $nullFallback
+                   ))
+                   ->orderBy('ip_sort', $dir)
+                   ->addOrderBy('h.name', 'ASC');
+                break;
+
+            default: // 'name'
+                $qb->select('h.id as hid', 'h.name as hname')
+                   ->orderBy('h.name', $dir);
+                break;
+        }
+
+        $rows = $qb->setFirstResult($offset)
             ->setMaxResults($perPage)
             ->getQuery()
             ->getScalarResult();
 
-        return array_column($rows, 'hid');
+        return array_map('intval', array_column($rows, 'hid'));
     }
 
     /**
      * Fetch full Host entities by ID with all associations the list template needs
-     * eagerly loaded to prevent N+1 queries.
+     * eagerly loaded to prevent N+1 queries. Order matches the provided $ids array.
      *
      * @return Host[]
      */
@@ -583,7 +613,7 @@ class HostRepository extends ServiceEntityRepository
             return [];
         }
 
-        return $this->createQueryBuilder('h')
+        $hosts = $this->createQueryBuilder('h')
             ->leftJoin('h.interfaces', 'i')->addSelect('i')
             ->leftJoin('h.tags', 'tg')->addSelect('tg')
             ->leftJoin('i.ipAddress', 'ip4')->addSelect('ip4')
@@ -593,9 +623,15 @@ class HostRepository extends ServiceEntityRepository
             ->leftJoin('n.domain', 'nd')->addSelect('nd')
             ->where('h.id IN (:ids)')
             ->setParameter('ids', $ids)
-            ->orderBy('h.name', 'ASC')
             ->getQuery()
             ->getResult();
+
+        // Reorder to match the sort order established by idsForPage.
+        $indexed = [];
+        foreach ($hosts as $host) {
+            $indexed[$host->getId()] = $host;
+        }
+        return array_values(array_filter(array_map(fn($id) => $indexed[$id] ?? null, $ids)));
     }
 
     public function purgeDeletedBefore(\DateTimeImmutable $before): int
