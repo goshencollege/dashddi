@@ -909,6 +909,10 @@ function addCondition(groupEl, fieldKey, rawValue) {
     valueArea.className = 'value-area d-flex gap-1 align-items-center';
     valueArea.style.minWidth = '160px';
 
+    const andLabel = document.createElement('span');
+    andLabel.className = 'and-label text-muted small fw-bold';
+    andLabel.style.cssText = 'min-width:2.2rem;display:inline-block';
+
     const removeBtn = document.createElement('button');
     removeBtn.type = 'button';
     removeBtn.className = 'btn btn-sm btn-outline-danger remove-row-btn py-0';
@@ -921,11 +925,14 @@ function addCondition(groupEl, fieldKey, rawValue) {
             builder.removeChild(groupEl);
             updateGroupSeparators();
             if (!builder.querySelector('.filter-group')) addGroup([]);
+        } else {
+            updateAndLabels(groupEl);
         }
         updateRemoveButtons();
     });
 
     rowEl.appendChild(removeBtn);
+    rowEl.appendChild(andLabel);
     rowEl.appendChild(fieldSel);
     rowEl.appendChild(opSel);
     rowEl.appendChild(valueArea);
@@ -935,7 +942,15 @@ function addCondition(groupEl, fieldKey, rawValue) {
 
     fieldSel.addEventListener('change', () => updateRow(rowEl, fieldSel.value, null));
     opSel.addEventListener('change',    () => updateValueArea(rowEl, fieldSel.value, opSel.value, null));
+    updateAndLabels(groupEl);
     updateRemoveButtons();
+}
+
+function updateAndLabels(groupEl) {
+    groupEl.querySelectorAll('.filter-row').forEach((row, i) => {
+        const lbl = row.querySelector('.and-label');
+        if (lbl) lbl.textContent = i === 0 ? '' : 'AND';
+    });
 }
 
 function addGroup(conditions) {
@@ -945,7 +960,7 @@ function addGroup(conditions) {
     groupEl.className = 'filter-group mb-2';
 
     const sep = document.createElement('div');
-    sep.className = 'text-center text-muted small fw-bold my-1 filter-or-sep';
+    sep.className = 'text-muted small fw-bold my-1 filter-or-sep';
     sep.textContent = 'OR';
     sep.style.display = isFirst ? 'none' : '';
 
@@ -954,9 +969,17 @@ function addGroup(conditions) {
     const cardBody = document.createElement('div');
     cardBody.className = 'card-body py-2 px-3';
 
-    const hdr = document.createElement('div');
-    hdr.className = 'd-flex align-items-center justify-content-between mb-2';
-    hdr.innerHTML = '<span class="small fw-semibold text-muted">Match ALL of:</span>';
+    const conditionsEl = document.createElement('div');
+    conditionsEl.className = 'filter-conditions';
+
+    const footer = document.createElement('div');
+    footer.className = 'd-flex align-items-center justify-content-between mt-1';
+
+    const addCondBtn = document.createElement('button');
+    addCondBtn.type = 'button';
+    addCondBtn.className = 'btn btn-link btn-sm p-0 text-secondary';
+    addCondBtn.innerHTML = '<i class="bi bi-plus-circle me-1"></i>Add condition';
+    addCondBtn.addEventListener('click', () => addCondition(groupEl));
 
     const removeGroupBtn = document.createElement('button');
     removeGroupBtn.type = 'button';
@@ -967,20 +990,12 @@ function addGroup(conditions) {
         updateGroupSeparators();
         updateRemoveButtons();
     });
-    hdr.appendChild(removeGroupBtn);
 
-    const conditionsEl = document.createElement('div');
-    conditionsEl.className = 'filter-conditions';
+    footer.appendChild(addCondBtn);
+    footer.appendChild(removeGroupBtn);
 
-    const addCondBtn = document.createElement('button');
-    addCondBtn.type = 'button';
-    addCondBtn.className = 'btn btn-link btn-sm p-0 mt-1 text-secondary';
-    addCondBtn.innerHTML = '<i class="bi bi-plus-circle me-1"></i>Add condition';
-    addCondBtn.addEventListener('click', () => addCondition(groupEl));
-
-    cardBody.appendChild(hdr);
     cardBody.appendChild(conditionsEl);
-    cardBody.appendChild(addCondBtn);
+    cardBody.appendChild(footer);
     card.appendChild(cardBody);
     groupEl.appendChild(sep);
     groupEl.appendChild(card);
