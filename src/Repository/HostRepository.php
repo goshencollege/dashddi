@@ -373,12 +373,14 @@ class HostRepository extends ServiceEntityRepository
 
         switch ($field) {
             case 'name':
-                $qb->setParameter("sp_$n", $this->toLike($value));
-                return "{$not}(h.name LIKE :sp_{$n})";
+                [$cmp, $param] = $this->toStructuredLikeOrEq($value);
+                $qb->setParameter("sp_$n", $param);
+                return "{$not}(h.name $cmp :sp_{$n})";
 
             case 'room':
-                $qb->setParameter("sp_$n", $this->toLike($value));
-                return "{$not}(h.room LIKE :sp_{$n})";
+                [$cmp, $param] = $this->toStructuredLikeOrEq($value);
+                $qb->setParameter("sp_$n", $param);
+                return "{$not}(h.room $cmp :sp_{$n})";
 
             case 'building':
                 $qb->setParameter("sp_$n", (int) $value);
@@ -392,42 +394,47 @@ class HostRepository extends ServiceEntityRepository
                 return "{$not}EXISTS (SELECT 1 FROM App\Entity\NetworkInterface i{$n} WHERE i{$n}.host = h AND i{$n}.subnet = :sp_{$n})";
 
             case 'ip':
-                $qb->setParameter("sp_$n", $this->toLike($value));
+                [$cmp, $param] = $this->toStructuredLikeOrEq($value);
+                $qb->setParameter("sp_$n", $param);
                 return <<<DQL
                     {$not}EXISTS (
                         SELECT 1 FROM App\Entity\NetworkInterface i{$n}
                         LEFT JOIN i{$n}.ipAddress ip4{$n}
                         LEFT JOIN i{$n}.ipv6Address ip6{$n}
                         WHERE i{$n}.host = h AND (
-                            ip4{$n}.address LIKE :sp_{$n}
-                            OR ip6{$n}.address LIKE :sp_{$n}
+                            ip4{$n}.address $cmp :sp_{$n}
+                            OR ip6{$n}.address $cmp :sp_{$n}
                             OR EXISTS (
                                 SELECT 1 FROM App\Entity\DhcpLease dl{$n}
-                                WHERE dl{$n}.macAddress = i{$n}.macAddress AND dl{$n}.ipAddress LIKE :sp_{$n}
+                                WHERE dl{$n}.macAddress = i{$n}.macAddress AND dl{$n}.ipAddress $cmp :sp_{$n}
                             )
                         )
                     )
                     DQL;
 
             case 'mac':
-                $qb->setParameter("sp_$n", $this->normalizeMacLike($value));
-                return "{$not}EXISTS (SELECT 1 FROM App\Entity\NetworkInterface i{$n} WHERE i{$n}.host = h AND i{$n}.macAddress LIKE :sp_{$n})";
+                $macParam = $this->normalizeMacLike($value);
+                $macCmp = str_contains($macParam, '%') ? 'LIKE' : '=';
+                $qb->setParameter("sp_$n", $macParam);
+                return "{$not}EXISTS (SELECT 1 FROM App\Entity\NetworkInterface i{$n} WHERE i{$n}.host = h AND i{$n}.macAddress $macCmp :sp_{$n})";
 
             case 'tag':
-                $qb->setParameter("sp_$n", $this->toLike($value));
-                return "{$not}EXISTS (SELECT 1 FROM App\Entity\Host h{$n} JOIN h{$n}.tags tg{$n} WHERE h{$n} = h AND tg{$n}.name LIKE :sp_{$n})";
+                [$cmp, $param] = $this->toStructuredLikeOrEq($value);
+                $qb->setParameter("sp_$n", $param);
+                return "{$not}EXISTS (SELECT 1 FROM App\Entity\Host h{$n} JOIN h{$n}.tags tg{$n} WHERE h{$n} = h AND tg{$n}.name $cmp :sp_{$n})";
 
             case 'dns':
-                $qb->setParameter("sp_$n", $this->toLike($value));
+                [$cmp, $param] = $this->toStructuredLikeOrEq($value);
+                $qb->setParameter("sp_$n", $param);
                 return <<<DQL
                     {$not}EXISTS (
                         SELECT 1 FROM App\Entity\NetworkInterface i{$n}
                         LEFT JOIN i{$n}.domainRecords nr{$n}
                         LEFT JOIN nr{$n}.domain nd{$n}
                         WHERE i{$n}.host = h AND (
-                            nr{$n}.hostname LIKE :sp_{$n}
-                            OR nd{$n}.name LIKE :sp_{$n}
-                            OR CONCAT(nr{$n}.hostname, '.', nd{$n}.name) LIKE :sp_{$n}
+                            nr{$n}.hostname $cmp :sp_{$n}
+                            OR nd{$n}.name $cmp :sp_{$n}
+                            OR CONCAT(nr{$n}.hostname, '.', nd{$n}.name) $cmp :sp_{$n}
                         )
                     )
                     DQL;
@@ -447,12 +454,14 @@ class HostRepository extends ServiceEntityRepository
                 return $this->dateConditionDql('lastAuthAt', $value, $negate, $n, $qb);
 
             case 'switch_ip':
-                $qb->setParameter("sp_$n", $this->toLike($value));
-                return "{$not}EXISTS (SELECT 1 FROM App\Entity\NetworkInterface i{$n} WHERE i{$n}.host = h AND i{$n}.switchIp LIKE :sp_{$n})";
+                [$cmp, $param] = $this->toStructuredLikeOrEq($value);
+                $qb->setParameter("sp_$n", $param);
+                return "{$not}EXISTS (SELECT 1 FROM App\Entity\NetworkInterface i{$n} WHERE i{$n}.host = h AND i{$n}.switchIp $cmp :sp_{$n})";
 
             case 'switch_port':
-                $qb->setParameter("sp_$n", $this->toLike($value));
-                return "{$not}EXISTS (SELECT 1 FROM App\Entity\NetworkInterface i{$n} WHERE i{$n}.host = h AND i{$n}.switchPort LIKE :sp_{$n})";
+                [$cmp, $param] = $this->toStructuredLikeOrEq($value);
+                $qb->setParameter("sp_$n", $param);
+                return "{$not}EXISTS (SELECT 1 FROM App\Entity\NetworkInterface i{$n} WHERE i{$n}.host = h AND i{$n}.switchPort $cmp :sp_{$n})";
         }
 
         return null;
@@ -696,5 +705,14 @@ class HostRepository extends ServiceEntityRepository
         return str_contains($value, '*')
             ? str_replace('*', '%', $value)
             : '%' . $value . '%';
+    }
+
+    /** Returns [$operator, $param] — LIKE+wildcards when '*' present, '='+ exact value otherwise. */
+    private function toStructuredLikeOrEq(string $value): array
+    {
+        if (str_contains($value, '*')) {
+            return ['LIKE', str_replace('*', '%', $value)];
+        }
+        return ['=', $value];
     }
 }
