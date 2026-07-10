@@ -268,6 +268,92 @@
     {% endif %}
 </div>
 
+{# ── Records Missing View Assignments ─────────────────────────────────────── #}
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>
+            <i class="bi bi-eye me-1"></i>
+            <strong>Records Missing View Assignments</strong>
+            <span class="badge bg-secondary ms-2">{{ missing_views|length }}</span>
+        </span>
+    </div>
+    <div class="card-body pb-0">
+        <p class="text-muted small mb-3">
+            These DNS records have no views assigned, but their domain (and subnet, if applicable)
+            has views configured. Each record will be added to all views relevant for its
+            domain and subnet combination.
+        </p>
+    </div>
+
+    {% if missing_views is empty %}
+        <div class="card-body pt-0">
+            <div class="alert alert-success mb-0">
+                <i class="bi bi-check-circle me-1"></i>No records with missing view assignments found.
+            </div>
+        </div>
+    {% else %}
+        <form method="post" action="{{ path('recommendation_apply_add_missing_views') }}" id="missing-views-form">
+            <input type="hidden" name="_token" value="{{ csrf_token('add_missing_views_bulk') }}">
+
+            <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom border-top">
+                <div class="form-check mb-0">
+                    <input class="form-check-input" type="checkbox" id="select-all-missingviews">
+                    <label class="form-check-label small text-muted" for="select-all-missingviews">Select all</label>
+                </div>
+                <button type="submit" class="btn btn-sm btn-success" id="missingviews-apply-btn" disabled
+                        onclick="return confirm('Add missing views to ' + document.getElementById('missingviews-selected-count').textContent + ' record(s)?')">
+                    <i class="bi bi-eye me-1"></i>
+                    Add Views to Selected (<span id="missingviews-selected-count">0</span>)
+                </button>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-sm table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th style="width: 2.25rem"></th>
+                            <th>Domain</th>
+                            <th>Hostname</th>
+                            <th>Type</th>
+                            <th>Linked To</th>
+                            <th>Views to Add</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in missing_views %}
+                        <tr>
+                            <td>
+                                <input class="form-check-input missingviews-checkbox" type="checkbox"
+                                       name="ids[]" value="{{ row.record_id }}">
+                            </td>
+                            <td>
+                                <a href="{{ path('domain_show', {id: row.domain_id}) }}">{{ row.domain_name }}</a>
+                            </td>
+                            <td class="font-monospace">{{ row.hostname }}</td>
+                            <td><span class="badge bg-primary-subtle text-primary-emphasis">{{ row.record_type }}</span></td>
+                            <td>
+                                {% if row.match_type == 'interface' %}
+                                    <a href="{{ path('interface_show', {id: row.match_id}) }}">{{ row.match_label }}{% if row.match_sublabel %} / {{ row.match_sublabel }}{% endif %}</a>
+                                {% elseif row.match_type == 'vip' %}
+                                    <a href="{{ path('virtual_ip_show', {id: row.match_id}) }}">{{ row.match_label }}</a>
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% for v in row.views %}
+                                    <span class="badge bg-info-subtle text-info-emphasis me-1">{{ v.name }}</span>
+                                {% endfor %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </form>
+    {% endif %}
+</div>
+
 </div>
 
 <script>
@@ -316,8 +402,9 @@ function initCheckboxGroup(selectAllId, checkboxClass, applyBtnId, countSpanId) 
     });
 }
 
-initCheckboxGroup('select-all-dns',       'dns-checkbox',        'bulk-apply-btn',        'selected-count');
-initCheckboxGroup('select-all-cname',     'cname-checkbox',      'cname-apply-btn',       'cname-selected-count');
-initCheckboxGroup('select-all-dualstack', 'dualstack-checkbox',  'dualstack-apply-btn',   'dualstack-selected-count');
+initCheckboxGroup('select-all-dns',          'dns-checkbox',          'bulk-apply-btn',          'selected-count');
+initCheckboxGroup('select-all-cname',        'cname-checkbox',        'cname-apply-btn',         'cname-selected-count');
+initCheckboxGroup('select-all-dualstack',    'dualstack-checkbox',    'dualstack-apply-btn',     'dualstack-selected-count');
+initCheckboxGroup('select-all-missingviews', 'missingviews-checkbox', 'missingviews-apply-btn',  'missingviews-selected-count');
 </script>
 {% endblock %}

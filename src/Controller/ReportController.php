@@ -2,10 +2,12 @@
 
 namespace App\Controller;
 
+use App\Entity\DnsView;
 use App\Entity\DomainRecord;
 use App\Entity\NetworkInterface;
 use App\Entity\VirtualIp;
 use App\Enum\RecordType;
+use App\Service\DnsViewResolver;
 use App\Repository\DhcpLeaseRepository;
 use App\Service\RecommendationService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -46,6 +48,7 @@ class ReportController extends AbstractController
             'unlinked_dns'        => $service->findUnlinkedDnsRecords(),
             'convertible_cnames'  => $service->findConvertibleCnameRecords(),
             'missing_dual_stack'  => $service->findMissingDualStackRecords(),
+            'missing_views'       => $service->findRecordsWithMissingViews(),
         ]);
     }
 
@@ -273,6 +276,60 @@ class ReportController extends AbstractController
         }
         if ($skipped > 0) {
             $this->addFlash('warning', sprintf('%d item%s skipped (already exists or data changed).', $skipped, $skipped !== 1 ? 's' : ''));
+        }
+
+        return $this->redirectToRoute('recommendation_index');
+    }
+
+    #[Route('/recommendations/apply/add-missing-views', name: 'recommendation_apply_add_missing_views', methods: ['POST'])]
+    public function applyAddMissingViews(
+        Request $request,
+        EntityManagerInterface $em,
+        DnsViewResolver $viewResolver,
+    ): Response {
+        if (!$this->isCsrfTokenValid('add_missing_views_bulk', $request->request->get('_token'))) {
+            $this->addFlash('danger', 'Invalid CSRF token.');
+            return $this->redirectToRoute('recommendation_index');
+        }
+
+        $ids = array_filter(array_map('intval', (array) $request->request->all('ids')));
+        if (empty($ids)) {
+            $this->addFlash('warning', 'No records selected.');
+            return $this->redirectToRoute('recommendation_index');
+        }
+
+        $updated = 0;
+        $skipped = 0;
+
+        foreach ($ids as $id) {
+            $record = $em->find(DomainRecord::class, $id);
+            if ($record === null || !$record->getViews()->isEmpty()) {
+                $skipped++;
+                continue;
+            }
+
+            $subnet = $record->getNetworkInterface()?->getSubnet()
+                   ?? $record->getVirtualIp()?->getSubnet();
+
+            $views = $viewResolver->availableViewsFor($record->getDomain(), $subnet);
+            if (empty($views)) {
+                $skipped++;
+                continue;
+            }
+
+            foreach ($views as $view) {
+                $record->addView($view);
+            }
+            $updated++;
+        }
+
+        $em->flush();
+
+        if ($updated > 0) {
+            $this->addFlash('success', sprintf('%d DNS record%s updated with missing views.', $updated, $updated !== 1 ? 's' : ''));
+        }
+        if ($skipped > 0) {
+            $this->addFlash('warning', sprintf('%d record%s skipped (already has views or no applicable views).', $skipped, $skipped !== 1 ? 's' : ''));
         }
 
         return $this->redirectToRoute('recommendation_index');

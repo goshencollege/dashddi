@@ -2,15 +2,20 @@
 
 namespace App\Service;
 
+use App\Entity\Domain;
 use App\Entity\DomainRecord;
 use App\Entity\NetworkInterface;
+use App\Entity\Subnet;
 use App\Entity\VirtualIp;
 use App\Enum\RecordType;
 use Doctrine\ORM\EntityManagerInterface;
 
 class RecommendationService
 {
-    public function __construct(private readonly EntityManagerInterface $em) {}
+    public function __construct(
+        private readonly EntityManagerInterface $em,
+        private readonly DnsViewResolver $viewResolver,
+    ) {}
 
     /**
      * Finds A/AAAA domain records whose IP value matches a network interface or VIP
@@ -331,6 +336,80 @@ class RecommendationService
         SQL;
 
         return $this->em->getConnection()->fetchAllAssociative($sql);
+    }
+
+    /**
+     * Finds DNS records that have no views assigned but whose domain (and subnet, if
+     * applicable) has views configured. Returns only records where there is at least
+     * one view that should be added.
+     *
+     * Each row contains: record_id, hostname, record_type, domain_id, domain_name,
+     * match_type ('interface'|'vip'|null), match_id, match_label, match_sublabel,
+     * views (array of {id, name}).
+     */
+    public function findRecordsWithMissingViews(): array
+    {
+        $sql = <<<SQL
+            SELECT
+                dr.id           AS record_id,
+                dr.hostname,
+                dr.type         AS record_type,
+                d.id            AS domain_id,
+                d.name          AS domain_name,
+                ni.id           AS iface_id,
+                h.name          AS host_name,
+                ni.name         AS iface_name,
+                vip.id          AS vip_id,
+                vip.label       AS vip_label,
+                COALESCE(ni.subnet_id, vip.subnet_id) AS subnet_id
+            FROM domain_record dr
+            JOIN domain d ON dr.domain_id = d.id
+            LEFT JOIN network_interface ni  ON ni.id  = dr.network_interface_id AND ni.deleted_at  IS NULL
+            LEFT JOIN host h                ON h.id   = ni.host_id
+            LEFT JOIN virtual_ip vip        ON vip.id = dr.virtual_ip_id        AND vip.deleted_at IS NULL
+            WHERE NOT EXISTS (
+                SELECT 1 FROM domain_record_dns_view drdv
+                WHERE drdv.domain_record_id = dr.id
+            )
+            AND EXISTS (
+                SELECT 1 FROM domain_dns_view ddv
+                WHERE ddv.domain_id = d.id
+            )
+            ORDER BY d.name, dr.hostname
+        SQL;
+
+        $rows    = $this->em->getConnection()->fetchAllAssociative($sql);
+        $results = [];
+
+        foreach ($rows as $row) {
+            $domain = $this->em->find(Domain::class, (int) $row['domain_id']);
+            $subnet = $row['subnet_id'] !== null
+                ? $this->em->find(Subnet::class, (int) $row['subnet_id'])
+                : null;
+
+            $views = $this->viewResolver->availableViewsFor($domain, $subnet);
+            if (empty($views)) {
+                continue;
+            }
+
+            $results[] = [
+                'record_id'      => (int) $row['record_id'],
+                'hostname'       => $row['hostname'],
+                'record_type'    => $row['record_type'],
+                'domain_id'      => (int) $row['domain_id'],
+                'domain_name'    => $row['domain_name'],
+                'match_type'     => $row['iface_id'] !== null ? 'interface' : ($row['vip_id'] !== null ? 'vip' : null),
+                'match_id'       => $row['iface_id'] ?? $row['vip_id'],
+                'match_label'    => $row['host_name'] ?? $row['vip_label'],
+                'match_sublabel' => $row['iface_name'],
+                'views'          => array_map(
+                    fn($v) => ['id' => $v->getId(), 'name' => $v->getName()],
+                    $views,
+                ),
+            ];
+        }
+
+        return $results;
     }
 
     // ── private helpers ───────────────────────────────────────────────────────
