@@ -4,7 +4,7 @@ namespace App\Controller;
 
 use App\Entity\DhcpServer;
 use App\Form\DhcpServerType;
-use App\Message\PushDhcpMessage;
+use App\Message\PushAllDhcpMessage;
 use App\Repository\DhcpServerRepository;
 use App\Service\SshKeyService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -125,16 +125,14 @@ class DhcpServerController extends AbstractController
             return $this->json(['error' => 'Invalid CSRF token.'], 403);
         }
 
-        $servers = $repo->findBy([], ['name' => 'ASC']);
+        $count = count($repo->findBy([]));
 
-        if (empty($servers)) {
+        if ($count === 0) {
             return $this->json(['error' => 'No DHCP servers configured.'], 400);
         }
 
-        foreach ($servers as $server) {
-            $bus->dispatch(new PushDhcpMessage($server->getId()), [new DeduplicateStamp('push_dhcp_' . $server->getId())]);
-        }
+        $bus->dispatch(new PushAllDhcpMessage(), [new DeduplicateStamp('push_dhcp_all')]);
 
-        return $this->json(['queued' => true, 'count' => count($servers)], 202);
+        return $this->json(['queued' => true, 'count' => $count], 202);
     }
 }
