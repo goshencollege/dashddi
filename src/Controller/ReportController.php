@@ -3,6 +3,8 @@
 namespace App\Controller;
 
 use App\Entity\DomainRecord;
+use App\Entity\NetworkInterface;
+use App\Entity\VirtualIp;
 use App\Enum\RecordType;
 use App\Repository\DhcpLeaseRepository;
 use App\Service\RecommendationService;
@@ -41,7 +43,8 @@ class ReportController extends AbstractController
     public function recommendations(RecommendationService $service): Response
     {
         return $this->render('report/recommendations.html.twig', [
-            'unlinked_dns' => $service->findUnlinkedDnsRecords(),
+            'unlinked_dns'     => $service->findUnlinkedDnsRecords(),
+            'convertible_cnames' => $service->findConvertibleCnameRecords(),
         ]);
     }
 
@@ -100,6 +103,68 @@ class ReportController extends AbstractController
         }
         if ($skipped > 0) {
             $this->addFlash('warning', sprintf('%d record%s skipped (already linked or no longer matched).', $skipped, $skipped !== 1 ? 's' : ''));
+        }
+
+        return $this->redirectToRoute('recommendation_index');
+    }
+
+    #[Route('/recommendations/apply/convert-cname', name: 'recommendation_apply_convert_cname', methods: ['POST'])]
+    public function applyConvertCname(
+        Request $request,
+        EntityManagerInterface $em,
+        RecommendationService $service,
+    ): Response {
+        if (!$this->isCsrfTokenValid('convert_cname_bulk', $request->request->get('_token'))) {
+            $this->addFlash('danger', 'Invalid CSRF token.');
+            return $this->redirectToRoute('recommendation_index');
+        }
+
+        $ids = array_filter(array_map('intval', (array) $request->request->all('ids')));
+        if (empty($ids)) {
+            $this->addFlash('warning', 'No records selected.');
+            return $this->redirectToRoute('recommendation_index');
+        }
+
+        $converted = 0;
+        $skipped   = 0;
+
+        foreach ($ids as $id) {
+            $record = $em->find(DomainRecord::class, $id);
+            if ($record === null || $record->getType() !== RecordType::CNAME
+                || $record->getNetworkInterface() !== null || $record->getVirtualIp() !== null) {
+                $skipped++;
+                continue;
+            }
+
+            $target = $service->findCnameConversionTarget($id);
+            if ($target === null) {
+                $skipped++;
+                continue;
+            }
+
+            $record->setType(RecordType::from($target['target_type']));
+            $record->setValue('');
+
+            if ($target['match_type'] === 'interface') {
+                $iface = $em->find(NetworkInterface::class, $target['match_id']);
+                if ($iface === null || $iface->isDeleted()) { $skipped++; continue; }
+                $record->setNetworkInterface($iface);
+            } else {
+                $vip = $em->find(VirtualIp::class, $target['match_id']);
+                if ($vip === null || $vip->isDeleted()) { $skipped++; continue; }
+                $record->setVirtualIp($vip);
+            }
+
+            $converted++;
+        }
+
+        $em->flush();
+
+        if ($converted > 0) {
+            $this->addFlash('success', sprintf('%d CNAME record%s converted.', $converted, $converted !== 1 ? 's' : ''));
+        }
+        if ($skipped > 0) {
+            $this->addFlash('warning', sprintf('%d record%s skipped (already changed or no longer unambiguous).', $skipped, $skipped !== 1 ? 's' : ''));
         }
 
         return $this->redirectToRoute('recommendation_index');

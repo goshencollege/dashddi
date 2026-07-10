@@ -95,18 +95,106 @@
     {% endif %}
 </div>
 
+{# ── Convertible CNAME Records ────────────────────────────────────────────── #}
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>
+            <i class="bi bi-arrow-repeat me-1"></i>
+            <strong>Convertible CNAME Records</strong>
+            <span class="badge bg-secondary ms-2">{{ convertible_cnames|length }}</span>
+        </span>
+    </div>
+    <div class="card-body pb-0">
+        <p class="text-muted small mb-3">
+            These CNAME records point to a single A or AAAA record that is already linked to an interface or VIP.
+            Since the target is unambiguous, the CNAME can be converted to an A/AAAA record linked to the same
+            interface or VIP so DashDDI manages it directly.
+        </p>
+    </div>
+
+    {% if convertible_cnames is empty %}
+        <div class="card-body pt-0">
+            <div class="alert alert-success mb-0">
+                <i class="bi bi-check-circle me-1"></i>No convertible CNAME records found.
+            </div>
+        </div>
+    {% else %}
+        <form method="post" action="{{ path('recommendation_apply_convert_cname') }}" id="cname-form">
+            <input type="hidden" name="_token" value="{{ csrf_token('convert_cname_bulk') }}">
+
+            <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom border-top">
+                <div class="form-check mb-0">
+                    <input class="form-check-input" type="checkbox" id="select-all-cname">
+                    <label class="form-check-label small text-muted" for="select-all-cname">Select all</label>
+                </div>
+                <button type="submit" class="btn btn-sm btn-success" id="cname-apply-btn" disabled
+                        onclick="return confirm('Convert ' + document.getElementById('cname-selected-count').textContent + ' CNAME record(s) to A/AAAA?')">
+                    <i class="bi bi-arrow-repeat me-1"></i>
+                    Convert Selected (<span id="cname-selected-count">0</span>)
+                </button>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-sm table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th style="width: 2.25rem"></th>
+                            <th>Domain</th>
+                            <th>Hostname</th>
+                            <th>Points To</th>
+                            <th>Would Become</th>
+                            <th>Match</th>
+                            <th>Name</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in convertible_cnames %}
+                        <tr>
+                            <td>
+                                <input class="form-check-input cname-checkbox" type="checkbox"
+                                       name="ids[]" value="{{ row.record_id }}">
+                            </td>
+                            <td>
+                                <a href="{{ path('domain_show', {id: row.domain_id}) }}">{{ row.domain_name }}</a>
+                            </td>
+                            <td class="font-monospace">{{ row.hostname }}</td>
+                            <td class="font-monospace text-muted">{{ row.cname_target }}</td>
+                            <td><span class="badge bg-primary-subtle text-primary-emphasis">{{ row.target_type }}</span></td>
+                            <td>
+                                {% if row.match_type == 'vip' %}
+                                    <span class="badge bg-warning-subtle text-warning-emphasis">VIP</span>
+                                {% else %}
+                                    <span class="badge bg-secondary-subtle text-secondary-emphasis">Interface</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if row.match_type == 'vip' %}
+                                    <a href="{{ path('virtual_ip_show', {id: row.match_id}) }}">{{ row.match_label }}</a>
+                                {% else %}
+                                    <a href="{{ path('interface_show', {id: row.match_id}) }}">{{ row.match_label }}{% if row.match_sublabel %} / {{ row.match_sublabel }}{% endif %}</a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </form>
+    {% endif %}
 </div>
 
-{% if unlinked_dns is not empty %}
+</div>
+
 <script>
-(function () {
-    const selectAll  = document.getElementById('select-all-dns');
-    const applyBtn   = document.getElementById('bulk-apply-btn');
-    const countSpan  = document.getElementById('selected-count');
-    const checkboxes = document.querySelectorAll('.dns-checkbox');
+function initCheckboxGroup(selectAllId, checkboxClass, applyBtnId, countSpanId) {
+    const selectAll  = document.getElementById(selectAllId);
+    const applyBtn   = document.getElementById(applyBtnId);
+    const countSpan  = document.getElementById(countSpanId);
+    const checkboxes = document.querySelectorAll('.' + checkboxClass);
+    if (!selectAll) return;
 
     function updateState() {
-        const checked = document.querySelectorAll('.dns-checkbox:checked').length;
+        const checked = document.querySelectorAll('.' + checkboxClass + ':checked').length;
         countSpan.textContent = checked;
         applyBtn.disabled = checked === 0;
         selectAll.indeterminate = checked > 0 && checked < checkboxes.length;
@@ -118,13 +206,15 @@
         updateState();
     });
 
-    checkboxes.forEach(cb => cb.addEventListener('change', updateState));
+    checkboxes.forEach(cb => {
+        cb.addEventListener('change', updateState);
+        cb.addEventListener('change', function () {
+            this.closest('tr').classList.toggle('table-active', this.checked);
+        });
+    });
+}
 
-    // Highlight row when its checkbox is checked
-    checkboxes.forEach(cb => cb.addEventListener('change', function () {
-        this.closest('tr').classList.toggle('table-active', this.checked);
-    }));
-})();
+initCheckboxGroup('select-all-dns',   'dns-checkbox',   'bulk-apply-btn',  'selected-count');
+initCheckboxGroup('select-all-cname', 'cname-checkbox', 'cname-apply-btn', 'cname-selected-count');
 </script>
-{% endif %}
 {% endblock %}
