@@ -277,11 +277,13 @@ function initCheckboxGroup(selectAllId, checkboxClass, applyBtnId, countSpanId) 
     const selectAll  = document.getElementById(selectAllId);
     const applyBtn   = document.getElementById(applyBtnId);
     const countSpan  = document.getElementById(countSpanId);
-    const checkboxes = document.querySelectorAll('.' + checkboxClass);
+    const checkboxes = Array.from(document.querySelectorAll('.' + checkboxClass));
     if (!selectAll) return;
 
+    let lastChecked = null;
+
     function updateState() {
-        const checked = document.querySelectorAll('.' + checkboxClass + ':checked').length;
+        const checked = checkboxes.filter(cb => cb.checked).length;
         countSpan.textContent = checked;
         applyBtn.disabled = checked === 0;
         selectAll.indeterminate = checked > 0 && checked < checkboxes.length;
@@ -289,14 +291,29 @@ function initCheckboxGroup(selectAllId, checkboxClass, applyBtnId, countSpanId) 
     }
 
     selectAll.addEventListener('change', function () {
-        checkboxes.forEach(cb => { cb.checked = this.checked; });
+        checkboxes.forEach(cb => {
+            cb.checked = this.checked;
+            cb.closest('tr').classList.toggle('table-active', this.checked);
+        });
+        lastChecked = null;
         updateState();
     });
 
     checkboxes.forEach(cb => {
-        cb.addEventListener('change', updateState);
-        cb.addEventListener('change', function () {
-            this.closest('tr').classList.toggle('table-active', this.checked);
+        cb.addEventListener('click', function (e) {
+            if (e.shiftKey && lastChecked !== null && lastChecked !== this) {
+                const a = checkboxes.indexOf(lastChecked);
+                const b = checkboxes.indexOf(this);
+                const [from, to] = a < b ? [a, b] : [b, a];
+                checkboxes.slice(from, to + 1).forEach(c => {
+                    c.checked = this.checked;
+                    c.closest('tr').classList.toggle('table-active', this.checked);
+                });
+            } else {
+                this.closest('tr').classList.toggle('table-active', this.checked);
+            }
+            lastChecked = this;
+            updateState();
         });
     });
 }
