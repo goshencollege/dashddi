@@ -43,8 +43,9 @@ class ReportController extends AbstractController
     public function recommendations(RecommendationService $service): Response
     {
         return $this->render('report/recommendations.html.twig', [
-            'unlinked_dns'     => $service->findUnlinkedDnsRecords(),
-            'convertible_cnames' => $service->findConvertibleCnameRecords(),
+            'unlinked_dns'        => $service->findUnlinkedDnsRecords(),
+            'convertible_cnames'  => $service->findConvertibleCnameRecords(),
+            'missing_dual_stack'  => $service->findMissingDualStackRecords(),
         ]);
     }
 
@@ -196,6 +197,82 @@ class ReportController extends AbstractController
         }
         if ($skipped > 0) {
             $this->addFlash('warning', sprintf('%d record%s skipped (already changed or no longer matched).', $skipped, $skipped !== 1 ? 's' : ''));
+        }
+
+        return $this->redirectToRoute('recommendation_index');
+    }
+
+    #[Route('/recommendations/apply/add-dual-stack', name: 'recommendation_apply_add_dual_stack', methods: ['POST'])]
+    public function applyAddDualStack(
+        Request $request,
+        EntityManagerInterface $em,
+    ): Response {
+        if (!$this->isCsrfTokenValid('add_dual_stack_bulk', $request->request->get('_token'))) {
+            $this->addFlash('danger', 'Invalid CSRF token.');
+            return $this->redirectToRoute('recommendation_index');
+        }
+
+        $targets = (array) $request->request->all('targets');
+        if (empty($targets)) {
+            $this->addFlash('warning', 'No records selected.');
+            return $this->redirectToRoute('recommendation_index');
+        }
+
+        $added   = 0;
+        $skipped = 0;
+
+        foreach ($targets as $target) {
+            $parts = explode(':', (string) $target, 2);
+            if (count($parts) !== 2) { $skipped++; continue; }
+
+            $existing = $em->find(DomainRecord::class, (int) $parts[0]);
+            $type     = RecordType::tryFrom($parts[1]);
+
+            if ($existing === null || $type === null || !in_array($type, [RecordType::A, RecordType::AAAA], true)) {
+                $skipped++;
+                continue;
+            }
+
+            $iface = $existing->getNetworkInterface();
+            $vip   = $existing->getVirtualIp();
+            if ($iface === null && $vip === null) { $skipped++; continue; }
+
+            // Guard: skip if the record was already created since page load
+            $qb = $em->createQueryBuilder()
+                ->select('COUNT(dr.id)')->from(DomainRecord::class, 'dr')
+                ->where('dr.hostname = :h')->andWhere('dr.domain = :d')->andWhere('dr.type = :t')
+                ->setParameter('h', $existing->getHostname())
+                ->setParameter('d', $existing->getDomain())
+                ->setParameter('t', $type);
+            if ($iface !== null) {
+                $qb->andWhere('dr.networkInterface = :e')->setParameter('e', $iface);
+            } else {
+                $qb->andWhere('dr.virtualIp = :e')->setParameter('e', $vip);
+            }
+            if ((int) $qb->getQuery()->getSingleScalarResult() > 0) { $skipped++; continue; }
+
+            $new = new DomainRecord();
+            $new->setDomain($existing->getDomain());
+            $new->setHostname($existing->getHostname());
+            $new->setType($type);
+            $new->setValue('');
+            $new->setTtl($existing->getTtl());
+            $new->setComment($existing->getComment());
+            foreach ($existing->getViews() as $view) {
+                $new->addView($view);
+            }
+            $iface !== null ? $new->setNetworkInterface($iface) : $new->setVirtualIp($vip);
+            $em->persist($new);
+            $added++;
+        }
+
+        $em->flush();
+
+        if ($added > 0) {
+            $this->addFlash('success', sprintf('%d missing DNS record%s added.', $added, $added !== 1 ? 's' : ''));
+        }
+        if ($skipped > 0) {
+            $this->addFlash('warning', sprintf('%d item%s skipped (already exists or data changed).', $skipped, $skipped !== 1 ? 's' : ''));
         }
 
         return $this->redirectToRoute('recommendation_index');

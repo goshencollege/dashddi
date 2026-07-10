@@ -212,6 +212,127 @@ class RecommendationService
         );
     }
 
+    /**
+     * Finds dual-stack interfaces and VIPs that have an A or AAAA record linked
+     * but are missing the complementary record for the same hostname and domain.
+     *
+     * Each row contains: existing_record_id, hostname, domain_id, domain_name,
+     * missing_type ('A'|'AAAA'), match_type ('interface'|'vip'), match_id,
+     * match_label, match_sublabel.
+     */
+    public function findMissingDualStackRecords(): array
+    {
+        $sql = <<<SQL
+            SELECT
+                'AAAA'       AS missing_type,
+                'interface'  AS match_type,
+                ni.id        AS match_id,
+                h.name       AS match_label,
+                ni.name      AS match_sublabel,
+                dr.id        AS existing_record_id,
+                dr.hostname,
+                d.id         AS domain_id,
+                d.name       AS domain_name
+            FROM network_interface ni
+            JOIN host h           ON h.id    = ni.host_id
+            JOIN ip_address ia    ON ia.id   = ni.ip_address_id
+            JOIN ipv6_address ia6 ON ia6.id  = ni.ipv6_address_id
+            JOIN domain_record dr ON dr.network_interface_id = ni.id AND dr.type = 'A'
+            JOIN domain d         ON d.id    = dr.domain_id
+            WHERE ni.deleted_at IS NULL
+              AND NOT EXISTS (
+                  SELECT 1 FROM domain_record dr2
+                  WHERE dr2.network_interface_id = ni.id
+                    AND dr2.type = 'AAAA'
+                    AND dr2.hostname  = dr.hostname
+                    AND dr2.domain_id = dr.domain_id
+              )
+
+            UNION ALL
+
+            SELECT
+                'A'          AS missing_type,
+                'interface'  AS match_type,
+                ni.id        AS match_id,
+                h.name       AS match_label,
+                ni.name      AS match_sublabel,
+                dr.id        AS existing_record_id,
+                dr.hostname,
+                d.id         AS domain_id,
+                d.name       AS domain_name
+            FROM network_interface ni
+            JOIN host h           ON h.id    = ni.host_id
+            JOIN ip_address ia    ON ia.id   = ni.ip_address_id
+            JOIN ipv6_address ia6 ON ia6.id  = ni.ipv6_address_id
+            JOIN domain_record dr ON dr.network_interface_id = ni.id AND dr.type = 'AAAA'
+            JOIN domain d         ON d.id    = dr.domain_id
+            WHERE ni.deleted_at IS NULL
+              AND NOT EXISTS (
+                  SELECT 1 FROM domain_record dr2
+                  WHERE dr2.network_interface_id = ni.id
+                    AND dr2.type = 'A'
+                    AND dr2.hostname  = dr.hostname
+                    AND dr2.domain_id = dr.domain_id
+              )
+
+            UNION ALL
+
+            SELECT
+                'AAAA'       AS missing_type,
+                'vip'        AS match_type,
+                vip.id       AS match_id,
+                vip.label    AS match_label,
+                NULL         AS match_sublabel,
+                dr.id        AS existing_record_id,
+                dr.hostname,
+                d.id         AS domain_id,
+                d.name       AS domain_name
+            FROM virtual_ip vip
+            JOIN ip_address ia    ON ia.id   = vip.ip_address_id
+            JOIN ipv6_address ia6 ON ia6.id  = vip.ipv6_address_id
+            JOIN domain_record dr ON dr.virtual_ip_id = vip.id AND dr.type = 'A'
+            JOIN domain d         ON d.id    = dr.domain_id
+            WHERE vip.deleted_at IS NULL
+              AND NOT EXISTS (
+                  SELECT 1 FROM domain_record dr2
+                  WHERE dr2.virtual_ip_id = vip.id
+                    AND dr2.type = 'AAAA'
+                    AND dr2.hostname  = dr.hostname
+                    AND dr2.domain_id = dr.domain_id
+              )
+
+            UNION ALL
+
+            SELECT
+                'A'          AS missing_type,
+                'vip'        AS match_type,
+                vip.id       AS match_id,
+                vip.label    AS match_label,
+                NULL         AS match_sublabel,
+                dr.id        AS existing_record_id,
+                dr.hostname,
+                d.id         AS domain_id,
+                d.name       AS domain_name
+            FROM virtual_ip vip
+            JOIN ip_address ia    ON ia.id   = vip.ip_address_id
+            JOIN ipv6_address ia6 ON ia6.id  = vip.ipv6_address_id
+            JOIN domain_record dr ON dr.virtual_ip_id = vip.id AND dr.type = 'AAAA'
+            JOIN domain d         ON d.id    = dr.domain_id
+            WHERE vip.deleted_at IS NULL
+              AND NOT EXISTS (
+                  SELECT 1 FROM domain_record dr2
+                  WHERE dr2.virtual_ip_id = vip.id
+                    AND dr2.type = 'A'
+                    AND dr2.hostname  = dr.hostname
+                    AND dr2.domain_id = dr.domain_id
+              )
+
+            ORDER BY match_label, hostname, domain_name
+        SQL;
+
+        return $this->em->getConnection()->fetchAllAssociative($sql);
+    }
+
     // ── private helpers ───────────────────────────────────────────────────────
 
     private function fetchCnameTargetRows(?int $cnameId = null): array

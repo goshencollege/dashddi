@@ -182,6 +182,96 @@
 
 </div>
 
+{# ── Missing Dual-Stack DNS Records ──────────────────────────────────────── #}
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>
+            <i class="bi bi-stack me-1"></i>
+            <strong>Missing Dual-Stack DNS Records</strong>
+            <span class="badge bg-secondary ms-2">{{ missing_dual_stack|length }}</span>
+        </span>
+    </div>
+    <div class="card-body pb-0">
+        <p class="text-muted small mb-3">
+            These dual-stack interfaces and VIPs have an A or AAAA record but are missing the
+            complementary record for the same hostname and domain. The missing record will be
+            created and linked to the same interface or VIP.
+        </p>
+    </div>
+
+    {% if missing_dual_stack is empty %}
+        <div class="card-body pt-0">
+            <div class="alert alert-success mb-0">
+                <i class="bi bi-check-circle me-1"></i>No missing dual-stack records found.
+            </div>
+        </div>
+    {% else %}
+        <form method="post" action="{{ path('recommendation_apply_add_dual_stack') }}" id="dual-stack-form">
+            <input type="hidden" name="_token" value="{{ csrf_token('add_dual_stack_bulk') }}">
+
+            <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom border-top">
+                <div class="form-check mb-0">
+                    <input class="form-check-input" type="checkbox" id="select-all-dualstack">
+                    <label class="form-check-label small text-muted" for="select-all-dualstack">Select all</label>
+                </div>
+                <button type="submit" class="btn btn-sm btn-success" id="dualstack-apply-btn" disabled
+                        onclick="return confirm('Add ' + document.getElementById('dualstack-selected-count').textContent + ' missing DNS record(s)?')">
+                    <i class="bi bi-plus-circle me-1"></i>
+                    Add Selected (<span id="dualstack-selected-count">0</span>)
+                </button>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-sm table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th style="width: 2.25rem"></th>
+                            <th>Match</th>
+                            <th>Name</th>
+                            <th>Hostname</th>
+                            <th>Domain</th>
+                            <th>Missing</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in missing_dual_stack %}
+                        <tr>
+                            <td>
+                                <input class="form-check-input dualstack-checkbox" type="checkbox"
+                                       name="targets[]" value="{{ row.existing_record_id }}:{{ row.missing_type }}">
+                            </td>
+                            <td>
+                                {% if row.match_type == 'vip' %}
+                                    <span class="badge bg-warning-subtle text-warning-emphasis">VIP</span>
+                                {% else %}
+                                    <span class="badge bg-secondary-subtle text-secondary-emphasis">Interface</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if row.match_type == 'vip' %}
+                                    <a href="{{ path('virtual_ip_show', {id: row.match_id}) }}">{{ row.match_label }}</a>
+                                {% else %}
+                                    <a href="{{ path('interface_show', {id: row.match_id}) }}">{{ row.match_label }}{% if row.match_sublabel %} / {{ row.match_sublabel }}{% endif %}</a>
+                                {% endif %}
+                            </td>
+                            <td class="font-monospace">{{ row.hostname }}</td>
+                            <td>
+                                <a href="{{ path('domain_show', {id: row.domain_id}) }}">{{ row.domain_name }}</a>
+                            </td>
+                            <td>
+                                <span class="badge bg-danger-subtle text-danger-emphasis">{{ row.missing_type }}</span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </form>
+    {% endif %}
+</div>
+
+</div>
+
 <script>
 function initCheckboxGroup(selectAllId, checkboxClass, applyBtnId, countSpanId) {
     const selectAll  = document.getElementById(selectAllId);
@@ -211,7 +301,8 @@ function initCheckboxGroup(selectAllId, checkboxClass, applyBtnId, countSpanId) 
     });
 }
 
-initCheckboxGroup('select-all-dns',   'dns-checkbox',   'bulk-apply-btn',  'selected-count');
-initCheckboxGroup('select-all-cname', 'cname-checkbox', 'cname-apply-btn', 'cname-selected-count');
+initCheckboxGroup('select-all-dns',       'dns-checkbox',        'bulk-apply-btn',        'selected-count');
+initCheckboxGroup('select-all-cname',     'cname-checkbox',      'cname-apply-btn',       'cname-selected-count');
+initCheckboxGroup('select-all-dualstack', 'dualstack-checkbox',  'dualstack-apply-btn',   'dualstack-selected-count');
 </script>
 {% endblock %}
