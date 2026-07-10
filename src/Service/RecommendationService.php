@@ -31,7 +31,8 @@ class RecommendationService
                 'A'          AS record_type,
                 'interface'  AS match_type,
                 ni.id        AS match_id,
-                h.name       AS match_label
+                h.name       AS match_label,
+                ni.name      AS match_sublabel
             FROM domain_record dr
             JOIN domain d              ON dr.domain_id       = d.id
             JOIN ip_address ia         ON dr.value           = ia.address
@@ -53,7 +54,8 @@ class RecommendationService
                 'AAAA'       AS record_type,
                 'interface'  AS match_type,
                 ni.id        AS match_id,
-                h.name       AS match_label
+                h.name       AS match_label,
+                ni.name      AS match_sublabel
             FROM domain_record dr
             JOIN domain d              ON dr.domain_id        = d.id
             JOIN ipv6_address ia6      ON dr.value            = ia6.address
@@ -75,7 +77,8 @@ class RecommendationService
                 'A'          AS record_type,
                 'vip'        AS match_type,
                 vip.id       AS match_id,
-                vip.label    AS match_label
+                vip.label    AS match_label,
+                NULL         AS match_sublabel
             FROM domain_record dr
             JOIN domain d         ON dr.domain_id       = d.id
             JOIN ip_address ia    ON dr.value           = ia.address
@@ -96,7 +99,8 @@ class RecommendationService
                 'AAAA'       AS record_type,
                 'vip'        AS match_type,
                 vip.id       AS match_id,
-                vip.label    AS match_label
+                vip.label    AS match_label,
+                NULL         AS match_sublabel
             FROM domain_record dr
             JOIN domain d          ON dr.domain_id        = d.id
             JOIN ipv6_address ia6  ON dr.value            = ia6.address

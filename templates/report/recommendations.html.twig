@@ -84,6 +84,9 @@
                                     <a href="{{ path('virtual_ip_show', {id: row.match_id}) }}">{{ row.match_label }}</a>
                                 {% else %}
                                     <a href="{{ path('interface_show', {id: row.match_id}) }}">{{ row.match_label }}</a>
+                                    {% if row.match_sublabel %}
+                                        <span class="text-muted"> / {{ row.match_sublabel }}</span>
+                                    {% endif %}
                                 {% endif %}
                             </td>
                         </tr>
