@@ -246,6 +246,7 @@ class RecommendationService
             WHERE dr.type = 'CNAME'
               AND dr.value != d.name
               AND dr.value != CONCAT(d.name, '.')
+              AND NOT (dr.value LIKE '%.' AND dr.value NOT LIKE CONCAT('%.', d.name, '.'))
               AND NOT EXISTS (
                   SELECT 1 FROM domain_record dr2
                   WHERE dr2.domain_id = dr.domain_id
