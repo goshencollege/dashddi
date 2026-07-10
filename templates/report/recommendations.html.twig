@@ -1,0 +1,78 @@
+{% extends 'base.html.twig' %}
+{% block title %}Recommendations{% endblock %}
+{% block body_class %}page-list-view{% endblock %}
+
+{% block content %}
+<div class="list-page-content">
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0"><i class="bi bi-lightbulb me-2"></i>Recommendations</h1>
+</div>
+
+{# ── Unlinked DNS Records ─────────────────────────────────────────────────── #}
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>
+            <i class="bi bi-link-45deg me-1"></i>
+            <strong>Unlinked DNS Records</strong>
+            <span class="badge bg-secondary ms-2">{{ unlinked_dns|length }}</span>
+        </span>
+    </div>
+    <div class="card-body pb-0">
+        <p class="text-muted small mb-3">
+            These A and AAAA records have an IP address that matches a network interface, but the record is not
+            linked to that interface. Linking the record lets DashDDI manage it automatically and keep it in sync.
+        </p>
+    </div>
+
+    {% if unlinked_dns is empty %}
+        <div class="card-body pt-0">
+            <div class="alert alert-success mb-0">
+                <i class="bi bi-check-circle me-1"></i>No unlinked DNS records found.
+            </div>
+        </div>
+    {% else %}
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Domain</th>
+                        <th>Hostname</th>
+                        <th>Type</th>
+                        <th>IP Address</th>
+                        <th>Matching Interface / Host</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in unlinked_dns %}
+                    <tr>
+                        <td>
+                            <a href="{{ path('domain_show', {id: row.domain_id}) }}">{{ row.domain_name }}</a>
+                        </td>
+                        <td class="font-monospace">{{ row.hostname }}</td>
+                        <td><span class="badge bg-primary-subtle text-primary-emphasis">{{ row.record_type }}</span></td>
+                        <td class="font-monospace">{{ row.ip }}</td>
+                        <td>
+                            <a href="{{ path('interface_show', {id: row.iface_id}) }}">{{ row.host_name }}</a>
+                        </td>
+                        <td class="text-end">
+                            <form method="post"
+                                  action="{{ path('recommendation_apply_link_dns', {id: row.record_id}) }}"
+                                  class="d-inline"
+                                  onsubmit="return confirm('Link this DNS record to the interface on {{ row.host_name|e('js') }}?')">
+                                <input type="hidden" name="_token" value="{{ csrf_token('link_dns_' ~ row.record_id) }}">
+                                <button type="submit" class="btn btn-sm btn-outline-success">
+                                    <i class="bi bi-link-45deg me-1"></i>Link to Interface
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+</div>
+
+</div>
+{% endblock %}
