@@ -119,6 +119,15 @@ class DomainRecordType extends AbstractType
 
         $domainFromPreSetData = null;
 
+        if ($options['allow_dual_stack']) {
+            $builder->addEventListener(FormEvents::POST_SET_DATA, function (FormEvent $event) {
+                $record = $event->getData();
+                if ($record instanceof DomainRecord && $record->getId() === null) {
+                    $event->getForm()->get('type')->setData('A+AAAA');
+                }
+            });
+        }
+
         $builder->addEventListener(FormEvents::PRE_SET_DATA, function (FormEvent $event) use ($hasContext, $subnet, &$domainFromPreSetData) {
             $record = $event->getData();
             $domain = ($record instanceof DomainRecord) ? $record->getDomain() : null;
