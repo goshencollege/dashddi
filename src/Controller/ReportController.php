@@ -5,6 +5,8 @@ namespace App\Controller;
 use App\Entity\DnsView;
 use App\Entity\DomainRecord;
 use App\Entity\NetworkInterface;
+use App\Entity\Subnet;
+use App\Entity\Tag;
 use App\Entity\VirtualIp;
 use App\Enum\RecordType;
 use App\Service\DnsViewResolver;
@@ -49,6 +51,7 @@ class ReportController extends AbstractController
             'convertible_cnames'  => $service->findConvertibleCnameRecords(),
             'missing_dual_stack'  => $service->findMissingDualStackRecords(),
             'missing_views'       => $service->findRecordsWithMissingViews(),
+            'dhcp_mismatches'     => $service->findDhcpSubnetMismatches(),
         ]);
     }
 
@@ -276,6 +279,110 @@ class ReportController extends AbstractController
         }
         if ($skipped > 0) {
             $this->addFlash('warning', sprintf('%d item%s skipped (already exists or data changed).', $skipped, $skipped !== 1 ? 's' : ''));
+        }
+
+        return $this->redirectToRoute('recommendation_index');
+    }
+
+    #[Route('/recommendations/apply/dhcp-mismatch/tag', name: 'recommendation_apply_dhcp_mismatch_tag', methods: ['POST'])]
+    public function applyDhcpMismatchTag(
+        Request $request,
+        EntityManagerInterface $em,
+    ): Response {
+        if (!$this->isCsrfTokenValid('dhcp_mismatch_tag', $request->request->get('_token_tag'))) {
+            $this->addFlash('danger', 'Invalid CSRF token.');
+            return $this->redirectToRoute('recommendation_index');
+        }
+
+        $ids = array_filter(array_map('intval', (array) $request->request->all('ids')));
+        if (empty($ids)) {
+            $this->addFlash('warning', 'No interfaces selected.');
+            return $this->redirectToRoute('recommendation_index');
+        }
+
+        $tagRepo = $em->getRepository(Tag::class);
+        $tag = $tagRepo->findOneBy(['name' => RecommendationService::DHCP_EXCLUSION_TAG]);
+        if ($tag === null) {
+            $tag = (new Tag())->setName(RecommendationService::DHCP_EXCLUSION_TAG);
+            $em->persist($tag);
+        }
+
+        $tagged = 0;
+        $skipped = 0;
+        $seenHosts = [];
+
+        foreach ($ids as $id) {
+            $iface = $em->find(NetworkInterface::class, $id);
+            if ($iface === null || $iface->isDeleted()) { $skipped++; continue; }
+
+            $host = $iface->getHost();
+            if ($host === null || in_array($host->getId(), $seenHosts, true)) { $skipped++; continue; }
+            $seenHosts[] = $host->getId();
+
+            if (!$host->getTags()->contains($tag)) {
+                $host->addTag($tag);
+                $tagged++;
+            } else {
+                $skipped++;
+            }
+        }
+
+        $em->flush();
+
+        if ($tagged > 0) {
+            $this->addFlash('success', sprintf(
+                'Tag "%s" added to %d host%s — %s interfaces will no longer appear in this list.',
+                RecommendationService::DHCP_EXCLUSION_TAG,
+                $tagged,
+                $tagged !== 1 ? 's' : '',
+                $tagged !== 1 ? 'their' : 'its',
+            ));
+        }
+        if ($skipped > 0) {
+            $this->addFlash('warning', sprintf('%d item%s skipped (already tagged or data changed).', $skipped, $skipped !== 1 ? 's' : ''));
+        }
+
+        return $this->redirectToRoute('recommendation_index');
+    }
+
+    #[Route('/recommendations/apply/dhcp-mismatch/move', name: 'recommendation_apply_dhcp_mismatch_move', methods: ['POST'])]
+    public function applyDhcpMismatchMove(
+        Request $request,
+        EntityManagerInterface $em,
+        RecommendationService $service,
+    ): Response {
+        if (!$this->isCsrfTokenValid('dhcp_mismatch_move', $request->request->get('_token_move'))) {
+            $this->addFlash('danger', 'Invalid CSRF token.');
+            return $this->redirectToRoute('recommendation_index');
+        }
+
+        $ids = array_filter(array_map('intval', (array) $request->request->all('ids')));
+        if (empty($ids)) {
+            $this->addFlash('warning', 'No interfaces selected.');
+            return $this->redirectToRoute('recommendation_index');
+        }
+
+        $moved = 0;
+        $skipped = 0;
+
+        foreach ($ids as $id) {
+            $iface = $em->find(NetworkInterface::class, $id);
+            if ($iface === null || $iface->isDeleted()) { $skipped++; continue; }
+
+            $leaseSubnet = $service->findCurrentLeaseSubnet($iface);
+            if ($leaseSubnet === null || $leaseSubnet === $iface->getSubnet()) { $skipped++; continue; }
+
+            $iface->setSubnet($leaseSubnet);
+            $moved++;
+        }
+
+        $em->flush();
+
+        if ($moved > 0) {
+            $this->addFlash('success', sprintf('%d interface%s moved to lease subnet.', $moved, $moved !== 1 ? 's' : ''));
+        }
+        if ($skipped > 0) {
+            $this->addFlash('warning', sprintf('%d interface%s skipped (no active lease or data changed).', $skipped, $skipped !== 1 ? 's' : ''));
         }
 
         return $this->redirectToRoute('recommendation_index');

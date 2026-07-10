@@ -9,6 +9,14 @@
 </div>
 
 {# ── Unlinked DNS Records ─────────────────────────────────────────────────── #}
+{% if unlinked_dns is empty %}
+<div class="card mb-2 border-success-subtle">
+    <div class="card-header bg-success-subtle text-success-emphasis d-flex justify-content-between align-items-center py-2">
+        <span><i class="bi bi-link-45deg me-1"></i><strong>Unlinked DNS Records</strong></span>
+        <small><i class="bi bi-check-circle me-1"></i>None found</small>
+    </div>
+</div>
+{% else %}
 <div class="card mb-4">
     <div class="card-header d-flex justify-content-between align-items-center">
         <span>
@@ -19,83 +27,76 @@
     </div>
     <div class="card-body pb-0">
         <p class="text-muted small mb-3">
-            These A and AAAA records have an IP address that matches a network interface, but the record is not
-            linked to that interface. Linking the record lets DashDDI manage it automatically and keep it in sync.
+            These A and AAAA records have an IP address that matches a network interface or VIP, but the record
+            is not linked to that entity. Linking the record lets DashDDI manage it automatically and keep it in sync.
         </p>
     </div>
-
-    {% if unlinked_dns is empty %}
-        <div class="card-body pt-0">
-            <div class="alert alert-success mb-0">
-                <i class="bi bi-check-circle me-1"></i>No unlinked DNS records found.
+    <form method="post" action="{{ path('recommendation_apply_link_dns') }}" id="unlinked-dns-form">
+        <input type="hidden" name="_token" value="{{ csrf_token('link_dns_bulk') }}">
+        <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom border-top">
+            <div class="form-check mb-0">
+                <input class="form-check-input" type="checkbox" id="select-all-dns">
+                <label class="form-check-label small text-muted" for="select-all-dns">Select all</label>
             </div>
+            <button type="submit" class="btn btn-sm btn-success" id="bulk-apply-btn" disabled
+                    onclick="return confirm('Link ' + document.getElementById('selected-count').textContent + ' DNS record(s) to their matching interfaces?')">
+                <i class="bi bi-link-45deg me-1"></i>
+                Implement Selected (<span id="selected-count">0</span>)
+            </button>
         </div>
-    {% else %}
-        <form method="post" action="{{ path('recommendation_apply_link_dns') }}" id="unlinked-dns-form">
-            <input type="hidden" name="_token" value="{{ csrf_token('link_dns_bulk') }}">
-
-            <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom border-top">
-                <div class="form-check mb-0">
-                    <input class="form-check-input" type="checkbox" id="select-all-dns">
-                    <label class="form-check-label small text-muted" for="select-all-dns">Select all</label>
-                </div>
-                <button type="submit" class="btn btn-sm btn-success" id="bulk-apply-btn" disabled
-                        onclick="return confirm('Link ' + document.getElementById('selected-count').textContent + ' DNS record(s) to their matching interfaces?')">
-                    <i class="bi bi-link-45deg me-1"></i>
-                    Implement Selected (<span id="selected-count">0</span>)
-                </button>
-            </div>
-
-            <div class="table-responsive">
-                <table class="table table-sm table-hover mb-0">
-                    <thead>
-                        <tr>
-                            <th style="width: 2.25rem"></th>
-                            <th>Domain</th>
-                            <th>Hostname</th>
-                            <th>Type</th>
-                            <th>IP Address</th>
-                            <th>Match</th>
-                            <th>Name</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for row in unlinked_dns %}
-                        <tr class="dns-row">
-                            <td>
-                                <input class="form-check-input dns-checkbox" type="checkbox"
-                                       name="ids[]" value="{{ row.record_id }}">
-                            </td>
-                            <td>
-                                <a href="{{ path('domain_show', {id: row.domain_id}) }}">{{ row.domain_name }}</a>
-                            </td>
-                            <td class="font-monospace">{{ row.hostname }}</td>
-                            <td><span class="badge bg-primary-subtle text-primary-emphasis">{{ row.record_type }}</span></td>
-                            <td class="font-monospace">{{ row.ip }}</td>
-                            <td>
-                                {% if row.match_type == 'vip' %}
-                                    <span class="badge bg-warning-subtle text-warning-emphasis">VIP</span>
-                                {% else %}
-                                    <span class="badge bg-secondary-subtle text-secondary-emphasis">Interface</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if row.match_type == 'vip' %}
-                                    <a href="{{ path('virtual_ip_show', {id: row.match_id}) }}">{{ row.match_label }}</a>
-                                {% else %}
-                                    <a href="{{ path('interface_show', {id: row.match_id}) }}">{{ row.match_label }}{% if row.match_sublabel %} / {{ row.match_sublabel }}{% endif %}</a>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </form>
-    {% endif %}
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th style="width: 2.25rem"></th>
+                        <th>Domain</th>
+                        <th>Hostname</th>
+                        <th>Type</th>
+                        <th>IP Address</th>
+                        <th>Match</th>
+                        <th>Name</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in unlinked_dns %}
+                    <tr class="dns-row">
+                        <td><input class="form-check-input dns-checkbox" type="checkbox" name="ids[]" value="{{ row.record_id }}"></td>
+                        <td><a href="{{ path('domain_show', {id: row.domain_id}) }}">{{ row.domain_name }}</a></td>
+                        <td class="font-monospace">{{ row.hostname }}</td>
+                        <td><span class="badge bg-primary-subtle text-primary-emphasis">{{ row.record_type }}</span></td>
+                        <td class="font-monospace">{{ row.ip }}</td>
+                        <td>
+                            {% if row.match_type == 'vip' %}
+                                <span class="badge bg-warning-subtle text-warning-emphasis">VIP</span>
+                            {% else %}
+                                <span class="badge bg-secondary-subtle text-secondary-emphasis">Interface</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if row.match_type == 'vip' %}
+                                <a href="{{ path('virtual_ip_show', {id: row.match_id}) }}">{{ row.match_label }}</a>
+                            {% else %}
+                                <a href="{{ path('interface_show', {id: row.match_id}) }}">{{ row.match_label }}{% if row.match_sublabel %} / {{ row.match_sublabel }}{% endif %}</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </form>
 </div>
+{% endif %}
 
 {# ── Convertible CNAME Records ────────────────────────────────────────────── #}
+{% if convertible_cnames is empty %}
+<div class="card mb-2 border-success-subtle">
+    <div class="card-header bg-success-subtle text-success-emphasis d-flex justify-content-between align-items-center py-2">
+        <span><i class="bi bi-arrow-repeat me-1"></i><strong>Convertible CNAME Records</strong></span>
+        <small><i class="bi bi-check-circle me-1"></i>None found</small>
+    </div>
+</div>
+{% else %}
 <div class="card mb-4">
     <div class="card-header d-flex justify-content-between align-items-center">
         <span>
@@ -106,81 +107,73 @@
     </div>
     <div class="card-body pb-0">
         <p class="text-muted small mb-3">
-            These CNAME records point to a single A or AAAA record that is already linked to an interface or VIP.
-            Since the target is unambiguous, the CNAME can be converted to an A/AAAA record linked to the same
-            interface or VIP so DashDDI manages it directly.
+            These CNAME records point to A or AAAA records that are already linked to an interface or VIP.
+            Converting them to direct A/AAAA records lets DashDDI manage the IPs automatically.
         </p>
     </div>
-
-    {% if convertible_cnames is empty %}
-        <div class="card-body pt-0">
-            <div class="alert alert-success mb-0">
-                <i class="bi bi-check-circle me-1"></i>No convertible CNAME records found.
+    <form method="post" action="{{ path('recommendation_apply_convert_cname') }}" id="cname-form">
+        <input type="hidden" name="_token" value="{{ csrf_token('convert_cname_bulk') }}">
+        <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom border-top">
+            <div class="form-check mb-0">
+                <input class="form-check-input" type="checkbox" id="select-all-cname">
+                <label class="form-check-label small text-muted" for="select-all-cname">Select all</label>
             </div>
+            <button type="submit" class="btn btn-sm btn-success" id="cname-apply-btn" disabled
+                    onclick="return confirm('Convert ' + document.getElementById('cname-selected-count').textContent + ' CNAME record(s) to A/AAAA?')">
+                <i class="bi bi-arrow-repeat me-1"></i>
+                Convert Selected (<span id="cname-selected-count">0</span>)
+            </button>
         </div>
-    {% else %}
-        <form method="post" action="{{ path('recommendation_apply_convert_cname') }}" id="cname-form">
-            <input type="hidden" name="_token" value="{{ csrf_token('convert_cname_bulk') }}">
-
-            <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom border-top">
-                <div class="form-check mb-0">
-                    <input class="form-check-input" type="checkbox" id="select-all-cname">
-                    <label class="form-check-label small text-muted" for="select-all-cname">Select all</label>
-                </div>
-                <button type="submit" class="btn btn-sm btn-success" id="cname-apply-btn" disabled
-                        onclick="return confirm('Convert ' + document.getElementById('cname-selected-count').textContent + ' CNAME record(s) to A/AAAA?')">
-                    <i class="bi bi-arrow-repeat me-1"></i>
-                    Convert Selected (<span id="cname-selected-count">0</span>)
-                </button>
-            </div>
-
-            <div class="table-responsive">
-                <table class="table table-sm table-hover mb-0">
-                    <thead>
-                        <tr>
-                            <th style="width: 2.25rem"></th>
-                            <th>Domain</th>
-                            <th>Hostname</th>
-                            <th>Points To</th>
-                            <th>Would Become</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for row in convertible_cnames %}
-                        <tr>
-                            <td>
-                                <input class="form-check-input cname-checkbox" type="checkbox"
-                                       name="ids[]" value="{{ row.record_id }}">
-                            </td>
-                            <td>
-                                <a href="{{ path('domain_show', {id: row.domain_id}) }}">{{ row.domain_name }}</a>
-                            </td>
-                            <td class="font-monospace">{{ row.hostname }}</td>
-                            <td class="font-monospace text-muted">{{ row.cname_target }}</td>
-                            <td>
-                                {% for c in row.conversions %}
-                                    <div>
-                                        <span class="badge bg-primary-subtle text-primary-emphasis me-1">{{ c.target_type }}</span>
-                                        {% if c.match_type == 'vip' %}
-                                            <span class="badge bg-warning-subtle text-warning-emphasis me-1">VIP</span>
-                                            <a href="{{ path('virtual_ip_show', {id: c.match_id}) }}">{{ c.match_label }}</a>
-                                        {% else %}
-                                            <span class="badge bg-secondary-subtle text-secondary-emphasis me-1">Interface</span>
-                                            <a href="{{ path('interface_show', {id: c.match_id}) }}">{{ c.match_label }}{% if c.match_sublabel %} / {{ c.match_sublabel }}{% endif %}</a>
-                                        {% endif %}
-                                    </div>
-                                {% endfor %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </form>
-    {% endif %}
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th style="width: 2.25rem"></th>
+                        <th>Domain</th>
+                        <th>Hostname</th>
+                        <th>Points To</th>
+                        <th>Would Become</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in convertible_cnames %}
+                    <tr>
+                        <td><input class="form-check-input cname-checkbox" type="checkbox" name="ids[]" value="{{ row.record_id }}"></td>
+                        <td><a href="{{ path('domain_show', {id: row.domain_id}) }}">{{ row.domain_name }}</a></td>
+                        <td class="font-monospace">{{ row.hostname }}</td>
+                        <td class="font-monospace text-muted">{{ row.cname_target }}</td>
+                        <td>
+                            {% for c in row.conversions %}
+                                <div>
+                                    <span class="badge bg-primary-subtle text-primary-emphasis me-1">{{ c.target_type }}</span>
+                                    {% if c.match_type == 'vip' %}
+                                        <span class="badge bg-warning-subtle text-warning-emphasis me-1">VIP</span>
+                                        <a href="{{ path('virtual_ip_show', {id: c.match_id}) }}">{{ c.match_label }}</a>
+                                    {% else %}
+                                        <span class="badge bg-secondary-subtle text-secondary-emphasis me-1">Interface</span>
+                                        <a href="{{ path('interface_show', {id: c.match_id}) }}">{{ c.match_label }}{% if c.match_sublabel %} / {{ c.match_sublabel }}{% endif %}</a>
+                                    {% endif %}
+                                </div>
+                            {% endfor %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </form>
 </div>
+{% endif %}
 
 {# ── Missing Dual-Stack DNS Records ──────────────────────────────────────── #}
+{% if missing_dual_stack is empty %}
+<div class="card mb-2 border-success-subtle">
+    <div class="card-header bg-success-subtle text-success-emphasis d-flex justify-content-between align-items-center py-2">
+        <span><i class="bi bi-stack me-1"></i><strong>Missing Dual-Stack DNS Records</strong></span>
+        <small><i class="bi bi-check-circle me-1"></i>None found</small>
+    </div>
+</div>
+{% else %}
 <div class="card mb-4">
     <div class="card-header d-flex justify-content-between align-items-center">
         <span>
@@ -196,79 +189,70 @@
             created and linked to the same interface or VIP.
         </p>
     </div>
-
-    {% if missing_dual_stack is empty %}
-        <div class="card-body pt-0">
-            <div class="alert alert-success mb-0">
-                <i class="bi bi-check-circle me-1"></i>No missing dual-stack records found.
+    <form method="post" action="{{ path('recommendation_apply_add_dual_stack') }}" id="dual-stack-form">
+        <input type="hidden" name="_token" value="{{ csrf_token('add_dual_stack_bulk') }}">
+        <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom border-top">
+            <div class="form-check mb-0">
+                <input class="form-check-input" type="checkbox" id="select-all-dualstack">
+                <label class="form-check-label small text-muted" for="select-all-dualstack">Select all</label>
             </div>
+            <button type="submit" class="btn btn-sm btn-success" id="dualstack-apply-btn" disabled
+                    onclick="return confirm('Add ' + document.getElementById('dualstack-selected-count').textContent + ' missing DNS record(s)?')">
+                <i class="bi bi-plus-circle me-1"></i>
+                Add Selected (<span id="dualstack-selected-count">0</span>)
+            </button>
         </div>
-    {% else %}
-        <form method="post" action="{{ path('recommendation_apply_add_dual_stack') }}" id="dual-stack-form">
-            <input type="hidden" name="_token" value="{{ csrf_token('add_dual_stack_bulk') }}">
-
-            <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom border-top">
-                <div class="form-check mb-0">
-                    <input class="form-check-input" type="checkbox" id="select-all-dualstack">
-                    <label class="form-check-label small text-muted" for="select-all-dualstack">Select all</label>
-                </div>
-                <button type="submit" class="btn btn-sm btn-success" id="dualstack-apply-btn" disabled
-                        onclick="return confirm('Add ' + document.getElementById('dualstack-selected-count').textContent + ' missing DNS record(s)?')">
-                    <i class="bi bi-plus-circle me-1"></i>
-                    Add Selected (<span id="dualstack-selected-count">0</span>)
-                </button>
-            </div>
-
-            <div class="table-responsive">
-                <table class="table table-sm table-hover mb-0">
-                    <thead>
-                        <tr>
-                            <th style="width: 2.25rem"></th>
-                            <th>Match</th>
-                            <th>Name</th>
-                            <th>Hostname</th>
-                            <th>Domain</th>
-                            <th>Missing</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for row in missing_dual_stack %}
-                        <tr>
-                            <td>
-                                <input class="form-check-input dualstack-checkbox" type="checkbox"
-                                       name="targets[]" value="{{ row.existing_record_id }}:{{ row.missing_type }}">
-                            </td>
-                            <td>
-                                {% if row.match_type == 'vip' %}
-                                    <span class="badge bg-warning-subtle text-warning-emphasis">VIP</span>
-                                {% else %}
-                                    <span class="badge bg-secondary-subtle text-secondary-emphasis">Interface</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if row.match_type == 'vip' %}
-                                    <a href="{{ path('virtual_ip_show', {id: row.match_id}) }}">{{ row.match_label }}</a>
-                                {% else %}
-                                    <a href="{{ path('interface_show', {id: row.match_id}) }}">{{ row.match_label }}{% if row.match_sublabel %} / {{ row.match_sublabel }}{% endif %}</a>
-                                {% endif %}
-                            </td>
-                            <td class="font-monospace">{{ row.hostname }}</td>
-                            <td>
-                                <a href="{{ path('domain_show', {id: row.domain_id}) }}">{{ row.domain_name }}</a>
-                            </td>
-                            <td>
-                                <span class="badge bg-danger-subtle text-danger-emphasis">{{ row.missing_type }}</span>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </form>
-    {% endif %}
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th style="width: 2.25rem"></th>
+                        <th>Match</th>
+                        <th>Name</th>
+                        <th>Hostname</th>
+                        <th>Domain</th>
+                        <th>Missing</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in missing_dual_stack %}
+                    <tr>
+                        <td><input class="form-check-input dualstack-checkbox" type="checkbox" name="targets[]" value="{{ row.existing_record_id }}:{{ row.missing_type }}"></td>
+                        <td>
+                            {% if row.match_type == 'vip' %}
+                                <span class="badge bg-warning-subtle text-warning-emphasis">VIP</span>
+                            {% else %}
+                                <span class="badge bg-secondary-subtle text-secondary-emphasis">Interface</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if row.match_type == 'vip' %}
+                                <a href="{{ path('virtual_ip_show', {id: row.match_id}) }}">{{ row.match_label }}</a>
+                            {% else %}
+                                <a href="{{ path('interface_show', {id: row.match_id}) }}">{{ row.match_label }}{% if row.match_sublabel %} / {{ row.match_sublabel }}{% endif %}</a>
+                            {% endif %}
+                        </td>
+                        <td class="font-monospace">{{ row.hostname }}</td>
+                        <td><a href="{{ path('domain_show', {id: row.domain_id}) }}">{{ row.domain_name }}</a></td>
+                        <td><span class="badge bg-danger-subtle text-danger-emphasis">{{ row.missing_type }}</span></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </form>
 </div>
+{% endif %}
 
 {# ── Records Missing View Assignments ─────────────────────────────────────── #}
+{% if missing_views is empty %}
+<div class="card mb-2 border-success-subtle">
+    <div class="card-header bg-success-subtle text-success-emphasis d-flex justify-content-between align-items-center py-2">
+        <span><i class="bi bi-eye me-1"></i><strong>Records Missing View Assignments</strong></span>
+        <small><i class="bi bi-check-circle me-1"></i>None found</small>
+    </div>
+</div>
+{% else %}
 <div class="card mb-4">
     <div class="card-header d-flex justify-content-between align-items-center">
         <span>
@@ -284,75 +268,149 @@
             domain and subnet combination.
         </p>
     </div>
-
-    {% if missing_views is empty %}
-        <div class="card-body pt-0">
-            <div class="alert alert-success mb-0">
-                <i class="bi bi-check-circle me-1"></i>No records with missing view assignments found.
+    <form method="post" action="{{ path('recommendation_apply_add_missing_views') }}" id="missing-views-form">
+        <input type="hidden" name="_token" value="{{ csrf_token('add_missing_views_bulk') }}">
+        <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom border-top">
+            <div class="form-check mb-0">
+                <input class="form-check-input" type="checkbox" id="select-all-missingviews">
+                <label class="form-check-label small text-muted" for="select-all-missingviews">Select all</label>
             </div>
+            <button type="submit" class="btn btn-sm btn-success" id="missingviews-apply-btn" disabled
+                    onclick="return confirm('Add missing views to ' + document.getElementById('missingviews-selected-count').textContent + ' record(s)?')">
+                <i class="bi bi-eye me-1"></i>
+                Add Views to Selected (<span id="missingviews-selected-count">0</span>)
+            </button>
         </div>
-    {% else %}
-        <form method="post" action="{{ path('recommendation_apply_add_missing_views') }}" id="missing-views-form">
-            <input type="hidden" name="_token" value="{{ csrf_token('add_missing_views_bulk') }}">
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th style="width: 2.25rem"></th>
+                        <th>Domain</th>
+                        <th>Hostname</th>
+                        <th>Type</th>
+                        <th>Linked To</th>
+                        <th>Views to Add</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in missing_views %}
+                    <tr>
+                        <td><input class="form-check-input missingviews-checkbox" type="checkbox" name="ids[]" value="{{ row.record_id }}"></td>
+                        <td><a href="{{ path('domain_show', {id: row.domain_id}) }}">{{ row.domain_name }}</a></td>
+                        <td class="font-monospace">{{ row.hostname }}</td>
+                        <td><span class="badge bg-primary-subtle text-primary-emphasis">{{ row.record_type }}</span></td>
+                        <td>
+                            {% if row.match_type == 'interface' %}
+                                <a href="{{ path('interface_show', {id: row.match_id}) }}">{{ row.match_label }}{% if row.match_sublabel %} / {{ row.match_sublabel }}{% endif %}</a>
+                            {% elseif row.match_type == 'vip' %}
+                                <a href="{{ path('virtual_ip_show', {id: row.match_id}) }}">{{ row.match_label }}</a>
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% for v in row.views %}
+                                <span class="badge bg-info-subtle text-info-emphasis me-1">{{ v.name }}</span>
+                            {% endfor %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </form>
+</div>
+{% endif %}
 
-            <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom border-top">
-                <div class="form-check mb-0">
-                    <input class="form-check-input" type="checkbox" id="select-all-missingviews">
-                    <label class="form-check-label small text-muted" for="select-all-missingviews">Select all</label>
-                </div>
-                <button type="submit" class="btn btn-sm btn-success" id="missingviews-apply-btn" disabled
-                        onclick="return confirm('Add missing views to ' + document.getElementById('missingviews-selected-count').textContent + ' record(s)?')">
-                    <i class="bi bi-eye me-1"></i>
-                    Add Views to Selected (<span id="missingviews-selected-count">0</span>)
+{# ── DHCP Subnet Mismatches ───────────────────────────────────────────────── #}
+{% if dhcp_mismatches is empty %}
+<div class="card mb-2 border-success-subtle">
+    <div class="card-header bg-success-subtle text-success-emphasis d-flex justify-content-between align-items-center py-2">
+        <span><i class="bi bi-wifi me-1"></i><strong>DHCP Subnet Mismatches</strong></span>
+        <small><i class="bi bi-check-circle me-1"></i>None found</small>
+    </div>
+</div>
+{% else %}
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>
+            <i class="bi bi-wifi me-1"></i>
+            <strong>DHCP Subnet Mismatches</strong>
+            <span class="badge bg-secondary ms-2">{{ dhcp_mismatches|length }}</span>
+        </span>
+    </div>
+    <div class="card-body pb-0">
+        <p class="text-muted small mb-3">
+            These interfaces have a recent DHCP lease from a subnet other than the one they are assigned to.
+            <strong>Move</strong> the interface to match where it is actually DHCP-ing, or
+            <strong>exclude</strong> the host from this check by adding the
+            <code>dhcp-ok</code> tag (use this when roaming between subnets is intentional).
+        </p>
+    </div>
+    <form method="post" id="dhcp-mismatch-form">
+        <input type="hidden" name="_token_tag"  value="{{ csrf_token('dhcp_mismatch_tag') }}">
+        <input type="hidden" name="_token_move" value="{{ csrf_token('dhcp_mismatch_move') }}">
+        <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom border-top">
+            <div class="form-check mb-0">
+                <input class="form-check-input" type="checkbox" id="select-all-dhcp">
+                <label class="form-check-label small text-muted" for="select-all-dhcp">Select all</label>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <span class="small text-muted"><span id="dhcp-selected-count">0</span> selected</span>
+                <button type="submit" id="dhcp-tag-btn" disabled
+                        class="btn btn-sm btn-outline-secondary"
+                        formaction="{{ path('recommendation_apply_dhcp_mismatch_tag') }}"
+                        onclick="return confirm('Add dhcp-ok tag to the hosts of the selected interface(s)?')">
+                    <i class="bi bi-tag me-1"></i>Exclude Selected
+                </button>
+                <button type="submit" id="dhcp-move-btn" disabled
+                        class="btn btn-sm btn-success"
+                        formaction="{{ path('recommendation_apply_dhcp_mismatch_move') }}"
+                        onclick="return confirm('Move the selected interface(s) to their lease subnet? Review any static IP assignments afterward.')">
+                    <i class="bi bi-arrow-right-circle me-1"></i>Move to Lease Subnet
                 </button>
             </div>
-
-            <div class="table-responsive">
-                <table class="table table-sm table-hover mb-0">
-                    <thead>
-                        <tr>
-                            <th style="width: 2.25rem"></th>
-                            <th>Domain</th>
-                            <th>Hostname</th>
-                            <th>Type</th>
-                            <th>Linked To</th>
-                            <th>Views to Add</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for row in missing_views %}
-                        <tr>
-                            <td>
-                                <input class="form-check-input missingviews-checkbox" type="checkbox"
-                                       name="ids[]" value="{{ row.record_id }}">
-                            </td>
-                            <td>
-                                <a href="{{ path('domain_show', {id: row.domain_id}) }}">{{ row.domain_name }}</a>
-                            </td>
-                            <td class="font-monospace">{{ row.hostname }}</td>
-                            <td><span class="badge bg-primary-subtle text-primary-emphasis">{{ row.record_type }}</span></td>
-                            <td>
-                                {% if row.match_type == 'interface' %}
-                                    <a href="{{ path('interface_show', {id: row.match_id}) }}">{{ row.match_label }}{% if row.match_sublabel %} / {{ row.match_sublabel }}{% endif %}</a>
-                                {% elseif row.match_type == 'vip' %}
-                                    <a href="{{ path('virtual_ip_show', {id: row.match_id}) }}">{{ row.match_label }}</a>
-                                {% else %}
-                                    <span class="text-muted">—</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% for v in row.views %}
-                                    <span class="badge bg-info-subtle text-info-emphasis me-1">{{ v.name }}</span>
-                                {% endfor %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </form>
-    {% endif %}
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th style="width: 2.25rem"></th>
+                        <th>Host</th>
+                        <th>Interface</th>
+                        <th>MAC</th>
+                        <th>Assigned Subnet</th>
+                        <th>Lease Subnet</th>
+                        <th>Lease IP</th>
+                        <th>Last Seen</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in dhcp_mismatches %}
+                    <tr>
+                        <td><input class="form-check-input dhcp-checkbox" type="checkbox" name="ids[]" value="{{ row.interface_id }}"></td>
+                        <td><a href="{{ path('host_show', {id: row.host_id}) }}">{{ row.host_name }}</a></td>
+                        <td><a href="{{ path('interface_show', {id: row.interface_id}) }}">{{ row.interface_name ?? row.mac_address }}</a></td>
+                        <td class="font-monospace text-muted small">{{ row.mac_address }}</td>
+                        <td>
+                            <a href="{{ path('subnet_show', {id: row.assigned_subnet_id}) }}">{{ row.assigned_subnet_name }}</a>
+                            {% if row.assigned_cidr %}<br><small class="text-muted font-monospace">{{ row.assigned_cidr }}</small>{% endif %}
+                        </td>
+                        <td>
+                            <a href="{{ path('subnet_show', {id: row.lease_subnet_id}) }}">{{ row.lease_subnet_name }}</a>
+                            {% if row.lease_cidr %}<br><small class="text-muted font-monospace">{{ row.lease_cidr }}</small>{% endif %}
+                        </td>
+                        <td class="font-monospace">{{ row.lease_ip }}</td>
+                        <td class="small text-muted">{{ row.lease_start|date('Y-m-d H:i') }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </form>
 </div>
+{% endif %}
 
 </div>
 
@@ -406,5 +464,53 @@ initCheckboxGroup('select-all-dns',          'dns-checkbox',          'bulk-appl
 initCheckboxGroup('select-all-cname',        'cname-checkbox',        'cname-apply-btn',         'cname-selected-count');
 initCheckboxGroup('select-all-dualstack',    'dualstack-checkbox',    'dualstack-apply-btn',     'dualstack-selected-count');
 initCheckboxGroup('select-all-missingviews', 'missingviews-checkbox', 'missingviews-apply-btn',  'missingviews-selected-count');
+
+// DHCP mismatch card — two apply buttons, single count span
+(function () {
+    const selectAll  = document.getElementById('select-all-dhcp');
+    const tagBtn     = document.getElementById('dhcp-tag-btn');
+    const moveBtn    = document.getElementById('dhcp-move-btn');
+    const countSpan  = document.getElementById('dhcp-selected-count');
+    const checkboxes = Array.from(document.querySelectorAll('.dhcp-checkbox'));
+    if (!selectAll) return;
+
+    let lastChecked = null;
+
+    function updateState() {
+        const checked = checkboxes.filter(cb => cb.checked).length;
+        countSpan.textContent = checked;
+        tagBtn.disabled  = checked === 0;
+        moveBtn.disabled = checked === 0;
+        selectAll.indeterminate = checked > 0 && checked < checkboxes.length;
+        selectAll.checked = checked === checkboxes.length;
+    }
+
+    selectAll.addEventListener('change', function () {
+        checkboxes.forEach(cb => {
+            cb.checked = this.checked;
+            cb.closest('tr').classList.toggle('table-active', this.checked);
+        });
+        lastChecked = null;
+        updateState();
+    });
+
+    checkboxes.forEach(cb => {
+        cb.addEventListener('click', function (e) {
+            if (e.shiftKey && lastChecked !== null && lastChecked !== this) {
+                const a = checkboxes.indexOf(lastChecked);
+                const b = checkboxes.indexOf(this);
+                const [from, to] = a < b ? [a, b] : [b, a];
+                checkboxes.slice(from, to + 1).forEach(c => {
+                    c.checked = this.checked;
+                    c.closest('tr').classList.toggle('table-active', this.checked);
+                });
+            } else {
+                this.closest('tr').classList.toggle('table-active', this.checked);
+            }
+            lastChecked = this;
+            updateState();
+        });
+    });
+})();
 </script>
 {% endblock %}

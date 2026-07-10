@@ -2,6 +2,7 @@
 
 namespace App\Service;
 
+use App\Entity\DhcpLease;
 use App\Entity\Domain;
 use App\Entity\DomainRecord;
 use App\Entity\NetworkInterface;
@@ -12,6 +13,7 @@ use Doctrine\ORM\EntityManagerInterface;
 
 class RecommendationService
 {
+    public const DHCP_EXCLUSION_TAG = 'dhcp-ok';
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly DnsViewResolver $viewResolver,
@@ -410,6 +412,81 @@ class RecommendationService
         }
 
         return $results;
+    }
+
+    /**
+     * Finds network interfaces whose most recent DHCP lease was issued by a subnet
+     * other than the one the interface is assigned to.
+     *
+     * Hosts tagged with DHCP_EXCLUSION_TAG are excluded. Each row contains:
+     * interface_id, interface_name, mac_address, host_id, host_name,
+     * assigned_subnet_id, assigned_subnet_name, assigned_cidr,
+     * lease_subnet_id, lease_subnet_name, lease_cidr, lease_ip, lease_start.
+     */
+    public function findDhcpSubnetMismatches(): array
+    {
+        $sql = <<<SQL
+            SELECT
+                ni.id          AS interface_id,
+                ni.name        AS interface_name,
+                ni.mac_address,
+                h.id           AS host_id,
+                h.name         AS host_name,
+                sa.id          AS assigned_subnet_id,
+                sa.name        AS assigned_subnet_name,
+                COALESCE(sa.ipv4_cidr, sa.ipv6_cidr) AS assigned_cidr,
+                sl.id          AS lease_subnet_id,
+                sl.name        AS lease_subnet_name,
+                COALESCE(sl.ipv4_cidr, sl.ipv6_cidr) AS lease_cidr,
+                dl.ip_address  AS lease_ip,
+                dl.lease_start AS lease_start
+            FROM network_interface ni
+            JOIN host h     ON h.id  = ni.host_id
+            JOIN subnet sa  ON sa.id = ni.subnet_id
+            JOIN dhcp_lease dl ON dl.mac_address = ni.mac_address
+            JOIN subnet sl  ON sl.id = dl.subnet_id
+            WHERE ni.deleted_at IS NULL
+              AND h.deleted_at  IS NULL
+              AND ni.mac_address != '00:00:00:00:00:00'
+              AND sl.id != ni.subnet_id
+              AND dl.lease_start = (
+                  SELECT MAX(dl2.lease_start)
+                  FROM dhcp_lease dl2
+                  WHERE dl2.mac_address = ni.mac_address
+              )
+              AND h.id NOT IN (
+                  SELECT ht.host_id
+                  FROM host_tag ht
+                  JOIN tag t ON t.id = ht.tag_id
+                  WHERE t.name = :exclusion_tag
+              )
+            ORDER BY h.name, ni.name
+        SQL;
+
+        return $this->em->getConnection()->fetchAllAssociative($sql, [
+            'exclusion_tag' => self::DHCP_EXCLUSION_TAG,
+        ]);
+    }
+
+    /**
+     * Returns the Subnet associated with the most recent DHCP lease for the
+     * given interface's MAC address, or null if no lease exists.
+     */
+    public function findCurrentLeaseSubnet(NetworkInterface $interface): ?Subnet
+    {
+        /** @var DhcpLease|null $lease */
+        $lease = $this->em->createQueryBuilder()
+            ->select('dl')
+            ->from(DhcpLease::class, 'dl')
+            ->where('dl.macAddress = :mac')
+            ->andWhere('dl.subnet IS NOT NULL')
+            ->orderBy('dl.leaseStart', 'DESC')
+            ->setMaxResults(1)
+            ->setParameter('mac', $interface->getMacAddress())
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        return $lease?->getSubnet();
     }
 
     // ── private helpers ───────────────────────────────────────────────────────
