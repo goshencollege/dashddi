@@ -81,72 +81,100 @@
 <div class="card list-scroll-card">
     <div class="card-header d-flex justify-content-between align-items-center">
         <span><i class="bi bi-list-ul me-1"></i>Results</span>
-        <span class="text-muted small">{{ total }} record(s)</span>
-    </div>
-    {% if logs|length == 0 %}
-        <div class="card-body text-center text-muted py-4">No authentication log records found.</div>
-    {% else %}
-        <div class="table-responsive">
-            <table class="table table-hover mb-0">
-                <thead>
-                    <tr>
-                        <th>MAC Address</th>
-                        <th>Username</th>
-                        <th>Protocol</th>
-                        <th>Service</th>
-                        <th>Switch IP</th>
-                        <th>Switch Port</th>
-                        <th>Role</th>
-                        <th>VLAN</th>
-                        <th>Timestamp</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for log in logs %}
-                        {% set iface = interface_map[log.macAddress] ?? null %}
-                        <tr>
-                            <td>
-                                {% if iface %}
-                                    <a href="{{ path('interface_show', {id: iface.id}) }}"><code>{{ log.macAddress }}</code></a>
-                                {% else %}
-                                    <code>{{ log.macAddress }}</code>
-                                {% endif %}
-                            </td>
-                            <td>{{ log.username ?: '—' }}</td>
-                            <td>{{ log.authProtocol ?: '—' }}</td>
-                            <td>{{ log.service ?: '—' }}</td>
-                            <td>{{ log.nasIp ?: '—' }}</td>
-                            <td>{{ log.nasPortId ?: '—' }}</td>
-                            <td>{{ log.role ?: '—' }}</td>
-                            <td>{{ log.vlan ?: '—' }}</td>
-                            <td class="text-nowrap">{{ log.authTimestamp|date('Y-m-d H:i') }}</td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-
-        {% if total > per_page %}
-            <div class="card-footer d-flex justify-content-between align-items-center">
-                <span class="text-muted small">Page {{ page }} of {{ (total / per_page)|round(0, 'ceil') }}</span>
-                <div>
-                    {% set pagerParams = {mac: filter_mac, username: filter_username, role: filter_role, vlan: filter_vlan, protocol: filter_protocol, service: filter_service, nas_ip: filter_nas_ip, nas_port_id: filter_nas_port_id} %}
-                    {% if page > 1 %}
-                        <a href="{{ path('clearpass_auth_log_index', pagerParams|merge({page: page - 1})) }}"
-                           class="btn btn-sm btn-outline-secondary me-1">
-                            <i class="bi bi-chevron-left"></i> Prev
-                        </a>
-                    {% endif %}
-                    {% if page * per_page < total %}
-                        <a href="{{ path('clearpass_auth_log_index', pagerParams|merge({page: page + 1})) }}"
-                           class="btn btn-sm btn-outline-secondary">
-                            Next <i class="bi bi-chevron-right"></i>
-                        </a>
-                    {% endif %}
-                </div>
+        <div class="d-flex align-items-center gap-2">
+            <span class="text-muted small fst-italic" id="refresh-label"></span>
+            <div class="btn-group btn-group-sm" id="refresh-controls" role="group" aria-label="Auto-refresh">
+                <button type="button" class="btn btn-outline-secondary active" data-interval="0">Off</button>
+                <button type="button" class="btn btn-outline-secondary" data-interval="30">30s</button>
+                <button type="button" class="btn btn-outline-secondary" data-interval="60">60s</button>
             </div>
-        {% endif %}
-    {% endif %}
+            <span class="text-muted small"><span id="record-count">{{ total }}</span> record(s)</span>
+        </div>
+    </div>
+    <div id="table-wrapper">
+        {% include 'clearpass_auth_log/_table.html.twig' %}
+    </div>
 </div>{# /list-scroll-card #}
 </div>{# /list-page-content #}
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    var TABLE_URL = '{{ path('clearpass_auth_log_table') }}';
+    var wrapper   = document.getElementById('table-wrapper');
+    var label     = document.getElementById('refresh-label');
+    var countEl   = document.getElementById('record-count');
+
+    var intervalSecs = 0;
+    var tickCount    = 0;
+    var tickTimer    = null;
+    var fetching     = false;
+
+    function buildUrl() {
+        return TABLE_URL + (window.location.search || '');
+    }
+
+    function doRefresh() {
+        if (fetching) { return; }
+        fetching = true;
+        if (label) { label.textContent = 'Refreshing…'; }
+        fetch(buildUrl(), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(function (r) { return r.text(); })
+            .then(function (html) {
+                wrapper.innerHTML = html;
+                var el = wrapper.querySelector('[data-record-count]');
+                if (el && countEl) { countEl.textContent = el.getAttribute('data-record-count'); }
+            })
+            .catch(function () {})
+            .finally(function () {
+                fetching = false;
+                tickCount = 0;
+                updateLabel();
+            });
+    }
+
+    function updateLabel() {
+        if (!label) { return; }
+        if (intervalSecs === 0) {
+            label.textContent = '';
+        } else {
+            var left = intervalSecs - tickCount;
+            label.textContent = left > 0 ? 'Next in ' + left + 's' : 'Refreshing…';
+        }
+    }
+
+    function tick() {
+        tickCount++;
+        if (tickCount >= intervalSecs) {
+            tickCount = 0;
+            doRefresh();
+        } else {
+            updateLabel();
+        }
+    }
+
+    function startRefresh(secs) {
+        clearInterval(tickTimer);
+        intervalSecs = secs;
+        tickCount    = 0;
+        if (secs > 0) {
+            tickTimer = setInterval(tick, 1000);
+            updateLabel();
+        } else {
+            if (label) { label.textContent = ''; }
+        }
+    }
+
+    document.querySelectorAll('#refresh-controls button').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            document.querySelectorAll('#refresh-controls button').forEach(function (b) {
+                b.classList.remove('active');
+            });
+            this.classList.add('active');
+            startRefresh(parseInt(this.dataset.interval, 10));
+        });
+    });
+})();
+</script>
 {% endblock %}
