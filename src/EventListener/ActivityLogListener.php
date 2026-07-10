@@ -27,7 +27,7 @@ class ActivityLogListener
     /** Rows pending DBAL insert, keyed by array with all column values. */
     private array $pending = [];
 
-    private const ALWAYS_IGNORED = ['createdAt', 'createdBy', 'updatedAt', 'updatedBy', 'deletedAt', 'lastDhcpAt', 'lastDhcpIp', 'lastAuthAt', 'lastSyncAt'];
+    private const ALWAYS_IGNORED = ['createdAt', 'createdBy', 'updatedAt', 'updatedBy', 'deletedAt', 'lastDhcpAt', 'lastDhcpIp', 'lastAuthAt', 'lastSyncAt', 'switchIp', 'switchPort'];
 
     public function __construct(
         private readonly TokenStorageInterface $tokenStorage,
