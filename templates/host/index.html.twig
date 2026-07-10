@@ -360,16 +360,37 @@
                                         {% endif %}
                                     </td>
                                     <td class="small font-monospace">
-                                        {% set fqdns = [] %}
+                                        {% set fqdn_types = {} %}
                                         {% for record in iface.domainRecords %}
                                             {% if record.domain %}
-                                                {% set fqdns = fqdns|merge([record.fullyQualifiedHostname]) %}
+                                                {% set fqdn = record.fullyQualifiedHostname %}
+                                                {% set t = record.type.value %}
+                                                {% if fqdn_types[fqdn] is defined %}
+                                                    {% set fqdn_types = fqdn_types|merge({(fqdn): fqdn_types[fqdn]|merge([t])}) %}
+                                                {% else %}
+                                                    {% set fqdn_types = fqdn_types|merge({(fqdn): [t]}) %}
+                                                {% endif %}
                                             {% endif %}
                                         {% endfor %}
-                                        {% if fqdns is empty %}
+                                        {% if fqdn_types is empty %}
                                             <span class="text-muted">—</span>
                                         {% else %}
-                                            {% for fqdn in fqdns %}<div>{{ fqdn }}</div>{% endfor %}
+                                            {% for fqdn, types in fqdn_types %}
+                                                <div>
+                                                    {% set has_a    = 'A'    in types %}
+                                                    {% set has_aaaa = 'AAAA' in types %}
+                                                    {% if has_a and has_aaaa %}
+                                                        <span class="badge text-bg-secondary me-1">A+AAAA</span>
+                                                    {% elseif has_a %}
+                                                        <span class="badge text-bg-info me-1">A</span>
+                                                    {% elseif has_aaaa %}
+                                                        <span class="badge text-bg-success me-1">AAAA</span>
+                                                    {% else %}
+                                                        {% for t in types %}<span class="badge text-bg-secondary me-1">{{ t }}</span>{% endfor %}
+                                                    {% endif %}
+                                                    {{ fqdn }}
+                                                </div>
+                                            {% endfor %}
                                         {% endif %}
                                     </td>
                                     <td class="text-muted small">
@@ -415,16 +436,37 @@
                                     <td class="ip-address small">{{ vip.ipAddress ? vip.ipAddress.address : '—' }}</td>
                                     <td class="ip-address small">{{ vip.ipv6Address ? vip.ipv6Address.address : '—' }}</td>
                                     <td class="small font-monospace">
-                                        {% set fqdns = [] %}
+                                        {% set fqdn_types = {} %}
                                         {% for record in vip.domainRecords %}
                                             {% if record.domain %}
-                                                {% set fqdns = fqdns|merge([record.fullyQualifiedHostname]) %}
+                                                {% set fqdn = record.fullyQualifiedHostname %}
+                                                {% set t = record.type.value %}
+                                                {% if fqdn_types[fqdn] is defined %}
+                                                    {% set fqdn_types = fqdn_types|merge({(fqdn): fqdn_types[fqdn]|merge([t])}) %}
+                                                {% else %}
+                                                    {% set fqdn_types = fqdn_types|merge({(fqdn): [t]}) %}
+                                                {% endif %}
                                             {% endif %}
                                         {% endfor %}
-                                        {% if fqdns is empty %}
+                                        {% if fqdn_types is empty %}
                                             <span class="text-muted">—</span>
                                         {% else %}
-                                            {% for fqdn in fqdns %}<div>{{ fqdn }}</div>{% endfor %}
+                                            {% for fqdn, types in fqdn_types %}
+                                                <div>
+                                                    {% set has_a    = 'A'    in types %}
+                                                    {% set has_aaaa = 'AAAA' in types %}
+                                                    {% if has_a and has_aaaa %}
+                                                        <span class="badge text-bg-secondary me-1">A+AAAA</span>
+                                                    {% elseif has_a %}
+                                                        <span class="badge text-bg-info me-1">A</span>
+                                                    {% elseif has_aaaa %}
+                                                        <span class="badge text-bg-success me-1">AAAA</span>
+                                                    {% else %}
+                                                        {% for t in types %}<span class="badge text-bg-secondary me-1">{{ t }}</span>{% endfor %}
+                                                    {% endif %}
+                                                    {{ fqdn }}
+                                                </div>
+                                            {% endfor %}
                                         {% endif %}
                                     </td>
                                     <td class="text-muted small">

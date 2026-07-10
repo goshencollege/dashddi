@@ -16,7 +16,9 @@ use App\Service\DnsViewResolver;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
+use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Form\Extension\Core\Type\EnumType;
+use Symfony\Component\Form\Extension\Core\Type\HiddenType;
 use Symfony\Component\Form\Extension\Core\Type\IntegerType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
@@ -69,8 +71,26 @@ class DomainRecordType extends AbstractType
                 'label'    => 'Comment',
             ]);
 
-        // When creating/editing from an interface or virtual IP context, add domain and isCanonical
+        // When creating/editing from an interface or virtual IP context, add domain, isCanonical,
+        // and override the type field with an extended ChoiceType that includes the A+AAAA meta option.
         if ($hasContext) {
+            $typeChoices = [];
+            foreach (RecordType::cases() as $case) {
+                $typeChoices[$case->value] = $case;
+            }
+            $typeChoices['A+AAAA'] = 'A+AAAA';
+
+            $builder->add('type', ChoiceType::class, [
+                'choices'      => $typeChoices,
+                'choice_value' => fn($c) => $c instanceof RecordType ? $c->value : (string) $c,
+            ]);
+
+            $builder->add('create_aaaa_companion', HiddenType::class, [
+                'mapped'   => false,
+                'required' => false,
+                'data'     => '',
+            ]);
+
             $builder->add('domain', EntityType::class, [
                 'class'         => Domain::class,
                 'choice_label'  => 'name',
@@ -109,10 +129,18 @@ class DomainRecordType extends AbstractType
         $builder->addEventListener(FormEvents::PRE_SUBMIT, function (FormEvent $event) use ($hasContext, $subnet, &$domainFromPreSetData) {
             $data = $event->getData();
 
+            // Intercept A+AAAA meta option: treat this submission as a plain A record and flag
+            // the companion AAAA record for creation in the controller after validation.
+            if ($hasContext && ($data['type'] ?? '') === 'A+AAAA') {
+                $data['type'] = RecordType::A->value;
+                $data['create_aaaa_companion'] = '1';
+            }
+
             if (($data['type'] ?? '') === 'TXT' && isset($data['value'])) {
                 $data['value'] = TxtRecordValueValidator::normalizeTxtValue($data['value']);
-                $event->setData($data);
             }
+
+            $event->setData($data);
 
             if ($hasContext) {
                 $domainId = isset($data['domain']) ? (int) $data['domain'] : null;

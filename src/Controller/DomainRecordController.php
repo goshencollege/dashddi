@@ -98,6 +98,10 @@ class DomainRecordController extends AbstractController
                 }
             }
 
+            if ($form->get('create_aaaa_companion')->getData() === '1') {
+                $this->createCompanionAaaa($record);
+            }
+
             if ($request->isXmlHttpRequest()) {
                 return $this->json(['success' => true]);
             }
@@ -157,6 +161,10 @@ class DomainRecordController extends AbstractController
                 if ($fcrdnsError !== null) {
                     $this->addFlash('warning', 'FCrDNS check failed — record saved as canonical anyway. ' . $fcrdnsError);
                 }
+            }
+
+            if ($form->get('create_aaaa_companion')->getData() === '1') {
+                $this->createCompanionAaaa($record);
             }
 
             if ($request->isXmlHttpRequest()) {
@@ -363,6 +371,52 @@ class DomainRecordController extends AbstractController
             return $this->redirectToRoute('virtual_ip_show', ['id' => $vip->getId()]);
         }
         return $this->redirectToRoute('domain_show', ['id' => $domainId]);
+    }
+
+    private function createCompanionAaaa(DomainRecord $primary): void
+    {
+        $iface = $primary->getNetworkInterface();
+        $vip   = $primary->getVirtualIp();
+
+        $hasIpv6 = ($iface?->getIpv6Address() !== null) || ($vip?->getIpv6Address() !== null);
+        if (!$hasIpv6) {
+            $this->addFlash('warning', 'A+AAAA: AAAA record not created — no IPv6 address on this interface.');
+            return;
+        }
+
+        $companion = new DomainRecord();
+        $companion->setHostname($primary->getHostname());
+        $companion->setDomain($primary->getDomain());
+        $companion->setType(RecordType::AAAA);
+        $companion->setTtl($primary->getTtl());
+        $companion->setComment($primary->getComment());
+        $companion->setNetworkInterface($iface);
+        $companion->setVirtualIp($vip);
+
+        foreach ($primary->getViews() as $view) {
+            $companion->addView($view);
+        }
+
+        if ($iface !== null) {
+            $this->autoSetCanonical($companion);
+        } elseif ($vip !== null) {
+            $this->autoSetCanonicalForVip($companion);
+        }
+
+        $this->em->persist($companion);
+        $this->em->flush();
+
+        if ($companion->isCanonical()) {
+            if ($iface !== null) {
+                $this->enforceCanonicalUniqueness($companion);
+            } else {
+                $this->enforceCanonicalUniquenessForVip($companion);
+            }
+            $fcrdnsError = $this->checkCanonical($companion);
+            if ($fcrdnsError !== null) {
+                $this->addFlash('warning', 'FCrDNS check failed for AAAA companion — record saved as canonical anyway. ' . $fcrdnsError);
+            }
+        }
     }
 
     private function autoSetCanonical(DomainRecord $record): void
