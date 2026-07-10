@@ -176,6 +176,25 @@ class ReportControllerTest extends AppWebTestCase
         $this->assertNull($this->em->find(DomainRecord::class, $id));
     }
 
+    public function testOrphanedCnameIgnoresOutOfZoneAbsoluteTargets(): void
+    {
+        $domain = $this->makeDomain('zone.test');
+        // CNAME pointing to an absolute out-of-zone FQDN — not orphaned, just external
+        $record = (new DomainRecord())
+            ->setDomain($domain)
+            ->setHostname('alias')
+            ->setType(RecordType::CNAME)
+            ->setValue('mail.google.com.');
+        $this->em->persist($record);
+        $this->em->flush();
+
+        $service = static::getContainer()->get(RecommendationService::class);
+        $orphans = $service->findOrphanedCnameRecords();
+
+        $orphanIds = array_column($orphans, 'record_id');
+        $this->assertNotContains($record->getId(), $orphanIds, 'Out-of-zone absolute CNAME target must not be flagged as orphaned');
+    }
+
     public function testDeleteOrphanedCnameSkipsNonCnameRecords(): void
     {
         $domain = $this->makeDomain('skip.test');
