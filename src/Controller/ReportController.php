@@ -49,6 +49,7 @@ class ReportController extends AbstractController
             'unlinked_dns'        => $service->findUnlinkedDnsRecords(),
             'convertible_cnames'  => $service->findConvertibleCnameRecords(),
             'missing_dual_stack'  => $service->findMissingDualStackRecords(),
+            'orphaned_cnames'     => $service->findOrphanedCnameRecords(),
             'missing_views'       => $service->findRecordsWithMissingViews(),
             'dhcp_mismatches'     => $service->findDhcpSubnetMismatches(),
         ]);
@@ -202,6 +203,47 @@ class ReportController extends AbstractController
         }
         if ($skipped > 0) {
             $this->addFlash('warning', sprintf('%d record%s skipped (already changed or no longer matched).', $skipped, $skipped !== 1 ? 's' : ''));
+        }
+
+        return $this->redirectToRoute('recommendation_index');
+    }
+
+    #[Route('/recommendations/apply/delete-orphaned-cname', name: 'recommendation_apply_delete_orphaned_cname', methods: ['POST'])]
+    public function applyDeleteOrphanedCname(
+        Request $request,
+        EntityManagerInterface $em,
+    ): Response {
+        if (!$this->isCsrfTokenValid('delete_orphaned_cname', $request->request->get('_token'))) {
+            $this->addFlash('danger', 'Invalid CSRF token.');
+            return $this->redirectToRoute('recommendation_index');
+        }
+
+        $ids = array_filter(array_map('intval', (array) $request->request->all('ids')));
+        if (empty($ids)) {
+            $this->addFlash('warning', 'No records selected.');
+            return $this->redirectToRoute('recommendation_index');
+        }
+
+        $deleted = 0;
+        $skipped = 0;
+
+        foreach ($ids as $id) {
+            $record = $em->find(DomainRecord::class, $id);
+            if ($record === null || $record->getType() !== RecordType::CNAME) {
+                $skipped++;
+                continue;
+            }
+            $em->remove($record);
+            $deleted++;
+        }
+
+        $em->flush();
+
+        if ($deleted > 0) {
+            $this->addFlash('success', sprintf('%d orphaned CNAME record%s deleted.', $deleted, $deleted !== 1 ? 's' : ''));
+        }
+        if ($skipped > 0) {
+            $this->addFlash('warning', sprintf('%d record%s skipped (not found or not a CNAME).', $skipped, $skipped !== 1 ? 's' : ''));
         }
 
         return $this->redirectToRoute('recommendation_index');

@@ -219,6 +219,62 @@ class RecommendationService
     }
 
     /**
+     * Finds CNAME records that point to a hostname within the same zone but that
+     * hostname does not exist as any record in that domain.
+     *
+     * The three in-zone forms are matched:
+     *   1. bare label  — value has no dot (relative to current zone)
+     *   2. FQDN        — value is hostname.domain
+     *   3. FQDN+dot    — value is hostname.domain.
+     *
+     * Each row contains: record_id, hostname, cname_target, domain_id, domain_name.
+     */
+    public function findOrphanedCnameRecords(): array
+    {
+        $sql = <<<SQL
+            SELECT
+                dr.id       AS record_id,
+                dr.hostname,
+                dr.value    AS cname_target,
+                d.id        AS domain_id,
+                d.name      AS domain_name
+            FROM domain_record dr
+            JOIN domain d ON dr.domain_id = d.id
+            WHERE dr.type = 'CNAME'
+              AND (
+                  (dr.value NOT LIKE '%.%'
+                   AND NOT EXISTS (
+                       SELECT 1 FROM domain_record dr2
+                       WHERE dr2.domain_id = dr.domain_id
+                         AND dr2.hostname  = dr.value
+                   ))
+
+                  OR
+
+                  (dr.value LIKE CONCAT('%.', d.name)
+                   AND dr.value NOT LIKE CONCAT('%.', d.name, '.')
+                   AND NOT EXISTS (
+                       SELECT 1 FROM domain_record dr2
+                       WHERE dr2.domain_id = dr.domain_id
+                         AND dr2.hostname  = LEFT(dr.value, CHAR_LENGTH(dr.value) - CHAR_LENGTH(d.name) - 1)
+                   ))
+
+                  OR
+
+                  (dr.value LIKE CONCAT('%.', d.name, '.')
+                   AND NOT EXISTS (
+                       SELECT 1 FROM domain_record dr2
+                       WHERE dr2.domain_id = dr.domain_id
+                         AND dr2.hostname  = LEFT(dr.value, CHAR_LENGTH(dr.value) - CHAR_LENGTH(d.name) - 2)
+                   ))
+              )
+            ORDER BY d.name, dr.hostname
+        SQL;
+
+        return $this->em->getConnection()->fetchAllAssociative($sql);
+    }
+
+    /**
      * Finds dual-stack interfaces and VIPs that have an A or AAAA record linked
      * but are missing the complementary record for the same hostname and domain.
      *
