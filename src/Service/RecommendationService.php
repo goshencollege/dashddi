@@ -228,7 +228,7 @@ class RecommendationService
      *   2. value = hostname.domain   (FQDN without trailing dot)
      *   3. value = hostname.domain.  (FQDN with trailing dot)
      * A CNAME is orphaned when none of those forms matches any existing record
-     * in the domain.
+     * in the domain. CNAMEs pointing to the naked domain (zone apex) are excluded.
      *
      * Each row contains: record_id, hostname, cname_target, domain_id, domain_name.
      */
@@ -244,6 +244,8 @@ class RecommendationService
             FROM domain_record dr
             JOIN domain d ON dr.domain_id = d.id
             WHERE dr.type = 'CNAME'
+              AND dr.value != d.name
+              AND dr.value != CONCAT(d.name, '.')
               AND NOT EXISTS (
                   SELECT 1 FROM domain_record dr2
                   WHERE dr2.domain_id = dr.domain_id
