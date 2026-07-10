@@ -185,12 +185,13 @@
         <ul class="mb-2">
             <li><strong>Domain</strong> — the DNS zone this record belongs to (only zones compatible with the interface's subnet are selectable)</li>
             <li><strong>Hostname</strong> — the name part without the domain suffix (e.g. <code>web01</code>)</li>
-            <li><strong>Type</strong> — <code>A</code>, <code>AAAA</code>, <code>TXT</code>, or any other supported record type</li>
+            <li><strong>Type</strong> — <code>A</code>, <code>AAAA</code>, <code>TXT</code>, or any other supported record type. Select <code>A+AAAA</code> to create both an A and an AAAA record simultaneously using the same hostname — the IPv4 address populates the A record and the IPv6 address populates the AAAA record. If the interface has no IPv6 address, only the A record is created and a warning is shown.</li>
             <li><strong>Value</strong> — leave blank for <code>A</code>/<code>AAAA</code> records; the IP address is derived automatically from the interface</li>
             <li><strong>Canonical</strong> — marks this record as the reverse DNS (PTR) name for the interface's IP. The first <code>A</code> record added to an interface is automatically marked canonical (used for IPv4 PTR); the first <code>AAAA</code> record is automatically canonical for IPv6. An interface can have at most one canonical <code>A</code> and one canonical <code>AAAA</code>.</li>
             <li><strong>Views</strong> — optionally restrict which DNS views include this record</li>
         </ul>
         <p class="text-muted small mb-0">Records with the <span class="badge bg-primary">PTR</span> badge are canonical and appear in reverse DNS zones. All interface-linked records appear in the domain's unified record list with a <em>Host</em> column showing the host name.</p>
+        <p class="text-muted small mb-0 mt-2">In the <strong>host list</strong>, the DNS Names column shows a type badge before each hostname: <span class="badge text-bg-info">A</span> for IPv4-only, <span class="badge text-bg-success">AAAA</span> for IPv6-only, or <span class="badge text-bg-secondary">A+AAAA</span> when both an A and AAAA record exist for the same hostname — in which case the pair is shown as a single line.</p>
     </div>
 </div>
 
