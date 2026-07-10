@@ -52,8 +52,14 @@ class SessionExpirySubscriber implements EventSubscriberInterface
         }
 
         if (time() <= $expiresAt) {
-            $lifetime = $session->get('_session_lifetime', 1800);
-            $session->set('_session_expires_at', time() + $lifetime);
+            // Only extend on real page navigations — XHR/API requests validate the session
+            // but don't reset the idle timer, so background polling can't keep a session alive.
+            $isXhrOrApi = $request->isXmlHttpRequest()
+                || str_starts_with($request->getPathInfo(), '/api/');
+            if (!$isXhrOrApi) {
+                $lifetime = $session->get('_session_lifetime', 1800);
+                $session->set('_session_expires_at', time() + $lifetime);
+            }
             return;
         }
 
