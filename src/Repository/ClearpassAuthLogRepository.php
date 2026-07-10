@@ -68,7 +68,7 @@ class ClearpassAuthLogRepository extends ServiceEntityRepository
         $qb->setFirstResult(($page - 1) * $perPage)
            ->setMaxResults($perPage);
 
-        return new Paginator($qb);
+        return new Paginator($qb, false);
     }
 
     /** Most recent auth logs for a given MAC, newest first. */
