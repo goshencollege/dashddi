@@ -362,7 +362,7 @@
                                     <td class="small font-monospace">
                                         {% set fqdn_types = {} %}
                                         {% for record in iface.domainRecords %}
-                                            {% if record.domain %}
+                                            {% if record.domain and record.type.value in ['A', 'AAAA'] %}
                                                 {% set fqdn = record.fullyQualifiedHostname %}
                                                 {% set t = record.type.value %}
                                                 {% if fqdn_types[fqdn] is defined %}
@@ -376,19 +376,17 @@
                                             <span class="text-muted">—</span>
                                         {% else %}
                                             {% for fqdn, types in fqdn_types %}
+                                                {% set has_a    = 'A'    in types %}
+                                                {% set has_aaaa = 'AAAA' in types %}
                                                 <div>
-                                                    {% set has_a    = 'A'    in types %}
-                                                    {% set has_aaaa = 'AAAA' in types %}
-                                                    {% if has_a and has_aaaa %}
-                                                        <span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle me-0" style="border-radius:0.375rem 0 0 0.375rem;border-right-width:0">A</span><span class="badge bg-info-subtle text-info-emphasis border border-info-subtle me-1" style="border-radius:0 0.375rem 0.375rem 0;border-left-width:0">AAAA</span>
-                                                    {% elseif has_a %}
-                                                        <span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle me-1">A</span>
-                                                    {% elseif has_aaaa %}
-                                                        <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle me-1">AAAA</span>
-                                                    {% else %}
-                                                        {% for t in types %}<span class="badge text-bg-secondary me-1">{{ t }}</span>{% endfor %}
-                                                    {% endif %}
                                                     {{ fqdn }}
+                                                    {% if has_a and has_aaaa %}
+                                                        <span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle ms-1" style="border-radius:0.375rem 0 0 0.375rem;border-right-width:0">A</span><span class="badge bg-info-subtle text-info-emphasis border border-info-subtle" style="border-radius:0 0.375rem 0.375rem 0;border-left-width:0">AAAA</span>
+                                                    {% elseif has_a %}
+                                                        <span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle ms-1">A</span>
+                                                    {% elseif has_aaaa %}
+                                                        <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle ms-1">AAAA</span>
+                                                    {% endif %}
                                                 </div>
                                             {% endfor %}
                                         {% endif %}
@@ -438,7 +436,7 @@
                                     <td class="small font-monospace">
                                         {% set fqdn_types = {} %}
                                         {% for record in vip.domainRecords %}
-                                            {% if record.domain %}
+                                            {% if record.domain and record.type.value in ['A', 'AAAA'] %}
                                                 {% set fqdn = record.fullyQualifiedHostname %}
                                                 {% set t = record.type.value %}
                                                 {% if fqdn_types[fqdn] is defined %}
@@ -452,19 +450,17 @@
                                             <span class="text-muted">—</span>
                                         {% else %}
                                             {% for fqdn, types in fqdn_types %}
+                                                {% set has_a    = 'A'    in types %}
+                                                {% set has_aaaa = 'AAAA' in types %}
                                                 <div>
-                                                    {% set has_a    = 'A'    in types %}
-                                                    {% set has_aaaa = 'AAAA' in types %}
-                                                    {% if has_a and has_aaaa %}
-                                                        <span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle me-0" style="border-radius:0.375rem 0 0 0.375rem;border-right-width:0">A</span><span class="badge bg-info-subtle text-info-emphasis border border-info-subtle me-1" style="border-radius:0 0.375rem 0.375rem 0;border-left-width:0">AAAA</span>
-                                                    {% elseif has_a %}
-                                                        <span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle me-1">A</span>
-                                                    {% elseif has_aaaa %}
-                                                        <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle me-1">AAAA</span>
-                                                    {% else %}
-                                                        {% for t in types %}<span class="badge text-bg-secondary me-1">{{ t }}</span>{% endfor %}
-                                                    {% endif %}
                                                     {{ fqdn }}
+                                                    {% if has_a and has_aaaa %}
+                                                        <span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle ms-1" style="border-radius:0.375rem 0 0 0.375rem;border-right-width:0">A</span><span class="badge bg-info-subtle text-info-emphasis border border-info-subtle" style="border-radius:0 0.375rem 0.375rem 0;border-left-width:0">AAAA</span>
+                                                    {% elseif has_a %}
+                                                        <span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle ms-1">A</span>
+                                                    {% elseif has_aaaa %}
+                                                        <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle ms-1">AAAA</span>
+                                                    {% endif %}
                                                 </div>
                                             {% endfor %}
                                         {% endif %}
