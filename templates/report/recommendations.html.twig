@@ -55,7 +55,8 @@
                             <th>Hostname</th>
                             <th>Type</th>
                             <th>IP Address</th>
-                            <th>Matching Interface / Host</th>
+                            <th>Match</th>
+                            <th>Name</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -72,7 +73,18 @@
                             <td><span class="badge bg-primary-subtle text-primary-emphasis">{{ row.record_type }}</span></td>
                             <td class="font-monospace">{{ row.ip }}</td>
                             <td>
-                                <a href="{{ path('interface_show', {id: row.iface_id}) }}">{{ row.host_name }}</a>
+                                {% if row.match_type == 'vip' %}
+                                    <span class="badge bg-warning-subtle text-warning-emphasis">VIP</span>
+                                {% else %}
+                                    <span class="badge bg-secondary-subtle text-secondary-emphasis">Interface</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if row.match_type == 'vip' %}
+                                    <a href="{{ path('virtual_ip_show', {id: row.match_id}) }}">{{ row.match_label }}</a>
+                                {% else %}
+                                    <a href="{{ path('interface_show', {id: row.match_id}) }}">{{ row.match_label }}</a>
+                                {% endif %}
                             </td>
                         </tr>
                         {% endfor %}

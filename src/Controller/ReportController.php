@@ -78,13 +78,18 @@ class ReportController extends AbstractController
             }
 
             $iface = $service->findInterfaceForDnsRecord($record);
-            if ($iface === null) {
-                $skipped++;
-                continue;
+            if ($iface !== null) {
+                $record->setNetworkInterface($iface);
+                $record->setValue('');
+            } else {
+                $vip = $service->findVipForDnsRecord($record);
+                if ($vip === null) {
+                    $skipped++;
+                    continue;
+                }
+                $record->setVirtualIp($vip);
+                $record->setValue('');
             }
-
-            $record->setNetworkInterface($iface);
-            $record->setValue('');
             $linked++;
         }
 
