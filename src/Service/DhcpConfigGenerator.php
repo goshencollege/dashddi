@@ -64,7 +64,7 @@ class DhcpConfigGenerator
                 $block['ddns-send-updates']        = true;
                 $block['ddns-update-on-renew']     = true;
                 $block['ddns-qualifying-suffix']   = rtrim($subnet->getDdnsQualifyingSuffix(), '.') . '.';
-                $block['ddns-replace-client-name'] = 'always';
+                $block['ddns-replace-client-name'] = 'never';
             }
 
             $subnet4[] = $block;
@@ -119,7 +119,7 @@ class DhcpConfigGenerator
                 $block['ddns-send-updates']        = true;
                 $block['ddns-update-on-renew']     = true;
                 $block['ddns-qualifying-suffix']   = rtrim($subnet->getDdnsQualifyingSuffix(), '.') . '.';
-                $block['ddns-replace-client-name'] = 'always';
+                $block['ddns-replace-client-name'] = 'never';
             }
 
             $subnet6[] = $block;
