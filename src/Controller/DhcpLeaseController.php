@@ -28,6 +28,29 @@ class DhcpLeaseController extends AbstractController
         DhcpServerRepository $dhcpServerRepo,
         NetworkInterfaceRepository $ifaceRepo,
     ): Response {
+        return $this->render('dhcp_lease/index.html.twig',
+            $this->buildViewData($request, $leaseRepo, $subnetRepo, $dhcpServerRepo, $ifaceRepo));
+    }
+
+    #[Route('/dhcp/leases/table', name: 'dhcp_lease_table', methods: ['GET'])]
+    public function table(
+        Request $request,
+        DhcpLeaseRepository $leaseRepo,
+        SubnetRepository $subnetRepo,
+        DhcpServerRepository $dhcpServerRepo,
+        NetworkInterfaceRepository $ifaceRepo,
+    ): Response {
+        return $this->render('dhcp_lease/_table.html.twig',
+            $this->buildViewData($request, $leaseRepo, $subnetRepo, $dhcpServerRepo, $ifaceRepo));
+    }
+
+    private function buildViewData(
+        Request $request,
+        DhcpLeaseRepository $leaseRepo,
+        SubnetRepository $subnetRepo,
+        DhcpServerRepository $dhcpServerRepo,
+        NetworkInterfaceRepository $ifaceRepo,
+    ): array {
         $mac      = trim((string) $request->query->get('mac', ''));
         $ip       = trim((string) $request->query->get('ip', ''));
         $subnetId = (int) $request->query->get('subnet', 0);
@@ -42,7 +65,7 @@ class DhcpLeaseController extends AbstractController
 
         $macs = array_unique(array_map(fn($l) => $l->getMacAddress(), iterator_to_array($leases)));
 
-        return $this->render('dhcp_lease/index.html.twig', [
+        return [
             'leases'         => $leases,
             'subnets'        => $subnets,
             'servers'        => $servers,
@@ -54,7 +77,7 @@ class DhcpLeaseController extends AbstractController
             'total'          => count($leases),
             'per_page'       => 50,
             'interface_map'  => $ifaceRepo->findByMacs($macs),
-        ]);
+        ];
     }
 
     #[Route('/api/dhcp/lease', name: 'api_dhcp_lease', methods: ['POST'])]

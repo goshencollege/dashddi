@@ -17,6 +17,25 @@ class ClearpassAuthLogController extends AbstractController
         ClearpassAuthLogRepository $logRepo,
         NetworkInterfaceRepository $ifaceRepo,
     ): Response {
+        return $this->render('clearpass_auth_log/index.html.twig',
+            $this->buildViewData($request, $logRepo, $ifaceRepo));
+    }
+
+    #[Route('/clearpass/auth-logs/table', name: 'clearpass_auth_log_table', methods: ['GET'])]
+    public function table(
+        Request $request,
+        ClearpassAuthLogRepository $logRepo,
+        NetworkInterfaceRepository $ifaceRepo,
+    ): Response {
+        return $this->render('clearpass_auth_log/_table.html.twig',
+            $this->buildViewData($request, $logRepo, $ifaceRepo));
+    }
+
+    private function buildViewData(
+        Request $request,
+        ClearpassAuthLogRepository $logRepo,
+        NetworkInterfaceRepository $ifaceRepo,
+    ): array {
         $mac       = trim((string) $request->query->get('mac', ''));
         $username  = trim((string) $request->query->get('username', ''));
         $role      = trim((string) $request->query->get('role', ''));
@@ -30,24 +49,24 @@ class ClearpassAuthLogController extends AbstractController
         $logs = $logRepo->search($mac, $username, $role, $vlan, $protocol, $service, $nasIp, $nasPortId, $page);
         $macs = array_unique(array_map(fn($l) => $l->getMacAddress(), iterator_to_array($logs)));
 
-        return $this->render('clearpass_auth_log/index.html.twig', [
-            'logs'              => $logs,
-            'roles'             => $logRepo->findDistinctRoles(),
-            'vlans'             => $logRepo->findDistinctVlans(),
-            'protocols'         => $logRepo->findDistinctProtocols(),
-            'services'          => $logRepo->findDistinctServices(),
-            'filter_mac'        => $mac,
-            'filter_username'   => $username,
-            'filter_role'       => $role,
-            'filter_vlan'       => $vlan,
-            'filter_protocol'   => $protocol,
-            'filter_service'    => $service,
-            'filter_nas_ip'     => $nasIp,
+        return [
+            'logs'               => $logs,
+            'roles'              => $logRepo->findDistinctRoles(),
+            'vlans'              => $logRepo->findDistinctVlans(),
+            'protocols'          => $logRepo->findDistinctProtocols(),
+            'services'           => $logRepo->findDistinctServices(),
+            'filter_mac'         => $mac,
+            'filter_username'    => $username,
+            'filter_role'        => $role,
+            'filter_vlan'        => $vlan,
+            'filter_protocol'    => $protocol,
+            'filter_service'     => $service,
+            'filter_nas_ip'      => $nasIp,
             'filter_nas_port_id' => $nasPortId,
-            'page'              => $page,
-            'total'             => count($logs),
-            'per_page'          => 50,
-            'interface_map'     => $ifaceRepo->findByMacs($macs),
-        ]);
+            'page'               => $page,
+            'total'              => count($logs),
+            'per_page'           => 50,
+            'interface_map'      => $ifaceRepo->findByMacs($macs),
+        ];
     }
 }
