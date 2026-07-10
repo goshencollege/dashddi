@@ -222,11 +222,13 @@ class RecommendationService
      * Finds CNAME records that point to a hostname within the same zone but that
      * hostname does not exist as any record in that domain.
      *
-     * Two unambiguous in-zone forms are matched:
-     *   1. bare label  — value has no dot (relative to current zone → hostname.domain.)
-     *   2. FQDN+dot    — value is hostname.domain. (absolute, same zone)
-     * FQDNs without a trailing dot are relative names and expand outside the zone,
-     * so they are not treated as in-zone references.
+     * Uses the same three-form matching as the CNAME conversion check to decide
+     * whether a value refers to a record in the same zone:
+     *   1. value = hostname          (bare/dotted label, relative to zone)
+     *   2. value = hostname.domain   (FQDN without trailing dot)
+     *   3. value = hostname.domain.  (FQDN with trailing dot)
+     * A CNAME is orphaned when none of those forms matches any existing record
+     * in the domain.
      *
      * Each row contains: record_id, hostname, cname_target, domain_id, domain_name.
      */
@@ -242,22 +244,14 @@ class RecommendationService
             FROM domain_record dr
             JOIN domain d ON dr.domain_id = d.id
             WHERE dr.type = 'CNAME'
-              AND (
-                  (dr.value NOT LIKE '%.%'
-                   AND NOT EXISTS (
-                       SELECT 1 FROM domain_record dr2
-                       WHERE dr2.domain_id = dr.domain_id
-                         AND dr2.hostname  = dr.value
-                   ))
-
-                  OR
-
-                  (dr.value LIKE CONCAT('%.', d.name, '.')
-                   AND NOT EXISTS (
-                       SELECT 1 FROM domain_record dr2
-                       WHERE dr2.domain_id = dr.domain_id
-                         AND dr2.hostname  = LEFT(dr.value, CHAR_LENGTH(dr.value) - CHAR_LENGTH(d.name) - 2)
-                   ))
+              AND NOT EXISTS (
+                  SELECT 1 FROM domain_record dr2
+                  WHERE dr2.domain_id = dr.domain_id
+                    AND (
+                        dr.value = dr2.hostname
+                        OR dr.value = CONCAT(dr2.hostname, '.', d.name)
+                        OR dr.value = CONCAT(dr2.hostname, '.', d.name, '.')
+                    )
               )
             ORDER BY d.name, dr.hostname
         SQL;
