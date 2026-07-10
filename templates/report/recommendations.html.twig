@@ -83,7 +83,7 @@
                                 {% if row.match_type == 'vip' %}
                                     <a href="{{ path('virtual_ip_show', {id: row.match_id}) }}">{{ row.match_label }}</a>
                                 {% else %}
-                                    <a href="{{ path('interface_show', {id: row.match_id}) }}">{{ row.match_label }}{% if row.match_sublabel %}<span class="text-muted"> / {{ row.match_sublabel }}</span>{% endif %}</a>
+                                    <a href="{{ path('interface_show', {id: row.match_id}) }}">{{ row.match_label }}{% if row.match_sublabel %} / {{ row.match_sublabel }}{% endif %}</a>
                                 {% endif %}
                             </td>
                         </tr>
