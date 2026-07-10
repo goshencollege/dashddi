@@ -18,7 +18,7 @@ git pull
 
 echo "==> Applying compose patches..."
 if command -v yq &>/dev/null; then
-    backup="${COMPOSE_FILE_PATH}.bak.$(date +%Y%m%d%H%M%S)"
+    backup="${COMPOSE_FILE_PATH}.bak"
     cp "$COMPOSE_FILE_PATH" "$backup"
     echo "  Backed up to $(basename "$backup")"
     for patch in compose-patches/*.sh; do
