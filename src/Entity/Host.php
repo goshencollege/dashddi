@@ -41,6 +41,7 @@ class Host
     private ?string $notes = null;
 
     #[ORM\OneToMany(targetEntity: NetworkInterface::class, mappedBy: 'host', cascade: ['persist', 'remove'], orphanRemoval: true)]
+    #[ORM\OrderBy(['name' => 'ASC'])]
     private Collection $interfaces;
 
     #[ORM\ManyToMany(targetEntity: Tag::class, inversedBy: 'hosts')]
