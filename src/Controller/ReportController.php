@@ -5,7 +5,6 @@ namespace App\Controller;
 use App\Entity\DnsView;
 use App\Entity\DomainRecord;
 use App\Entity\NetworkInterface;
-use App\Entity\Subnet;
 use App\Entity\Tag;
 use App\Entity\VirtualIp;
 use App\Enum\RecordType;
@@ -369,7 +368,7 @@ class ReportController extends AbstractController
             $iface = $em->find(NetworkInterface::class, $id);
             if ($iface === null || $iface->isDeleted()) { $skipped++; continue; }
 
-            $leaseSubnet = $service->findCurrentLeaseSubnet($iface);
+            $leaseSubnet = $service->findSubnetForLastDhcpIp($iface);
             if ($leaseSubnet === null || $leaseSubnet === $iface->getSubnet()) { $skipped++; continue; }
 
             $iface->setSubnet($leaseSubnet);

@@ -2,7 +2,6 @@
 
 namespace App\Service;
 
-use App\Entity\DhcpLease;
 use App\Entity\Domain;
 use App\Entity\DomainRecord;
 use App\Entity\NetworkInterface;
@@ -427,32 +426,40 @@ class RecommendationService
     {
         $sql = <<<SQL
             SELECT
-                ni.id          AS interface_id,
-                ni.name        AS interface_name,
+                ni.id            AS interface_id,
+                ni.name          AS interface_name,
                 ni.mac_address,
-                h.id           AS host_id,
-                h.name         AS host_name,
-                sa.id          AS assigned_subnet_id,
-                sa.name        AS assigned_subnet_name,
-                COALESCE(sa.ipv4_cidr, sa.ipv6_cidr) AS assigned_cidr,
-                sl.id          AS lease_subnet_id,
-                sl.name        AS lease_subnet_name,
-                COALESCE(sl.ipv4_cidr, sl.ipv6_cidr) AS lease_cidr,
-                dl.ip_address  AS lease_ip,
-                dl.lease_start AS lease_start
+                ni.last_dhcp_ip  AS lease_ip,
+                ni.last_dhcp_at  AS lease_start,
+                h.id             AS host_id,
+                h.name           AS host_name,
+                sa.id            AS assigned_subnet_id,
+                sa.name          AS assigned_subnet_name,
+                sa.ipv4_cidr     AS assigned_cidr,
+                sl.id            AS lease_subnet_id,
+                sl.name          AS lease_subnet_name,
+                sl.ipv4_cidr     AS lease_cidr
             FROM network_interface ni
-            JOIN host h     ON h.id  = ni.host_id
-            JOIN subnet sa  ON sa.id = ni.subnet_id
-            JOIN dhcp_lease dl ON dl.mac_address = ni.mac_address
-            JOIN subnet sl  ON sl.id = dl.subnet_id
+            JOIN host h    ON h.id  = ni.host_id
+            JOIN subnet sa ON sa.id = ni.subnet_id
+            LEFT JOIN subnet sl ON sl.id = (
+                SELECT s2.id FROM subnet s2
+                WHERE s2.ipv4_cidr IS NOT NULL
+                  AND INET_ATON(ni.last_dhcp_ip) BETWEEN
+                      INET_ATON(SUBSTRING_INDEX(s2.ipv4_cidr, '/', 1))
+                      AND INET_ATON(SUBSTRING_INDEX(s2.ipv4_cidr, '/', 1))
+                         + POW(2, 32 - CAST(SUBSTRING_INDEX(s2.ipv4_cidr, '/', -1) AS UNSIGNED)) - 1
+                LIMIT 1
+            )
             WHERE ni.deleted_at IS NULL
               AND h.deleted_at  IS NULL
-              AND ni.mac_address != '00:00:00:00:00:00'
-              AND sl.id != ni.subnet_id
-              AND dl.lease_start = (
-                  SELECT MAX(dl2.lease_start)
-                  FROM dhcp_lease dl2
-                  WHERE dl2.mac_address = ni.mac_address
+              AND ni.last_dhcp_ip IS NOT NULL
+              AND sa.ipv4_cidr IS NOT NULL
+              AND NOT (
+                  INET_ATON(ni.last_dhcp_ip) BETWEEN
+                      INET_ATON(SUBSTRING_INDEX(sa.ipv4_cidr, '/', 1))
+                      AND INET_ATON(SUBSTRING_INDEX(sa.ipv4_cidr, '/', 1))
+                         + POW(2, 32 - CAST(SUBSTRING_INDEX(sa.ipv4_cidr, '/', -1) AS UNSIGNED)) - 1
               )
               AND h.id NOT IN (
                   SELECT ht.host_id
@@ -469,24 +476,28 @@ class RecommendationService
     }
 
     /**
-     * Returns the Subnet associated with the most recent DHCP lease for the
-     * given interface's MAC address, or null if no lease exists.
+     * Returns the Subnet whose CIDR contains the interface's last_dhcp_ip,
+     * or null if the IP is unset or does not fall within any known subnet.
      */
-    public function findCurrentLeaseSubnet(NetworkInterface $interface): ?Subnet
+    public function findSubnetForLastDhcpIp(NetworkInterface $interface): ?Subnet
     {
-        /** @var DhcpLease|null $lease */
-        $lease = $this->em->createQueryBuilder()
-            ->select('dl')
-            ->from(DhcpLease::class, 'dl')
-            ->where('dl.macAddress = :mac')
-            ->andWhere('dl.subnet IS NOT NULL')
-            ->orderBy('dl.leaseStart', 'DESC')
-            ->setMaxResults(1)
-            ->setParameter('mac', $interface->getMacAddress())
-            ->getQuery()
-            ->getOneOrNullResult();
+        $ip = $interface->getLastDhcpIp();
+        if ($ip === null) {
+            return null;
+        }
 
-        return $lease?->getSubnet();
+        $sql = <<<SQL
+            SELECT id FROM subnet
+            WHERE ipv4_cidr IS NOT NULL
+              AND INET_ATON(:ip) BETWEEN
+                  INET_ATON(SUBSTRING_INDEX(ipv4_cidr, '/', 1))
+                  AND INET_ATON(SUBSTRING_INDEX(ipv4_cidr, '/', 1))
+                     + POW(2, 32 - CAST(SUBSTRING_INDEX(ipv4_cidr, '/', -1) AS UNSIGNED)) - 1
+            LIMIT 1
+        SQL;
+
+        $id = $this->em->getConnection()->fetchOne($sql, ['ip' => $ip]);
+        return $id !== false ? $this->em->find(Subnet::class, (int) $id) : null;
     }
 
     // ── private helpers ───────────────────────────────────────────────────────
