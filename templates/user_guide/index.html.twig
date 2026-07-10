@@ -106,6 +106,20 @@
     <div class="col-md-6 col-xl-4">
         <div class="card h-100">
             <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-lightbulb me-2 text-warning"></i>Recommendations</h5>
+                <p class="card-text text-muted small">
+                    Scan your data for consistency issues: unlinked DNS records, convertible or orphaned CNAMEs, missing dual-stack records, missing DNS view assignments, and DHCP subnet mismatches.
+                </p>
+            </div>
+            <div class="card-footer bg-transparent">
+                <a href="{{ path('user_guide_recommendations') }}" class="btn btn-sm btn-primary">Read guide →</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-xl-4">
+        <div class="card h-100">
+            <div class="card-body">
                 <h5 class="card-title"><i class="bi bi-gear me-2"></i>Settings &amp; Administration</h5>
                 <p class="card-text text-muted small">
                     Configure buildings, tags, application settings, backups, API tokens, and SAML authentication providers.

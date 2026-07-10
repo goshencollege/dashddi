@@ -56,4 +56,10 @@ class UserGuideController extends AbstractController
     {
         return $this->render('user_guide/settings.html.twig');
     }
+
+    #[Route('/recommendations', name: 'recommendations')]
+    public function recommendations(): Response
+    {
+        return $this->render('user_guide/recommendations.html.twig');
+    }
 }

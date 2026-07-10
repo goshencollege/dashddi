@@ -1,0 +1,672 @@
+{% extends 'base.html.twig' %}
+{% block title %}Recommendations{% endblock %}
+{% block body_class %}page-list-scroll{% endblock %}
+
+{% block content %}
+<div class="list-page-content">
+{# CSRF tokens emitted unconditionally so forms and tests can always access them #}
+<div id="recommendation-csrf" hidden>
+    <span id="csrf-link-dns">{{ csrf_token('link_dns_bulk') }}</span>
+    <span id="csrf-convert-cname">{{ csrf_token('convert_cname_bulk') }}</span>
+    <span id="csrf-delete-orphaned-cname">{{ csrf_token('delete_orphaned_cname') }}</span>
+    <span id="csrf-add-dual-stack">{{ csrf_token('add_dual_stack_bulk') }}</span>
+    <span id="csrf-add-missing-views">{{ csrf_token('add_missing_views_bulk') }}</span>
+    <span id="csrf-dhcp-mismatch-tag">{{ csrf_token('dhcp_mismatch_tag') }}</span>
+    <span id="csrf-dhcp-mismatch-move">{{ csrf_token('dhcp_mismatch_move') }}</span>
+    <span id="csrf-expire-stale-api-tokens">{{ csrf_token('expire_stale_api_tokens') }}</span>
+</div>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0"><i class="bi bi-lightbulb me-2"></i>Recommendations</h1>
+    <a href="{{ path('user_guide_recommendations') }}" class="btn btn-sm btn-outline-secondary" target="_blank">
+        <i class="bi bi-question-circle me-1"></i>Help
+    </a>
+</div>
+
+{# ── Unlinked DNS Records ─────────────────────────────────────────────────── #}
+{% if unlinked_dns is empty %}
+<div class="card mb-2 border-success-subtle">
+    <div class="card-header bg-success-subtle text-success-emphasis d-flex justify-content-between align-items-center py-2">
+        <span><i class="bi bi-link-45deg me-1"></i><strong>Unlinked DNS Records</strong></span>
+        <small><i class="bi bi-check-circle me-1"></i>None found</small>
+    </div>
+</div>
+{% else %}
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>
+            <i class="bi bi-link-45deg me-1"></i>
+            <strong>Unlinked DNS Records</strong>
+            <span class="badge bg-secondary ms-2">{{ unlinked_dns|length }}</span>
+        </span>
+    </div>
+    <div class="card-body pb-0">
+        <p class="text-muted small mb-3">
+            These A and AAAA records have an IP address that matches a network interface or VIP, but the record
+            is not linked to that entity. Linking the record lets DashDDI manage it automatically and keep it in sync.
+        </p>
+    </div>
+    <form method="post" action="{{ path('recommendation_apply_link_dns') }}" id="unlinked-dns-form">
+        <input type="hidden" name="_token" value="{{ csrf_token('link_dns_bulk') }}">
+        <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom border-top">
+            <div class="form-check mb-0">
+                <input class="form-check-input" type="checkbox" id="select-all-dns">
+                <label class="form-check-label small text-muted" for="select-all-dns">Select all</label>
+            </div>
+            <button type="submit" class="btn btn-sm btn-success" id="bulk-apply-btn" disabled
+                    onclick="return confirm('Link ' + document.getElementById('selected-count').textContent + ' DNS record(s) to their matching interfaces?')">
+                <i class="bi bi-link-45deg me-1"></i>
+                Implement Selected (<span id="selected-count">0</span>)
+            </button>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th style="width: 2.25rem"></th>
+                        <th>Domain</th>
+                        <th>Hostname</th>
+                        <th>Type</th>
+                        <th>IP Address</th>
+                        <th>Match</th>
+                        <th>Name</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in unlinked_dns %}
+                    <tr class="dns-row">
+                        <td><input class="form-check-input dns-checkbox" type="checkbox" name="ids[]" value="{{ row.record_id }}"></td>
+                        <td><a href="{{ path('domain_show', {id: row.domain_id}) }}">{{ row.domain_name }}</a></td>
+                        <td class="font-monospace">{{ row.hostname }}</td>
+                        <td><span class="badge bg-primary-subtle text-primary-emphasis">{{ row.record_type }}</span></td>
+                        <td class="font-monospace">{{ row.ip }}</td>
+                        <td>
+                            {% if row.match_type == 'vip' %}
+                                <span class="badge bg-warning-subtle text-warning-emphasis">VIP</span>
+                            {% else %}
+                                <span class="badge bg-secondary-subtle text-secondary-emphasis">Interface</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if row.match_type == 'vip' %}
+                                <a href="{{ path('virtual_ip_show', {id: row.match_id}) }}">{{ row.match_label }}</a>
+                            {% else %}
+                                <a href="{{ path('interface_show', {id: row.match_id}) }}">{{ row.match_label }}{% if row.match_sublabel %} / {{ row.match_sublabel }}{% endif %}</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </form>
+</div>
+{% endif %}
+
+{# ── Convertible CNAME Records ────────────────────────────────────────────── #}
+{% if convertible_cnames is empty %}
+<div class="card mb-2 border-success-subtle">
+    <div class="card-header bg-success-subtle text-success-emphasis d-flex justify-content-between align-items-center py-2">
+        <span><i class="bi bi-arrow-repeat me-1"></i><strong>Convertible CNAME Records</strong></span>
+        <small><i class="bi bi-check-circle me-1"></i>None found</small>
+    </div>
+</div>
+{% else %}
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>
+            <i class="bi bi-arrow-repeat me-1"></i>
+            <strong>Convertible CNAME Records</strong>
+            <span class="badge bg-secondary ms-2">{{ convertible_cnames|length }}</span>
+        </span>
+    </div>
+    <div class="card-body pb-0">
+        <p class="text-muted small mb-3">
+            These CNAME records point to A or AAAA records that are already linked to an interface or VIP.
+            Converting them to direct A/AAAA records lets DashDDI manage the IPs automatically.
+        </p>
+    </div>
+    <form method="post" action="{{ path('recommendation_apply_convert_cname') }}" id="cname-form">
+        <input type="hidden" name="_token" value="{{ csrf_token('convert_cname_bulk') }}">
+        <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom border-top">
+            <div class="form-check mb-0">
+                <input class="form-check-input" type="checkbox" id="select-all-cname">
+                <label class="form-check-label small text-muted" for="select-all-cname">Select all</label>
+            </div>
+            <button type="submit" class="btn btn-sm btn-success" id="cname-apply-btn" disabled
+                    onclick="return confirm('Convert ' + document.getElementById('cname-selected-count').textContent + ' CNAME record(s) to A/AAAA?')">
+                <i class="bi bi-arrow-repeat me-1"></i>
+                Convert Selected (<span id="cname-selected-count">0</span>)
+            </button>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th style="width: 2.25rem"></th>
+                        <th>Domain</th>
+                        <th>Hostname</th>
+                        <th>Points To</th>
+                        <th>Would Become</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in convertible_cnames %}
+                    <tr>
+                        <td><input class="form-check-input cname-checkbox" type="checkbox" name="ids[]" value="{{ row.record_id }}"></td>
+                        <td><a href="{{ path('domain_show', {id: row.domain_id}) }}">{{ row.domain_name }}</a></td>
+                        <td class="font-monospace">{{ row.hostname }}</td>
+                        <td class="font-monospace text-muted">{{ row.cname_target }}</td>
+                        <td>
+                            {% for c in row.conversions %}
+                                <div>
+                                    <span class="badge bg-primary-subtle text-primary-emphasis me-1">{{ c.target_type }}</span>
+                                    {% if c.match_type == 'vip' %}
+                                        <span class="badge bg-warning-subtle text-warning-emphasis me-1">VIP</span>
+                                        <a href="{{ path('virtual_ip_show', {id: c.match_id}) }}">{{ c.match_label }}</a>
+                                    {% else %}
+                                        <span class="badge bg-secondary-subtle text-secondary-emphasis me-1">Interface</span>
+                                        <a href="{{ path('interface_show', {id: c.match_id}) }}">{{ c.match_label }}{% if c.match_sublabel %} / {{ c.match_sublabel }}{% endif %}</a>
+                                    {% endif %}
+                                </div>
+                            {% endfor %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </form>
+</div>
+{% endif %}
+
+{# ── Orphaned CNAME Records ───────────────────────────────────────────────── #}
+{% if orphaned_cnames is empty %}
+<div class="card mb-2 border-success-subtle">
+    <div class="card-header bg-success-subtle text-success-emphasis d-flex justify-content-between align-items-center py-2">
+        <span><i class="bi bi-link-45deg me-1"></i><strong>Orphaned CNAME Records</strong></span>
+        <small><i class="bi bi-check-circle me-1"></i>None found</small>
+    </div>
+</div>
+{% else %}
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>
+            <i class="bi bi-link-45deg me-1"></i>
+            <strong>Orphaned CNAME Records</strong>
+            <span class="badge bg-secondary ms-2">{{ orphaned_cnames|length }}</span>
+        </span>
+    </div>
+    <div class="card-body pb-0">
+        <p class="text-muted small mb-3">
+            These CNAME records point to a hostname within the same zone, but that
+            hostname does not exist as any record in the domain. They are stale aliases
+            with no valid target and should be deleted.
+        </p>
+    </div>
+    <form method="post" action="{{ path('recommendation_apply_delete_orphaned_cname') }}" id="orphaned-cname-form">
+        <input type="hidden" name="_token" value="{{ csrf_token('delete_orphaned_cname') }}">
+        <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom border-top">
+            <div class="form-check mb-0">
+                <input class="form-check-input" type="checkbox" id="select-all-orphaned-cname">
+                <label class="form-check-label small text-muted" for="select-all-orphaned-cname">Select all</label>
+            </div>
+            <button type="submit" class="btn btn-sm btn-danger" id="orphaned-cname-apply-btn" disabled
+                    onclick="return confirm('Permanently delete ' + document.getElementById('orphaned-cname-count').textContent + ' CNAME record(s)? This cannot be undone.')">
+                <i class="bi bi-trash me-1"></i>Delete Selected (<span id="orphaned-cname-count">0</span>)
+            </button>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th style="width: 2.25rem"></th>
+                        <th>Domain</th>
+                        <th>Hostname</th>
+                        <th>Target (missing)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in orphaned_cnames %}
+                    <tr>
+                        <td><input class="form-check-input orphaned-cname-checkbox" type="checkbox" name="ids[]" value="{{ row.record_id }}"></td>
+                        <td><a href="{{ path('domain_show', {id: row.domain_id}) }}">{{ row.domain_name }}</a></td>
+                        <td class="font-monospace">{{ row.hostname }}</td>
+                        <td class="font-monospace text-danger">{{ row.cname_target }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </form>
+</div>
+{% endif %}
+
+{# ── Missing Dual-Stack DNS Records ──────────────────────────────────────── #}
+{% if missing_dual_stack is empty %}
+<div class="card mb-2 border-success-subtle">
+    <div class="card-header bg-success-subtle text-success-emphasis d-flex justify-content-between align-items-center py-2">
+        <span><i class="bi bi-stack me-1"></i><strong>Missing Dual-Stack DNS Records</strong></span>
+        <small><i class="bi bi-check-circle me-1"></i>None found</small>
+    </div>
+</div>
+{% else %}
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>
+            <i class="bi bi-stack me-1"></i>
+            <strong>Missing Dual-Stack DNS Records</strong>
+            <span class="badge bg-secondary ms-2">{{ missing_dual_stack|length }}</span>
+        </span>
+    </div>
+    <div class="card-body pb-0">
+        <p class="text-muted small mb-3">
+            These dual-stack interfaces and VIPs have an A or AAAA record but are missing the
+            complementary record for the same hostname and domain. The missing record will be
+            created and linked to the same interface or VIP.
+        </p>
+    </div>
+    <form method="post" action="{{ path('recommendation_apply_add_dual_stack') }}" id="dual-stack-form">
+        <input type="hidden" name="_token" value="{{ csrf_token('add_dual_stack_bulk') }}">
+        <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom border-top">
+            <div class="form-check mb-0">
+                <input class="form-check-input" type="checkbox" id="select-all-dualstack">
+                <label class="form-check-label small text-muted" for="select-all-dualstack">Select all</label>
+            </div>
+            <button type="submit" class="btn btn-sm btn-success" id="dualstack-apply-btn" disabled
+                    onclick="return confirm('Add ' + document.getElementById('dualstack-selected-count').textContent + ' missing DNS record(s)?')">
+                <i class="bi bi-plus-circle me-1"></i>
+                Add Selected (<span id="dualstack-selected-count">0</span>)
+            </button>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th style="width: 2.25rem"></th>
+                        <th>Match</th>
+                        <th>Name</th>
+                        <th>Hostname</th>
+                        <th>Domain</th>
+                        <th>Missing</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in missing_dual_stack %}
+                    <tr>
+                        <td><input class="form-check-input dualstack-checkbox" type="checkbox" name="targets[]" value="{{ row.existing_record_id }}:{{ row.missing_type }}"></td>
+                        <td>
+                            {% if row.match_type == 'vip' %}
+                                <span class="badge bg-warning-subtle text-warning-emphasis">VIP</span>
+                            {% else %}
+                                <span class="badge bg-secondary-subtle text-secondary-emphasis">Interface</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if row.match_type == 'vip' %}
+                                <a href="{{ path('virtual_ip_show', {id: row.match_id}) }}">{{ row.match_label }}</a>
+                            {% else %}
+                                <a href="{{ path('interface_show', {id: row.match_id}) }}">{{ row.match_label }}{% if row.match_sublabel %} / {{ row.match_sublabel }}{% endif %}</a>
+                            {% endif %}
+                        </td>
+                        <td class="font-monospace">{{ row.hostname }}</td>
+                        <td><a href="{{ path('domain_show', {id: row.domain_id}) }}">{{ row.domain_name }}</a></td>
+                        <td><span class="badge bg-danger-subtle text-danger-emphasis">{{ row.missing_type }}</span></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </form>
+</div>
+{% endif %}
+
+{# ── Records Missing View Assignments ─────────────────────────────────────── #}
+{% if missing_views is empty %}
+<div class="card mb-2 border-success-subtle">
+    <div class="card-header bg-success-subtle text-success-emphasis d-flex justify-content-between align-items-center py-2">
+        <span><i class="bi bi-eye me-1"></i><strong>Records Missing View Assignments</strong></span>
+        <small><i class="bi bi-check-circle me-1"></i>None found</small>
+    </div>
+</div>
+{% else %}
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>
+            <i class="bi bi-eye me-1"></i>
+            <strong>Records Missing View Assignments</strong>
+            <span class="badge bg-secondary ms-2">{{ missing_views|length }}</span>
+        </span>
+    </div>
+    <div class="card-body pb-0">
+        <p class="text-muted small mb-3">
+            These DNS records have no views assigned, but their domain (and subnet, if applicable)
+            has views configured. Each record will be added to all views relevant for its
+            domain and subnet combination.
+        </p>
+    </div>
+    <form method="post" action="{{ path('recommendation_apply_add_missing_views') }}" id="missing-views-form">
+        <input type="hidden" name="_token" value="{{ csrf_token('add_missing_views_bulk') }}">
+        <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom border-top">
+            <div class="form-check mb-0">
+                <input class="form-check-input" type="checkbox" id="select-all-missingviews">
+                <label class="form-check-label small text-muted" for="select-all-missingviews">Select all</label>
+            </div>
+            <button type="submit" class="btn btn-sm btn-success" id="missingviews-apply-btn" disabled
+                    onclick="return confirm('Add missing views to ' + document.getElementById('missingviews-selected-count').textContent + ' record(s)?')">
+                <i class="bi bi-eye me-1"></i>
+                Add Views to Selected (<span id="missingviews-selected-count">0</span>)
+            </button>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th style="width: 2.25rem"></th>
+                        <th>Domain</th>
+                        <th>Hostname</th>
+                        <th>Type</th>
+                        <th>Linked To</th>
+                        <th>Views to Add</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in missing_views %}
+                    <tr>
+                        <td><input class="form-check-input missingviews-checkbox" type="checkbox" name="ids[]" value="{{ row.record_id }}"></td>
+                        <td><a href="{{ path('domain_show', {id: row.domain_id}) }}">{{ row.domain_name }}</a></td>
+                        <td class="font-monospace">{{ row.hostname }}</td>
+                        <td><span class="badge bg-primary-subtle text-primary-emphasis">{{ row.record_type }}</span></td>
+                        <td>
+                            {% if row.match_type == 'interface' %}
+                                <a href="{{ path('interface_show', {id: row.match_id}) }}">{{ row.match_label }}{% if row.match_sublabel %} / {{ row.match_sublabel }}{% endif %}</a>
+                            {% elseif row.match_type == 'vip' %}
+                                <a href="{{ path('virtual_ip_show', {id: row.match_id}) }}">{{ row.match_label }}</a>
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% for v in row.views %}
+                                <span class="badge bg-info-subtle text-info-emphasis me-1">{{ v.name }}</span>
+                            {% endfor %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </form>
+</div>
+{% endif %}
+
+{# ── DHCP Subnet Mismatches ───────────────────────────────────────────────── #}
+{% if dhcp_mismatches is empty %}
+<div class="card mb-2 border-success-subtle">
+    <div class="card-header bg-success-subtle text-success-emphasis d-flex justify-content-between align-items-center py-2">
+        <span><i class="bi bi-wifi me-1"></i><strong>DHCP Subnet Mismatches</strong></span>
+        <small><i class="bi bi-check-circle me-1"></i>None found</small>
+    </div>
+</div>
+{% else %}
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>
+            <i class="bi bi-wifi me-1"></i>
+            <strong>DHCP Subnet Mismatches</strong>
+            <span class="badge bg-secondary ms-2">{{ dhcp_mismatches|length }}</span>
+        </span>
+    </div>
+    <div class="card-body pb-0">
+        <p class="text-muted small mb-3">
+            These interfaces have a recent DHCP lease from a subnet other than the one they are assigned to.
+            <strong>Move</strong> the interface to match where it is actually DHCP-ing, or
+            <strong>exclude</strong> the host from this check by adding the
+            <code>dhcp-ok</code> tag (use this when roaming between subnets is intentional).
+        </p>
+    </div>
+    <form method="post" id="dhcp-mismatch-form">
+        <input type="hidden" name="_token_tag"  value="{{ csrf_token('dhcp_mismatch_tag') }}">
+        <input type="hidden" name="_token_move" value="{{ csrf_token('dhcp_mismatch_move') }}">
+        <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom border-top">
+            <div class="form-check mb-0">
+                <input class="form-check-input" type="checkbox" id="select-all-dhcp">
+                <label class="form-check-label small text-muted" for="select-all-dhcp">Select all</label>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <span class="small text-muted"><span id="dhcp-selected-count">0</span> selected</span>
+                <button type="submit" id="dhcp-tag-btn" disabled
+                        class="btn btn-sm btn-outline-secondary"
+                        formaction="{{ path('recommendation_apply_dhcp_mismatch_tag') }}"
+                        onclick="return confirm('Add dhcp-ok tag to the hosts of the selected interface(s)?')">
+                    <i class="bi bi-tag me-1"></i>Exclude Selected
+                </button>
+                <button type="submit" id="dhcp-move-btn" disabled
+                        class="btn btn-sm btn-success"
+                        formaction="{{ path('recommendation_apply_dhcp_mismatch_move') }}"
+                        onclick="return confirm('Move the selected interface(s) to their lease subnet? Review any static IP assignments afterward.')">
+                    <i class="bi bi-arrow-right-circle me-1"></i>Move to Lease Subnet
+                </button>
+            </div>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th style="width: 2.25rem"></th>
+                        <th>Host</th>
+                        <th>Interface</th>
+                        <th>MAC</th>
+                        <th>Assigned Subnet</th>
+                        <th>Lease Subnet</th>
+                        <th>Lease IP</th>
+                        <th>Last Seen</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in dhcp_mismatches %}
+                    <tr>
+                        <td><input class="form-check-input dhcp-checkbox" type="checkbox" name="ids[]" value="{{ row.interface_id }}"></td>
+                        <td><a href="{{ path('host_show', {id: row.host_id}) }}">{{ row.host_name }}</a></td>
+                        <td><a href="{{ path('interface_show', {id: row.interface_id}) }}">{{ row.interface_name ?? row.mac_address }}</a></td>
+                        <td class="font-monospace text-muted small">{{ row.mac_address }}</td>
+                        <td>
+                            <a href="{{ path('subnet_show', {id: row.assigned_subnet_id}) }}">{{ row.assigned_subnet_name }}</a>
+                            {% if row.assigned_cidr %}<br><small class="text-muted font-monospace">{{ row.assigned_cidr }}</small>{% endif %}
+                        </td>
+                        <td>
+                            <a href="{{ path('subnet_show', {id: row.lease_subnet_id}) }}">{{ row.lease_subnet_name }}</a>
+                            {% if row.lease_cidr %}<br><small class="text-muted font-monospace">{{ row.lease_cidr }}</small>{% endif %}
+                        </td>
+                        <td class="font-monospace">{{ row.lease_ip }}</td>
+                        <td class="small text-muted">{{ row.lease_start|date('Y-m-d H:i') }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </form>
+</div>
+{% endif %}
+
+{# ── Stale API Tokens ─────────────────────────────────────────────────────── #}
+{% if stale_api_tokens is empty %}
+<div class="card mb-2 border-success-subtle">
+    <div class="card-header bg-success-subtle text-success-emphasis d-flex justify-content-between align-items-center py-2">
+        <span><i class="bi bi-key me-1"></i><strong>Stale API Tokens</strong></span>
+        <small><i class="bi bi-check-circle me-1"></i>None found</small>
+    </div>
+</div>
+{% else %}
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>
+            <i class="bi bi-key me-1"></i>
+            <strong>Stale API Tokens</strong>
+            <span class="badge bg-secondary ms-2">{{ stale_api_tokens|length }}</span>
+        </span>
+    </div>
+    <div class="card-body pb-0">
+        <p class="text-muted small mb-3">
+            These API tokens are still valid but have not been used in more than six months
+            (or were never used and are at least six months old). Setting their expiration date
+            to yesterday will revoke them immediately without deleting the token record.
+        </p>
+    </div>
+    <form method="post" action="{{ path('recommendation_apply_expire_stale_api_tokens') }}" id="stale-api-tokens-form">
+        <input type="hidden" name="_token" value="{{ csrf_token('expire_stale_api_tokens') }}">
+        <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom border-top">
+            <div class="form-check mb-0">
+                <input class="form-check-input" type="checkbox" id="select-all-stale-tokens">
+                <label class="form-check-label small text-muted" for="select-all-stale-tokens">Select all</label>
+            </div>
+            <button type="submit" class="btn btn-sm btn-warning" id="stale-tokens-apply-btn" disabled
+                    onclick="return confirm('Expire ' + document.getElementById('stale-tokens-count').textContent + ' API token(s)? They will stop working immediately.')">
+                <i class="bi bi-clock-history me-1"></i>Expire Selected (<span id="stale-tokens-count">0</span>)
+            </button>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th style="width: 2.25rem"></th>
+                        <th>Name</th>
+                        <th>Owner</th>
+                        <th>Last Used</th>
+                        <th>Created</th>
+                        <th>Expires</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in stale_api_tokens %}
+                    <tr>
+                        <td><input class="form-check-input stale-token-checkbox" type="checkbox" name="ids[]" value="{{ row.id }}"></td>
+                        <td><a href="{{ path('api_token_edit', {id: row.id}) }}">{{ row.name }}</a></td>
+                        <td class="text-muted small">{{ row.owner_identifier }}</td>
+                        <td class="small text-muted">
+                            {% if row.last_used_at %}
+                                {{ row.last_used_at|date('Y-m-d') }}
+                            {% else %}
+                                <em class="text-danger">Never</em>
+                            {% endif %}
+                        </td>
+                        <td class="small text-muted">{{ row.created_at|date('Y-m-d') }}</td>
+                        <td class="small text-muted">
+                            {% if row.expires_at %}
+                                {{ row.expires_at|date('Y-m-d') }}
+                            {% else %}
+                                <em>Never</em>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </form>
+</div>
+{% endif %}
+
+</div>
+
+<script>
+function initCheckboxGroup(selectAllId, checkboxClass, applyBtnId, countSpanId) {
+    const selectAll  = document.getElementById(selectAllId);
+    const applyBtn   = document.getElementById(applyBtnId);
+    const countSpan  = document.getElementById(countSpanId);
+    const checkboxes = Array.from(document.querySelectorAll('.' + checkboxClass));
+    if (!selectAll) return;
+
+    let lastChecked = null;
+
+    function updateState() {
+        const checked = checkboxes.filter(cb => cb.checked).length;
+        countSpan.textContent = checked;
+        applyBtn.disabled = checked === 0;
+        selectAll.indeterminate = checked > 0 && checked < checkboxes.length;
+        selectAll.checked = checked === checkboxes.length;
+    }
+
+    selectAll.addEventListener('change', function () {
+        checkboxes.forEach(cb => {
+            cb.checked = this.checked;
+            cb.closest('tr').classList.toggle('table-active', this.checked);
+        });
+        lastChecked = null;
+        updateState();
+    });
+
+    checkboxes.forEach(cb => {
+        cb.addEventListener('click', function (e) {
+            if (e.shiftKey && lastChecked !== null && lastChecked !== this) {
+                const a = checkboxes.indexOf(lastChecked);
+                const b = checkboxes.indexOf(this);
+                const [from, to] = a < b ? [a, b] : [b, a];
+                checkboxes.slice(from, to + 1).forEach(c => {
+                    c.checked = this.checked;
+                    c.closest('tr').classList.toggle('table-active', this.checked);
+                });
+            } else {
+                this.closest('tr').classList.toggle('table-active', this.checked);
+            }
+            lastChecked = this;
+            updateState();
+        });
+    });
+}
+
+initCheckboxGroup('select-all-dns',          'dns-checkbox',          'bulk-apply-btn',          'selected-count');
+initCheckboxGroup('select-all-cname',        'cname-checkbox',        'cname-apply-btn',         'cname-selected-count');
+initCheckboxGroup('select-all-orphaned-cname', 'orphaned-cname-checkbox', 'orphaned-cname-apply-btn', 'orphaned-cname-count');
+initCheckboxGroup('select-all-dualstack',    'dualstack-checkbox',    'dualstack-apply-btn',     'dualstack-selected-count');
+initCheckboxGroup('select-all-missingviews', 'missingviews-checkbox', 'missingviews-apply-btn',  'missingviews-selected-count');
+initCheckboxGroup('select-all-stale-tokens', 'stale-token-checkbox',  'stale-tokens-apply-btn',  'stale-tokens-count');
+
+// DHCP mismatch card — two apply buttons, single count span
+(function () {
+    const selectAll  = document.getElementById('select-all-dhcp');
+    const tagBtn     = document.getElementById('dhcp-tag-btn');
+    const moveBtn    = document.getElementById('dhcp-move-btn');
+    const countSpan  = document.getElementById('dhcp-selected-count');
+    const checkboxes = Array.from(document.querySelectorAll('.dhcp-checkbox'));
+    if (!selectAll) return;
+
+    let lastChecked = null;
+
+    function updateState() {
+        const checked = checkboxes.filter(cb => cb.checked).length;
+        countSpan.textContent = checked;
+        tagBtn.disabled  = checked === 0;
+        moveBtn.disabled = checked === 0;
+        selectAll.indeterminate = checked > 0 && checked < checkboxes.length;
+        selectAll.checked = checked === checkboxes.length;
+    }
+
+    selectAll.addEventListener('change', function () {
+        checkboxes.forEach(cb => {
+            cb.checked = this.checked;
+            cb.closest('tr').classList.toggle('table-active', this.checked);
+        });
+        lastChecked = null;
+        updateState();
+    });
+
+    checkboxes.forEach(cb => {
+        cb.addEventListener('click', function (e) {
+            if (e.shiftKey && lastChecked !== null && lastChecked !== this) {
+                const a = checkboxes.indexOf(lastChecked);
+                const b = checkboxes.indexOf(this);
+                const [from, to] = a < b ? [a, b] : [b, a];
+                checkboxes.slice(from, to + 1).forEach(c => {
+                    c.checked = this.checked;
+                    c.closest('tr').classList.toggle('table-active', this.checked);
+                });
+            } else {
+                this.closest('tr').classList.toggle('table-active', this.checked);
+            }
+            lastChecked = this;
+            updateState();
+        });
+    });
+})();
+</script>
+{% endblock %}
