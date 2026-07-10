@@ -45,49 +45,57 @@ class ReportController extends AbstractController
         ]);
     }
 
-    #[Route('/recommendations/apply/link-dns/{id}', name: 'recommendation_apply_link_dns', methods: ['POST'])]
+    #[Route('/recommendations/apply/link-dns', name: 'recommendation_apply_link_dns', methods: ['POST'])]
     public function applyLinkDns(
-        int $id,
         Request $request,
         EntityManagerInterface $em,
         RecommendationService $service,
     ): Response {
-        if (!$this->isCsrfTokenValid('link_dns_' . $id, $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid('link_dns_bulk', $request->request->get('_token'))) {
             $this->addFlash('danger', 'Invalid CSRF token.');
             return $this->redirectToRoute('recommendation_index');
         }
 
-        $record = $em->find(DomainRecord::class, $id);
-        if ($record === null) {
-            $this->addFlash('warning', 'Record not found.');
+        $ids = array_filter(array_map('intval', (array) $request->request->all('ids')));
+        if (empty($ids)) {
+            $this->addFlash('warning', 'No records selected.');
             return $this->redirectToRoute('recommendation_index');
         }
 
-        if ($record->getNetworkInterface() !== null) {
-            $this->addFlash('info', 'Record is already linked to an interface.');
-            return $this->redirectToRoute('recommendation_index');
+        $linked = 0;
+        $skipped = 0;
+
+        foreach ($ids as $id) {
+            $record = $em->find(DomainRecord::class, $id);
+            if ($record === null || $record->getNetworkInterface() !== null) {
+                $skipped++;
+                continue;
+            }
+
+            if (!in_array($record->getType(), [RecordType::A, RecordType::AAAA], true)) {
+                $skipped++;
+                continue;
+            }
+
+            $iface = $service->findInterfaceForDnsRecord($record);
+            if ($iface === null) {
+                $skipped++;
+                continue;
+            }
+
+            $record->setNetworkInterface($iface);
+            $record->setValue('');
+            $linked++;
         }
 
-        if (!in_array($record->getType(), [RecordType::A, RecordType::AAAA], true)) {
-            $this->addFlash('warning', 'Only A and AAAA records can be linked via this action.');
-            return $this->redirectToRoute('recommendation_index');
-        }
-
-        $iface = $service->findInterfaceForDnsRecord($record);
-        if ($iface === null) {
-            $this->addFlash('warning', 'No matching interface found — the data may have changed.');
-            return $this->redirectToRoute('recommendation_index');
-        }
-
-        $record->setNetworkInterface($iface);
-        $record->setValue('');
         $em->flush();
 
-        $this->addFlash('success', sprintf(
-            'DNS record "%s" linked to interface on host "%s".',
-            $record->getHostname(),
-            $iface->getHost()?->getName() ?? '(unknown)',
-        ));
+        if ($linked > 0) {
+            $this->addFlash('success', sprintf('%d DNS record%s linked to interface%s.', $linked, $linked !== 1 ? 's' : '', $linked !== 1 ? 's' : ''));
+        }
+        if ($skipped > 0) {
+            $this->addFlash('warning', sprintf('%d record%s skipped (already linked or no longer matched).', $skipped, $skipped !== 1 ? 's' : ''));
+        }
 
         return $this->redirectToRoute('recommendation_index');
     }
