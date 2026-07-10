@@ -3,8 +3,8 @@
 namespace App\EventListener;
 
 use App\Entity\Host;
+use App\Message\PushAllDhcpMessage;
 use App\Message\PushClearpassMessage;
-use App\Message\PushDhcpMessage;
 use App\Message\PushDnsMessage;
 use App\Service\PushScopeService;
 use App\Service\PushSuppressionContext;
@@ -141,9 +141,7 @@ class EntityPushListener
         }
 
         if ($allDhcp) {
-            foreach ($this->scope->allDhcpServerIds() as $id) {
-                $this->bus->dispatch(new PushDhcpMessage($id), [new DeduplicateStamp('push_dhcp_' . $id)]);
-            }
+            $this->bus->dispatch(new PushAllDhcpMessage(), [new DeduplicateStamp('push_dhcp_all')]);
         }
     }
 

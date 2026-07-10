@@ -422,6 +422,30 @@ ${DEPENDS_ON_BLOCK}
         max-file: "5"
 ${DEPENDS_ON_BLOCK}
 
+  worker_priority_2:
+    image: ${APP_IMAGE}
+    read_only: true
+    restart: unless-stopped
+    command: ["php", "bin/console", "messenger:consume", "async_priority", "failed_priority", "--time-limit=3600"]
+    volumes:
+      - symfony_var:/var/www/html/var
+    tmpfs:
+      - /tmp
+      - /usr/local/var/run
+    environment:
+      APP_ENV: prod
+      APP_SECRET: "${APP_SECRET}"
+      APP_ENCRYPTION_KEY: "${APP_ENCRYPTION_KEY}"
+      DATABASE_URL: "${DATABASE_URL}"
+      DEFAULT_URI: "${BASE_URL}"
+      MESSENGER_TRANSPORT_DSN: "doctrine://default?auto_setup=0"
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+${DEPENDS_ON_BLOCK}
+
   worker_bulk:
     image: ${APP_IMAGE}
     read_only: true
