@@ -7,6 +7,7 @@ use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpKernel\Event\RequestEvent;
+use Symfony\Component\HttpKernel\Event\ResponseEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
@@ -22,7 +23,10 @@ class SessionExpirySubscriber implements EventSubscriberInterface
     public static function getSubscribedEvents(): array
     {
         // Priority 6: runs after the firewall (8) but before the controller
-        return [KernelEvents::REQUEST => ['onKernelRequest', 6]];
+        return [
+            KernelEvents::REQUEST  => ['onKernelRequest', 6],
+            KernelEvents::RESPONSE => ['onKernelResponse', 0],
+        ];
     }
 
     public function onKernelRequest(RequestEvent $event): void
@@ -72,6 +76,34 @@ class SessionExpirySubscriber implements EventSubscriberInterface
             $event->setResponse(new JsonResponse(['error' => 'Session expired'], 401));
         } else {
             $event->setResponse(new RedirectResponse($this->urlGenerator->generate('saml_login')));
+        }
+    }
+
+    public function onKernelResponse(ResponseEvent $event): void
+    {
+        if (!$event->isMainRequest()) {
+            return;
+        }
+
+        $response = $event->getResponse();
+        if (!$response instanceof RedirectResponse) {
+            return;
+        }
+
+        $request     = $event->getRequest();
+        $isXhrOrApi  = $request->isXmlHttpRequest()
+            || str_starts_with($request->getPathInfo(), '/api/');
+
+        if (!$isXhrOrApi) {
+            return;
+        }
+
+        // Any redirect to the login page in response to an XHR/API request means
+        // the security layer rejected the session. Return 401 so the client can
+        // handle it gracefully instead of rendering the login page inside the page.
+        $loginPath = $this->urlGenerator->generate('saml_login');
+        if (str_starts_with($response->getTargetUrl(), $loginPath)) {
+            $event->setResponse(new JsonResponse(['error' => 'Session expired'], 401));
         }
     }
 }

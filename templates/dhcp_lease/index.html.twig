@@ -101,8 +101,16 @@
         var scrollTop = wrapper.scrollTop;
         if (label) { label.textContent = 'Refreshing…'; }
         fetch(buildUrl(), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-            .then(function (r) { return r.text(); })
+            .then(function (r) {
+                if (r.status === 401) {
+                    clearInterval(tickTimer);
+                    window.location.reload();
+                    return null;
+                }
+                return r.text();
+            })
             .then(function (html) {
+                if (html === null) { return; }
                 wrapper.innerHTML = html;
                 wrapper.scrollTop = scrollTop;
                 var el = wrapper.querySelector('[data-record-count]');
