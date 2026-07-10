@@ -2,6 +2,7 @@
 
 namespace App\Tests\Functional\Controller;
 
+use App\Entity\ApiToken;
 use App\Entity\Domain;
 use App\Entity\DomainRecord;
 use App\Entity\Host;
@@ -290,6 +291,28 @@ class ReportControllerTest extends AppWebTestCase
         $this->assertCount(1, $dhcpOkTags, 'Tag should be added only once even when multiple interfaces from the same host are submitted');
     }
 
+    // ── helpers ── api token ──────────────────────────────────────────────────
+
+    private function makeApiToken(string $suffix, \DateTimeImmutable $lastUsedAt = null, \DateTimeImmutable $expiresAt = null): ApiToken
+    {
+        $token = (new ApiToken())
+            ->setName('token-' . $suffix)
+            ->setTokenHash(hash('sha256', 'test-token-' . $suffix))
+            ->setOwnerIdentifier('test@example.com')
+            ->setAllowedRoutes(['api_subnet_index'])
+            ->setAllowedCidrs(['127.0.0.1']);
+
+        if ($lastUsedAt !== null) {
+            $token->setLastUsedAt($lastUsedAt);
+        }
+        if ($expiresAt !== null) {
+            $token->setExpiresAt($expiresAt);
+        }
+
+        $this->em->persist($token);
+        return $token;
+    }
+
     // ── dhcp-mismatch/move ────────────────────────────────────────────────────
 
     public function testDhcpMismatchMoveChangesInterfaceSubnet(): void
@@ -313,5 +336,47 @@ class ReportControllerTest extends AppWebTestCase
         $this->em->clear();
         $refreshed = $this->em->find(NetworkInterface::class, $iface->getId());
         $this->assertSame($subnetB->getId(), $refreshed->getSubnet()->getId());
+    }
+
+    // ── expire-stale-api-tokens ───────────────────────────────────────────────
+
+    public function testExpireStaleApiTokenSetsExpirationToYesterday(): void
+    {
+        $sevenMonthsAgo = new \DateTimeImmutable('-7 months');
+        $token = $this->makeApiToken('stale', $sevenMonthsAgo);
+        $this->em->flush();
+
+        $crawler = $this->getRecommendationsPage();
+        $csrf    = $this->extractToken($crawler, 'csrf-expire-stale-api-tokens');
+
+        $this->client->request('POST', '/recommendations/apply/expire-stale-api-tokens', [
+            '_token' => $csrf,
+            'ids'    => [$token->getId()],
+        ]);
+        $this->assertResponseRedirects('/recommendations');
+
+        $this->em->clear();
+        $refreshed = $this->em->find(ApiToken::class, $token->getId());
+        $this->assertTrue($refreshed->isExpired(), 'Token should be expired after applying remediation');
+    }
+
+    public function testExpireStaleApiTokenSkipsAlreadyExpiredTokens(): void
+    {
+        $alreadyExpired = new \DateTimeImmutable('-1 day');
+        $token = $this->makeApiToken('already-expired', new \DateTimeImmutable('-7 months'), $alreadyExpired);
+        $this->em->flush();
+
+        $crawler = $this->getRecommendationsPage();
+        $csrf    = $this->extractToken($crawler, 'csrf-expire-stale-api-tokens');
+
+        $this->client->request('POST', '/recommendations/apply/expire-stale-api-tokens', [
+            '_token' => $csrf,
+            'ids'    => [$token->getId()],
+        ]);
+        $this->assertResponseRedirects('/recommendations');
+
+        $this->em->clear();
+        $refreshed = $this->em->find(ApiToken::class, $token->getId());
+        $this->assertEquals($alreadyExpired->getTimestamp(), $refreshed->getExpiresAt()->getTimestamp(), 'Already-expired token expiry should not be changed');
     }
 }

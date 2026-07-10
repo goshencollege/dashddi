@@ -543,6 +543,34 @@ class RecommendationService
         return $id !== false ? $this->em->find(Subnet::class, (int) $id) : null;
     }
 
+    /**
+     * Finds non-expired API tokens that have not been used in the past 6 months
+     * (or were never used and are at least 6 months old).
+     *
+     * Each row contains: id, name, owner_identifier, last_used_at, created_at, expires_at.
+     */
+    public function findStaleApiTokens(): array
+    {
+        $sql = <<<SQL
+            SELECT
+                t.id,
+                t.name,
+                t.owner_identifier,
+                t.last_used_at,
+                t.created_at,
+                t.expires_at
+            FROM api_token t
+            WHERE (t.expires_at IS NULL OR t.expires_at > NOW())
+              AND (
+                  (t.last_used_at IS NOT NULL AND t.last_used_at < DATE_SUB(NOW(), INTERVAL 6 MONTH))
+                  OR (t.last_used_at IS NULL AND t.created_at < DATE_SUB(NOW(), INTERVAL 6 MONTH))
+              )
+            ORDER BY t.owner_identifier, t.name
+        SQL;
+
+        return $this->em->getConnection()->fetchAllAssociative($sql);
+    }
+
     // ── private helpers ───────────────────────────────────────────────────────
 
     private function fetchCnameTargetRows(?int $cnameId = null): array

@@ -13,6 +13,7 @@
     <span id="csrf-add-missing-views">{{ csrf_token('add_missing_views_bulk') }}</span>
     <span id="csrf-dhcp-mismatch-tag">{{ csrf_token('dhcp_mismatch_tag') }}</span>
     <span id="csrf-dhcp-mismatch-move">{{ csrf_token('dhcp_mismatch_move') }}</span>
+    <span id="csrf-expire-stale-api-tokens">{{ csrf_token('expire_stale_api_tokens') }}</span>
 </div>
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1 class="h3 mb-0"><i class="bi bi-lightbulb me-2"></i>Recommendations</h1>
@@ -487,6 +488,84 @@
 </div>
 {% endif %}
 
+{# ── Stale API Tokens ─────────────────────────────────────────────────────── #}
+{% if stale_api_tokens is empty %}
+<div class="card mb-2 border-success-subtle">
+    <div class="card-header bg-success-subtle text-success-emphasis d-flex justify-content-between align-items-center py-2">
+        <span><i class="bi bi-key me-1"></i><strong>Stale API Tokens</strong></span>
+        <small><i class="bi bi-check-circle me-1"></i>None found</small>
+    </div>
+</div>
+{% else %}
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>
+            <i class="bi bi-key me-1"></i>
+            <strong>Stale API Tokens</strong>
+            <span class="badge bg-secondary ms-2">{{ stale_api_tokens|length }}</span>
+        </span>
+    </div>
+    <div class="card-body pb-0">
+        <p class="text-muted small mb-3">
+            These API tokens are still valid but have not been used in more than six months
+            (or were never used and are at least six months old). Setting their expiration date
+            to yesterday will revoke them immediately without deleting the token record.
+        </p>
+    </div>
+    <form method="post" action="{{ path('recommendation_apply_expire_stale_api_tokens') }}" id="stale-api-tokens-form">
+        <input type="hidden" name="_token" value="{{ csrf_token('expire_stale_api_tokens') }}">
+        <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom border-top">
+            <div class="form-check mb-0">
+                <input class="form-check-input" type="checkbox" id="select-all-stale-tokens">
+                <label class="form-check-label small text-muted" for="select-all-stale-tokens">Select all</label>
+            </div>
+            <button type="submit" class="btn btn-sm btn-warning" id="stale-tokens-apply-btn" disabled
+                    onclick="return confirm('Expire ' + document.getElementById('stale-tokens-count').textContent + ' API token(s)? They will stop working immediately.')">
+                <i class="bi bi-clock-history me-1"></i>Expire Selected (<span id="stale-tokens-count">0</span>)
+            </button>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th style="width: 2.25rem"></th>
+                        <th>Name</th>
+                        <th>Owner</th>
+                        <th>Last Used</th>
+                        <th>Created</th>
+                        <th>Expires</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in stale_api_tokens %}
+                    <tr>
+                        <td><input class="form-check-input stale-token-checkbox" type="checkbox" name="ids[]" value="{{ row.id }}"></td>
+                        <td><a href="{{ path('api_token_edit', {id: row.id}) }}">{{ row.name }}</a></td>
+                        <td class="text-muted small">{{ row.owner_identifier }}</td>
+                        <td class="small text-muted">
+                            {% if row.last_used_at %}
+                                {{ row.last_used_at|date('Y-m-d') }}
+                            {% else %}
+                                <em class="text-danger">Never</em>
+                            {% endif %}
+                        </td>
+                        <td class="small text-muted">{{ row.created_at|date('Y-m-d') }}</td>
+                        <td class="small text-muted">
+                            {% if row.expires_at %}
+                                {{ row.expires_at|date('Y-m-d') }}
+                            {% else %}
+                                <em>Never</em>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </form>
+</div>
+{% endif %}
+
 </div>
 
 <script>
@@ -540,6 +619,7 @@ initCheckboxGroup('select-all-cname',        'cname-checkbox',        'cname-app
 initCheckboxGroup('select-all-orphaned-cname', 'orphaned-cname-checkbox', 'orphaned-cname-apply-btn', 'orphaned-cname-count');
 initCheckboxGroup('select-all-dualstack',    'dualstack-checkbox',    'dualstack-apply-btn',     'dualstack-selected-count');
 initCheckboxGroup('select-all-missingviews', 'missingviews-checkbox', 'missingviews-apply-btn',  'missingviews-selected-count');
+initCheckboxGroup('select-all-stale-tokens', 'stale-token-checkbox',  'stale-tokens-apply-btn',  'stale-tokens-count');
 
 // DHCP mismatch card — two apply buttons, single count span
 (function () {

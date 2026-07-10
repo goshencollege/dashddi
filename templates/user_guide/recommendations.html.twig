@@ -94,19 +94,30 @@
     </div>
 </div>
 
+<div class="card mb-4" id="stale-api-tokens">
+    <div class="card-header fw-semibold"><i class="bi bi-key me-1"></i>Stale API Tokens</div>
+    <div class="card-body">
+        <p>An API token is considered stale when it is still valid (not yet expired) but has not been used in more than six months. Tokens that were created more than six months ago and never used at all are also included.</p>
+        <p>Stale tokens represent unnecessary access surface. If the integration or script that used the token is no longer active, the token should be revoked. The check excludes tokens that are already expired, since they cannot be used regardless.</p>
+        <p><strong>Remediation:</strong> Select one or more tokens and click <em>Expire Selected</em>. DashDDI sets each token's expiration date to yesterday, revoking it immediately without deleting the token record. The token remains visible in <a href="{{ path('api_token_index') }}">Settings → API Tokens</a> so you can review it or reactivate it by setting a future expiration date if needed.</p>
+        <p class="mb-0 text-muted small"><i class="bi bi-info-circle me-1"></i>The six-month threshold is fixed. If a token is intentionally long-lived and infrequently used, you can safely ignore it here — the card will continue to show it until the token expires or is used.</p>
+    </div>
+</div>
+
 </div>{# /col-lg-9 #}
 
 <div class="col-lg-3 d-none d-lg-block">
     <div class="card sticky-top" style="top:80px">
         <div class="card-header small fw-semibold">On this page</div>
         <div class="list-group list-group-flush small">
-            <a href="#overview"          class="list-group-item list-group-item-action py-1">Overview</a>
-            <a href="#unlinked-dns"      class="list-group-item list-group-item-action py-1">Unlinked DNS Records</a>
+            <a href="#overview"           class="list-group-item list-group-item-action py-1">Overview</a>
+            <a href="#unlinked-dns"       class="list-group-item list-group-item-action py-1">Unlinked DNS Records</a>
             <a href="#convertible-cnames" class="list-group-item list-group-item-action py-1">Convertible CNAME Records</a>
-            <a href="#orphaned-cnames"   class="list-group-item list-group-item-action py-1">Orphaned CNAME Records</a>
+            <a href="#orphaned-cnames"    class="list-group-item list-group-item-action py-1">Orphaned CNAME Records</a>
             <a href="#missing-dual-stack" class="list-group-item list-group-item-action py-1">Missing Dual-Stack</a>
-            <a href="#missing-views"     class="list-group-item list-group-item-action py-1">Missing View Assignments</a>
-            <a href="#dhcp-mismatches"   class="list-group-item list-group-item-action py-1">DHCP Subnet Mismatches</a>
+            <a href="#missing-views"      class="list-group-item list-group-item-action py-1">Missing View Assignments</a>
+            <a href="#dhcp-mismatches"    class="list-group-item list-group-item-action py-1">DHCP Subnet Mismatches</a>
+            <a href="#stale-api-tokens"   class="list-group-item list-group-item-action py-1">Stale API Tokens</a>
         </div>
     </div>
 </div>

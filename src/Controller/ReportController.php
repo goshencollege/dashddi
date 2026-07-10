@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\Entity\ApiToken;
 use App\Entity\DnsView;
 use App\Entity\DomainRecord;
 use App\Entity\NetworkInterface;
@@ -52,6 +53,7 @@ class ReportController extends AbstractController
             'orphaned_cnames'     => $service->findOrphanedCnameRecords(),
             'missing_views'       => $service->findRecordsWithMissingViews(),
             'dhcp_mismatches'     => $service->findDhcpSubnetMismatches(),
+            'stale_api_tokens'    => $service->findStaleApiTokens(),
         ]);
     }
 
@@ -478,6 +480,43 @@ class ReportController extends AbstractController
         }
         if ($skipped > 0) {
             $this->addFlash('warning', sprintf('%d record%s skipped (already has views or no applicable views).', $skipped, $skipped !== 1 ? 's' : ''));
+        }
+
+        return $this->redirectToRoute('recommendation_index');
+    }
+
+    #[Route('/recommendations/apply/expire-stale-api-tokens', name: 'recommendation_apply_expire_stale_api_tokens', methods: ['POST'])]
+    public function applyExpireStaleApiTokens(
+        Request $request,
+        EntityManagerInterface $em,
+    ): Response {
+        if (!$this->isCsrfTokenValid('expire_stale_api_tokens', $request->request->get('_token'))) {
+            $this->addFlash('danger', 'Invalid CSRF token.');
+            return $this->redirectToRoute('recommendation_index');
+        }
+
+        $ids = array_filter(array_map('intval', (array) $request->request->all('ids')));
+        if (empty($ids)) {
+            $this->addFlash('warning', 'No tokens selected.');
+            return $this->redirectToRoute('recommendation_index');
+        }
+
+        $yesterday = new \DateTimeImmutable('yesterday');
+        $expired   = 0;
+
+        foreach ($ids as $id) {
+            $token = $em->find(ApiToken::class, $id);
+            if ($token === null || $token->isExpired()) {
+                continue;
+            }
+            $token->setExpiresAt($yesterday);
+            $expired++;
+        }
+
+        $em->flush();
+
+        if ($expired > 0) {
+            $this->addFlash('success', sprintf('%d API token%s expired.', $expired, $expired !== 1 ? 's' : ''));
         }
 
         return $this->redirectToRoute('recommendation_index');
