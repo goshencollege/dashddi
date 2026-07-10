@@ -143,8 +143,6 @@
                             <th>Hostname</th>
                             <th>Points To</th>
                             <th>Would Become</th>
-                            <th>Match</th>
-                            <th>Name</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -159,20 +157,19 @@
                             </td>
                             <td class="font-monospace">{{ row.hostname }}</td>
                             <td class="font-monospace text-muted">{{ row.cname_target }}</td>
-                            <td><span class="badge bg-primary-subtle text-primary-emphasis">{{ row.target_type }}</span></td>
                             <td>
-                                {% if row.match_type == 'vip' %}
-                                    <span class="badge bg-warning-subtle text-warning-emphasis">VIP</span>
-                                {% else %}
-                                    <span class="badge bg-secondary-subtle text-secondary-emphasis">Interface</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if row.match_type == 'vip' %}
-                                    <a href="{{ path('virtual_ip_show', {id: row.match_id}) }}">{{ row.match_label }}</a>
-                                {% else %}
-                                    <a href="{{ path('interface_show', {id: row.match_id}) }}">{{ row.match_label }}{% if row.match_sublabel %} / {{ row.match_sublabel }}{% endif %}</a>
-                                {% endif %}
+                                {% for c in row.conversions %}
+                                    <div>
+                                        <span class="badge bg-primary-subtle text-primary-emphasis me-1">{{ c.target_type }}</span>
+                                        {% if c.match_type == 'vip' %}
+                                            <span class="badge bg-warning-subtle text-warning-emphasis me-1">VIP</span>
+                                            <a href="{{ path('virtual_ip_show', {id: c.match_id}) }}">{{ c.match_label }}</a>
+                                        {% else %}
+                                            <span class="badge bg-secondary-subtle text-secondary-emphasis me-1">Interface</span>
+                                            <a href="{{ path('interface_show', {id: c.match_id}) }}">{{ c.match_label }}{% if c.match_sublabel %} / {{ c.match_sublabel }}{% endif %}</a>
+                                        {% endif %}
+                                    </div>
+                                {% endfor %}
                             </td>
                         </tr>
                         {% endfor %}

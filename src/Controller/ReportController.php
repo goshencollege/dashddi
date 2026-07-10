@@ -136,23 +136,54 @@ class ReportController extends AbstractController
                 continue;
             }
 
-            $target = $service->findCnameConversionTarget($id);
-            if ($target === null) {
+            $targets = $service->findCnameConversionTargets($id);
+            if (empty($targets)) {
                 $skipped++;
                 continue;
             }
 
-            $record->setType(RecordType::from($target['target_type']));
-            $record->setValue('');
+            $views    = $record->getViews()->toArray();
+            $domain   = $record->getDomain();
+            $hostname = $record->getHostname();
+            $ttl      = $record->getTtl();
+            $comment  = $record->getComment();
 
-            if ($target['match_type'] === 'interface') {
-                $iface = $em->find(NetworkInterface::class, $target['match_id']);
+            // Convert the existing record in-place for the first target
+            $first = array_shift($targets);
+            $record->setType(RecordType::from($first['target_type']));
+            $record->setValue('');
+            if ($first['match_type'] === 'interface') {
+                $iface = $em->find(NetworkInterface::class, $first['match_id']);
                 if ($iface === null || $iface->isDeleted()) { $skipped++; continue; }
                 $record->setNetworkInterface($iface);
             } else {
-                $vip = $em->find(VirtualIp::class, $target['match_id']);
+                $vip = $em->find(VirtualIp::class, $first['match_id']);
                 if ($vip === null || $vip->isDeleted()) { $skipped++; continue; }
                 $record->setVirtualIp($vip);
+            }
+
+            // Create additional records for any remaining targets
+            foreach ($targets as $t) {
+                $extra = new DomainRecord();
+                $extra->setDomain($domain);
+                $extra->setHostname($hostname);
+                $extra->setType(RecordType::from($t['target_type']));
+                $extra->setValue('');
+                $extra->setTtl($ttl);
+                $extra->setComment($comment);
+                foreach ($views as $view) {
+                    $extra->addView($view);
+                }
+                if ($t['match_type'] === 'interface') {
+                    $iface = $em->find(NetworkInterface::class, $t['match_id']);
+                    if ($iface === null || $iface->isDeleted()) continue;
+                    $extra->setNetworkInterface($iface);
+                } else {
+                    $vip = $em->find(VirtualIp::class, $t['match_id']);
+                    if ($vip === null || $vip->isDeleted()) continue;
+                    $extra->setVirtualIp($vip);
+                }
+                $em->persist($extra);
             }
 
             $converted++;
@@ -164,7 +195,7 @@ class ReportController extends AbstractController
             $this->addFlash('success', sprintf('%d CNAME record%s converted.', $converted, $converted !== 1 ? 's' : ''));
         }
         if ($skipped > 0) {
-            $this->addFlash('warning', sprintf('%d record%s skipped (already changed or no longer unambiguous).', $skipped, $skipped !== 1 ? 's' : ''));
+            $this->addFlash('warning', sprintf('%d record%s skipped (already changed or no longer matched).', $skipped, $skipped !== 1 ? 's' : ''));
         }
 
         return $this->redirectToRoute('recommendation_index');
