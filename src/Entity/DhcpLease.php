@@ -11,6 +11,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Index(columns: ['ip_address'], name: 'idx_dhcp_lease_ip')]
 #[ORM\Index(columns: ['subnet_id'],  name: 'idx_dhcp_lease_subnet_id')]
 #[ORM\Index(columns: ['dhcp_server_id'], name: 'idx_dhcp_lease_server_id')]
+#[ORM\Index(columns: ['lease_start'], name: 'idx_dhcp_lease_start')]
 class DhcpLease
 {
     #[ORM\Id]

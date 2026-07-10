@@ -45,7 +45,7 @@ class DhcpLeaseRepository extends ServiceEntityRepository
         $qb->setFirstResult(($page - 1) * $perPage)
            ->setMaxResults($perPage);
 
-        return new Paginator($qb);
+        return new Paginator($qb, false);
     }
 
     /**
