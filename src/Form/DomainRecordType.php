@@ -74,11 +74,10 @@ class DomainRecordType extends AbstractType
         // When creating/editing from an interface or virtual IP context, add domain, isCanonical,
         // and override the type field with an extended ChoiceType that includes the A+AAAA meta option.
         if ($hasContext) {
-            $typeChoices = [];
+            $typeChoices = ['A+AAAA' => 'A+AAAA'];
             foreach (RecordType::cases() as $case) {
                 $typeChoices[$case->value] = $case;
             }
-            $typeChoices['A+AAAA'] = 'A+AAAA';
 
             $builder->add('type', ChoiceType::class, [
                 'choices'      => $typeChoices,
