@@ -1,4 +1,4 @@
-<span data-record-count="{{ total }}" class="d-none"></span>
+<span data-record-count="{{ logs|length }}" class="d-none"></span>
 {% if logs|length == 0 %}
     <div class="card-body text-center text-muted py-4">No authentication log records found.</div>
 {% else %}
@@ -42,9 +42,9 @@
         </table>
     </div>
 
-    {% if total > per_page %}
+    {% if page > 1 or has_more %}
         <div class="card-footer d-flex justify-content-between align-items-center">
-            <span class="text-muted small">Page {{ page }} of {{ (total / per_page)|round(0, 'ceil') }}</span>
+            <span class="text-muted small">Page {{ page }}</span>
             <div>
                 {% set pagerParams = {mac: filter_mac, username: filter_username, role: filter_role, vlan: filter_vlan, protocol: filter_protocol, service: filter_service, nas_ip: filter_nas_ip, nas_port_id: filter_nas_port_id} %}
                 {% if page > 1 %}
@@ -53,7 +53,7 @@
                         <i class="bi bi-chevron-left"></i> Prev
                     </a>
                 {% endif %}
-                {% if page * per_page < total %}
+                {% if has_more %}
                     <a href="{{ path('clearpass_auth_log_index', pagerParams|merge({page: page + 1})) }}"
                        class="btn btn-sm btn-outline-secondary">
                         Next <i class="bi bi-chevron-right"></i>

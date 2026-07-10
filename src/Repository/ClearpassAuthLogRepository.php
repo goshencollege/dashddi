@@ -5,7 +5,6 @@ namespace App\Repository;
 use App\Entity\ClearpassAuthLog;
 use App\Entity\ClearpassServer;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
-use Doctrine\ORM\Tools\Pagination\Paginator;
 use Doctrine\Persistence\ManagerRegistry;
 
 class ClearpassAuthLogRepository extends ServiceEntityRepository
@@ -15,6 +14,9 @@ class ClearpassAuthLogRepository extends ServiceEntityRepository
         parent::__construct($registry, ClearpassAuthLog::class);
     }
 
+    /**
+     * @return array{items: ClearpassAuthLog[], hasMore: bool}
+     */
     public function search(
         string $mac,
         string $username,
@@ -26,7 +28,7 @@ class ClearpassAuthLogRepository extends ServiceEntityRepository
         string $nasPortId,
         int $page,
         int $perPage = 50,
-    ): Paginator {
+    ): array {
         $qb = $this->createQueryBuilder('l')
             ->leftJoin('l.clearpassServer', 's')->addSelect('s')
             ->leftJoin('l.networkInterface', 'i')->addSelect('i')
@@ -66,9 +68,13 @@ class ClearpassAuthLogRepository extends ServiceEntityRepository
         }
 
         $qb->setFirstResult(($page - 1) * $perPage)
-           ->setMaxResults($perPage);
+           ->setMaxResults($perPage + 1);
 
-        return new Paginator($qb, false);
+        $results = $qb->getQuery()->getResult();
+        return [
+            'items'   => array_slice($results, 0, $perPage),
+            'hasMore' => count($results) > $perPage,
+        ];
     }
 
     /** Most recent auth logs for a given MAC, newest first. */
