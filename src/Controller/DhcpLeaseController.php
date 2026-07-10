@@ -103,10 +103,15 @@ class DhcpLeaseController extends AbstractController
         $lease = new DhcpLease($macStr, $ipStr);
         $lease->setHostname($data['hostname'] ?? null ?: null);
 
-        if (!empty($data['expire'])) {
-            $lease->setLeaseExpires(
-                (new \DateTimeImmutable())->setTimestamp((int) $data['expire'])
-            );
+        $expireTs  = !empty($data['expire'])   ? (int) $data['expire']    : null;
+        $validLft  = !empty($data['valid-lft']) ? (int) $data['valid-lft'] : null;
+
+        if ($expireTs !== null) {
+            $lease->setLeaseExpires((new \DateTimeImmutable())->setTimestamp($expireTs));
+            // Derive start from expire - valid-lft when available; more accurate than request time.
+            if ($validLft !== null) {
+                $lease->setLeaseStart((new \DateTimeImmutable())->setTimestamp($expireTs - $validLft));
+            }
         }
 
         $lease->setSubnet($this->findSubnetForIp($ipStr, $subnetRepo));
