@@ -4,8 +4,21 @@
 
 {% block content %}
 <div class="list-page-content">
+{# CSRF tokens emitted unconditionally so forms and tests can always access them #}
+<div id="recommendation-csrf" hidden>
+    <span id="csrf-link-dns">{{ csrf_token('link_dns_bulk') }}</span>
+    <span id="csrf-convert-cname">{{ csrf_token('convert_cname_bulk') }}</span>
+    <span id="csrf-delete-orphaned-cname">{{ csrf_token('delete_orphaned_cname') }}</span>
+    <span id="csrf-add-dual-stack">{{ csrf_token('add_dual_stack_bulk') }}</span>
+    <span id="csrf-add-missing-views">{{ csrf_token('add_missing_views_bulk') }}</span>
+    <span id="csrf-dhcp-mismatch-tag">{{ csrf_token('dhcp_mismatch_tag') }}</span>
+    <span id="csrf-dhcp-mismatch-move">{{ csrf_token('dhcp_mismatch_move') }}</span>
+</div>
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1 class="h3 mb-0"><i class="bi bi-lightbulb me-2"></i>Recommendations</h1>
+    <a href="{{ path('user_guide_recommendations') }}" class="btn btn-sm btn-outline-secondary" target="_blank">
+        <i class="bi bi-question-circle me-1"></i>Help
+    </a>
 </div>
 
 {# ── Unlinked DNS Records ─────────────────────────────────────────────────── #}

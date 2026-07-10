@@ -1,0 +1,115 @@
+{% extends 'base.html.twig' %}
+{% block title %}User Guide – Recommendations{% endblock %}
+
+{% block content %}
+{% set section_title = 'Recommendations' %}
+{{ include('user_guide/_breadcrumb.html.twig') }}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0"><i class="bi bi-lightbulb me-2"></i>Recommendations</h1>
+    <a href="{{ path('recommendation_index') }}" class="btn btn-sm btn-outline-primary">
+        <i class="bi bi-arrow-right-circle me-1"></i>Go to Recommendations
+    </a>
+</div>
+
+<div class="row g-4">
+<div class="col-lg-9">
+
+<div class="card mb-4" id="overview">
+    <div class="card-header fw-semibold"><i class="bi bi-info-circle me-1"></i>Overview</div>
+    <div class="card-body">
+        <p>The Recommendations page (found under <strong>Reports → Recommendations</strong>) scans your data for common consistency issues and offers one-click fixes where possible. It is read-only until you explicitly apply a recommendation — browsing the page makes no changes.</p>
+        <p>Each recommendation card shows a count badge and a table of affected items. Cards with no issues collapse to a slim green bar so you can see at a glance which areas are clean.</p>
+        <h6 class="mt-3">Selecting and applying items</h6>
+        <ul class="mb-0">
+            <li>Use the checkbox on each row to select individual items, or <strong>Select all</strong> to select every item in that card.</li>
+            <li><strong>Shift-click</strong> any checkbox to select a range. Shift-click is scoped to a single card — it will not span across cards.</li>
+            <li>Click the action button to apply the selected changes. A confirmation dialog will appear before anything is modified.</li>
+            <li>After applying, the page reloads and any items that were successfully resolved disappear from their card.</li>
+        </ul>
+    </div>
+</div>
+
+<div class="card mb-4" id="unlinked-dns">
+    <div class="card-header fw-semibold"><i class="bi bi-link-45deg me-1"></i>Unlinked DNS Records</div>
+    <div class="card-body">
+        <p>An A or AAAA record is considered <em>unlinked</em> when its stored IP address value matches the IP of a known network interface or VIP, but the record has not been formally linked to that entity in DashDDI.</p>
+        <p>Linked records have their IP address managed automatically: when the interface or VIP's IP changes, the DNS record updates on the next push. Unlinked records keep a static value that must be maintained by hand.</p>
+        <p class="mb-0"><strong>Remediation:</strong> Select one or more records and click <em>Implement Selected</em>. DashDDI will link each record to its matching interface or VIP and clear the stored value so the IP is derived automatically.</p>
+    </div>
+</div>
+
+<div class="card mb-4" id="convertible-cnames">
+    <div class="card-header fw-semibold"><i class="bi bi-arrow-repeat me-1"></i>Convertible CNAME Records</div>
+    <div class="card-body">
+        <p>An intra-zone CNAME that points to an A or AAAA record which is already linked to an interface or VIP can be converted to a direct A or AAAA record on that entity. There is generally no benefit to keeping an intra-zone CNAME when a direct linked record is possible — the CNAME adds an extra DNS lookup hop for no gain.</p>
+        <p>If a CNAME points to multiple linked records (e.g. both an IPv4 and an IPv6 record), converting it creates one A or AAAA record per target, each linked to the appropriate interface or VIP.</p>
+        <p class="mb-0"><strong>Remediation:</strong> Select one or more CNAMEs and click <em>Convert Selected</em>. The CNAME is replaced in-place with a direct A or AAAA record linked to the same interface or VIP. If multiple targets are found, additional records are created for the extra targets.</p>
+    </div>
+</div>
+
+<div class="card mb-4" id="orphaned-cnames">
+    <div class="card-header fw-semibold"><i class="bi bi-link-45deg me-1"></i>Orphaned CNAME Records</div>
+    <div class="card-body">
+        <p>An orphaned CNAME points to a hostname within the same zone that does not exist as any record in that domain. This typically happens when a target record is deleted but its CNAME aliases are left behind.</p>
+        <p>The check covers two unambiguous in-zone forms:</p>
+        <ul>
+            <li><strong>Bare label</strong> — e.g. <code>server</code> (relative name, resolves to <code>server.example.com.</code>)</li>
+            <li><strong>Absolute FQDN</strong> — e.g. <code>server.example.com.</code> (trailing dot, same zone)</li>
+        </ul>
+        <p>CNAMEs pointing to the naked domain apex (e.g. <code>example.com.</code>) are excluded since the apex always has NS and SOA records.</p>
+        <p class="mb-0"><strong>Remediation:</strong> Select one or more orphaned CNAMEs and click <em>Delete Selected</em>. This is a permanent deletion — a confirmation dialog will appear. If you are unsure whether a CNAME is truly orphaned, open the domain detail page to inspect it before deleting.</p>
+    </div>
+</div>
+
+<div class="card mb-4" id="missing-dual-stack">
+    <div class="card-header fw-semibold"><i class="bi bi-stack me-1"></i>Missing Dual-Stack DNS Records</div>
+    <div class="card-body">
+        <p>A dual-stack interface or VIP has both an IPv4 and an IPv6 address but is missing either an A or an AAAA record for a given hostname and domain. This is detected per-record: if an interface has an A record for <code>host.example.com</code> but no AAAA record for the same name, it will appear here.</p>
+        <p class="mb-0"><strong>Remediation:</strong> Select one or more rows and click <em>Add Selected</em>. A new DNS record of the missing type is created, linked to the same interface or VIP as the existing record, and assigned the same hostname, domain, TTL, and views.</p>
+    </div>
+</div>
+
+<div class="card mb-4" id="missing-views">
+    <div class="card-header fw-semibold"><i class="bi bi-eye me-1"></i>Records Missing View Assignments</div>
+    <div class="card-body">
+        <p>When DNS views are configured on a domain (or on both a domain and a subnet), each record in that domain should be assigned to one or more views so it appears in the right split-DNS response. A record with no views assigned is effectively hidden from all named views.</p>
+        <p>The applicable views for a record are computed from the intersection of the domain's views and the subnet's views (if the record is linked to an interface or VIP with a subnet). If the subnet has no views, the domain's views are used in full.</p>
+        <p class="mb-0"><strong>Remediation:</strong> Select one or more records and click <em>Add Views to Selected</em>. Each record is assigned all views that are applicable for its domain and subnet combination.</p>
+    </div>
+</div>
+
+<div class="card mb-4" id="dhcp-mismatches">
+    <div class="card-header fw-semibold"><i class="bi bi-wifi me-1"></i>DHCP Subnet Mismatches</div>
+    <div class="card-body">
+        <p>A DHCP subnet mismatch occurs when an interface's most recent DHCP lease IP address falls outside the CIDR of the subnet the interface is assigned to. This usually means the device has physically moved to a different network segment or VLAN.</p>
+        <p>The check uses the <strong>Last DHCP IP</strong> field stored on the interface (updated when DashDDI processes DHCP lease data from Kea), and compares it against the interface's assigned subnet's IPv4 CIDR.</p>
+        <h6 class="mt-3">Remediations</h6>
+        <dl class="mb-0">
+            <dt><i class="bi bi-arrow-right-circle me-1"></i>Move to Lease Subnet</dt>
+            <dd class="mb-3">Updates the interface's assigned subnet to the one whose CIDR contains the last DHCP IP. Use this when the device has permanently moved. Note that any static IP assignments should be reviewed after moving, as the previous IP may not be valid in the new subnet.</dd>
+            <dt><i class="bi bi-tag me-1"></i>Exclude Selected (add <code>dhcp-ok</code> tag)</dt>
+            <dd class="mb-0">Adds the <code>dhcp-ok</code> tag to the host, which permanently suppresses that host's interfaces from appearing in this check. Use this when a device intentionally roams between subnets — for example, a laptop that moves between wired and wireless segments — and the mismatch is expected.</dd>
+        </dl>
+    </div>
+</div>
+
+</div>{# /col-lg-9 #}
+
+<div class="col-lg-3 d-none d-lg-block">
+    <div class="card sticky-top" style="top:80px">
+        <div class="card-header small fw-semibold">On this page</div>
+        <div class="list-group list-group-flush small">
+            <a href="#overview"          class="list-group-item list-group-item-action py-1">Overview</a>
+            <a href="#unlinked-dns"      class="list-group-item list-group-item-action py-1">Unlinked DNS Records</a>
+            <a href="#convertible-cnames" class="list-group-item list-group-item-action py-1">Convertible CNAME Records</a>
+            <a href="#orphaned-cnames"   class="list-group-item list-group-item-action py-1">Orphaned CNAME Records</a>
+            <a href="#missing-dual-stack" class="list-group-item list-group-item-action py-1">Missing Dual-Stack</a>
+            <a href="#missing-views"     class="list-group-item list-group-item-action py-1">Missing View Assignments</a>
+            <a href="#dhcp-mismatches"   class="list-group-item list-group-item-action py-1">DHCP Subnet Mismatches</a>
+        </div>
+    </div>
+</div>
+
+</div>{# /row #}
+{% endblock %}
