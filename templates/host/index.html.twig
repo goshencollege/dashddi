@@ -386,7 +386,7 @@
                                                     {% elseif has_aaaa %}
                                                         <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle me-1">AAAA</span>
                                                     {% endif %}
-                                                    <span title="{{ fqdn }}">{{ fqdn|length > 23 ? fqdn|slice(0, 20) ~ '…' : fqdn }}</span>
+                                                    <span class="text-nowrap" title="{{ fqdn }}">{{ fqdn|length > 23 ? fqdn|slice(0, 20) ~ '…' : fqdn }}</span>
                                                 </div>
                                             {% endfor %}
                                         {% endif %}
@@ -460,7 +460,7 @@
                                                     {% elseif has_aaaa %}
                                                         <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle me-1">AAAA</span>
                                                     {% endif %}
-                                                    <span title="{{ fqdn }}">{{ fqdn|length > 23 ? fqdn|slice(0, 20) ~ '…' : fqdn }}</span>
+                                                    <span class="text-nowrap" title="{{ fqdn }}">{{ fqdn|length > 23 ? fqdn|slice(0, 20) ~ '…' : fqdn }}</span>
                                                 </div>
                                             {% endfor %}
                                         {% endif %}
