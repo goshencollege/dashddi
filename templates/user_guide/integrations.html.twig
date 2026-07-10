@@ -263,7 +263,8 @@ curl -s -X POST https://dashddi.example.com/api/dhcp/lease \
     \"ip-address\": \"$LEASES4_AT0_ADDRESS\",
     \"hw-address\": \"$LEASES4_AT0_HWADDR\",
     \"hostname\": \"$LEASES4_AT0_HOSTNAME\",
-    \"expire\": $LEASES4_AT0_CLTT
+    \"valid-lft\": $LEASES4_AT0_VALID_LIFETIME,
+    \"expire\": $((LEASES4_AT0_CLTT + LEASES4_AT0_VALID_LIFETIME))
   }"</code></pre>
         <p class="mb-3">Replace <code>dashddi.example.com</code> with your DashDDI hostname and <code>&lt;YOUR_API_TOKEN&gt;</code> with the token from step 1. The script must reside under <code>/usr/share/kea/scripts/</code> — some versions of the <code>run_script</code> hook reject scripts placed elsewhere (e.g. <code>/etc/kea</code>).</p>
         <div class="alert alert-warning py-2 small mb-3">
