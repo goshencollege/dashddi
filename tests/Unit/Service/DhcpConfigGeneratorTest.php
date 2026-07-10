@@ -127,7 +127,7 @@ class DhcpConfigGeneratorTest extends TestCase
         $this->assertTrue($block['ddns-send-updates']);
         $this->assertTrue($block['ddns-update-on-renew']);
         $this->assertSame('dyn.example.com.', $block['ddns-qualifying-suffix']);
-        $this->assertSame('always', $block['ddns-replace-client-name']);
+        $this->assertSame('never', $block['ddns-replace-client-name']);
     }
 
     public function testSubnetWithoutDdnsDomainOmitsDdnsSettings(): void
