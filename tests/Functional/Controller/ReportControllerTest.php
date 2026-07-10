@@ -357,6 +357,43 @@ class ReportControllerTest extends AppWebTestCase
         $this->assertSame($subnetB->getId(), $refreshed->getSubnet()->getId());
     }
 
+    public function testDhcpMismatchUsesmostSpecificLeaseSubnet(): void
+    {
+        // Broad supernet contains the lease IP; specific /24 also contains it.
+        // The check must report the /24 as the lease subnet, not the /16.
+        $broad    = $this->makeSubnet('broad',    '10.2.0.0/16');
+        $specific = $this->makeSubnet('specific', '10.2.1.0/24');
+        $assigned = $this->makeSubnet('assigned', '10.1.0.0/24');
+        $host     = $this->makeHost('specific-host');
+        $iface    = $this->makeInterface($host, $assigned, 'aa:bb:cc:dd:ff:01');
+        $iface->setLastDhcpIp('10.2.1.50');
+        $this->em->flush();
+
+        $service = static::getContainer()->get(RecommendationService::class);
+        $rows    = $service->findDhcpSubnetMismatches();
+
+        $row = array_values(array_filter($rows, fn($r) => $r['interface_id'] === $iface->getId()))[0] ?? null;
+        $this->assertNotNull($row, 'Interface should appear as a DHCP mismatch');
+        $this->assertSame($specific->getId(), (int) $row['lease_subnet_id'], 'Most specific (/24) subnet should be selected over the broader /16');
+    }
+
+    public function testFindSubnetForLastDhcpIpReturnssMostSpecificSubnet(): void
+    {
+        $broad    = $this->makeSubnet('broad2',    '10.3.0.0/16');
+        $specific = $this->makeSubnet('specific2', '10.3.1.0/24');
+        $assigned = $this->makeSubnet('assigned2', '10.1.0.0/24');
+        $host     = $this->makeHost('specific-host2');
+        $iface    = $this->makeInterface($host, $assigned, 'aa:bb:cc:dd:ff:02');
+        $iface->setLastDhcpIp('10.3.1.77');
+        $this->em->flush();
+
+        $service = static::getContainer()->get(RecommendationService::class);
+        $found   = $service->findSubnetForLastDhcpIp($iface);
+
+        $this->assertNotNull($found);
+        $this->assertSame($specific->getId(), $found->getId(), 'Most specific (/24) subnet should be returned over the broader /16');
+    }
+
     // ── expire-stale-api-tokens ───────────────────────────────────────────────
 
     public function testExpireStaleApiTokenSetsExpirationToYesterday(): void

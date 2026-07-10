@@ -493,6 +493,7 @@ class RecommendationService
                       INET_ATON(SUBSTRING_INDEX(s2.ipv4_cidr, '/', 1))
                       AND INET_ATON(SUBSTRING_INDEX(s2.ipv4_cidr, '/', 1))
                          + POW(2, 32 - CAST(SUBSTRING_INDEX(s2.ipv4_cidr, '/', -1) AS UNSIGNED)) - 1
+                ORDER BY CAST(SUBSTRING_INDEX(s2.ipv4_cidr, '/', -1) AS UNSIGNED) DESC
                 LIMIT 1
             )
             WHERE ni.deleted_at IS NULL
@@ -537,6 +538,7 @@ class RecommendationService
                   INET_ATON(SUBSTRING_INDEX(ipv4_cidr, '/', 1))
                   AND INET_ATON(SUBSTRING_INDEX(ipv4_cidr, '/', 1))
                      + POW(2, 32 - CAST(SUBSTRING_INDEX(ipv4_cidr, '/', -1) AS UNSIGNED)) - 1
+            ORDER BY CAST(SUBSTRING_INDEX(ipv4_cidr, '/', -1) AS UNSIGNED) DESC
             LIMIT 1
         SQL;
 
