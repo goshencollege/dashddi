@@ -6,7 +6,6 @@ use App\Entity\DhcpLease;
 use App\Entity\DhcpServer;
 use App\Entity\Subnet;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
-use Doctrine\ORM\Tools\Pagination\Paginator;
 use Doctrine\Persistence\ManagerRegistry;
 
 class DhcpLeaseRepository extends ServiceEntityRepository
@@ -16,7 +15,10 @@ class DhcpLeaseRepository extends ServiceEntityRepository
         parent::__construct($registry, DhcpLease::class);
     }
 
-    public function search(string $mac, string $ip, ?Subnet $subnet, ?DhcpServer $server, int $page, int $perPage = 50): Paginator
+    /**
+     * @return array{items: DhcpLease[], hasMore: bool}
+     */
+    public function search(string $mac, string $ip, ?Subnet $subnet, ?DhcpServer $server, int $page, int $perPage = 50): array
     {
         $qb = $this->createQueryBuilder('l')
             ->leftJoin('l.subnet', 's')
@@ -43,9 +45,13 @@ class DhcpLeaseRepository extends ServiceEntityRepository
         }
 
         $qb->setFirstResult(($page - 1) * $perPage)
-           ->setMaxResults($perPage);
+           ->setMaxResults($perPage + 1);
 
-        return new Paginator($qb, false);
+        $results = $qb->getQuery()->getResult();
+        return [
+            'items'   => array_slice($results, 0, $perPage),
+            'hasMore' => count($results) > $perPage,
+        ];
     }
 
     /**

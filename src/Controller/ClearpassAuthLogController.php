@@ -46,8 +46,9 @@ class ClearpassAuthLogController extends AbstractController
         $nasPortId = trim((string) $request->query->get('nas_port_id', ''));
         $page      = max(1, $request->query->getInt('page', 1));
 
-        $logs = $logRepo->search($mac, $username, $role, $vlan, $protocol, $service, $nasIp, $nasPortId, $page);
-        $macs = array_unique(array_map(fn($l) => $l->getMacAddress(), iterator_to_array($logs)));
+        $result = $logRepo->search($mac, $username, $role, $vlan, $protocol, $service, $nasIp, $nasPortId, $page);
+        $logs   = $result['items'];
+        $macs   = array_unique(array_map(fn($l) => $l->getMacAddress(), $logs));
 
         return [
             'logs'               => $logs,
@@ -64,7 +65,7 @@ class ClearpassAuthLogController extends AbstractController
             'filter_nas_ip'      => $nasIp,
             'filter_nas_port_id' => $nasPortId,
             'page'               => $page,
-            'total'              => count($logs),
+            'has_more'           => $result['hasMore'],
             'per_page'           => 50,
             'interface_map'      => $ifaceRepo->findByMacs($macs),
         ];

@@ -57,13 +57,14 @@ class DhcpLeaseController extends AbstractController
         $serverId = (int) $request->query->get('server', 0);
         $page     = max(1, $request->query->getInt('page', 1));
 
-        $subnet = $subnetId ? $subnetRepo->find($subnetId) : null;
-        $server = $serverId ? $dhcpServerRepo->find($serverId) : null;
-        $leases  = $leaseRepo->search($mac, $ip, $subnet, $server, $page);
+        $subnet  = $subnetId ? $subnetRepo->find($subnetId) : null;
+        $server  = $serverId ? $dhcpServerRepo->find($serverId) : null;
+        $result  = $leaseRepo->search($mac, $ip, $subnet, $server, $page);
+        $leases  = $result['items'];
         $subnets = $subnetRepo->findBy([], ['name' => 'ASC']);
         $servers = $dhcpServerRepo->findBy([], ['name' => 'ASC']);
 
-        $macs = array_unique(array_map(fn($l) => $l->getMacAddress(), iterator_to_array($leases)));
+        $macs = array_unique(array_map(fn($l) => $l->getMacAddress(), $leases));
 
         return [
             'leases'         => $leases,
@@ -74,7 +75,7 @@ class DhcpLeaseController extends AbstractController
             'filter_subnet'  => $subnetId,
             'filter_server'  => $serverId,
             'page'           => $page,
-            'total'          => count($leases),
+            'has_more'       => $result['hasMore'],
             'per_page'       => 50,
             'interface_map'  => $ifaceRepo->findByMacs($macs),
         ];
