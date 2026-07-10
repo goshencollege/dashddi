@@ -72,23 +72,25 @@ class DomainRecordType extends AbstractType
             ]);
 
         // When creating/editing from an interface or virtual IP context, add domain, isCanonical,
-        // and override the type field with an extended ChoiceType that includes the A+AAAA meta option.
+        // and (for new records only) override the type field with a ChoiceType that includes A+AAAA.
         if ($hasContext) {
-            $typeChoices = ['A+AAAA' => 'A+AAAA'];
-            foreach (RecordType::cases() as $case) {
-                $typeChoices[$case->value] = $case;
+            if ($options['allow_dual_stack']) {
+                $typeChoices = ['A+AAAA' => 'A+AAAA'];
+                foreach (RecordType::cases() as $case) {
+                    $typeChoices[$case->value] = $case;
+                }
+
+                $builder->add('type', ChoiceType::class, [
+                    'choices'      => $typeChoices,
+                    'choice_value' => fn($c) => $c instanceof RecordType ? $c->value : (string) $c,
+                ]);
+
+                $builder->add('create_aaaa_companion', HiddenType::class, [
+                    'mapped'   => false,
+                    'required' => false,
+                    'data'     => '',
+                ]);
             }
-
-            $builder->add('type', ChoiceType::class, [
-                'choices'      => $typeChoices,
-                'choice_value' => fn($c) => $c instanceof RecordType ? $c->value : (string) $c,
-            ]);
-
-            $builder->add('create_aaaa_companion', HiddenType::class, [
-                'mapped'   => false,
-                'required' => false,
-                'data'     => '',
-            ]);
 
             $builder->add('domain', EntityType::class, [
                 'class'         => Domain::class,
@@ -125,12 +127,12 @@ class DomainRecordType extends AbstractType
         });
 
         // Rebuild views choices before validation so submitted view IDs remain valid.
-        $builder->addEventListener(FormEvents::PRE_SUBMIT, function (FormEvent $event) use ($hasContext, $subnet, &$domainFromPreSetData) {
+        $builder->addEventListener(FormEvents::PRE_SUBMIT, function (FormEvent $event) use ($hasContext, $subnet, $options, &$domainFromPreSetData) {
             $data = $event->getData();
 
             // Intercept A+AAAA meta option: treat this submission as a plain A record and flag
             // the companion AAAA record for creation in the controller after validation.
-            if ($hasContext && ($data['type'] ?? '') === 'A+AAAA') {
+            if ($hasContext && $options['allow_dual_stack'] && ($data['type'] ?? '') === 'A+AAAA') {
                 $data['type'] = RecordType::A->value;
                 $data['create_aaaa_companion'] = '1';
             }
@@ -177,8 +179,10 @@ class DomainRecordType extends AbstractType
             'data_class'        => DomainRecord::class,
             'network_interface' => null,
             'virtual_ip'        => null,
+            'allow_dual_stack'  => false,
         ]);
         $resolver->setAllowedTypes('network_interface', ['null', NetworkInterface::class]);
         $resolver->setAllowedTypes('virtual_ip', ['null', VirtualIp::class]);
+        $resolver->setAllowedTypes('allow_dual_stack', 'bool');
     }
 }

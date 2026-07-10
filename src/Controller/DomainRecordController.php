@@ -81,6 +81,7 @@ class DomainRecordController extends AbstractController
 
         $form = $this->createForm(DomainRecordType::class, $record, [
             'network_interface' => $interface,
+            'allow_dual_stack'  => true,
         ]);
         $form->handleRequest($request);
 
@@ -145,7 +146,8 @@ class DomainRecordController extends AbstractController
         $record->setVirtualIp($virtualIp);
 
         $form = $this->createForm(DomainRecordType::class, $record, [
-            'virtual_ip' => $virtualIp,
+            'virtual_ip'       => $virtualIp,
+            'allow_dual_stack' => true,
         ]);
         $form->handleRequest($request);
 
