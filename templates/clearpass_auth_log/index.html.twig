@@ -78,21 +78,23 @@
     </div>
 </div>
 
-<div class="card list-scroll-card">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <span><i class="bi bi-list-ul me-1"></i>Results</span>
-        <div class="d-flex align-items-center gap-2">
-            <span class="text-muted small fst-italic" id="refresh-label"></span>
-            <div class="btn-group btn-group-sm" id="refresh-controls" role="group" aria-label="Auto-refresh">
-                <button type="button" class="btn btn-outline-secondary active" data-interval="0">Off</button>
-                <button type="button" class="btn btn-outline-secondary" data-interval="30">30s</button>
-                <button type="button" class="btn btn-outline-secondary" data-interval="60">60s</button>
+<div class="list-scroll-card">
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-list-ul me-1"></i>Results</span>
+            <div class="d-flex align-items-center gap-2">
+                <span class="text-muted small fst-italic" id="refresh-label"></span>
+                <div class="btn-group btn-group-sm" id="refresh-controls" role="group" aria-label="Auto-refresh">
+                    <button type="button" class="btn btn-outline-secondary active" data-interval="0">Off</button>
+                    <button type="button" class="btn btn-outline-secondary" data-interval="30">30s</button>
+                    <button type="button" class="btn btn-outline-secondary" data-interval="60">60s</button>
+                </div>
+                <span class="text-muted small"><span id="record-count">{{ total }}</span> record(s)</span>
             </div>
-            <span class="text-muted small"><span id="record-count">{{ total }}</span> record(s)</span>
         </div>
-    </div>
-    <div id="table-wrapper">
-        {% include 'clearpass_auth_log/_table.html.twig' %}
+        <div id="table-wrapper" class="table-scroll-wrapper">
+            {% include 'clearpass_auth_log/_table.html.twig' %}
+        </div>
     </div>
 </div>{# /list-scroll-card #}
 </div>{# /list-page-content #}
@@ -118,11 +120,13 @@
     function doRefresh() {
         if (fetching) { return; }
         fetching = true;
+        var scrollTop = wrapper.scrollTop;
         if (label) { label.textContent = 'Refreshing…'; }
         fetch(buildUrl(), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
             .then(function (r) { return r.text(); })
             .then(function (html) {
                 wrapper.innerHTML = html;
+                wrapper.scrollTop = scrollTop;
                 var el = wrapper.querySelector('[data-record-count]');
                 if (el && countEl) { countEl.textContent = el.getAttribute('data-record-count'); }
             })
