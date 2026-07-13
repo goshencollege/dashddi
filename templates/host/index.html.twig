@@ -27,6 +27,7 @@
 .host-tree-table .tree-toggle { border: none; background: none; padding: 0; line-height: 1; color: #6c757d; }
 .host-tree-table .tree-toggle:hover { color: var(--bs-body-color); }
 .host-tree-table .iface-row { --bs-table-bg: var(--tree-iface-bg); }
+.host-tree-table .iface-row.row-deleted { --bs-table-bg: rgba(var(--bs-warning-rgb), 0.15); }
 .host-tree-table .iface-name-cell { padding-left: 2rem !important; }
 .host-tree-table .vip-row { --bs-table-bg: var(--tree-vip-bg); }
 .host-tree-table .vip-row > td:nth-child(3) { padding-left: 3.5rem !important; }
@@ -261,7 +262,7 @@
                                         {{ host.name }}
                                     </a>
                                     {% if host.deleted %}
-                                        <span class="badge text-bg-warning ms-1">Deleted</span>
+                                        <span class="badge text-bg-warning ms-1">Deleted {{ host.deletedAt|date('Y-m-d') }}</span>
                                     {% endif %}
                                     {% set snipeLink = host.snipeItAssetLink %}
                                     {% if snipeLink and snipeLink.snipeAssetName != host.name %}
@@ -315,19 +316,19 @@
                                     <td class="ps-2">
                                         <input type="checkbox" class="form-check-input bulk-iface-cb" value="{{ iface.id }}">
                                     </td>
-                                    <td class="iface-name-cell small">
+                                    <td class="iface-name-cell">
                                         {% if iface.name %}
                                             <a href="{{ path('interface_show', {id: iface.id}) }}" class="text-decoration-none fw-semibold">{{ iface.name }} <span class="font-monospace text-muted">({{ iface.macAddress }})</span></a>
                                         {% else %}
                                             <a href="{{ path('interface_show', {id: iface.id}) }}" class="text-decoration-none font-monospace text-muted">{{ iface.macAddress }}</a>
                                         {% endif %}
                                         {% if iface.deleted %}
-                                            <span class="badge text-bg-warning mt-1">Interface deleted</span>
+                                            <span class="badge text-bg-warning mt-1">Deleted {{ iface.deletedAt|date('Y-m-d') }}</span>
                                         {% endif %}
                                     </td>
                                     <td></td>
-                                    <td class="small">{{ iface.subnet ? iface.subnet.name : '—' }}</td>
-                                    <td class="ip-address small">
+                                    <td>{{ iface.subnet ? iface.subnet.name : '—' }}</td>
+                                    <td class="ip-address">
                                         {% if iface.ipAddress %}
                                             {{ iface.ipAddress.address }}
                                             {% if iface.lastDhcpIp and iface.lastDhcpIp != iface.ipAddress.address %}
@@ -339,14 +340,14 @@
                                             <span class="text-muted">—</span>
                                         {% endif %}
                                     </td>
-                                    <td class="ip-address small">
+                                    <td class="ip-address">
                                         {% if iface.ipv6Address %}
                                             {{ iface.ipv6Address.address }}
                                         {% else %}
                                             <span class="text-muted">—</span>
                                         {% endif %}
                                     </td>
-                                    <td class="small font-monospace">
+                                    <td class="font-monospace">
                                         {% set fqdn_types = {} %}
                                         {% for record in iface.domainRecords %}
                                             {% if record.domain and record.type.value in ['A', 'AAAA'] %}
@@ -418,9 +419,9 @@
                                         {% if vip.vrid %}<span class="text-muted small ms-1">VRID&nbsp;{{ vip.vrid }}</span>{% endif %}
                                     </td>
                                     <td></td>
-                                    <td class="ip-address small">{{ vip.ipAddress ? vip.ipAddress.address : '—' }}</td>
-                                    <td class="ip-address small">{{ vip.ipv6Address ? vip.ipv6Address.address : '—' }}</td>
-                                    <td class="small font-monospace">
+                                    <td class="ip-address">{{ vip.ipAddress ? vip.ipAddress.address : '—' }}</td>
+                                    <td class="ip-address">{{ vip.ipv6Address ? vip.ipv6Address.address : '—' }}</td>
+                                    <td class="font-monospace">
                                         {% set fqdn_types = {} %}
                                         {% for record in vip.domainRecords %}
                                             {% if record.domain and record.type.value in ['A', 'AAAA'] %}
