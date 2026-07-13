@@ -54,14 +54,10 @@ class DhcpServerController extends AbstractController
     #[Route('/{id}/edit', name: 'dhcp_server_edit', methods: ['GET', 'POST'])]
     public function edit(Request $request, DhcpServer $server, EntityManagerInterface $em): Response
     {
-        $existingPassword = $server->getControlPassword();
         $form = $this->createForm(DhcpServerType::class, $server);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            if ($server->getControlPassword() === null) {
-                $server->setControlPassword($existingPassword);
-            }
             $em->flush();
             $this->addFlash('success', 'DHCP server updated.');
             return $this->redirectToRoute('dhcp_server_edit', ['id' => $server->getId()]);

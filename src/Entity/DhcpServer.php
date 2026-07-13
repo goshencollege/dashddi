@@ -43,11 +43,6 @@ class DhcpServer
     #[ORM\Column(nullable: true, options: ['unsigned' => true])]
     private ?int $controlPort = null;
 
-    #[ORM\Column(length: 128, nullable: true)]
-    private ?string $controlUser = null;
-
-    #[ORM\Column(type: 'text', nullable: true)]
-    private ?string $controlPassword = null;
 
     #[ORM\Column(length: 4)]
     private string $versionScope = 'both';
@@ -80,12 +75,6 @@ class DhcpServer
 
     public function getControlPort(): ?int { return $this->controlPort; }
     public function setControlPort(?int $controlPort): static { $this->controlPort = $controlPort; return $this; }
-
-    public function getControlUser(): ?string { return $this->controlUser; }
-    public function setControlUser(?string $controlUser): static { $this->controlUser = $controlUser ?: null; return $this; }
-
-    public function getControlPassword(): ?string { return $this->controlPassword; }
-    public function setControlPassword(?string $controlPassword): static { $this->controlPassword = $controlPassword ?: null; return $this; }
 
     public function getVersionScope(): string { return $this->versionScope; }
     public function setVersionScope(string $versionScope): static { $this->versionScope = $versionScope; return $this; }

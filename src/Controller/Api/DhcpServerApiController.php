@@ -53,8 +53,6 @@ class DhcpServerApiController extends AbstractController
         $server->setSshUser($data['ssh_user'] ?? 'root');
         $server->setRemotePath($data['remote_path'] ?? '/etc/kea');
         $server->setControlPort(isset($data['control_port']) ? (int) $data['control_port'] : null);
-        $server->setControlUser($data['control_user'] ?? null);
-        $server->setControlPassword($data['control_password'] ?? null);
         $server->setDescription($data['description'] ?? null);
 
         $keys = $sshKeys->generateKeyPair();
@@ -89,8 +87,6 @@ class DhcpServerApiController extends AbstractController
         if (array_key_exists('ssh_user', $data))        { $server->setSshUser($data['ssh_user']); }
         if (array_key_exists('remote_path', $data))     { $server->setRemotePath($data['remote_path']); }
         if (array_key_exists('control_port', $data))    { $server->setControlPort($data['control_port'] !== null ? (int) $data['control_port'] : null); }
-        if (array_key_exists('control_user', $data))    { $server->setControlUser($data['control_user']); }
-        if (array_key_exists('control_password', $data)) { $server->setControlPassword($data['control_password']); }
         if (array_key_exists('description', $data))     { $server->setDescription($data['description']); }
 
         $em->flush();
@@ -125,7 +121,6 @@ class DhcpServerApiController extends AbstractController
             'ssh_public_key' => $server->getSshPublicKey(),
             'remote_path'  => $server->getRemotePath(),
             'control_port' => $server->getControlPort(),
-            'control_user' => $server->getControlUser(),
             'description'  => $server->getDescription(),
             'created_at'   => $server->getCreatedAt()->format(\DateTimeInterface::ATOM),
             'updated_at'   => $server->getUpdatedAt()->format(\DateTimeInterface::ATOM),

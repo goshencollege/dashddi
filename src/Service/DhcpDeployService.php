@@ -192,10 +192,6 @@ class DhcpDeployService
              . ' -H ' . escapeshellarg('Content-Type: application/json')
              . ' -d ' . escapeshellarg($payload);
 
-        if ($server->getControlUser() !== null) {
-            $cmd .= ' -u ' . escapeshellarg($server->getControlUser() . ':' . ($server->getControlPassword() ?? ''));
-        }
-
         $output = $sftp->exec($cmd);
 
         if ($output === false) {
