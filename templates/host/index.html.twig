@@ -315,7 +315,7 @@
                                     <td class="ps-2">
                                         <input type="checkbox" class="form-check-input bulk-iface-cb" value="{{ iface.id }}">
                                     </td>
-                                    <td class="iface-name-cell small">
+                                    <td class="iface-name-cell">
                                         {% if iface.name %}
                                             <a href="{{ path('interface_show', {id: iface.id}) }}" class="text-decoration-none fw-semibold">{{ iface.name }} <span class="font-monospace text-muted">({{ iface.macAddress }})</span></a>
                                         {% else %}
@@ -326,8 +326,8 @@
                                         {% endif %}
                                     </td>
                                     <td></td>
-                                    <td class="small">{{ iface.subnet ? iface.subnet.name : '—' }}</td>
-                                    <td class="ip-address small">
+                                    <td>{{ iface.subnet ? iface.subnet.name : '—' }}</td>
+                                    <td class="ip-address">
                                         {% if iface.ipAddress %}
                                             {{ iface.ipAddress.address }}
                                             {% if iface.lastDhcpIp and iface.lastDhcpIp != iface.ipAddress.address %}
@@ -339,14 +339,14 @@
                                             <span class="text-muted">—</span>
                                         {% endif %}
                                     </td>
-                                    <td class="ip-address small">
+                                    <td class="ip-address">
                                         {% if iface.ipv6Address %}
                                             {{ iface.ipv6Address.address }}
                                         {% else %}
                                             <span class="text-muted">—</span>
                                         {% endif %}
                                     </td>
-                                    <td class="small font-monospace">
+                                    <td class="font-monospace">
                                         {% set fqdn_types = {} %}
                                         {% for record in iface.domainRecords %}
                                             {% if record.domain and record.type.value in ['A', 'AAAA'] %}
@@ -418,9 +418,9 @@
                                         {% if vip.vrid %}<span class="text-muted small ms-1">VRID&nbsp;{{ vip.vrid }}</span>{% endif %}
                                     </td>
                                     <td></td>
-                                    <td class="ip-address small">{{ vip.ipAddress ? vip.ipAddress.address : '—' }}</td>
-                                    <td class="ip-address small">{{ vip.ipv6Address ? vip.ipv6Address.address : '—' }}</td>
-                                    <td class="small font-monospace">
+                                    <td class="ip-address">{{ vip.ipAddress ? vip.ipAddress.address : '—' }}</td>
+                                    <td class="ip-address">{{ vip.ipv6Address ? vip.ipv6Address.address : '—' }}</td>
+                                    <td class="font-monospace">
                                         {% set fqdn_types = {} %}
                                         {% for record in vip.domainRecords %}
                                             {% if record.domain and record.type.value in ['A', 'AAAA'] %}
