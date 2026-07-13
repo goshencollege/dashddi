@@ -30,7 +30,7 @@ class EncryptedFieldSubscriber
         ArubaSwitch::class      => ['password', 'sshPrivateKey'],
         BackupSetting::class    => ['backupPassword'],
         ClearpassServer::class  => ['clientSecret'],
-        DhcpServer::class       => ['sshPrivateKey', 'controlPassword'],
+        DhcpServer::class       => ['sshPrivateKey'],
         DnsServer::class        => ['sshPrivateKey', 'ddnsSecret'],
         SnipeItServer::class    => ['apiKey'],
     ];
