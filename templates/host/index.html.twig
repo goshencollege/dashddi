@@ -111,46 +111,33 @@
 
 {% block content %}
 <div class="list-page-content">
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h1 class="h3 mb-0"><i class="bi bi-pc-display me-2"></i>Hosts</h1>
-    <div class="d-flex align-items-center gap-2">
-        <a href="{{ path('user_guide_hosts') }}" class="btn btn-sm btn-outline-secondary" title="User Guide" target="_blank"><i class="bi bi-question-circle"></i></a>
-        <a href="{{ path('host_index', showDeleted ? {} : {deleted: 1}) }}"
-           class="btn btn-sm {{ showDeleted ? 'btn-warning' : 'btn-outline-secondary' }}">
-            <i class="bi bi-trash me-1"></i>{{ showDeleted ? 'Show Active' : 'Deleted' }}
-        </a>
-        {% if not showDeleted %}
-        <a href="{{ path('host_import') }}" class="btn btn-outline-secondary btn-sm">
-            <i class="bi bi-upload me-1"></i>Import CSV
-        </a>
-        <a href="{{ path('host_new') }}" class="btn btn-primary btn-sm">
-            <i class="bi bi-plus-lg me-1"></i>Add Host
-        </a>
-        {% endif %}
-    </div>
-</div>
-{% if showDeleted %}
-<div class="alert alert-warning py-2 mb-3">
-    <i class="bi bi-trash me-1"></i>Showing deleted hosts. <a href="{{ path('host_index') }}">Return to active hosts →</a>
-</div>
-{% endif %}
-
 <div class="mb-4">
-    {# Simple search #}
-    <form method="get" action="{{ path('host_index') }}" class="mb-2" id="simple-search-form">
-        <div class="input-group">
-            <span class="input-group-text"><i class="bi bi-search"></i></span>
-            <input type="search" name="q" id="q-input" class="form-control" placeholder="Search by name, location, subnet, IP address, MAC, or DNS name…" value="{{ query }}">
-            <button type="submit" class="btn btn-outline-secondary">Search</button>
-            {% if query or isAdvanced %}
-                <a href="{{ path('host_index', {reset: 1}) }}" class="btn btn-outline-secondary">Clear</a>
-            {% endif %}
-            <button type="button" class="btn btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#advanced-search"
-                    aria-expanded="{{ isAdvanced ? 'true' : 'false' }}">
-                <i class="bi bi-sliders me-1"></i>Advanced
-            </button>
+    <div class="d-flex align-items-center gap-2 mb-2">
+        <h1 class="h3 mb-0 flex-shrink-0"><i class="bi bi-pc-display me-2"></i>Hosts</h1>
+        <form method="get" action="{{ path('host_index') }}" class="flex-grow-1 ps-3" id="simple-search-form">
+            <div class="input-group">
+                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                <input type="search" name="q" id="q-input" class="form-control" placeholder="Search by name, location, subnet, IP address, MAC, or DNS name…" value="{{ query }}">
+                <button type="submit" class="btn btn-outline-secondary">Search</button>
+                {% if query or isAdvanced %}
+                    <a href="{{ path('host_index', {reset: 1}) }}" class="btn btn-outline-secondary">Clear</a>
+                {% endif %}
+                <button type="button" class="btn btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#advanced-search"
+                        aria-expanded="{{ isAdvanced ? 'true' : 'false' }}">
+                    <i class="bi bi-sliders me-1"></i>Advanced
+                </button>
+            </div>
+        </form>
+        <div class="d-flex align-items-center gap-2 flex-shrink-0">
+            <a href="{{ path('user_guide_hosts') }}" class="btn btn-outline-secondary" title="User Guide" target="_blank"><i class="bi bi-question-circle"></i></a>
+            <a href="{{ path('host_import') }}" class="btn btn-outline-secondary">
+                <i class="bi bi-upload me-1"></i>Import CSV
+            </a>
+            <a href="{{ path('host_new') }}" class="btn btn-primary">
+                <i class="bi bi-plus-lg me-1"></i>Add Host
+            </a>
         </div>
-    </form>
+    </div>
 
     {# Advanced search — OR-groups condition builder #}
     <div class="collapse" id="advanced-search">
@@ -636,6 +623,7 @@ const FIELDS = {
     last_auth:     { label: 'Last Auth',     type: 'date' },
     switch_ip:     { label: 'Switch IP',     type: 'text' },
     switch_port:   { label: 'Switch Port',   type: 'text' },
+    deleted:       { label: 'Deleted',       type: 'bool' },
 };
 
 const TEXT_OPS = [

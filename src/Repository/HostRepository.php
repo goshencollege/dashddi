@@ -76,12 +76,11 @@ class HostRepository extends ServiceEntityRepository
 
         $total = (int) $this->createQueryBuilder('h')
             ->select('COUNT(h.id)')
-            ->where('h.deletedAt IS NULL')
             ->getQuery()
             ->getSingleScalarResult();
 
         $ids = $this->idsForPage(
-            $this->createQueryBuilder('h')->where('h.deletedAt IS NULL'),
+            $this->createQueryBuilder('h'),
             $offset,
             $perPage,
             $sort,
@@ -132,8 +131,7 @@ class HostRepository extends ServiceEntityRepository
     {
         $q  = '%' . $query . '%';
         $qb = $this->createQueryBuilder('h')
-            ->leftJoin('h.building', 'b')
-            ->where('h.deletedAt IS NULL');
+            ->leftJoin('h.building', 'b');
 
         // Classify the query so we can skip subqueries that cannot possibly match,
         // making the basic search behave like the targeted advanced search.
@@ -334,7 +332,8 @@ class HostRepository extends ServiceEntityRepository
 
     private function buildStructuredQb(array $orGroups): QueryBuilder
     {
-        $qb = $this->createQueryBuilder('h')->where('h.deletedAt IS NULL');
+        $qb = $this->createQueryBuilder('h');
+
         if (empty($orGroups)) {
             return $qb;
         }
@@ -462,6 +461,12 @@ class HostRepository extends ServiceEntityRepository
                 [$cmp, $param] = $this->toStructuredLikeOrEq($value);
                 $qb->setParameter("sp_$n", $param);
                 return "{$not}EXISTS (SELECT 1 FROM App\Entity\NetworkInterface i{$n} WHERE i{$n}.host = h AND i{$n}.switchPort $cmp :sp_{$n})";
+
+            case 'deleted':
+                if ($value === '1') {
+                    return $negate ? 'h.deletedAt IS NULL' : 'h.deletedAt IS NOT NULL';
+                }
+                return null;
         }
 
         return null;
