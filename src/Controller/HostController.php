@@ -33,11 +33,10 @@ class HostController extends AbstractController
     #[Route('', name: 'host_index', methods: ['GET'])]
     public function index(Request $request, HostRepository $repo, SubnetRepository $subnetRepo, BuildingRepository $buildingRepo, TagRepository $tagRepo, UserPreferenceRepository $prefRepo, VirtualIpRepository $vipRepo, EntityManagerInterface $em): Response
     {
-        $user        = $this->getUser();
-        $pref        = $user ? $prefRepo->findByIdentifier($user->getUserIdentifier()) : null;
-        $page        = max(1, $request->query->getInt('page', 1));
-        $reset       = $request->query->getBoolean('reset');
-        $showDeleted = $request->query->getBoolean('deleted');
+        $user       = $this->getUser();
+        $pref       = $user ? $prefRepo->findByIdentifier($user->getUserIdentifier()) : null;
+        $page       = max(1, $request->query->getInt('page', 1));
+        $reset      = $request->query->getBoolean('reset');
 
         $validSorts = ['name', 'updated', 'ip'];
         $validDirs  = ['asc', 'desc'];
@@ -51,52 +50,58 @@ class HostController extends AbstractController
         $isAdvanced = false;
         $needsFlush = false;
 
-        if (!$showDeleted) {
-            $hasExplicitState = $request->query->has('q') || $request->query->has('page');
+        $hasExplicitState = $request->query->has('q') || $request->query->has('page');
 
-            if ($reset) {
-                if ($user && $pref) {
-                    $pref->setHostSearch(null);
-                    $needsFlush = true;
-                }
-            } elseif ($hasExplicitState) {
-                $query = trim($request->query->getString('q'));
-                if ($user) {
-                    if (!$pref) {
-                        $pref = new UserPreference($user->getUserIdentifier());
-                        $em->persist($pref);
-                    }
-                    $pref->setHostSearch($query !== '' ? ['q' => $query] : null);
-                    $needsFlush = true;
-                }
-            } else {
-                $saved = $pref?->getHostSearch() ?? [];
-                if (isset($saved['q'])) {
-                    $query = $saved['q'];
-                } elseif (!empty($saved)) {
-                    // Backward compat: old format stored individual field keys
-                    $oldFields = ['name', 'building', 'room', 'subnet', 'ip', 'mac', 'dns', 'tag', 'dhcp_mismatch'];
-                    $parts = [];
-                    foreach ($oldFields as $f) {
-                        if (!empty($saved[$f])) {
-                            $parts[] = "$f:{$saved[$f]}";
-                        }
-                    }
-                    $query = implode(' AND ', $parts);
-                }
+        if ($reset) {
+            if ($user && $pref) {
+                $pref->setHostSearch(null);
+                $needsFlush = true;
             }
-
-            $orGroups   = self::parseStructuredQuery($query);
-            $isAdvanced = !empty($orGroups);
+        } elseif ($hasExplicitState) {
+            $query = trim($request->query->getString('q'));
+            if ($user) {
+                if (!$pref) {
+                    $pref = new UserPreference($user->getUserIdentifier());
+                    $em->persist($pref);
+                }
+                $pref->setHostSearch($query !== '' ? ['q' => $query] : null);
+                $needsFlush = true;
+            }
+        } else {
+            $saved = $pref?->getHostSearch() ?? [];
+            if (isset($saved['q'])) {
+                $query = $saved['q'];
+            } elseif (!empty($saved)) {
+                // Backward compat: old format stored individual field keys
+                $oldFields = ['name', 'building', 'room', 'subnet', 'ip', 'mac', 'dns', 'tag', 'dhcp_mismatch'];
+                $parts = [];
+                foreach ($oldFields as $f) {
+                    if (!empty($saved[$f])) {
+                        $parts[] = "$f:{$saved[$f]}";
+                    }
+                }
+                $query = implode(' AND ', $parts);
+            }
         }
+
+        $orGroups   = self::parseStructuredQuery($query);
+        $isAdvanced = !empty($orGroups);
 
         if ($needsFlush) {
             $em->flush();
         }
 
-        if ($showDeleted) {
-            ['hosts' => $hosts, 'total' => $total] = $repo->findDeletedPaginated($page, self::PER_PAGE);
-        } elseif ($isAdvanced) {
+        // Derive showDeleted for template display (controls buttons/restore UI)
+        $showDeleted = false;
+        foreach ($orGroups as $conditions) {
+            foreach ($conditions as [$field, $value, $negate]) {
+                if ($field === 'deleted' && $value === '1' && !$negate) {
+                    $showDeleted = true;
+                }
+            }
+        }
+
+        if ($isAdvanced) {
             ['hosts' => $hosts, 'total' => $total] = $repo->structuredSearchPaginated($orGroups, $page, self::PER_PAGE, $sort, $dir);
         } elseif ($query !== '') {
             ['hosts' => $hosts, 'total' => $total] = $repo->searchPaginated($query, $page, self::PER_PAGE, $sort, $dir);
@@ -115,10 +120,9 @@ class HostController extends AbstractController
 
         $hasCustomSort = ($sort !== 'name' || $dir !== 'asc');
         $linkParams = array_filter([
-            'deleted' => $showDeleted ?: null,
-            'q'       => $query ?: null,
-            'sort'    => $hasCustomSort ? $sort : null,
-            'dir'     => $hasCustomSort ? $dir : null,
+            'q'    => $query ?: null,
+            'sort' => $hasCustomSort ? $sort : null,
+            'dir'  => $hasCustomSort ? $dir : null,
         ]);
 
         $totalPages = max(1, (int) ceil($total / self::PER_PAGE));
@@ -163,7 +167,7 @@ class HostController extends AbstractController
         }
 
         $known = ['name', 'building', 'room', 'subnet', 'ip', 'mac', 'dns', 'tag',
-                  'dhcp_mismatch', 'last_dhcp', 'last_auth', 'switch_ip', 'switch_port'];
+                  'dhcp_mismatch', 'last_dhcp', 'last_auth', 'switch_ip', 'switch_port', 'deleted'];
 
         $fieldPattern = implode('|', $known);
         $orParts      = self::splitRespectingParens($q, ' OR ');

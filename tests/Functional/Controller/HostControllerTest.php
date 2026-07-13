@@ -77,7 +77,7 @@ class HostControllerTest extends AppWebTestCase
         $this->assertResponseRedirects();
     }
 
-    public function testSoftDeletedHostNotVisibleInIndex(): void
+    public function testSoftDeletedHostVisibleByDefault(): void
     {
         $host = (new Host())->setName('soft-deleted-host');
         $host->softDelete();
@@ -85,6 +85,18 @@ class HostControllerTest extends AppWebTestCase
         $this->em->flush();
 
         $this->client->request('GET', '/hosts');
+        $this->assertResponseIsSuccessful();
+        $this->assertStringContainsString('soft-deleted-host', $this->client->getResponse()->getContent());
+    }
+
+    public function testDeletedFalseFilterHidesSoftDeletedHost(): void
+    {
+        $host = (new Host())->setName('soft-deleted-host');
+        $host->softDelete();
+        $this->em->persist($host);
+        $this->em->flush();
+
+        $this->client->request('GET', '/hosts?' . http_build_query(['q' => 'deleted:!1']));
         $this->assertResponseIsSuccessful();
         $this->assertStringNotContainsString('soft-deleted-host', $this->client->getResponse()->getContent());
     }
