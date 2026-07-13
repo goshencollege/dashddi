@@ -126,6 +126,9 @@ class DomainRecord
     public function getFullyQualifiedHostname(): string
     {
         if ($this->domain) {
+            if ($this->hostname === '@') {
+                return $this->domain->getName();
+            }
             return $this->hostname . '.' . $this->domain->getName();
         }
         return $this->hostname;
