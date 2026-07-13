@@ -461,7 +461,7 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
             {% include 'api_docs/_endpoint.html.twig' with {
                 anchor_id: 'ep-dhcp-servers-list',
                 method: 'GET', path: '/api/dhcp-servers', name: 'List DHCP servers',
-                response_example: '[\n  {\n    "id": 1,\n    "name": "dhcp1",\n    "hostname": "dhcp1.example.com",\n    "ssh_user": "root",\n    "ssh_public_key": "ssh-ed25519 AAAA...",\n    "remote_path": "/etc/kea",\n    "control_url": "http://localhost:8000",\n    "control_user": "kea",\n    "description": null,\n    "created_at": "2024-01-01T00:00:00+00:00",\n    "updated_at": "2024-01-01T00:00:00+00:00",\n    "created_by": "user@example.com",\n    "updated_by": "user@example.com"\n  }\n]',
+                response_example: '[\n  {\n    "id": 1,\n    "name": "dhcp1",\n    "hostname": "dhcp1.example.com",\n    "ssh_user": "root",\n    "ssh_public_key": "ssh-ed25519 AAAA...",\n    "remote_path": "/etc/kea",\n    "control_port": 8000,\n    "control_user": "kea",\n    "description": null,\n    "created_at": "2024-01-01T00:00:00+00:00",\n    "updated_at": "2024-01-01T00:00:00+00:00",\n    "created_by": "user@example.com",\n    "updated_by": "user@example.com"\n  }\n]',
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
@@ -478,7 +478,7 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
                     {name: 'hostname', type: 'string', required: true, desc: 'Hostname or IP used for SSH connections.'},
                     {name: 'ssh_user', type: 'string', required: false, desc: 'SSH login user. Default: <code>root</code>.'},
                     {name: 'remote_path', type: 'string', required: false, desc: 'Path on the server where config files are written. Default: <code>/etc/kea</code>.'},
-                    {name: 'control_url', type: 'string', required: false, desc: 'Kea control agent URL for config reload (e.g. <code>http://localhost:8000</code>).'},
+                    {name: 'control_port', type: 'integer', required: false, desc: 'TCP port the Kea Control Agent listens on (e.g. <code>8000</code>). DashDDI reaches it via localhost over SSH — the agent need not be exposed externally.'},
                     {name: 'control_user', type: 'string', required: false, desc: 'HTTP basic auth username for control agent.'},
                     {name: 'control_password', type: 'string', required: false, desc: 'HTTP basic auth password for control agent. Write-only — never returned.'},
                     {name: 'description', type: 'string', required: false, desc: 'Free-text description.'},
@@ -495,7 +495,7 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
                     {name: 'hostname', type: 'string', required: false, desc: 'Hostname or IP.'},
                     {name: 'ssh_user', type: 'string', required: false, desc: 'SSH login user.'},
                     {name: 'remote_path', type: 'string', required: false, desc: 'Config file path on server.'},
-                    {name: 'control_url', type: 'string|null', required: false, desc: 'Control agent URL, or null to clear.'},
+                    {name: 'control_port', type: 'integer|null', required: false, desc: 'Control agent port, or null to disable reload.'},
                     {name: 'control_user', type: 'string|null', required: false, desc: 'Control agent username, or null to clear.'},
                     {name: 'control_password', type: 'string|null', required: false, desc: 'Control agent password, or null to clear.'},
                     {name: 'description', type: 'string|null', required: false, desc: 'Description, or null to clear.'},

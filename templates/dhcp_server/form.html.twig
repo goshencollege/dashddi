@@ -30,7 +30,7 @@
                     {{ form_errors(form.versionScope) }}
                 </div>
 
-                {% for field in ['controlUrl', 'controlUser', 'controlPassword', 'description'] %}
+                {% for field in ['controlPort', 'controlUser', 'controlPassword', 'description'] %}
                     <div class="mb-3">
                         {{ form_label(form[field], null, {label_attr: {class: 'form-label fw-semibold'}}) }}
                         {{ form_widget(form[field], {attr: {class: 'form-control' ~ (form[field].vars.errors|length ? ' is-invalid' : '')}}) }}
