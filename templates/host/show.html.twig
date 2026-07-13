@@ -83,10 +83,10 @@
                 <thead>
                     <tr>
                         <th>Interface</th>
+                        <th>DNS Names</th>
                         <th>Subnet</th>
                         <th>IPv4</th>
                         <th>IPv6</th>
-                        <th>DNS Names</th>
                         <th>Last Seen</th>
                         <th>Last Modified</th>
                         <th class="text-end">Actions</th>
@@ -106,20 +106,6 @@
                                     <span class="badge text-bg-warning mt-1">Deleted {{ iface.deletedAt|date('Y-m-d') }}</span>
                                 {% endif %}
                             </td>
-                            <td>{{ iface.subnet ? iface.subnet.name : '—' }}</td>
-                            <td class="ip-address">
-                                {% if iface.ipAddress %}
-                                    {{ iface.ipAddress.address }}
-                                    {% if iface.lastDhcpIp and iface.lastDhcpIp != iface.ipAddress.address %}
-                                        <span class="text-muted">({{ iface.lastDhcpIp }})</span>
-                                    {% endif %}
-                                {% elseif iface.lastDhcpIp %}
-                                    <span class="text-muted">({{ iface.lastDhcpIp }})</span>
-                                {% else %}
-                                    —
-                                {% endif %}
-                            </td>
-                            <td class="ip-address small">{{ iface.ipv6Address ? iface.ipv6Address.address : '—' }}</td>
                             <td class="font-monospace">
                                 {% set fqdn_types = {} %}
                                 {% for record in iface.domainRecords %}
@@ -152,6 +138,20 @@
                                     {% endfor %}
                                 {% endif %}
                             </td>
+                            <td>{{ iface.subnet ? iface.subnet.name : '—' }}</td>
+                            <td class="ip-address">
+                                {% if iface.ipAddress %}
+                                    {{ iface.ipAddress.address }}
+                                    {% if iface.lastDhcpIp and iface.lastDhcpIp != iface.ipAddress.address %}
+                                        <span class="text-muted">({{ iface.lastDhcpIp }})</span>
+                                    {% endif %}
+                                {% elseif iface.lastDhcpIp %}
+                                    <span class="text-muted">({{ iface.lastDhcpIp }})</span>
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+                            <td class="ip-address small">{{ iface.ipv6Address ? iface.ipv6Address.address : '—' }}</td>
                             <td class="text-muted small">
                                 {% set lastSeen = null %}
                                 {% if iface.lastAuthAt and iface.lastDhcpAt %}
