@@ -115,14 +115,12 @@
     <h1 class="h3 mb-0"><i class="bi bi-pc-display me-2"></i>Hosts</h1>
     <div class="d-flex align-items-center gap-2">
         <a href="{{ path('user_guide_hosts') }}" class="btn btn-sm btn-outline-secondary" title="User Guide" target="_blank"><i class="bi bi-question-circle"></i></a>
-        {% if not showDeleted %}
         <a href="{{ path('host_import') }}" class="btn btn-outline-secondary btn-sm">
             <i class="bi bi-upload me-1"></i>Import CSV
         </a>
         <a href="{{ path('host_new') }}" class="btn btn-primary btn-sm">
             <i class="bi bi-plus-lg me-1"></i>Add Host
         </a>
-        {% endif %}
     </div>
 </div>
 <div class="mb-4">
