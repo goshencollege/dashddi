@@ -40,9 +40,8 @@ class DhcpServer
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $sshPublicKey = null;
 
-    #[ORM\Column(length: 255, nullable: true)]
-    #[Assert\Url(protocols: ['http', 'https'], requireTld: false)]
-    private ?string $controlUrl = null;
+    #[ORM\Column(nullable: true, options: ['unsigned' => true])]
+    private ?int $controlPort = null;
 
     #[ORM\Column(length: 128, nullable: true)]
     private ?string $controlUser = null;
@@ -79,8 +78,8 @@ class DhcpServer
     public function getSshPublicKey(): ?string { return $this->sshPublicKey; }
     public function setSshPublicKey(?string $sshPublicKey): static { $this->sshPublicKey = $sshPublicKey; return $this; }
 
-    public function getControlUrl(): ?string { return $this->controlUrl; }
-    public function setControlUrl(?string $controlUrl): static { $this->controlUrl = $controlUrl ?: null; return $this; }
+    public function getControlPort(): ?int { return $this->controlPort; }
+    public function setControlPort(?int $controlPort): static { $this->controlPort = $controlPort; return $this; }
 
     public function getControlUser(): ?string { return $this->controlUser; }
     public function setControlUser(?string $controlUser): static { $this->controlUser = $controlUser ?: null; return $this; }

@@ -4,7 +4,6 @@ namespace App\Service;
 
 use App\Entity\DhcpServer;
 use phpseclib3\Net\SFTP;
-use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 class DhcpDeployService
 {
@@ -12,7 +11,6 @@ class DhcpDeployService
         private readonly DhcpConfigGenerator     $generator,
         private readonly DhcpDdnsConfigGenerator $ddnsGenerator,
         private readonly SshKeyService           $sshKeys,
-        private readonly HttpClientInterface     $httpClient,
     ) {}
 
     public function generateFiles(string $outputDir): array
@@ -88,7 +86,7 @@ class DhcpDeployService
             $backupContent = null;
 
             // Download current remote file as a backup before overwriting
-            if ($reload && $server->getControlUrl()) {
+            if ($reload && $server->getControlPort() !== null) {
                 $downloaded = $sftp->get($remotePath);
                 if ($downloaded !== false) {
                     $backupContent = $downloaded;
@@ -104,7 +102,7 @@ class DhcpDeployService
                 'reload'  => null,
             ];
 
-            if (!$result['success'] || !$reload || !$server->getControlUrl()) {
+            if (!$result['success'] || !$reload || $server->getControlPort() === null) {
                 $results[$type] = $result;
                 continue;
             }
@@ -112,7 +110,7 @@ class DhcpDeployService
             // Reload — the server validates config before applying it, so a bad file will
             // fail here without affecting the running service.
             $keaService   = $type === 'dhcp4' ? 'dhcp4' : 'dhcp6';
-            $reloadResult = $this->controlCommand('config-reload', $keaService, $server);
+            $reloadResult = $this->controlCommand('config-reload', $keaService, $server, $sftp);
             $result['reload'] = [
                 'success'  => $reloadResult['success'],
                 'response' => $reloadResult['response'],
@@ -123,7 +121,7 @@ class DhcpDeployService
             if (!$reloadResult['success'] && $backupContent !== null) {
                 $restored = $sftp->put($remotePath, $backupContent);
                 if ($restored) {
-                    $this->controlCommand('config-reload', $keaService, $server);
+                    $this->controlCommand('config-reload', $keaService, $server, $sftp);
                 }
                 $result['reload']['restored']      = $restored;
                 $result['reload']['restore_error'] = $restored ? null : 'SFTP restore failed';
@@ -161,11 +159,11 @@ class DhcpDeployService
             'reload'  => null,
         ];
 
-        if (!$result['success'] || !$reload || !$server->getControlUrl()) {
+        if (!$result['success'] || !$reload || $server->getControlPort() === null) {
             return $result;
         }
 
-        $reloadResult     = $this->controlCommand('config-reload', 'd2', $server);
+        $reloadResult     = $this->controlCommand('config-reload', 'd2', $server, $sftp);
         $result['reload'] = [
             'success'  => $reloadResult['success'],
             'response' => $reloadResult['response'],
@@ -174,11 +172,6 @@ class DhcpDeployService
         ];
 
         return $result;
-    }
-
-    public function reloadDhcp(string $controlUrl, string $service, ?string $user = null, ?string $password = null): array
-    {
-        return $this->controlRequest($controlUrl, 'config-reload', $service, $user, $password);
     }
 
     private function getSftp(DhcpServer $server): SFTP
@@ -190,44 +183,31 @@ class DhcpDeployService
         return $this->sshKeys->connect($server->getHostname(), $server->getSshUser(), $server->getSshPrivateKey());
     }
 
-    private function controlCommand(string $command, string $service, DhcpServer $server): array
+    private function controlCommand(string $command, string $service, DhcpServer $server, SFTP $sftp): array
     {
-        return $this->controlRequest(
-            $server->getControlUrl(),
-            $command,
-            $service,
-            $server->getControlUser(),
-            $server->getControlPassword(),
-        );
-    }
+        $port    = $server->getControlPort() ?? 8000;
+        $payload = json_encode(['command' => $command, 'service' => [$service]]);
 
-    private function controlRequest(string $controlUrl, string $command, string $service, ?string $user, ?string $password): array
-    {
-        $url = rtrim($controlUrl, '/');
+        $cmd = 'curl -s -X POST ' . escapeshellarg('http://127.0.0.1:' . $port)
+             . ' -H ' . escapeshellarg('Content-Type: application/json')
+             . ' -d ' . escapeshellarg($payload);
 
-        $options = [
-            'json'    => ['command' => $command, 'service' => [$service]],
-            'timeout' => 10,
-        ];
-        if ($user !== null) {
-            $options['auth_basic'] = [$user, $password ?? ''];
+        if ($server->getControlUser() !== null) {
+            $cmd .= ' -u ' . escapeshellarg($server->getControlUser() . ':' . ($server->getControlPassword() ?? ''));
         }
 
-        try {
-            $response = $this->httpClient->request('POST', $url, $options);
-            $body     = $response->getContent(false);
-        } catch (\Throwable) {
-            return ['success' => false, 'response' => 'Could not connect to DHCP Control Agent'];
+        $output = $sftp->exec($cmd);
+
+        if ($output === false) {
+            return ['success' => false, 'response' => 'SSH exec of curl failed'];
         }
 
-        $data = json_decode($body, true);
-
-        // result 0 = success; result 3 = unsupported command (e.g. config-test not available)
+        $data       = json_decode($output, true);
         $resultCode = $data[0]['result'] ?? -1;
 
         return [
             'success'  => $resultCode === 0,
-            'response' => $data[0]['text'] ?? $body,
+            'response' => $data[0]['text'] ?? $output,
         ];
     }
 }

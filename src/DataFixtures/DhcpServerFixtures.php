@@ -20,7 +20,7 @@ class DhcpServerFixtures extends Fixture
                 'hostname'     => 'kea.example.com',
                 'ssh_user'     => 'root',
                 'remote_path'  => '/etc/kea',
-                'control_url'  => 'http://kea.example.com:8000',
+                'control_port' => 8000,
                 'control_user' => 'admin',
             ],
         ];
@@ -31,7 +31,7 @@ class DhcpServerFixtures extends Fixture
                 ->setHostname($data['hostname'])
                 ->setSshUser($data['ssh_user'] ?? 'root')
                 ->setRemotePath($data['remote_path'] ?? '/etc/kea')
-                ->setControlUrl($data['control_url'] ?? null)
+                ->setControlPort($data['control_port'] ?? null)
                 ->setControlUser($data['control_user'] ?? null)
                 ->setControlPassword($data['control_password'] ?? null)
                 ->setSshPrivateKey($data['ssh_private_key'] ?? null)

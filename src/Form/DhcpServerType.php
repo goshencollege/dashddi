@@ -6,12 +6,12 @@ use App\Entity\DhcpServer;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
+use Symfony\Component\Form\Extension\Core\Type\IntegerType;
 use Symfony\Component\Form\Extension\Core\Type\PasswordType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
-use Symfony\Component\Validator\Constraints\Url;
 
 class DhcpServerType extends AbstractType
 {
@@ -41,11 +41,10 @@ class DhcpServerType extends AbstractType
                     'IPv6 only'          => 'v6',
                 ],
             ])
-            ->add('controlUrl', TextType::class, [
-                'label'       => 'Control Agent URL',
-                'required'    => false,
-                'attr'        => ['placeholder' => 'http://192.168.1.1:8000'],
-                'constraints' => [new Url(protocols: ['http', 'https'], requireTld: false)],
+            ->add('controlPort', IntegerType::class, [
+                'label'    => 'Control Agent Port',
+                'required' => false,
+                'attr'     => ['placeholder' => '8000', 'min' => 1, 'max' => 65535],
             ])
             ->add('controlUser', TextType::class, [
                 'label'    => 'Control Agent User',
