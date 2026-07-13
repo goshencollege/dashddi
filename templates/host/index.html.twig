@@ -261,7 +261,7 @@
                                         {{ host.name }}
                                     </a>
                                     {% if host.deleted %}
-                                        <span class="badge text-bg-warning ms-1">Deleted</span>
+                                        <span class="badge text-bg-warning ms-1">Deleted {{ host.deletedAt|date('Y-m-d') }}</span>
                                     {% endif %}
                                     {% set snipeLink = host.snipeItAssetLink %}
                                     {% if snipeLink and snipeLink.snipeAssetName != host.name %}
@@ -322,7 +322,7 @@
                                             <a href="{{ path('interface_show', {id: iface.id}) }}" class="text-decoration-none font-monospace text-muted">{{ iface.macAddress }}</a>
                                         {% endif %}
                                         {% if iface.deleted %}
-                                            <span class="badge text-bg-warning mt-1">Interface deleted</span>
+                                            <span class="badge text-bg-warning mt-1">Deleted {{ iface.deletedAt|date('Y-m-d') }}</span>
                                         {% endif %}
                                     </td>
                                     <td></td>
