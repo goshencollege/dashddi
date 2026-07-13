@@ -83,10 +83,10 @@
                 <thead>
                     <tr>
                         <th>Interface</th>
-                        <th>DNS Names</th>
                         <th>Subnet</th>
                         <th>IPv4</th>
                         <th>IPv6</th>
+                        <th>DNS Names</th>
                         <th>Last Seen</th>
                         <th>Last Modified</th>
                         <th class="text-end">Actions</th>
@@ -106,15 +106,6 @@
                                     <span class="badge text-bg-warning mt-1">Deleted {{ iface.deletedAt|date('Y-m-d') }}</span>
                                 {% endif %}
                             </td>
-                            <td>
-                                {% for record in iface.domainRecords %}
-                                    {% if record.domain %}
-                                        <span class="badge text-bg-secondary me-1">{{ record.fullyQualifiedHostname }}</span>
-                                    {% endif %}
-                                {% else %}
-                                    <span class="text-muted">—</span>
-                                {% endfor %}
-                            </td>
                             <td>{{ iface.subnet ? iface.subnet.name : '—' }}</td>
                             <td class="ip-address">
                                 {% if iface.ipAddress %}
@@ -129,6 +120,38 @@
                                 {% endif %}
                             </td>
                             <td class="ip-address small">{{ iface.ipv6Address ? iface.ipv6Address.address : '—' }}</td>
+                            <td class="font-monospace">
+                                {% set fqdn_types = {} %}
+                                {% for record in iface.domainRecords %}
+                                    {% if record.domain and record.type.value in ['A', 'AAAA'] %}
+                                        {% set fqdn = record.fullyQualifiedHostname %}
+                                        {% set t = record.type.value %}
+                                        {% if fqdn_types[fqdn] is defined %}
+                                            {% set fqdn_types = fqdn_types|merge({(fqdn): fqdn_types[fqdn]|merge([t])}) %}
+                                        {% else %}
+                                            {% set fqdn_types = fqdn_types|merge({(fqdn): [t]}) %}
+                                        {% endif %}
+                                    {% endif %}
+                                {% endfor %}
+                                {% if fqdn_types is empty %}
+                                    <span class="text-muted">—</span>
+                                {% else %}
+                                    {% for fqdn, types in fqdn_types %}
+                                        {% set has_a    = 'A'    in types %}
+                                        {% set has_aaaa = 'AAAA' in types %}
+                                        <div class="d-flex align-items-center" style="max-width:14rem">
+                                            {% if has_a and has_aaaa %}
+                                                <span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle flex-shrink-0" style="border-radius:0.375rem 0 0 0.375rem;border-right-width:0">A</span><span class="badge bg-info-subtle text-info-emphasis border border-info-subtle flex-shrink-0 me-1" style="border-radius:0 0.375rem 0.375rem 0;border-left-width:0">AAAA</span>
+                                            {% elseif has_a %}
+                                                <span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle flex-shrink-0 me-1">A</span>
+                                            {% elseif has_aaaa %}
+                                                <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle flex-shrink-0 me-1">AAAA</span>
+                                            {% endif %}
+                                            <span class="text-truncate" style="min-width:0" title="{{ fqdn }}">{{ fqdn }}</span>
+                                        </div>
+                                    {% endfor %}
+                                {% endif %}
+                            </td>
                             <td class="text-muted small">
                                 {% set lastSeen = null %}
                                 {% if iface.lastAuthAt and iface.lastDhcpAt %}
