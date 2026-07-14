@@ -12,7 +12,6 @@ use App\Repository\DomainRecordRepository;
 use App\Repository\NetworkInterfaceRepository;
 use App\Repository\VirtualIpRepository;
 use App\Service\DnsViewResolver;
-use App\Service\FcrdnsChecker;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -24,7 +23,6 @@ class DomainRecordController extends AbstractController
 {
     public function __construct(
         private readonly EntityManagerInterface      $em,
-        private readonly FcrdnsChecker               $fcrdnsChecker,
         private readonly DomainRecordRepository      $recordRepo,
         private readonly DnsViewResolver             $viewResolver,
         private readonly NetworkInterfaceRepository  $ifaceRepo,
@@ -93,10 +91,6 @@ class DomainRecordController extends AbstractController
 
             if ($record->isCanonical()) {
                 $this->enforceCanonicalUniqueness($record);
-                $fcrdnsError = $this->checkCanonical($record);
-                if ($fcrdnsError !== null) {
-                    $this->addFlash('warning', 'FCrDNS check failed — record saved as canonical anyway. ' . $fcrdnsError);
-                }
             }
 
             if ($form->get('create_aaaa_companion')->getData() === '1') {
@@ -159,10 +153,6 @@ class DomainRecordController extends AbstractController
 
             if ($record->isCanonical()) {
                 $this->enforceCanonicalUniquenessForVip($record);
-                $fcrdnsError = $this->checkCanonical($record);
-                if ($fcrdnsError !== null) {
-                    $this->addFlash('warning', 'FCrDNS check failed — record saved as canonical anyway. ' . $fcrdnsError);
-                }
             }
 
             if ($form->get('create_aaaa_companion')->getData() === '1') {
@@ -249,15 +239,8 @@ class DomainRecordController extends AbstractController
             if ($record->isCanonical()) {
                 if ($record->getNetworkInterface() !== null) {
                     $this->enforceCanonicalUniqueness($record);
-                    $fcrdnsError = $this->checkCanonical($record);
                 } elseif ($record->getVirtualIp() !== null) {
                     $this->enforceCanonicalUniquenessForVip($record);
-                    $fcrdnsError = $this->checkCanonical($record);
-                } else {
-                    $fcrdnsError = null;
-                }
-                if (!empty($fcrdnsError)) {
-                    $this->addFlash('warning', 'FCrDNS check failed — record saved as canonical anyway. ' . $fcrdnsError);
                 }
             }
 
@@ -414,10 +397,6 @@ class DomainRecordController extends AbstractController
             } else {
                 $this->enforceCanonicalUniquenessForVip($companion);
             }
-            $fcrdnsError = $this->checkCanonical($companion);
-            if ($fcrdnsError !== null) {
-                $this->addFlash('warning', 'FCrDNS check failed for AAAA companion — record saved as canonical anyway. ' . $fcrdnsError);
-            }
         }
     }
 
@@ -515,22 +494,4 @@ class DomainRecordController extends AbstractController
         }
     }
 
-    private function checkCanonical(DomainRecord $record): ?string
-    {
-        if (!$record->isCanonical()) {
-            return null;
-        }
-        if ($record->getDomain() === null) {
-            return 'A domain is required for canonical records.';
-        }
-        $iface = $record->getNetworkInterface();
-        $vip   = $record->getVirtualIp();
-        $ipv4  = $iface?->getIpAddress()?->getAddress() ?? $vip?->getIpAddress()?->getAddress();
-        $ipv6  = $iface?->getIpv6Address()?->getAddress() ?? $vip?->getIpv6Address()?->getAddress();
-        return $this->fcrdnsChecker->check(
-            $record->getFullyQualifiedHostname(),
-            $ipv4,
-            $ipv6,
-        );
-    }
 }
