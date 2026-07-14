@@ -567,12 +567,28 @@ class DnsConfigGeneratorTest extends TestCase
         $this->assertStringNotContainsString('IN PTR vip-internal.example.com.', $output);
     }
 
+    public function testIfacePtrAppearsInAnyViewWhenRecordHasNoViews(): void
+    {
+        $view   = $this->makeView(1, 'internal');
+        $subnet = $this->makeSubnetWithInterface('10.0.0.0/24', '10.0.0.5', 'host.example.com.');
+        $output = $this->generator->generateReverseZoneFile($subnet, '10.0.0.0/24', $view);
+        $this->assertStringContainsString('5 IN PTR host.example.com.', $output);
+    }
+
+    public function testVipPtrAppearsInAnyViewWhenRecordHasNoViews(): void
+    {
+        $view   = $this->makeView(1, 'internal');
+        $subnet = $this->makeSubnetWithVip('10.0.0.0/24', '10.0.0.200', 'vip.example.com.');
+        $output = $this->generator->generateReverseZoneFile($subnet, '10.0.0.0/24', $view);
+        $this->assertStringContainsString('200 IN PTR vip.example.com.', $output);
+    }
+
     // ── generateViewsConf helpers ─────────────────────────────────────────────
 
     /**
      * Create a subnet with one interface that has an IPv4 address and a canonical A record.
      */
-    private function makeSubnetWithInterface(string $cidr, string $ip, string $fqdn): Subnet
+    private function makeSubnetWithInterface(string $cidr, string $ip, string $fqdn, ?DnsView $view = null): Subnet
     {
         $subnet = $this->makeSubnet($cidr);
 
@@ -586,6 +602,9 @@ class DnsConfigGeneratorTest extends TestCase
             ->setType(RecordType::A)
             ->setIsCanonical(true)
             ->setDomain($domain);
+        if ($view !== null) {
+            $record->addView($view);
+        }
 
         $iface = new NetworkInterface();
         (new \ReflectionProperty(NetworkInterface::class, 'ipAddress'))->setValue($iface, $ipAddr);
