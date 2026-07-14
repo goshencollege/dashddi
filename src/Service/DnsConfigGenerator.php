@@ -743,7 +743,7 @@ class DnsConfigGenerator
             if (!$record->getDomain()) {
                 continue;
             }
-            if ($view !== null && !$this->inView($view, $record->getViews()->toArray())) {
+            if ($view !== null && !$record->getViews()->isEmpty() && !$this->inView($view, $record->getViews()->toArray())) {
                 continue;
             }
             return $record->getFullyQualifiedHostname() . '.';
@@ -764,7 +764,7 @@ class DnsConfigGenerator
             if (!$record->getDomain()) {
                 continue;
             }
-            if ($view !== null && !$this->inView($view, $record->getViews()->toArray())) {
+            if ($view !== null && !$record->getViews()->isEmpty() && !$this->inView($view, $record->getViews()->toArray())) {
                 continue;
             }
             return $record->getFullyQualifiedHostname() . '.';
