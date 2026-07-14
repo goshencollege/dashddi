@@ -11,6 +11,7 @@ use App\Entity\VirtualIp;
 use App\Enum\RecordType;
 use App\Service\DnsViewResolver;
 use App\Repository\DhcpLeaseRepository;
+use App\Service\IpAddressManager;
 use App\Service\RecommendationService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -393,6 +394,7 @@ class ReportController extends AbstractController
         Request $request,
         EntityManagerInterface $em,
         RecommendationService $service,
+        IpAddressManager $ipManager,
     ): Response {
         if (!$this->isCsrfTokenValid('dhcp_mismatch_move', $request->request->get('_token_move'))) {
             $this->addFlash('danger', 'Invalid CSRF token.');
@@ -416,6 +418,13 @@ class ReportController extends AbstractController
             if ($leaseSubnet === null || $leaseSubnet === $iface->getSubnet()) { $skipped++; continue; }
 
             $iface->setSubnet($leaseSubnet);
+
+            if ($ipManager->isIpv4ValidInSubnet($iface, $leaseSubnet)) {
+                $iface->getIpAddress()?->setSubnet($leaseSubnet);
+            } else {
+                $ipManager->releaseIpv4($iface);
+            }
+
             $moved++;
         }
 
