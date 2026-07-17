@@ -93,6 +93,23 @@
                             <li><a class="nav-link px-2 text-start" href="#ep-hosts-update"><span class="method-patch me-1">PATCH</span>Update</a></li>
                             <li><a class="nav-link px-2 text-start" href="#ep-hosts-delete"><span class="method-delete me-1">DEL</span>Delete</a></li>
                             <li><a class="nav-link px-2 text-start" href="#ep-hosts-restore"><span class="method-post me-1">POST</span>Restore</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-hosts-token-generate"><span class="method-post me-1">POST</span>Generate token</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-hosts-token-revoke"><span class="method-delete me-1">DEL</span>Revoke token</a></li>
+                        </ul>
+                    </div>
+                </li>
+
+                {# Host Self-Service #}
+                <li class="nav-item">
+                    <div class="d-flex align-items-center">
+                        <a class="nav-link flex-grow-1 py-1 px-2 text-start" href="#host-self">Host Self-Service</a>
+                        <button class="btn btn-link btn-sm py-0 px-2 border-0 text-muted api-nav-toggle collapsed" data-bs-toggle="collapse" data-bs-target="#nav-host-self" aria-expanded="false"><i class="bi bi-chevron-down" style="font-size:.65rem"></i></button>
+                    </div>
+                    <div class="collapse" id="nav-host-self">
+                        <ul class="nav flex-column gap-0 ms-2 ps-2 border-start api-sub-nav">
+                            <li><a class="nav-link px-2 text-start" href="#ep-self-host"><span class="method-get me-1">GET</span>Get host</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-self-challenge-create"><span class="method-post me-1">POST</span>Create challenge</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-self-challenge-delete"><span class="method-delete me-1">DEL</span>Delete challenge</a></li>
                         </ul>
                     </div>
                 </li>
@@ -279,10 +296,14 @@ curl -H "Authorization: Bearer &lt;your-token&gt;" https://example.com/api/...</
 curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
 
             <h3 class="h6 mt-3 mb-1">IP / CIDR restrictions</h3>
-            <p class="small mb-0">Every token must be restricted to one or more source IP addresses or CIDR ranges (IPv4 and IPv6 both supported). Requests from addresses outside the allowlist are rejected with <code>403</code>. Restrictions are configured when creating or editing a token.</p>
+            <p class="small mb-0">Every general-purpose token must be restricted to one or more source IP addresses or CIDR ranges (IPv4 and IPv6 both supported). Requests from addresses outside the allowlist are rejected with <code>403</code>. Restrictions are configured when creating or editing a token.</p>
 
             <h3 class="h6 mt-3 mb-1">Expiry</h3>
-            <p class="small mb-0">Every token must have an expiry date. Requests made with an expired token are rejected with <code>401</code>. The default expiry when creating a token is five years from the creation date. Tokens can be extended by editing them.</p>
+            <p class="small mb-0">Every general-purpose token must have an expiry date. Requests made with an expired token are rejected with <code>401</code>. The default expiry when creating a token is five years from the creation date. Tokens can be extended by editing them.</p>
+
+            <h3 class="h6 mt-3 mb-1">Host-scoped tokens</h3>
+            <p class="small">A separate token type used exclusively with the <a href="#host-self">Host Self-Service</a> endpoints. Host-scoped tokens are tied to a specific host and carry no IP allowlist or expiry — instead, access is automatically restricted to the IP addresses assigned to the host's network interfaces. Requests from any other IP are rejected with <code>401</code>. These tokens are generated from the host detail page and can only access <code>/api/self/*</code> routes. They are intended for ACME DNS-01 certificate automation running directly on the host.</p>
+            <p class="small mb-0">Use the same Bearer or Basic auth header format shown above. A host can have at most one active token; generating a new one immediately revokes the previous.</p>
 
             <p class="mt-3 mb-0 text-muted small">Always use <strong>HTTPS</strong>. HTTP requests will be redirected and the Authorization header will be stripped by the redirect.</p>
         </section>
@@ -527,6 +548,8 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
                     <tr><td><span class="badge bg-warning text-dark font-monospace">PATCH</span></td><td><code>/api/hosts/{id}</code></td><td class="text-muted">Update a host</td></tr>
                     <tr><td><span class="badge bg-danger font-monospace">DELETE</span></td><td><code>/api/hosts/{id}</code></td><td class="text-muted">Soft-delete a host and its interfaces</td></tr>
                     <tr><td><span class="badge bg-success font-monospace">POST</span></td><td><code>/api/hosts/{id}/restore</code></td><td class="text-muted">Restore a soft-deleted host</td></tr>
+                    <tr><td><span class="badge bg-success font-monospace">POST</span></td><td><code>/api/hosts/{id}/token</code></td><td class="text-muted">Generate or regenerate a host-scoped token</td></tr>
+                    <tr><td><span class="badge bg-danger font-monospace">DELETE</span></td><td><code>/api/hosts/{id}/token</code></td><td class="text-muted">Revoke the host-scoped token</td></tr>
                 </tbody>
             </table>
 
@@ -583,6 +606,21 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
                 method: 'POST', path: '/api/hosts/{id}/restore', name: 'Restore host',
                 notes: 'Restores a soft-deleted host and all of its interfaces. If the host is not deleted, the current state is returned unchanged.',
                 response_example: '{\n  "id": 1,\n  "name": "server01",\n  "room": "A101",\n  "building_id": 3,\n  "tag_ids": [1, 2],\n  "deleted_at": null,\n  "created_at": "2024-01-01T00:00:00+00:00",\n  "updated_at": "2024-01-01T00:00:00+00:00",\n  "created_by": "user@example.com",\n  "updated_by": "user@example.com"\n}',
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-hosts-token-generate',
+                method: 'POST', path: '/api/hosts/{id}/token', name: 'Generate host-scoped token',
+                notes: 'Creates a new host-scoped API token for use with the <a href="#host-self"><code>/api/self</code></a> endpoints. If the host already has a token, it is immediately revoked and replaced — keep the returned raw value; it cannot be retrieved again. Requires a general-purpose token with write access.',
+                response_example: '{\n  "id": 42,\n  "token": "&lt;raw-token-value&gt;",\n  "host_id": 7\n}',
+                response_status: '201',
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-hosts-token-revoke',
+                method: 'DELETE', path: '/api/hosts/{id}/token', name: 'Revoke host-scoped token',
+                notes: 'Permanently revokes the host\'s active token. Returns <code>404</code> if no token exists.',
+                response_status: '204',
             } %}
         </section>
 
@@ -1189,6 +1227,51 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
                 anchor_id: 'ep-virtual-ips-remove-member',
                 method: 'DELETE', path: '/api/virtual-ips/{id}/members/{interfaceId}', name: 'Remove member interface',
                 notes: 'Removes an interface from the VIP\'s member list. If the interface is not a member, the request is silently ignored. Returns <code>204</code> on success.',
+                response_status: '204',
+            } %}
+        </section>
+
+        {# ═══════════════════════════════════════════════════════════════════
+           HOST SELF-SERVICE
+           ═══════════════════════════════════════════════════════════════════ #}
+        <section id="host-self" class="mb-5">
+            <h2 class="h5 border-bottom pb-2 mb-3">Host Self-Service <code class="small fw-normal text-muted">/api/self</code></h2>
+            <p class="text-muted small mb-1">Endpoints accessible only with a <strong>host-scoped token</strong>. Requests are accepted only from IP addresses assigned to the token's host's network interfaces — any other source is rejected with <code>401</code>. These endpoints are designed for ACME DNS-01 certificate automation running directly on the host. See <a href="{{ path('user_guide_integrations') }}#api-self">the integrations guide</a> for setup examples.</p>
+            <table class="table table-sm table-borderless mb-4 small">
+                <tbody>
+                    <tr><td style="width:3.5rem"><span class="badge bg-primary font-monospace">GET</span></td><td><code>/api/self/host</code></td><td class="text-muted">Return host info, interfaces, and publicly-reachable DNS records</td></tr>
+                    <tr><td><span class="badge bg-success font-monospace">POST</span></td><td><code>/api/self/dns-challenge</code></td><td class="text-muted">Create an ACME DNS-01 challenge TXT record</td></tr>
+                    <tr><td><span class="badge bg-danger font-monospace">DELETE</span></td><td><code>/api/self/dns-challenge</code></td><td class="text-muted">Delete the ACME challenge TXT record after validation</td></tr>
+                </tbody>
+            </table>
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-self-host',
+                method: 'GET', path: '/api/self/host', name: 'Get host info',
+                notes: 'Returns the host associated with the token, its network interfaces, and the DNS records linked to each interface. Only records in domains with at least one public DNS view (marked as public in DNS → Views) are included; domains with no view restriction are treated as globally accessible.',
+                response_example: '{\n  "id": 7,\n  "name": "web01",\n  "interfaces": [\n    {\n      "id": 12,\n      "name": "eth0",\n      "mac": "aa:bb:cc:dd:ee:ff",\n      "ipv4": "10.0.0.5",\n      "ipv6": null,\n      "records": [\n        {\n          "id": 44,\n          "hostname": "web01",\n          "fqdn": "web01.example.com",\n          "type": "A",\n          "value": "10.0.0.5",\n          "domain_id": 3\n        }\n      ]\n    }\n  ]\n}',
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-self-challenge-create',
+                method: 'POST', path: '/api/self/dns-challenge', name: 'Create challenge TXT record',
+                notes: 'Creates a <code>_acme-challenge.*</code> TXT record for ACME DNS-01 validation. The <code>fqdn</code> must match a DNS record already assigned to one of the host\'s interfaces. The challenge record is assigned to all views the domain is part of (not just the views of the source record), so Let\'s Encrypt can reach it via whichever view is externally reachable. The domain must have at least one public view (marked as public in DNS → Views); requests for domains with only internal views return <code>422</code>.',
+                body: [
+                    {name: 'fqdn', type: 'string', required: true, desc: 'Fully-qualified domain name to certify (e.g. <code>web01.example.com</code>). For an apex record, pass the bare domain (e.g. <code>example.com</code>).'},
+                    {name: 'validation', type: 'string', required: true, desc: 'ACME token value provided by the CA (the string that must appear in the TXT record).'},
+                ],
+                response_example: '{\n  "id": 99,\n  "hostname": "_acme-challenge.web01"\n}',
+                response_status: '201',
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-self-challenge-delete',
+                method: 'DELETE', path: '/api/self/dns-challenge', name: 'Delete challenge TXT record',
+                notes: 'Removes the matching <code>_acme-challenge.*</code> TXT record after validation is complete. The request body is identical to the create request — both <code>fqdn</code> and <code>validation</code> must match the record to delete. Returns <code>404</code> if no matching record is found.',
+                body: [
+                    {name: 'fqdn', type: 'string', required: true, desc: 'Fully-qualified domain name used when creating the challenge.'},
+                    {name: 'validation', type: 'string', required: true, desc: 'ACME token value used when creating the challenge.'},
+                ],
                 response_status: '204',
             } %}
         </section>
