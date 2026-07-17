@@ -1,0 +1,12 @@
+[Unit]
+Description=Renew certificates via DashDDI
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/dashddi-certbot \
+    --credentials {{ dashddi_credentials_path }} \
+    -- \
+    --dns-dashddi-propagation-seconds {{ dashddi_propagation_seconds }}
+PrivateTmp=true

@@ -1,0 +1,122 @@
+---
+# ── Token generation ──────────────────────────────────────────────────────────
+
+- name: Check if credentials file already exists
+  ansible.builtin.stat:
+    path: "{{ dashddi_credentials_path }}"
+  register: _dashddi_credentials_stat
+
+- name: Look up host in DashDDI by name
+  ansible.builtin.uri:
+    url: "{{ dashddi_url }}/api/hosts?name={{ dashddi_host_name | urlencode }}"
+    headers:
+      Authorization: "Bearer {{ dashddi_admin_token }}"
+  register: _dashddi_host_lookup
+  delegate_to: localhost
+  when: not _dashddi_credentials_stat.stat.exists or dashddi_force_token_regenerate
+
+- name: Resolve host ID from lookup results
+  ansible.builtin.set_fact:
+    _dashddi_host_id: >-
+      {{ (_dashddi_host_lookup.json
+          | selectattr('name', 'equalto', dashddi_host_name)
+          | list | first).id }}
+  when: not _dashddi_credentials_stat.stat.exists or dashddi_force_token_regenerate
+
+- name: Fail if host not found in DashDDI
+  ansible.builtin.fail:
+    msg: >
+      Host '{{ dashddi_host_name }}' was not found in DashDDI.
+      Check that the host is registered and that dashddi_host_name matches exactly.
+  when:
+    - not _dashddi_credentials_stat.stat.exists or dashddi_force_token_regenerate
+    - (_dashddi_host_lookup.json
+       | selectattr('name', 'equalto', dashddi_host_name)
+       | list | length) == 0
+
+- name: Generate host-scoped token in DashDDI
+  ansible.builtin.uri:
+    url: "{{ dashddi_url }}/api/hosts/{{ _dashddi_host_id }}/token"
+    method: POST
+    headers:
+      Authorization: "Bearer {{ dashddi_admin_token }}"
+    status_code: 201
+  register: _dashddi_token_response
+  delegate_to: localhost
+  no_log: true
+  when: not _dashddi_credentials_stat.stat.exists or dashddi_force_token_regenerate
+
+- name: Store generated token
+  ansible.builtin.set_fact:
+    _dashddi_host_token: "{{ _dashddi_token_response.json.token }}"
+  no_log: true
+  when: not _dashddi_credentials_stat.stat.exists or dashddi_force_token_regenerate
+
+# ── Install certbot + plugin ──────────────────────────────────────────────────
+
+- name: Install python3-venv
+  ansible.builtin.package:
+    name: python3-venv
+    state: present
+
+- name: Install certbot into virtualenv
+  ansible.builtin.pip:
+    name: certbot
+    virtualenv: "{{ dashddi_venv_path }}"
+    virtualenv_command: python3 -m venv
+
+- name: Install certbot-dns-dashddi plugin
+  ansible.builtin.pip:
+    name: "{{ dashddi_plugin_source }}"
+    virtualenv: "{{ dashddi_venv_path }}"
+
+- name: Symlink certbot to /usr/local/bin
+  ansible.builtin.file:
+    src: "{{ dashddi_venv_path }}/bin/certbot"
+    dest: /usr/local/bin/certbot
+    state: link
+
+- name: Symlink dashddi-certbot to /usr/local/bin
+  ansible.builtin.file:
+    src: "{{ dashddi_venv_path }}/bin/dashddi-certbot"
+    dest: /usr/local/bin/dashddi-certbot
+    state: link
+
+# ── Credentials file ──────────────────────────────────────────────────────────
+
+- name: Ensure /etc/letsencrypt exists
+  ansible.builtin.file:
+    path: /etc/letsencrypt
+    state: directory
+    mode: "0755"
+
+- name: Write DashDDI credentials file
+  ansible.builtin.template:
+    src: dashddi.ini.j2
+    dest: "{{ dashddi_credentials_path }}"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+  when: not _dashddi_credentials_stat.stat.exists or dashddi_force_token_regenerate
+
+# ── Systemd renewal timer ─────────────────────────────────────────────────────
+
+- name: Deploy dashddi-certbot.service
+  ansible.builtin.template:
+    src: dashddi-certbot.service.j2
+    dest: /etc/systemd/system/dashddi-certbot.service
+    mode: "0644"
+
+- name: Deploy dashddi-certbot.timer
+  ansible.builtin.template:
+    src: dashddi-certbot.timer.j2
+    dest: /etc/systemd/system/dashddi-certbot.timer
+    mode: "0644"
+
+- name: Enable and start renewal timer
+  ansible.builtin.systemd:
+    name: dashddi-certbot.timer
+    enabled: true
+    state: started
+    daemon_reload: true

@@ -1,0 +1,20 @@
+---
+# Deploy certbot-dns-dashddi and configure automatic certificate renewal.
+#
+# Usage:
+#   ansible-playbook -i inventory certbot.yml
+#
+# To force token regeneration (revokes and replaces the existing token):
+#   ansible-playbook -i inventory certbot.yml -e dashddi_force_token_regenerate=true
+#
+# Required variables (set in group_vars, host_vars, or vault):
+#   dashddi_url          Base URL of your DashDDI instance
+#   dashddi_admin_token  General-purpose token with api_hosts_index and
+#                        api_hosts_token_generate route permissions
+
+- name: Deploy DashDDI certbot plugin and renewal timer
+  hosts: all
+  become: true
+
+  roles:
+    - dashddi_certbot
