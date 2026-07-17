@@ -79,7 +79,7 @@ systemctl restart pveproxy pvedaemon
 
 1. Go to **Datacenter → ACME → Challenge Plugins → Add**
 2. Set Plugin Type to **DNS**
-3. Select **dashddi** from the DNS API dropdown
+3. Select **DashDDI** from the DNS API dropdown
 4. Fill in `DASHDDI_API_URL` and `DASHDDI_API_TOKEN`
 5. If your DashDDI instance uses a self-signed or internal CA certificate, set `DASHDDI_CA_CERT` to the path of the PEM CA bundle, or `false` to disable SSL verification (not recommended for production)
 6. Save
@@ -88,7 +88,7 @@ systemctl restart pveproxy pvedaemon
 
 1. Go to **Node → System → Certificates → ACME**
 2. Set up an ACME account if you haven't already
-3. Add a domain entry using the **dashddi** challenge plugin
+3. Add a domain entry using the **DashDDI** challenge plugin
 4. Click **Order Certificates Now** to issue the first certificate
 
 Proxmox will automatically renew the certificate before expiry.
@@ -101,7 +101,7 @@ Because ACME plugin *configuration* lives in `/etc/pve/priv/acme/plugins.cfg` (c
 
 ## Troubleshooting
 
-**`dashddi` does not appear in the DNS API dropdown**
+**`DashDDI` does not appear in the DNS API dropdown**
 
 The schema edit didn't take effect. Re-validate the JSON, correct any syntax errors, and restart `pveproxy` and `pvedaemon`.
 

@@ -1,5 +1,6 @@
 {
   "dashddi": {
+    "name": "DashDDI",
     "fields": {
       "DASHDDI_API_URL": {
         "description": "DashDDI base URL (e.g. https://dashddi.example.com)",

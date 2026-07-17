@@ -653,6 +653,7 @@ curl -fsSL -X DELETE "${DASHDDI_URL}/api/self/dns-challenge" \
 systemctl restart pveproxy pvedaemon</code></pre>
         <p class="text-muted small">The script is idempotent — re-running it updates the plugin in place. The schema entry being merged is:</p>
         <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-3"><code>"dashddi": {
+  "name": "DashDDI",
   "fields": {
     "DASHDDI_API_URL": {
       "description": "DashDDI base URL (e.g. https://dashddi.example.com)",
@@ -674,7 +675,7 @@ systemctl restart pveproxy pvedaemon</code></pre>
         <p class="text-muted small mb-1">Generate a host-scoped token from the host detail page in DashDDI: <strong>Hosts → &lt;node name&gt; → Host API Token → Generate Token</strong>. Then in Proxmox:</p>
         <ol class="text-muted small mb-3">
             <li>Go to <strong>Datacenter → ACME → Challenge Plugins → Add</strong></li>
-            <li>Set Plugin Type to <strong>DNS</strong> and select <strong>dashddi</strong> from the dropdown</li>
+            <li>Set Plugin Type to <strong>DNS</strong> and select <strong>DashDDI</strong> from the dropdown</li>
             <li>Enter <code>DASHDDI_API_URL</code> and <code>DASHDDI_API_TOKEN</code></li>
             <li>If DashDDI uses a self-signed or internal CA cert, set <code>DASHDDI_CA_CERT</code> to the PEM bundle path, or <code>false</code> to skip verification</li>
             <li>Go to <strong>Node → System → Certificates → ACME</strong>, add a domain entry using the <strong>dashddi</strong> plugin, and click <strong>Order Certificates Now</strong></li>
