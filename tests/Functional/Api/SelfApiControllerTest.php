@@ -3,6 +3,7 @@
 namespace App\Tests\Functional\Api;
 
 use App\Entity\ApiToken;
+use App\Entity\DnsView;
 use App\Entity\Domain;
 use App\Entity\DomainRecord;
 use App\Entity\Host;
@@ -143,10 +144,18 @@ class SelfApiControllerTest extends AppWebTestCase
         $domain = (new Domain())->setName('acme-test.example.com');
         $this->em->persist($domain);
 
+        $view = (new DnsView())->setName('external');
+        $this->em->persist($view);
+        $domain->addView($view); // view must be on the domain for the validator to allow it
+        $this->em->flush();
+
         [$host, $iface] = $this->makeHostWithIp('acme-host'); // 127.0.0.1
         $raw = bin2hex(random_bytes(32));
         $this->makeHostToken($host, $raw);
-        $this->makeDomainRecord($iface, $domain, 'srv01', RecordType::A, '127.0.0.1');
+
+        $sourceRecord = $this->makeDomainRecord($iface, $domain, 'srv01', RecordType::A, '127.0.0.1');
+        $sourceRecord->addView($view);
+        $this->em->flush();
 
         $data = $this->tokenRequest('POST', '/api/self/dns-challenge', $raw, [
             'fqdn'       => 'srv01.acme-test.example.com',
@@ -157,13 +166,15 @@ class SelfApiControllerTest extends AppWebTestCase
         $this->assertArrayHasKey('id', $data);
         $this->assertSame('_acme-challenge.srv01', $data['hostname']);
 
-        // Reload from DB and verify interface link + value normalisation
+        // Reload from DB and verify interface link, value normalisation, and view inheritance
         $this->em->clear();
         $record = $this->em->find(DomainRecord::class, $data['id']);
         $this->assertNotNull($record);
         $this->assertSame(RecordType::TXT, $record->getType());
         $this->assertSame($iface->getId(), $record->getNetworkInterface()->getId());
         $this->assertSame(TxtRecordValueValidator::normalizeTxtValue('ACME_TOKEN_VALUE_123'), $record->getValue());
+        $this->assertCount(1, $record->getViews());
+        $this->assertSame($view->getId(), $record->getViews()->first()->getId());
     }
 
     public function testCreateChallengeForApexRecord(): void

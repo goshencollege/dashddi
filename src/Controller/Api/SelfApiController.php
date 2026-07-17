@@ -67,6 +67,9 @@ class SelfApiController extends AbstractController
         $record->setValue(TxtRecordValueValidator::normalizeTxtValue($validation));
         $record->setDomain($sourceRecord->getDomain());
         $record->setNetworkInterface($interface);
+        foreach ($sourceRecord->getViews() as $view) {
+            $record->addView($view);
+        }
 
         $violations = $validator->validate($record);
         if (count($violations) > 0) {
