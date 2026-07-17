@@ -520,8 +520,58 @@ curl -s -X POST https://dashddi.example.com/api/dhcp/lease \
 }</code></pre>
         <p class="text-muted small"><code>fqdn</code> must match one of the DNS records already assigned to the host's interfaces. For an apex record (<code>@</code>), pass the bare domain name (e.g. <code>example.com</code>). The challenge record is created as <code>_acme-challenge.web01.example.com</code> (or <code>_acme-challenge.example.com</code> for the apex) and linked to the same interface as the source record. The <strong>DELETE</strong> request uses the same body to identify and remove the record.</p>
 
-        <h6 id="api-acme" class="mt-3">ACME DNS-01 automation example</h6>
-        <p>The following shell script can be used as a Certbot manual-auth hook. It reads the token from an environment variable and uses DashDDI's <code>/api/self</code> endpoints to create and clean up challenge TXT records.</p>
+        <h6 id="api-certbot-plugin" class="mt-3">Certbot plugin (<code>certbot-dns-dashddi</code>)</h6>
+        <p>The recommended approach for certificate automation is the <strong>certbot-dns-dashddi</strong> plugin, which handles challenge creation and cleanup automatically and supports a <code>dashddi-certbot</code> wrapper that discovers the host's FQDNs from DashDDI so you don't have to list them manually.</p>
+
+        <p class="fw-semibold mb-1">Installation</p>
+        <p class="text-muted small mb-1">Certbot and the plugin must share the same Python environment. On Debian/Ubuntu:</p>
+        <pre class="bg-light rounded p-2 small overflow-auto mb-3"><code>apt install -y python3-venv
+python3 -m venv /opt/certbot
+/opt/certbot/bin/pip install certbot
+/opt/certbot/bin/pip install git+https://github.com/goshencollege/dashddi/#subdirectory=certbot-dns-dashddi
+ln -s /opt/certbot/bin/certbot /usr/local/bin/certbot
+ln -s /opt/certbot/bin/dashddi-certbot /usr/local/bin/dashddi-certbot</code></pre>
+
+        <p class="fw-semibold mb-1">Credentials file</p>
+        <p class="text-muted small mb-1">Create <code>/etc/letsencrypt/dashddi.ini</code> (chmod 600):</p>
+        <pre class="bg-light rounded p-2 small overflow-auto mb-3"><code>dns_dashddi_url = https://dashddi.example.com
+dns_dashddi_token = &lt;host-scoped-token&gt;</code></pre>
+        <p class="text-muted small">Generate the token from the host detail page in DashDDI: <strong>Hosts → &lt;hostname&gt; → Host API Token → Generate Token</strong>. The token is accepted only from this host's IP addresses.</p>
+
+        <p class="fw-semibold mb-1">Automatic FQDN discovery</p>
+        <p class="text-muted small mb-1">The <code>dashddi-certbot</code> wrapper queries <code>/api/self/host</code> to find all A/AAAA FQDNs for this host and requests a single SAN certificate covering them all:</p>
+        <pre class="bg-light rounded p-2 small overflow-auto mb-3"><code>dashddi-certbot --credentials /etc/letsencrypt/dashddi.ini</code></pre>
+
+        <p class="fw-semibold mb-1">Manual domain list</p>
+        <p class="text-muted small mb-1">To specify domains explicitly, use certbot directly:</p>
+        <pre class="bg-light rounded p-2 small overflow-auto mb-3"><code>certbot certonly \
+  --authenticator dns-dashddi \
+  --dns-dashddi-credentials /etc/letsencrypt/dashddi.ini \
+  -d web01.example.com -d app.example.com</code></pre>
+
+        <p class="fw-semibold mb-1">Automatic renewal (systemd timer)</p>
+        <p class="text-muted small mb-1">Create <code>/etc/systemd/system/dashddi-certbot.service</code> and <code>dashddi-certbot.timer</code>:</p>
+        <pre class="bg-light rounded p-2 small overflow-auto mb-3"><code>[Unit]
+Description=Renew certificates via DashDDI
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/dashddi-certbot --credentials /etc/letsencrypt/dashddi.ini</code></pre>
+        <pre class="bg-light rounded p-2 small overflow-auto mb-3"><code>[Unit]
+Description=Run dashddi-certbot twice daily
+
+[Timer]
+OnCalendar=*-*-* 03,15:00:00
+RandomizedDelaySec=1h
+Persistent=true
+
+[Install]
+WantedBy=timers.target</code></pre>
+        <pre class="bg-light rounded p-2 small overflow-auto mb-3"><code>systemctl daemon-reload
+systemctl enable --now dashddi-certbot.timer</code></pre>
+
+        <h6 id="api-acme" class="mt-4">Manual hook approach (curl)</h6>
+        <p class="text-muted small">If installing Python packages is not practical, you can drive the same endpoints manually using Certbot's <code>--manual</code> authenticator:</p>
         <pre class="bg-light rounded p-2 small overflow-auto mb-2"><code>#!/usr/bin/env bash
 # /etc/letsencrypt/renewal-hooks/deploy/dashddi-auth.sh
 # Set DASHDDI_TOKEN to the host-scoped token value.
@@ -569,7 +619,8 @@ curl -fsSL -X DELETE "${DASHDDI_URL}/api/self/dns-challenge" \
             <a href="#api" class="list-group-item list-group-item-action py-1">REST API</a>
             <a href="#api-host-token-management" class="list-group-item list-group-item-action py-1 ps-4">↳ Host token management</a>
             <a href="#api-self" class="list-group-item list-group-item-action py-1 ps-4">↳ Host self-service (/api/self)</a>
-            <a href="#api-acme" class="list-group-item list-group-item-action py-1 ps-4">↳ ACME DNS-01 example</a>
+            <a href="#api-certbot-plugin" class="list-group-item list-group-item-action py-1 ps-4">↳ Certbot plugin</a>
+            <a href="#api-acme" class="list-group-item list-group-item-action py-1 ps-4">↳ Manual hook (curl)</a>
         </div>
     </div>
 </div>
