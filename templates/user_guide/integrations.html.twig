@@ -485,8 +485,158 @@ curl -s -X POST https://dashddi.example.com/api/dhcp/lease \
     <div class="card-header fw-semibold"><i class="bi bi-code-slash me-1"></i>REST API</div>
     <div class="card-body">
         <p>DashDDI exposes a REST API covering all major resources — hosts, interfaces, subnets, domains, records, virtual IPs, and more. Interactive API documentation with request/response schemas and the ability to test calls is available at <a href="{{ path('api_docs') }}"><strong>API Docs</strong></a>.</p>
-        <p>Authentication uses Bearer tokens. Create a token under <strong>Other Settings → API Tokens</strong> and grant only the per-route permissions that integration needs.</p>
-        <p class="mb-0 text-muted small">The repository also includes a <strong>certbot-dns-dashddi</strong> Python plugin that enables Let's Encrypt DNS-01 challenge automation via DashDDI's API. Full endpoint reference — including request parameters, field descriptions, and response examples — is in the <a href="{{ path('api_docs') }}">API Docs</a>.</p>
+        <p>Authentication uses Bearer tokens (<code>Authorization: Bearer &lt;token&gt;</code>). Create a <strong>general token</strong> under <strong>Other Settings → API Tokens</strong> and grant only the per-route permissions that integration needs. For per-host automation, use <strong>host-scoped tokens</strong> instead — see below.</p>
+
+        <h6 id="api-host-token-management" class="mt-3">Host token management (admin API)</h6>
+        <p>These endpoints are available to any general token with the appropriate route permission.</p>
+        <div class="table-responsive mb-3">
+            <table class="table table-sm table-bordered mb-0">
+                <thead><tr><th>Method</th><th>Path</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>POST</code></td><td><code>/api/hosts/{id}/token</code></td><td>Generate (or regenerate) a host-scoped token. Returns the raw token value once — store it immediately.</td></tr>
+                    <tr><td><code>DELETE</code></td><td><code>/api/hosts/{id}/token</code></td><td>Revoke the host's token. Returns 204 on success, 404 if no token exists.</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="text-muted small"><strong>POST</strong> response: <code>{"token": "&lt;raw&gt;", "id": &lt;token_id&gt;, "host_id": &lt;host_id&gt;}</code></p>
+
+        <h6 id="api-self" class="mt-3">Host self-service endpoints (<code>/api/self</code>)</h6>
+        <p>These endpoints are only accessible with a <strong>host-scoped token</strong>. Requests are accepted only from IP addresses assigned to the token's host's network interfaces. They are designed to support ACME DNS-01 certificate automation on each host without granting broad DNS write access.</p>
+        <div class="table-responsive mb-3">
+            <table class="table table-sm table-bordered mb-0">
+                <thead><tr><th>Method</th><th>Path</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>GET</code></td><td><code>/api/self/host</code></td><td>Return the host's name, its interfaces (id, MAC, IPv4, IPv6), and all DNS records attached to each interface. Only records in domains with at least one <a href="{{ path('user_guide_dns') }}#views">public view</a> are included; domains with no views assigned are treated as globally accessible.</td></tr>
+                    <tr><td><code>POST</code></td><td><code>/api/self/dns-challenge</code></td><td>Create a <code>_acme-challenge.*</code> TXT record for ACME DNS-01 validation.</td></tr>
+                    <tr><td><code>DELETE</code></td><td><code>/api/self/dns-challenge</code></td><td>Delete the matching <code>_acme-challenge.*</code> TXT record after validation is complete.</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <p><strong><code>POST /api/self/dns-challenge</code></strong> request body:</p>
+        <pre class="bg-body-secondary rounded p-3 small mb-2"><code>{
+  "fqdn": "web01.example.com",
+  "validation": "&lt;acme-token-value&gt;"
+}</code></pre>
+        <p class="text-muted small"><code>fqdn</code> must match one of the DNS records already assigned to the host's interfaces. For an apex record (<code>@</code>), pass the bare domain name (e.g. <code>example.com</code>). The challenge record is created as <code>_acme-challenge.web01.example.com</code> (or <code>_acme-challenge.example.com</code> for the apex) and linked to the same interface as the source record. The <strong>DELETE</strong> request uses the same body to identify and remove the record.</p>
+
+        <h6 id="api-certbot-plugin" class="mt-3">Certbot plugin (<code>certbot-dns-dashddi</code>)</h6>
+        <p>The recommended approach for certificate automation is the <strong>certbot-dns-dashddi</strong> plugin, which handles challenge creation and cleanup automatically and supports a <code>dashddi-certbot</code> wrapper that discovers the host's FQDNs from DashDDI so you don't have to list them manually.</p>
+
+        <p class="fw-semibold mb-1">Installation</p>
+        <p class="text-muted small mb-1">Certbot and the plugin must share the same Python environment. On Debian/Ubuntu:</p>
+        <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-3"><code>apt install -y python3-venv
+python3 -m venv /opt/certbot
+/opt/certbot/bin/pip install certbot
+/opt/certbot/bin/pip install git+https://github.com/goshencollege/dashddi/#subdirectory=certbot-dns-dashddi
+ln -s /opt/certbot/bin/certbot /usr/local/bin/certbot
+ln -s /opt/certbot/bin/dashddi-certbot /usr/local/bin/dashddi-certbot</code></pre>
+
+        <p class="fw-semibold mb-1">Credentials file</p>
+        <p class="text-muted small mb-1">Create <code>/etc/letsencrypt/dashddi.ini</code> (chmod 600):</p>
+        <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-3"><code>dns_dashddi_url = https://dashddi.example.com
+dns_dashddi_token = &lt;host-scoped-token&gt;</code></pre>
+        <p class="text-muted small">Generate the token from the host detail page in DashDDI: <strong>Hosts → &lt;hostname&gt; → Host API Token → Generate Token</strong>. The token is accepted only from this host's IP addresses.</p>
+
+        <p class="fw-semibold mb-1">Automatic FQDN discovery</p>
+        <p class="text-muted small mb-1">The <code>dashddi-certbot</code> wrapper queries <code>/api/self/host</code> to find all A/AAAA FQDNs for this host and requests a single SAN certificate covering them all:</p>
+        <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-3"><code>dashddi-certbot --credentials /etc/letsencrypt/dashddi.ini</code></pre>
+
+        <p class="fw-semibold mb-1">Manual domain list</p>
+        <p class="text-muted small mb-1">To specify domains explicitly, use certbot directly:</p>
+        <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-3"><code>certbot certonly \
+  --authenticator dns-dashddi \
+  --dns-dashddi-credentials /etc/letsencrypt/dashddi.ini \
+  -d web01.example.com -d app.example.com</code></pre>
+
+        <p class="fw-semibold mb-1">Automatic renewal (systemd timer)</p>
+        <p class="text-muted small mb-1">Create <code>/etc/systemd/system/dashddi-certbot.service</code> and <code>dashddi-certbot.timer</code>:</p>
+        <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-3"><code>[Unit]
+Description=Renew certificates via DashDDI
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/dashddi-certbot --credentials /etc/letsencrypt/dashddi.ini</code></pre>
+        <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-3"><code>[Unit]
+Description=Run dashddi-certbot twice daily
+
+[Timer]
+OnCalendar=*-*-* 03,15:00:00
+RandomizedDelaySec=1h
+Persistent=true
+
+[Install]
+WantedBy=timers.target</code></pre>
+        <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-3"><code>systemctl daemon-reload
+systemctl enable --now dashddi-certbot.timer</code></pre>
+
+        <h6 id="api-ansible" class="mt-4">Ansible role (<code>dashddi_certbot</code>)</h6>
+        <p>An Ansible role is included in the repository at <code>certbot-dns-dashddi/ansible/roles/dashddi_certbot/</code>. It automates the entire setup: generates a host-scoped token via the DashDDI API, installs certbot and the plugin into a virtualenv, writes the credentials file, and deploys a systemd renewal timer.</p>
+
+        <p class="fw-semibold mb-1">Required variables</p>
+        <div class="table-responsive mb-3">
+        <table class="table table-sm table-bordered small mb-0">
+            <thead><tr><th>Variable</th><th>Description</th></tr></thead>
+            <tbody>
+                <tr><td><code>dashddi_url</code></td><td>Base URL of your DashDDI instance</td></tr>
+                <tr><td><code>dashddi_admin_token</code></td><td>General-purpose token with <code>api_hosts_index</code> and <code>api_hosts_token_generate</code> route permissions</td></tr>
+            </tbody>
+        </table>
+        </div>
+
+        <p class="fw-semibold mb-1">Optional variables (with defaults)</p>
+        <div class="table-responsive mb-3">
+        <table class="table table-sm table-bordered small mb-0">
+            <thead><tr><th>Variable</th><th>Default</th><th>Description</th></tr></thead>
+            <tbody>
+                <tr><td><code>dashddi_host_name</code></td><td><code>inventory_hostname</code></td><td>Host name in DashDDI (must match exactly)</td></tr>
+                <tr><td><code>dashddi_credentials_path</code></td><td><code>/etc/letsencrypt/dashddi.ini</code></td><td>Where to write the credentials file</td></tr>
+                <tr><td><code>dashddi_venv_path</code></td><td><code>/opt/certbot</code></td><td>Virtualenv for certbot and the plugin</td></tr>
+                <tr><td><code>dashddi_propagation_seconds</code></td><td><code>30</code></td><td>DNS propagation wait passed to certbot</td></tr>
+                <tr><td><code>dashddi_force_token_regenerate</code></td><td><code>false</code></td><td>Set to <code>true</code> to revoke and replace the existing token</td></tr>
+            </tbody>
+        </table>
+        </div>
+
+        <p class="fw-semibold mb-1">Usage</p>
+        <p class="text-muted small mb-1">Run the included example playbook against your managed hosts. Set credentials in <code>group_vars</code> or pass via vault:</p>
+        <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-2"><code>ansible-playbook -i inventory certbot-dns-dashddi/ansible/certbot.yml \
+  -e dashddi_url=https://dashddi.example.com \
+  -e @vault.yml</code></pre>
+        <p class="text-muted small mb-1">To force token regeneration on a specific host:</p>
+        <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-3"><code>ansible-playbook -i inventory certbot-dns-dashddi/ansible/certbot.yml \
+  -e dashddi_force_token_regenerate=true \
+  --limit web01.example.com</code></pre>
+        <p class="text-muted small">The role is idempotent: if the credentials file already exists and <code>dashddi_force_token_regenerate</code> is false, token generation is skipped. Installation and systemd unit deployment always run.</p>
+
+        <h6 id="api-acme" class="mt-4">Manual hook approach (curl)</h6>
+        <p class="text-muted small">If installing Python packages is not practical, you can drive the same endpoints manually using Certbot's <code>--manual</code> authenticator:</p>
+        <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-2"><code>#!/usr/bin/env bash
+# /etc/letsencrypt/renewal-hooks/deploy/dashddi-auth.sh
+# Set DASHDDI_TOKEN to the host-scoped token value.
+
+DASHDDI_URL="https://dashddi.example.com"
+TOKEN="${DASHDDI_TOKEN:?DASHDDI_TOKEN must be set}"
+
+curl -fsSL -X POST "${DASHDDI_URL}/api/self/dns-challenge" \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d "{\"fqdn\": \"${CERTBOT_DOMAIN}\", \"validation\": \"${CERTBOT_VALIDATION}\"}"
+
+# Wait for DNS propagation, then signal Certbot to continue
+sleep 30</code></pre>
+        <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-3"><code>#!/usr/bin/env bash
+# /etc/letsencrypt/renewal-hooks/clean/dashddi-cleanup.sh
+
+DASHDDI_URL="https://dashddi.example.com"
+TOKEN="${DASHDDI_TOKEN:?DASHDDI_TOKEN must be set}"
+
+curl -fsSL -X DELETE "${DASHDDI_URL}/api/self/dns-challenge" \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d "{\"fqdn\": \"${CERTBOT_DOMAIN}\", \"validation\": \"${CERTBOT_VALIDATION}\"}"</code></pre>
+
+        <p class="mb-0 text-muted small">Full endpoint reference — including request parameters, field descriptions, and response examples — is in the <a href="{{ path('api_docs') }}">API Docs</a>.</p>
     </div>
 </div>
 
@@ -506,6 +656,11 @@ curl -s -X POST https://dashddi.example.com/api/dhcp/lease \
             <a href="#snipeit" class="list-group-item list-group-item-action py-1">Snipe-IT</a>
             <a href="#aruba" class="list-group-item list-group-item-action py-1">Aruba CX</a>
             <a href="#api" class="list-group-item list-group-item-action py-1">REST API</a>
+            <a href="#api-host-token-management" class="list-group-item list-group-item-action py-1 ps-4">↳ Host token management</a>
+            <a href="#api-self" class="list-group-item list-group-item-action py-1 ps-4">↳ Host self-service (/api/self)</a>
+            <a href="#api-certbot-plugin" class="list-group-item list-group-item-action py-1 ps-4">↳ Certbot plugin</a>
+            <a href="#api-ansible" class="list-group-item list-group-item-action py-1 ps-4">↳ Ansible role</a>
+            <a href="#api-acme" class="list-group-item list-group-item-action py-1 ps-4">↳ Manual hook (curl)</a>
         </div>
     </div>
 </div>

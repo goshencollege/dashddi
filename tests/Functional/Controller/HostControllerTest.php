@@ -2,6 +2,7 @@
 
 namespace App\Tests\Functional\Controller;
 
+use App\Entity\ApiToken;
 use App\Entity\Host;
 use App\Entity\NetworkInterface;
 use App\Entity\Subnet;
@@ -99,6 +100,78 @@ class HostControllerTest extends AppWebTestCase
         $this->client->request('GET', '/hosts?' . http_build_query(['q' => 'deleted:!1']));
         $this->assertResponseIsSuccessful();
         $this->assertStringNotContainsString('soft-deleted-host', $this->client->getResponse()->getContent());
+    }
+
+    // -------------------------------------------------------------------------
+    // Host token web routes (HostTokenController)
+    // -------------------------------------------------------------------------
+
+    public function testGenerateTokenViaWebCreatesToken(): void
+    {
+        $host = (new Host())->setName('web-token-host');
+        $this->em->persist($host);
+        $this->em->flush();
+
+        $id = $host->getId();
+        $this->em->clear(); // evict so controller lazy-loads apiToken fresh from DB
+        $crawler = $this->client->request('GET', "/hosts/{$id}");
+        $this->client->submit(
+            $crawler->filter('form[action="/hosts/' . $id . '/token/generate"]')->first()->form()
+        );
+        $this->assertResponseRedirects('/hosts/' . $id);
+
+        $this->em->clear();
+        $found = $this->em->find(Host::class, $id);
+        $this->assertNotNull($found->getApiToken());
+    }
+
+    public function testRegenerateTokenViaWebReplacesExistingToken(): void
+    {
+        $host = (new Host())->setName('web-regen-host');
+        $this->em->persist($host);
+        $existing = new ApiToken();
+        $existing->setName('old token')->setOwnerIdentifier('x')->setTokenHash('oldhash')
+            ->setHost($host)->setAllowedRoutes([])->setAllowedCidrs([]);
+        $this->em->persist($existing);
+        $this->em->flush();
+        $existingId = $existing->getId();
+
+        $id = $host->getId();
+        $this->em->clear(); // evict so the existing token is visible via lazy-load
+        $crawler = $this->client->request('GET', "/hosts/{$id}");
+        $this->client->submit(
+            $crawler->filter('form[action="/hosts/' . $id . '/token/generate"]')->first()->form()
+        );
+        $this->assertResponseRedirects('/hosts/' . $id);
+
+        $this->em->clear();
+        $this->assertNull($this->em->find(ApiToken::class, $existingId));
+        $found = $this->em->find(Host::class, $id);
+        $this->assertNotNull($found->getApiToken());
+        $this->assertNotSame($existingId, $found->getApiToken()->getId());
+    }
+
+    public function testRevokeTokenViaWebDeletesToken(): void
+    {
+        $host = (new Host())->setName('web-revoke-host');
+        $this->em->persist($host);
+        $token = new ApiToken();
+        $token->setName('revoke-me')->setOwnerIdentifier('x')->setTokenHash('hash')
+            ->setHost($host)->setAllowedRoutes([])->setAllowedCidrs([]);
+        $this->em->persist($token);
+        $this->em->flush();
+
+        $id = $host->getId();
+        $this->em->clear(); // evict so the token shows up in the rendered page
+        $crawler = $this->client->request('GET', "/hosts/{$id}");
+        $this->client->submit(
+            $crawler->filter('form[action="/hosts/' . $id . '/token/revoke"]')->form()
+        );
+        $this->assertResponseRedirects('/hosts/' . $id);
+
+        $this->em->clear();
+        $found = $this->em->find(Host::class, $id);
+        $this->assertNull($found->getApiToken());
     }
 
     // -------------------------------------------------------------------------

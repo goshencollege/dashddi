@@ -15,7 +15,11 @@ use Symfony\Component\Routing\RouterInterface;
 
 class ApiTokenType extends AbstractType
 {
-    private const EXCLUDED_ROUTES = [];
+    private const EXCLUDED_ROUTES = [
+        'api_self_host',
+        'api_self_dns_challenge_create',
+        'api_self_dns_challenge_delete',
+    ];
 
     public function __construct(private RouterInterface $router) {}
 

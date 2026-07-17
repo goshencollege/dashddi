@@ -1,6 +1,12 @@
 # certbot-dns-dashddi
 
-A Certbot DNS authenticator plugin that uses the [DashDDI](https://github.com/goshencollege/dashddi) DNS management API to perform DNS-01 challenges. This allows you to obtain certificates from an ACME CA without requiring the server to be publicly accessible.
+A Certbot DNS authenticator plugin that uses the [DashDDI](https://github.com/goshencollege/dashddi) host self-service API to perform DNS-01 challenges. This allows you to obtain and renew certificates automatically on any host managed by DashDDI without exposing broad API credentials.
+
+## Requirements
+
+- The host must be registered in DashDDI with at least one network interface whose IP address matches the machine running Certbot.
+- The host's A/AAAA record must exist in DashDDI and be in a domain with at least one **public** DNS view.
+- A host-scoped token must be generated from the host detail page (see Setup below).
 
 ## Installation
 
@@ -26,9 +32,13 @@ You should see `dns-dashddi` in the list.
 
 ## Setup
 
-### 1. Create a credentials file
+### 1. Generate a host-scoped token
 
-Copy the example credentials file to a secure location:
+In the DashDDI UI, navigate to **Hosts**, open the host record for this machine, and click **Generate Token** in the Host API Token card. Copy the displayed token — it is shown only once.
+
+The token is automatically restricted to requests originating from this host's IP addresses. No route permissions need to be configured.
+
+### 2. Create a credentials file
 
 ```bash
 cp dashddi.ini.example /etc/letsencrypt/dashddi.ini
@@ -38,20 +48,9 @@ chmod 600 /etc/letsencrypt/dashddi.ini
 Edit `/etc/letsencrypt/dashddi.ini`:
 
 ```ini
-dns_dashddi_url = https://dashddi.domain.com
-dns_dashddi_token = your-api-token-here
-
-# Optional: comma-separated DNS view IDs to add the challenge record to
-# dns_dashddi_view_ids = 1
+dns_dashddi_url = https://dashddi.example.com
+dns_dashddi_token = your-host-scoped-token-here
 ```
-
-### 2. Generate an API token
-
-In the DashDDI UI, go to **My Tokens** and create a new token. The token must have the following routes allowed:
-
-- `api_domains_index`
-- `api_domain_records_create`
-- `api_domain_records_delete`
 
 ### 3. Request a certificate
 
@@ -59,7 +58,16 @@ In the DashDDI UI, go to **My Tokens** and create a new token. The token must ha
 certbot certonly \
   --authenticator dns-dashddi \
   --dns-dashddi-credentials /etc/letsencrypt/dashddi.ini \
-  -d myhost.domain.com
+  -d myhost.example.com
+```
+
+For wildcard certificates:
+
+```bash
+certbot certonly \
+  --authenticator dns-dashddi \
+  --dns-dashddi-credentials /etc/letsencrypt/dashddi.ini \
+  -d '*.example.com'
 ```
 
 ## Configuration options
@@ -72,29 +80,85 @@ certbot certonly \
 ## How it works
 
 1. Certbot asks the plugin to prove control of a domain by placing a TXT record at `_acme-challenge.<domain>`.
-2. The plugin fetches all domains from the DashDDI API and finds the longest-suffix match (so `_acme-challenge.myhost.domain.com` matches domain `myhost.domain.com` in preference to `domain.com` if both exist).
-3. It creates a TXT record with a TTL of 60 seconds via `POST /api/domain-records`.
-4. After the CA validates the challenge, the plugin deletes the record via `DELETE /api/domain-records/{id}`.
+2. The plugin strips the `_acme-challenge.` prefix to recover the source FQDN (e.g. `myhost.example.com`) and calls `POST /api/self/dns-challenge` with the FQDN and validation token.
+3. DashDDI looks up the matching DNS record on the host, creates the `_acme-challenge.*` TXT record, and assigns it to all views the domain is part of — ensuring Let's Encrypt can reach it via the public view even if the host's A record is internal-only.
+4. After the CA validates the challenge, the plugin calls `DELETE /api/self/dns-challenge` with the same FQDN and token to remove the record.
 
-## DNS views
+## Automatic FQDN discovery with `dashddi-certbot`
 
-If your DashDDI instance uses DNS views, add the IDs of the views that should serve the challenge record to the credentials file:
+The package installs a `dashddi-certbot` helper that queries `GET /api/self/host` to discover all A/AAAA FQDNs registered to this host in DashDDI, then runs `certbot certonly` for all of them in a single SAN certificate request.
 
-```ini
-dns_dashddi_view_ids = 1,2
+```bash
+dashddi-certbot --credentials /etc/letsencrypt/dashddi.ini
 ```
 
-If this option is omitted, the record is created with no view association.
+Extra arguments after `--` are passed through to certbot:
+
+```bash
+dashddi-certbot --credentials /etc/letsencrypt/dashddi.ini \
+  -- --dry-run --dns-dashddi-propagation-seconds 60
+```
+
+This is the recommended way to set up automatic renewal — add it to a systemd timer or cron job and it will always request certs for exactly the FQDNs DashDDI knows about for this host. Only A and AAAA record FQDNs in domains with a public view are included.
+
+## Ansible role
+
+An Ansible role is included at `ansible/roles/dashddi_certbot/` that automates the full setup: token generation, plugin installation, credentials file, and systemd renewal timer.
+
+An example playbook is at `ansible/certbot.yml`.
+
+### Role variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `dashddi_url` | *(required)* | Base URL of your DashDDI instance |
+| `dashddi_admin_token` | *(required)* | General-purpose token with `api_hosts_index` and `api_hosts_token_generate` route permissions |
+| `dashddi_host_name` | `{{ inventory_hostname }}` | Name of the host in DashDDI (must match exactly) |
+| `dashddi_credentials_path` | `/etc/letsencrypt/dashddi.ini` | Where to write the credentials file |
+| `dashddi_venv_path` | `/opt/certbot` | Virtualenv path for certbot and the plugin |
+| `dashddi_plugin_source` | `git+https://github.com/goshencollege/dashddi/…` | pip-installable source for the plugin |
+| `dashddi_propagation_seconds` | `30` | DNS propagation wait passed to certbot |
+| `dashddi_force_token_regenerate` | `false` | Set to `true` to revoke and replace the existing host token |
+
+### Usage
+
+Install the role's dependencies (if any) and run the example playbook against your target hosts:
+
+```bash
+ansible-playbook -i inventory ansible/certbot.yml
+```
+
+Set `dashddi_url` and `dashddi_admin_token` in your inventory `group_vars` or `host_vars`, or pass them on the command line:
+
+```bash
+ansible-playbook -i inventory ansible/certbot.yml \
+  -e dashddi_url=https://dashddi.example.com \
+  -e @vault.yml          # encrypted file containing dashddi_admin_token
+```
+
+To force token regeneration on a host (revokes the existing token and writes a new credentials file):
+
+```bash
+ansible-playbook -i inventory ansible/certbot.yml \
+  -e dashddi_force_token_regenerate=true \
+  --limit web01.example.com
+```
+
+The role is idempotent: if the credentials file already exists and `dashddi_force_token_regenerate` is false, token generation and the credentials file write are skipped. Installation and systemd unit deployment always run.
 
 ## Troubleshooting
 
-**`Could not find a matching domain in DashDDI for '_acme-challenge.example.com'`**
+**`401 Unauthorized`**
 
-The domain being certified does not exist in DashDDI. Add it under the Domains section of the UI before running Certbot.
+The token is invalid, or the request is coming from an IP address not assigned to the host in DashDDI. Verify the token matches what was generated on the host detail page and that the host's interfaces include the machine's current IP.
 
-**`Token not permitted for this endpoint`**
+**`403 Forbidden` — "FQDN does not belong to this host"**
 
-The API token is missing one of the required route permissions. Edit the token in the DashDDI UI and add the three routes listed in the Setup section above.
+The FQDN being certified does not have a DNS record linked to this host's interfaces in DashDDI. Add an A or AAAA record for the hostname under the correct domain before running Certbot.
+
+**`422 Unprocessable Entity` — "no public views"**
+
+The domain containing the hostname has DNS views, but none are marked as public. In DashDDI, go to **DNS → Views**, edit the view that is reachable from the internet, and enable the **Public view** checkbox.
 
 **Validation fails despite record being created**
 
@@ -105,5 +169,14 @@ certbot certonly \
   --authenticator dns-dashddi \
   --dns-dashddi-credentials /etc/letsencrypt/dashddi.ini \
   --dns-dashddi-propagation-seconds 60 \
-  -d myhost.domain.com
+  -d myhost.example.com
 ```
+
+## Upgrading from v1
+
+Version 2.0 replaces the general-purpose token with a host-scoped token and drops the `dns_dashddi_view_ids` config option. To upgrade:
+
+1. Generate a host-scoped token from the host detail page in DashDDI.
+2. Replace `dns_dashddi_token` in your credentials file with the new token.
+3. Remove the `dns_dashddi_view_ids` line if present — view assignment is now automatic.
+4. Reinstall the plugin: `/opt/certbot/bin/pip install --upgrade git+https://github.com/goshencollege/dashddi/#subdirectory=certbot-dns-dashddi`

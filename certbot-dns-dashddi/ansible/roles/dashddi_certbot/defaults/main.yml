@@ -1,0 +1,23 @@
+---
+# Required — no defaults
+# dashddi_url: "https://dashddi.example.com"
+# dashddi_admin_token: "your-general-purpose-admin-token"
+
+# Host name to look up in DashDDI. Defaults to the Ansible inventory hostname.
+dashddi_host_name: "{{ inventory_hostname }}"
+
+# Path where the credentials file will be written on the target host.
+dashddi_credentials_path: "/etc/letsencrypt/dashddi.ini"
+
+# Certbot virtualenv location.
+dashddi_venv_path: "/opt/certbot"
+
+# Plugin source — pin to a tag or commit for reproducible deploys.
+dashddi_plugin_source: "git+https://github.com/goshencollege/dashddi/#subdirectory=certbot-dns-dashddi"
+
+# DNS propagation wait time passed to certbot.
+dashddi_propagation_seconds: 30
+
+# Set to true to force token regeneration even when a credentials file
+# already exists. The existing token is immediately revoked.
+dashddi_force_token_regenerate: false

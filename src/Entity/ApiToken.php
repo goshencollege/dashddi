@@ -5,6 +5,7 @@ namespace App\Entity;
 use App\Repository\ApiTokenRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Validator\Constraints as Assert;
+use App\Entity\Host;
 
 #[ORM\Entity(repositoryClass: ApiTokenRepository::class)]
 #[ORM\Table(name: 'api_token')]
@@ -27,11 +28,17 @@ class ApiToken
     private string $ownerIdentifier = '';
 
     #[ORM\Column(type: 'json')]
-    #[Assert\Count(min: 1, minMessage: 'Select at least one endpoint.')]
+    #[Assert\When(
+        expression: '!this.isHostScoped()',
+        constraints: [new Assert\Count(min: 1, minMessage: 'Select at least one endpoint.')],
+    )]
     private array $allowedRoutes = [];
 
     #[ORM\Column(type: 'json')]
-    #[Assert\Count(min: 1, minMessage: 'At least one IP address or CIDR range is required.')]
+    #[Assert\When(
+        expression: '!this.isHostScoped()',
+        constraints: [new Assert\Count(min: 1, minMessage: 'At least one IP address or CIDR range is required.')],
+    )]
     #[Assert\All([
         new Assert\Regex(
             pattern: '/^(\d{1,3}\.){3}\d{1,3}(\/\d{1,2})?$|^[0-9a-fA-F:]+:+[0-9a-fA-F]*(\/\d{1,3})?$/',
@@ -46,6 +53,10 @@ class ApiToken
 
     #[ORM\Column(nullable: true)]
     private ?\DateTimeImmutable $lastUsedAt = null;
+
+    #[ORM\OneToOne(targetEntity: Host::class, inversedBy: 'apiToken')]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?Host $host = null;
 
     #[ORM\Column]
     private \DateTimeImmutable $createdAt;
@@ -80,6 +91,11 @@ class ApiToken
     public function setLastUsedAt(?\DateTimeImmutable $dt): static { $this->lastUsedAt = $dt; return $this; }
 
     public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
+
+    public function getHost(): ?Host { return $this->host; }
+    public function setHost(?Host $host): static { $this->host = $host; return $this; }
+
+    public function isHostScoped(): bool { return $this->host !== null; }
 
     public function isExpired(): bool
     {

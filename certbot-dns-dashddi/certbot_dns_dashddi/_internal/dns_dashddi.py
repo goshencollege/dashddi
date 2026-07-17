@@ -1,4 +1,4 @@
-"""Certbot DNS authenticator plugin for dashddi."""
+"""Certbot DNS authenticator plugin for DashDDI (host-scoped token)."""
 import logging
 from typing import Any, Callable
 
@@ -8,118 +8,90 @@ from certbot.plugins import dns_common
 
 logger = logging.getLogger(__name__)
 
-ACME_RECORD_TTL = 60
-
 
 class Authenticator(dns_common.DNSAuthenticator):
-    """DNS Authenticator for dashddi."""
+    """DNS Authenticator for DashDDI using a host-scoped token."""
 
-    description = "Obtain certificates using a DNS TXT record via the dashddi DNS management API."
+    description = (
+        "Obtain certificates using a DNS TXT record via the DashDDI "
+        "host self-service API. Requires a host-scoped token generated "
+        "from the host detail page in DashDDI."
+    )
 
     def __init__(self, config: Any, name: str) -> None:
         super().__init__(config, name)
-        self._record_ids: dict[str, int] = {}
 
     @classmethod
     def add_parser_arguments(
         cls, add: Callable[..., None], default_propagation_seconds: int = 30
     ) -> None:
         super().add_parser_arguments(add, default_propagation_seconds)
-        add("credentials", help="Path to the dashddi credentials INI file.")
+        add("credentials", help="Path to the DashDDI credentials INI file.")
 
     def more_info(self) -> str:
-        return "This plugin uses the dashddi API to add a TXT record for DNS-01 validation."
+        return (
+            "This plugin uses the DashDDI host self-service API (/api/self) "
+            "to create and remove ACME DNS-01 challenge TXT records. "
+            "The host-scoped token must be generated on the host being certified."
+        )
 
     def _setup_credentials(self) -> None:
         self.credentials = self._configure_credentials(
             "credentials",
-            "dashddi credentials INI file",
+            "DashDDI credentials INI file",
             {
-                "url": "Base URL of the dashddi instance (e.g. https://dashddi.goshen.edu)",
-                "token": "API bearer token",
+                "url": "Base URL of the DashDDI instance (e.g. https://dashddi.example.com)",
+                "token": "Host-scoped API token (generated from the host detail page in DashDDI)",
             },
         )
 
     def _perform(self, domain: str, validation_name: str, validation: str) -> None:
+        fqdn = self._fqdn_from_validation_name(validation_name)
         url = self.credentials.conf("url").rstrip("/")
         token = self.credentials.conf("token")
-        view_ids_raw = self.credentials.conf("view_ids") or ""
-        view_ids = [int(v.strip()) for v in view_ids_raw.split(",") if v.strip()]
-
-        domain_id, hostname = self._find_domain(url, token, validation_name)
 
         resp = requests.post(
-            f"{url}/api/domain-records",
+            f"{url}/api/self/dns-challenge",
             headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-            json={
-                "domain_id": domain_id,
-                "hostname": hostname,
-                "type": "TXT",
-                "value": validation,
-                "ttl": ACME_RECORD_TTL,
-                "view_ids": view_ids,
-            },
+            json={"fqdn": fqdn, "validation": validation},
             timeout=30,
         )
         if resp.status_code != 201:
             raise errors.PluginError(
-                f"Failed to create TXT record: {resp.status_code} {resp.text}"
+                f"Failed to create challenge record for {fqdn}: "
+                f"{resp.status_code} {resp.text}"
             )
 
-        self._record_ids[validation_name] = resp.json()["id"]
-        logger.debug(
-            "Created TXT record id=%s for %s", self._record_ids[validation_name], validation_name
-        )
+        logger.debug("Created challenge TXT record id=%s for %s", resp.json().get("id"), fqdn)
 
     def _cleanup(self, domain: str, validation_name: str, validation: str) -> None:
-        record_id = self._record_ids.pop(validation_name, None)
-        if record_id is None:
-            logger.warning("No record ID found for %s, skipping cleanup", validation_name)
-            return
-
+        fqdn = self._fqdn_from_validation_name(validation_name)
         url = self.credentials.conf("url").rstrip("/")
         token = self.credentials.conf("token")
 
         resp = requests.delete(
-            f"{url}/api/domain-records/{record_id}",
-            headers={"Authorization": f"Bearer {token}"},
+            f"{url}/api/self/dns-challenge",
+            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+            json={"fqdn": fqdn, "validation": validation},
             timeout=30,
         )
         if resp.status_code not in (204, 404):
             raise errors.PluginError(
-                f"Failed to delete TXT record {record_id}: {resp.status_code} {resp.text}"
+                f"Failed to delete challenge record for {fqdn}: "
+                f"{resp.status_code} {resp.text}"
             )
 
-        logger.debug("Deleted TXT record id=%s", record_id)
+        logger.debug("Deleted challenge TXT record for %s", fqdn)
 
-    def _find_domain(self, url: str, token: str, validation_name: str) -> tuple[int, str]:
-        """Find the best-matching domain in dashddi for the given validation name.
+    @staticmethod
+    def _fqdn_from_validation_name(validation_name: str) -> str:
+        """Derive the source FQDN from the _acme-challenge.* validation name.
 
-        Tries progressively shorter suffixes until a match is found, so
-        _acme-challenge.sub.example.com will match sub.example.com before example.com.
-
-        Returns (domain_id, hostname) where hostname is the label(s) to prepend.
+        Certbot passes _acme-challenge.<hostname>; the DashDDI self-service API
+        expects the source A/AAAA record's FQDN instead.
         """
-        resp = requests.get(
-            f"{url}/api/domains",
-            headers={"Authorization": f"Bearer {token}"},
-            timeout=30,
-        )
-        if resp.status_code != 200:
-            raise errors.PluginError(
-                f"Failed to fetch domains from dashddi: {resp.status_code} {resp.text}"
-            )
-
-        domains = {d["name"]: d["id"] for d in resp.json()}
-
-        parts = validation_name.rstrip(".").split(".")
-        for i in range(1, len(parts)):
-            candidate = ".".join(parts[i:])
-            if candidate in domains:
-                hostname = ".".join(parts[:i])
-                return domains[candidate], hostname
-
-        raise errors.PluginError(
-            f"Could not find a matching domain in dashddi for '{validation_name}'. "
-            f"Available domains: {', '.join(sorted(domains.keys()))}"
-        )
+        name = validation_name.rstrip(".")
+        prefix = "_acme-challenge."
+        if name.startswith(prefix):
+            return name[len(prefix):]
+        return name

@@ -408,10 +408,17 @@ class HostController extends AbstractController
     }
 
     #[Route('/{id}', name: 'host_show', methods: ['GET'], requirements: ['id' => '\d+'])]
-    public function show(Host $host): Response
+    public function show(Host $host, Request $request): Response
     {
+        $sessionKey = '_host_token_raw_' . $host->getId();
+        $newToken   = $request->getSession()->get($sessionKey);
+        if ($newToken) {
+            $request->getSession()->remove($sessionKey);
+        }
+
         return $this->render('host/show.html.twig', [
-            'host' => $host,
+            'host'     => $host,
+            'newToken' => $newToken,
         ]);
     }
 
