@@ -1,17 +1,12 @@
-# dashddi API credentials for Certbot DNS-01 validation
-# Copy this file to a secure location (e.g. /etc/letsencrypt/dashddi.ini)
-# and set permissions: chmod 600 /etc/letsencrypt/dashddi.ini
+# DashDDI credentials for Certbot DNS-01 validation
+# Copy this file to a secure location and restrict permissions:
+#   cp dashddi.ini.example /etc/letsencrypt/dashddi.ini
+#   chmod 600 /etc/letsencrypt/dashddi.ini
 
-# Base URL of your dashddi instance (no trailing slash)
-dns_dashddi_url = https://dashddi.goshen.edu
+# Base URL of your DashDDI instance (no trailing slash)
+dns_dashddi_url = https://dashddi.example.com
 
-# API bearer token — generate one in the dashddi UI under My Tokens.
-# The token must have permission for the following routes:
-#   api_domains_index
-#   api_domain_records_create
-#   api_domain_records_delete
-dns_dashddi_token = your-api-token-here
-
-# Optional: comma-separated DNS view IDs to add the challenge record to.
-# If omitted the record is created with no view association.
-# dns_dashddi_view_ids = 1
+# Host-scoped API token — generate one from the host detail page in DashDDI
+# (Hosts → select host → Host API Token → Generate Token).
+# This token is tied to this host and is only accepted from this host's IP addresses.
+dns_dashddi_token = your-host-scoped-token-here
