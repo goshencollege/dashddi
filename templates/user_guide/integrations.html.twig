@@ -641,6 +641,54 @@ curl -fsSL -X DELETE "${DASHDDI_URL}/api/self/dns-challenge" \
   -d "{\"fqdn\": \"${CERTBOT_DOMAIN}\", \"validation\": \"${CERTBOT_VALIDATION}\"}"</code></pre>
 
         <p class="mb-0 text-muted small">Full endpoint reference — including request parameters, field descriptions, and response examples — is in the <a href="{{ path('api_docs') }}">API Docs</a>.</p>
+
+        <h5 id="proxmox-acme" class="mt-4">Proxmox VE ACME certificates</h5>
+        <p>Proxmox VE can use DashDDI to perform DNS-01 challenges for its built-in ACME certificate management. The plugin uses the same host-scoped token and <code>/api/self/dns-challenge</code> endpoints as the certbot plugin.</p>
+
+        <h6 id="proxmox-acme-install" class="mt-3">Installation</h6>
+        <p class="text-muted small mb-1">Run on each Proxmox node. The script and schema edit are local per-node — they are not cluster-replicated.</p>
+        <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-3"><code># 1. Copy the plugin script
+cp proxmox-acme-dashddi/dns_dashddi.sh /usr/share/proxmox-acme/dnsapi/
+chmod +x /usr/share/proxmox-acme/dnsapi/dns_dashddi.sh
+
+# 2. Add the dashddi entry to the schema (see dns-challenge-schema.snippet.json)
+#    Then validate before restarting:
+python3 -m json.tool /usr/share/proxmox-acme/dns-challenge-schema.json > /dev/null && echo OK
+
+# 3. Restart Proxmox services to pick up the schema change
+systemctl restart pveproxy pvedaemon</code></pre>
+
+        <p class="fw-semibold mb-1">Schema entry</p>
+        <p class="text-muted small mb-1">Add this block inside the top-level object in <code>/usr/share/proxmox-acme/dns-challenge-schema.json</code>. A JSON syntax error here breaks ACME plugin listing in the UI until corrected.</p>
+        <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-3"><code>"dashddi": {
+  "fields": {
+    "DASHDDI_API_URL": {
+      "description": "DashDDI base URL (e.g. https://dashddi.example.com)",
+      "type": "string"
+    },
+    "DASHDDI_API_TOKEN": {
+      "description": "Host-scoped API token (from the host detail page in DashDDI)",
+      "type": "string"
+    },
+    "DASHDDI_CA_CERT": {
+      "description": "Optional: PEM CA bundle path, or 'false' to skip SSL verification",
+      "type": "string",
+      "optional": 1
+    }
+  }
+}</code></pre>
+
+        <h6 id="proxmox-acme-configure" class="mt-3">Configuration</h6>
+        <p class="text-muted small mb-1">Generate a host-scoped token from the host detail page in DashDDI: <strong>Hosts → &lt;node name&gt; → Host API Token → Generate Token</strong>. Then in Proxmox:</p>
+        <ol class="text-muted small mb-3">
+            <li>Go to <strong>Datacenter → ACME → Challenge Plugins → Add</strong></li>
+            <li>Set Plugin Type to <strong>DNS</strong> and select <strong>dashddi</strong> from the dropdown</li>
+            <li>Enter <code>DASHDDI_API_URL</code> and <code>DASHDDI_API_TOKEN</code></li>
+            <li>If DashDDI uses a self-signed or internal CA cert, set <code>DASHDDI_CA_CERT</code> to the PEM bundle path, or <code>false</code> to skip verification</li>
+            <li>Go to <strong>Node → System → Certificates → ACME</strong>, add a domain entry using the <strong>dashddi</strong> plugin, and click <strong>Order Certificates Now</strong></li>
+        </ol>
+
+        <p class="text-muted small mb-0"><strong>Note:</strong> ACME plugin <em>configuration</em> is stored in <code>/etc/pve/priv/acme/plugins.cfg</code> and cluster-replicated automatically. The script file and schema edit are local to each node and must be reapplied if <code>libproxmox-acme-plugins</code> is ever purged, or when provisioning a new node.</p>
     </div>
 </div>
 
@@ -665,6 +713,9 @@ curl -fsSL -X DELETE "${DASHDDI_URL}/api/self/dns-challenge" \
             <a href="#api-certbot-plugin" class="list-group-item list-group-item-action py-1 ps-4">↳ Certbot plugin</a>
             <a href="#api-ansible" class="list-group-item list-group-item-action py-1 ps-4">↳ Ansible role</a>
             <a href="#api-acme" class="list-group-item list-group-item-action py-1 ps-4">↳ Manual hook (curl)</a>
+            <a href="#proxmox-acme" class="list-group-item list-group-item-action py-1">Proxmox VE ACME</a>
+            <a href="#proxmox-acme-install" class="list-group-item list-group-item-action py-1 ps-4">↳ Installation</a>
+            <a href="#proxmox-acme-configure" class="list-group-item list-group-item-action py-1 ps-4">↳ Configuration</a>
         </div>
     </div>
 </div>

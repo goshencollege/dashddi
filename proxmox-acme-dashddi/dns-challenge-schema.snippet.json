@@ -1,0 +1,19 @@
+{
+  "dashddi": {
+    "fields": {
+      "DASHDDI_API_URL": {
+        "description": "DashDDI base URL (e.g. https://dashddi.example.com)",
+        "type": "string"
+      },
+      "DASHDDI_API_TOKEN": {
+        "description": "Host-scoped API token (generated from the host detail page in DashDDI)",
+        "type": "string"
+      },
+      "DASHDDI_CA_CERT": {
+        "description": "Optional: path to a PEM CA bundle for self-signed/internal certs, or 'false' to disable SSL verification",
+        "type": "string",
+        "optional": 1
+      }
+    }
+  }
+}
