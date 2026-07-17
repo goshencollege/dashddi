@@ -31,57 +31,40 @@ In the DashDDI UI, navigate to **Hosts**, open the record for this Proxmox node,
 
 The token is automatically restricted to requests from this host's IP addresses and can only access the `/api/self/*` endpoints.
 
-### 2. Install the plugin script
+### 2. Install the plugin script and register the schema entry
 
-Run on each Proxmox node that will use this plugin:
+Run `install.sh` as root on each Proxmox node. It copies the plugin script, merges the schema snippet (backing up the original first), validates the result, and restarts the necessary services:
 
 ```bash
+sudo bash install.sh
+```
+
+To skip the automatic service restart (e.g. if you want to restart manually during a maintenance window):
+
+```bash
+sudo bash install.sh --no-restart
+systemctl restart pveproxy pvedaemon
+```
+
+The script is idempotent — running it again updates the plugin in place.
+
+<details>
+<summary>Manual installation (without the script)</summary>
+
+```bash
+# Copy the plugin script
 cp dns_dashddi.sh /usr/share/proxmox-acme/dnsapi/
 chmod +x /usr/share/proxmox-acme/dnsapi/dns_dashddi.sh
 ```
 
-### 3. Register the plugin in Proxmox's schema
-
-Add the `dashddi` entry from `dns-challenge-schema.snippet.json` into the top-level object in `/usr/share/proxmox-acme/dns-challenge-schema.json`.
-
-> **Warning:** A JSON syntax error in this file breaks ACME plugin listing entirely in the Proxmox UI and API until corrected. Validate after editing:
->
-> ```bash
-> python3 -m json.tool /usr/share/proxmox-acme/dns-challenge-schema.json > /dev/null && echo OK
-> ```
-
-The schema file is a single JSON object. Add the `dashddi` key alongside the other providers:
-
-```json
-{
-  "acmedns": { ... },
-  "acmeproxy": { ... },
-  "dashddi": {
-    "fields": {
-      "DASHDDI_API_URL": {
-        "description": "DashDDI base URL (e.g. https://dashddi.example.com)",
-        "type": "string"
-      },
-      "DASHDDI_API_TOKEN": {
-        "description": "Host-scoped API token (generated from the host detail page in DashDDI)",
-        "type": "string"
-      },
-      "DASHDDI_CA_CERT": {
-        "description": "Optional: path to a PEM CA bundle for self-signed/internal certs, or 'false' to disable SSL verification",
-        "type": "string",
-        "optional": 1
-      }
-    }
-  },
-  ...
-}
-```
-
-### 4. Restart Proxmox services
+Add the `dashddi` entry from `dns-challenge-schema.snippet.json` into the top-level object in `/usr/share/proxmox-acme/dns-challenge-schema.json`. **A JSON syntax error in this file breaks ACME plugin listing entirely until fixed.** Validate after editing:
 
 ```bash
+python3 -m json.tool /usr/share/proxmox-acme/dns-challenge-schema.json > /dev/null && echo OK
 systemctl restart pveproxy pvedaemon
 ```
+
+</details>
 
 ### 5. Configure the plugin in the Proxmox UI
 
