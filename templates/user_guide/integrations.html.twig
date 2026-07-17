@@ -535,7 +535,11 @@ ln -s /opt/certbot/bin/dashddi-certbot /usr/local/bin/dashddi-certbot</code></pr
         <p class="fw-semibold mb-1">Credentials file</p>
         <p class="text-muted small mb-1">Create <code>/etc/letsencrypt/dashddi.ini</code> (chmod 600):</p>
         <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-3"><code>dns_dashddi_url = https://dashddi.example.com
-dns_dashddi_token = &lt;host-scoped-token&gt;</code></pre>
+dns_dashddi_token = &lt;host-scoped-token&gt;
+
+# Optional — only needed if DashDDI uses a self-signed or internal CA cert:
+#   dns_dashddi_ca_cert = false                       # disable SSL verification (dev only)
+#   dns_dashddi_ca_cert = /etc/ssl/certs/internal.pem # custom CA bundle</code></pre>
         <p class="text-muted small">Generate the token from the host detail page in DashDDI: <strong>Hosts → &lt;hostname&gt; → Host API Token → Generate Token</strong>. The token is accepted only from this host's IP addresses.</p>
 
         <p class="fw-semibold mb-1">Automatic FQDN discovery</p>
