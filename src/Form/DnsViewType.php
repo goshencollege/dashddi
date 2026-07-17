@@ -4,6 +4,7 @@ namespace App\Form;
 
 use App\Entity\DnsView;
 use Symfony\Component\Form\AbstractType;
+use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
 use Symfony\Component\Form\Extension\Core\Type\CollectionType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
@@ -31,6 +32,11 @@ class DnsViewType extends AbstractType
             ->add('description', TextareaType::class, [
                 'required' => false,
                 'attr'     => ['rows' => 3],
+            ])
+            ->add('isPublic', CheckboxType::class, [
+                'label'    => 'Public view',
+                'required' => false,
+                'help'     => 'Mark this view as reachable from the public internet. Only hostnames in domains with at least one public view appear in the ACME self-service endpoint.',
             ])
             ->add('matchClients',   CollectionType::class, $aclEntry)
             ->add('allowQuery',     CollectionType::class, $aclEntry)

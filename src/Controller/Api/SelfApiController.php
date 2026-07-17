@@ -3,6 +3,7 @@
 namespace App\Controller\Api;
 
 use App\Entity\ApiToken;
+use App\Entity\Domain;
 use App\Entity\DomainRecord;
 use App\Entity\Host;
 use App\Entity\NetworkInterface;
@@ -57,6 +58,13 @@ class SelfApiController extends AbstractController
 
         [$sourceRecord, $interface] = $match;
 
+        if (!$this->domainHasPublicView($sourceRecord->getDomain())) {
+            return $this->json(
+                ['error' => 'The domain for this hostname has no public views — ACME validation from the internet is not possible.'],
+                Response::HTTP_UNPROCESSABLE_ENTITY
+            );
+        }
+
         $challengeHostname = $sourceRecord->getHostname() === '@'
             ? '_acme-challenge'
             : '_acme-challenge.' . $sourceRecord->getHostname();
@@ -67,7 +75,10 @@ class SelfApiController extends AbstractController
         $record->setValue(TxtRecordValueValidator::normalizeTxtValue($validation));
         $record->setDomain($sourceRecord->getDomain());
         $record->setNetworkInterface($interface);
-        foreach ($sourceRecord->getViews() as $view) {
+        // Assign all domain views so the record appears in every zone file (including the
+        // public/external one that Let's Encrypt queries), regardless of which views the
+        // source A record itself is restricted to.
+        foreach ($sourceRecord->getDomain()->getViews() as $view) {
             $record->addView($view);
         }
 
@@ -165,6 +176,24 @@ class SelfApiController extends AbstractController
         return null;
     }
 
+    /**
+     * A domain is publicly reachable if it has no view restrictions, or if at least
+     * one of its views is marked as public. Used to filter the hostname list so ACME
+     * clients only see names they can realistically certify from the internet.
+     */
+    private function domainHasPublicView(Domain $domain): bool
+    {
+        if ($domain->getViews()->isEmpty()) {
+            return true; // no view restriction → globally accessible
+        }
+        foreach ($domain->getViews() as $view) {
+            if ($view->isPublic()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private function serializeHost(Host $host): array
     {
         $interfaces = [];
@@ -174,13 +203,17 @@ class SelfApiController extends AbstractController
             }
             $records = [];
             foreach ($iface->getDomainRecords() as $record) {
+                $domain = $record->getDomain();
+                if ($domain === null || !$this->domainHasPublicView($domain)) {
+                    continue;
+                }
                 $records[] = [
                     'id'        => $record->getId(),
                     'hostname'  => $record->getHostname(),
                     'fqdn'      => $record->getFullyQualifiedHostname(),
                     'type'      => $record->getType()->value,
                     'value'     => $record->getValue(),
-                    'domain_id' => $record->getDomain()?->getId(),
+                    'domain_id' => $domain->getId(),
                 ];
             }
             $interfaces[] = [

@@ -27,6 +27,7 @@
                     <tr>
                         <th>Name</th>
                         <th>Description</th>
+                        <th>Public</th>
                         <th class="text-end">Actions</th>
                     </tr>
                 </thead>
@@ -35,6 +36,13 @@
                         <tr>
                             <td class="fw-semibold">{{ view.name }}</td>
                             <td class="text-muted">{{ view.description ?: '—' }}</td>
+                            <td>
+                                {% if view.isPublic %}
+                                    <i class="bi bi-globe text-success" title="Public view"></i>
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
                             <td class="text-end">
                                 <a href="{{ path('dns_view_edit', {id: view.id}) }}" class="btn btn-sm btn-outline-secondary me-1">
                                     <i class="bi bi-pencil"></i>

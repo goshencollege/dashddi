@@ -144,7 +144,7 @@ class SelfApiControllerTest extends AppWebTestCase
         $domain = (new Domain())->setName('acme-test.example.com');
         $this->em->persist($domain);
 
-        $view = (new DnsView())->setName('external');
+        $view = (new DnsView())->setName('external')->setIsPublic(true);
         $this->em->persist($view);
         $domain->addView($view); // view must be on the domain for the validator to allow it
         $this->em->flush();
@@ -236,6 +236,102 @@ class SelfApiControllerTest extends AppWebTestCase
             'validation' => 'DEL_TOKEN',
         ]);
         $this->assertSame(204, $this->tokenClient->getResponse()->getStatusCode());
+    }
+
+    // ── Public-view filtering ─────────────────────────────────────────────────
+
+    public function testHostEndpointExcludesInternalOnlyDomainRecords(): void
+    {
+        // Domain with a view that is NOT marked public → records must be excluded
+        $internalView = (new DnsView())->setName('internal-only')->setIsPublic(false);
+        $this->em->persist($internalView);
+
+        $internalDomain = (new Domain())->setName('internal.example.com');
+        $internalDomain->addView($internalView);
+        $this->em->persist($internalDomain);
+
+        // Domain with no views → no restriction, should be included
+        $publicDomain = (new Domain())->setName('public.example.com');
+        $this->em->persist($publicDomain);
+
+        [$host, $iface] = $this->makeHostWithIp('filter-host'); // 127.0.0.1
+        $raw = bin2hex(random_bytes(32));
+        $this->makeHostToken($host, $raw);
+        $this->makeDomainRecord($iface, $internalDomain, 'srv', RecordType::A, '127.0.0.1');
+        $this->makeDomainRecord($iface, $publicDomain, 'srv', RecordType::A, '127.0.0.1');
+
+        $data = $this->tokenRequest('GET', '/api/self/host', $raw);
+
+        $this->assertSame(200, $this->tokenClient->getResponse()->getStatusCode());
+        $fqdns = array_column($data['interfaces'][0]['records'], 'fqdn');
+        $this->assertContains('srv.public.example.com', $fqdns);
+        $this->assertNotContains('srv.internal.example.com', $fqdns);
+    }
+
+    public function testCreateChallengeRejectsInternalOnlyDomain(): void
+    {
+        $internalView = (new DnsView())->setName('int-only')->setIsPublic(false);
+        $this->em->persist($internalView);
+
+        $domain = (new Domain())->setName('int.example.com');
+        $domain->addView($internalView);
+        $this->em->persist($domain);
+        $this->em->flush();
+
+        [$host, $iface] = $this->makeHostWithIp('int-host'); // 127.0.0.1
+        $raw = bin2hex(random_bytes(32));
+        $this->makeHostToken($host, $raw);
+        $this->makeDomainRecord($iface, $domain, 'box', RecordType::A, '127.0.0.1');
+
+        $data = $this->tokenRequest('POST', '/api/self/dns-challenge', $raw, [
+            'fqdn'       => 'box.int.example.com',
+            'validation' => 'TOKEN',
+        ]);
+
+        $this->assertSame(422, $this->tokenClient->getResponse()->getStatusCode());
+        $this->assertStringContainsString('no public views', $data['error']);
+    }
+
+    public function testChallengeTxtRecordGetsAllDomainViews(): void
+    {
+        // Domain with two views: one internal (not public), one external (public).
+        // The source A record is only in the internal view.
+        // The challenge record must get BOTH domain views.
+        $internalView = (new DnsView())->setName('challenge-internal')->setIsPublic(false);
+        $externalView = (new DnsView())->setName('challenge-external')->setIsPublic(true);
+        $this->em->persist($internalView);
+        $this->em->persist($externalView);
+
+        $domain = (new Domain())->setName('mixed.example.com');
+        $domain->addView($internalView);
+        $domain->addView($externalView);
+        $this->em->persist($domain);
+        $this->em->flush();
+
+        [$host, $iface] = $this->makeHostWithIp('mixed-host'); // 127.0.0.1
+        $raw = bin2hex(random_bytes(32));
+        $this->makeHostToken($host, $raw);
+
+        // Source A record is only in the internal view
+        $sourceRecord = $this->makeDomainRecord($iface, $domain, 'box', RecordType::A, '127.0.0.1');
+        $sourceRecord->addView($internalView);
+        $this->em->flush();
+
+        $data = $this->tokenRequest('POST', '/api/self/dns-challenge', $raw, [
+            'fqdn'       => 'box.mixed.example.com',
+            'validation' => 'MIXED_TOKEN',
+        ]);
+
+        $this->assertSame(201, $this->tokenClient->getResponse()->getStatusCode());
+
+        // Challenge record must have BOTH domain views, not just the internal one
+        $this->em->clear();
+        $record = $this->em->find(DomainRecord::class, $data['id']);
+        $this->assertNotNull($record);
+        $challengeViewIds = $record->getViews()->map(fn($v) => $v->getId())->toArray();
+        $this->assertContains($internalView->getId(), $challengeViewIds);
+        $this->assertContains($externalView->getId(), $challengeViewIds);
+        $this->assertCount(2, $challengeViewIds);
     }
 
     // ── Security ──────────────────────────────────────────────────────────────

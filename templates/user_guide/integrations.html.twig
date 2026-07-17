@@ -506,7 +506,7 @@ curl -s -X POST https://dashddi.example.com/api/dhcp/lease \
             <table class="table table-sm table-bordered mb-0">
                 <thead class="table-light"><tr><th>Method</th><th>Path</th><th>Description</th></tr></thead>
                 <tbody>
-                    <tr><td><code>GET</code></td><td><code>/api/self/host</code></td><td>Return the host's name, its interfaces (id, MAC, IPv4, IPv6), and all DNS records attached to each interface.</td></tr>
+                    <tr><td><code>GET</code></td><td><code>/api/self/host</code></td><td>Return the host's name, its interfaces (id, MAC, IPv4, IPv6), and all DNS records attached to each interface. Only records in domains with at least one <a href="{{ path('user_guide_dns') }}#views">public view</a> are included; domains with no views assigned are treated as globally accessible.</td></tr>
                     <tr><td><code>POST</code></td><td><code>/api/self/dns-challenge</code></td><td>Create a <code>_acme-challenge.*</code> TXT record for ACME DNS-01 validation.</td></tr>
                     <tr><td><code>DELETE</code></td><td><code>/api/self/dns-challenge</code></td><td>Delete the matching <code>_acme-challenge.*</code> TXT record after validation is complete.</td></tr>
                 </tbody>

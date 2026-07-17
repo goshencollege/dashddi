@@ -85,11 +85,12 @@
     <div class="card-body">
         <p>DNS views let you serve different answers to different clients — for example, returning internal addresses to inside clients and external addresses to the internet.</p>
         <p>Create views at <strong>DNS → Views</strong>. Give each view a name (e.g. <code>internal</code>, <code>external</code>). Then:</p>
-        <ul class="mb-0">
+        <ul>
             <li>Assign subnets to views (on the subnet edit page) to indicate which source addresses belong to each view</li>
             <li>Assign domains to views to restrict which zones appear in which view</li>
             <li>Assign individual DNS records to views if they should only appear in certain views</li>
         </ul>
+        <p>Check the <strong>Public view</strong> checkbox on any view that is reachable from the public internet. This flag is used by the <a href="{{ path('user_guide_integrations') }}#api-self">ACME self-service API endpoint</a>: only hostnames in domains with at least one public view appear in <code>GET /api/self/host</code>, and <code>POST /api/self/dns-challenge</code> will only accept FQDNs in those domains. A domain with no views assigned is treated as globally accessible. This allows you to issue certificates for RFC 1918 hosts whose A records are internal-only, as long as the domain itself is served by a public view.</p>
         <p class="mt-2 mb-0 text-muted small">Views map directly to BIND's <code>view</code> configuration blocks. The generated zone files respect view assignments.</p>
     </div>
 </div>

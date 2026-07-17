@@ -44,6 +44,9 @@ class DnsView
     #[Assert\Ip(version: 'all')]
     private ?string $nsUpdateSourceAddress = null;
 
+    #[ORM\Column(options: ['default' => false])]
+    private bool $isPublic = false;
+
     public function getId(): ?int { return $this->id; }
 
     public function getName(): string { return $this->name; }
@@ -73,6 +76,9 @@ class DnsView
         // 127.0.0.1 is reserved for the server directive; views start at 127.0.0.2.
         return ($this->id !== null && $this->id < 254) ? ('127.0.0.' . ($this->id + 1)) : null;
     }
+
+    public function isPublic(): bool { return $this->isPublic; }
+    public function setIsPublic(bool $isPublic): static { $this->isPublic = $isPublic; return $this; }
 
     public function __toString(): string { return $this->name; }
 }
