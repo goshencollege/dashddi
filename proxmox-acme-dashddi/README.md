@@ -33,9 +33,11 @@ The token is automatically restricted to requests from this host's IP addresses 
 
 ### 2. Install the plugin script and register the schema entry
 
-Run `install.sh` as root on each Proxmox node. It copies the plugin script, merges the schema snippet (backing up the original first), validates the result, and restarts the necessary services:
+Clone the DashDDI repository on the Proxmox node (a shallow clone is sufficient), then run `install.sh` as root. It copies the plugin script, merges the schema snippet (backing up the original first), validates the result, and restarts the necessary services:
 
 ```bash
+git clone --depth=1 https://github.com/goshencollege/dashddi.git
+cd dashddi/proxmox-acme-dashddi
 sudo bash install.sh
 ```
 
