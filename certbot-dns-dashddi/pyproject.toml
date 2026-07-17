@@ -15,5 +15,8 @@ dependencies = [
 [project.entry-points."certbot.plugins"]
 dns-dashddi = "certbot_dns_dashddi._internal.dns_dashddi:Authenticator"
 
+[tool.setuptools.packages.find]
+include = ["certbot_dns_dashddi*"]
+
 [project.scripts]
 dashddi-certbot = "certbot_dns_dashddi._internal.renew:main"
