@@ -73,16 +73,29 @@
 <div class="card mb-4" id="api-tokens">
     <div class="card-header fw-semibold"><i class="bi bi-key me-1"></i>API Tokens</div>
     <div class="card-body">
-        <p>API tokens allow external scripts and tools to authenticate to DashDDI's REST API. Manage them at <strong>Other Settings → API Tokens</strong>.</p>
-        <h6>Creating a token</h6>
+        <p>API tokens allow external scripts and tools to authenticate to DashDDI's REST API. There are two kinds: <strong>general tokens</strong> (managed under <strong>Other Settings → API Tokens</strong>) and <strong>host-scoped tokens</strong> (generated from the Host detail page).</p>
+
+        <h6>General tokens</h6>
         <ol>
-            <li>Click <strong>New Token</strong></li>
-            <li>Enter a name that identifies what this token is used for (e.g. <code>certbot-script</code>, <code>monitoring-tool</code>)</li>
+            <li>Go to <strong>Other Settings → API Tokens</strong> and click <strong>New Token</strong></li>
+            <li>Enter a name that identifies what this token is used for (e.g. <code>monitoring-tool</code>)</li>
             <li>Save — the token value is shown <strong>once only</strong>. Copy it immediately.</li>
         </ol>
-        <h6>Permissions</h6>
-        <p class="mb-0">Each token has granular per-route permissions. Click <strong>Edit Permissions</strong> on a token to toggle access to individual API endpoints. By default, new tokens have no access — you must explicitly grant the routes they need. This allows you to issue narrowly-scoped tokens (e.g. a certbot token with only DNS record write access).</p>
-        <p class="mt-2 mb-0 text-muted small">Tokens can be regenerated at any time (invalidating the old value) or deleted. Use tokens in the <code>Authorization: Bearer &lt;token&gt;</code> HTTP header.</p>
+        <p>Each general token has granular per-route permissions. Click <strong>Edit Permissions</strong> to toggle access to individual API endpoints. By default, new tokens have no access — you must explicitly grant the routes they need. You can also restrict a general token to a list of allowed source IP addresses or CIDR ranges.</p>
+
+        <h6>Host-scoped tokens</h6>
+        <p>A host-scoped token is a special token tied to a single host. It can <strong>only</strong> access the <code>/api/self/*</code> endpoints, and only from the IP addresses on that host's own network interfaces — no manual IP configuration needed.</p>
+        <p>Use these when a host needs to manage its own DNS records for ACME (DNS-01) certificate validation. Each host may have at most one token at a time.</p>
+        <h6 class="mt-3">Managing host-scoped tokens</h6>
+        <ul>
+            <li>Open a Host's detail page and scroll to the <strong>Host API Token</strong> card</li>
+            <li>Click <strong>Generate Token</strong> — the raw token value is shown once and then cleared. Copy it immediately.</li>
+            <li>Click <strong>Regenerate Token</strong> at any time to invalidate the current token and issue a new one</li>
+            <li>Click <strong>Revoke Token</strong> to permanently delete the token</li>
+        </ul>
+        <p>You can also generate and revoke host tokens via the API (<code>POST /api/hosts/{id}/token</code> and <code>DELETE /api/hosts/{id}/token</code>) — see the <a href="{{ path('user_guide_integrations') }}#api">Integrations guide → REST API</a> for details.</p>
+
+        <p class="mb-0 text-muted small">All tokens are used in the <code>Authorization: Bearer &lt;token&gt;</code> HTTP header. General tokens can be regenerated at any time by editing them from the API Tokens page. The API Tokens list shows general tokens first, followed by all host-scoped tokens grouped by host.</p>
     </div>
 </div>
 
@@ -130,6 +143,7 @@
             <a href="#app-settings" class="list-group-item list-group-item-action py-1">Application Settings</a>
             <a href="#backup" class="list-group-item list-group-item-action py-1">Backup &amp; Restore</a>
             <a href="#api-tokens" class="list-group-item list-group-item-action py-1">API Tokens</a>
+            <a href="#api-tokens" class="list-group-item list-group-item-action py-1 ps-4">↳ Host-scoped tokens</a>
             <a href="#saml" class="list-group-item list-group-item-action py-1">SAML Authentication</a>
             <a href="#themes" class="list-group-item list-group-item-action py-1">Themes</a>
         </div>

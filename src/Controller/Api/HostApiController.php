@@ -2,6 +2,7 @@
 
 namespace App\Controller\Api;
 
+use App\Entity\ApiToken;
 use App\Entity\Host;
 use App\Repository\BuildingRepository;
 use App\Repository\HostRepository;
@@ -167,6 +168,59 @@ class HostApiController extends AbstractController
         $em->flush();
 
         return $this->json($this->serialize($host));
+    }
+
+    #[Route('/{id}/token', name: 'api_hosts_token_generate', methods: ['POST'])]
+    public function generateToken(Host $host, EntityManagerInterface $em): JsonResponse
+    {
+        if ($host->isDeleted()) {
+            return $this->json(['error' => 'Not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        // Remove existing token first so the unique host_id constraint doesn't conflict
+        $existing = $host->getApiToken();
+        if ($existing !== null) {
+            $em->remove($existing);
+            $em->flush();
+            $em->refresh($host); // clear stale inverse-side reference after deletion
+        }
+
+        $raw = bin2hex(random_bytes(32));
+
+        $token = new ApiToken();
+        $token->setName('Host token: ' . $host->getName());
+        $token->setOwnerIdentifier($this->getUser()->getUserIdentifier());
+        $token->setTokenHash(hash('sha256', $raw));
+        $token->setHost($host);
+        $token->setAllowedRoutes([]);
+        $token->setAllowedCidrs([]);
+
+        $em->persist($token);
+        $em->flush();
+
+        return $this->json([
+            'token'   => $raw,
+            'id'      => $token->getId(),
+            'host_id' => $host->getId(),
+        ], Response::HTTP_CREATED);
+    }
+
+    #[Route('/{id}/token', name: 'api_hosts_token_revoke', methods: ['DELETE'])]
+    public function revokeToken(Host $host, EntityManagerInterface $em): JsonResponse
+    {
+        if ($host->isDeleted()) {
+            return $this->json(['error' => 'Not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        $token = $host->getApiToken();
+        if ($token === null) {
+            return $this->json(['error' => 'This host has no API token.'], Response::HTTP_NOT_FOUND);
+        }
+
+        $em->remove($token);
+        $em->flush();
+
+        return $this->json(null, Response::HTTP_NO_CONTENT);
     }
 
     private function serialize(Host $host): array

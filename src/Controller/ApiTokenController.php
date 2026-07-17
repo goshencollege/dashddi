@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\ApiToken;
+use App\Entity\Host;
 use App\Form\ApiTokenType;
 use App\Repository\ApiTokenRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -18,7 +19,8 @@ class ApiTokenController extends AbstractController
     public function index(ApiTokenRepository $repo): Response
     {
         return $this->render('api_token/index.html.twig', [
-            'tokens' => $repo->findByOwner($this->getUser()->getUserIdentifier()),
+            'generalTokens' => $repo->findGeneralByOwner($this->getUser()->getUserIdentifier()),
+            'hostTokens'    => $repo->findAllHostScoped(),
         ]);
     }
 

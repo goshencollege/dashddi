@@ -2,6 +2,7 @@
 
 namespace App\Security;
 
+use App\Entity\Host;
 use App\Repository\ApiTokenRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -53,12 +54,25 @@ class ApiTokenAuthenticator extends AbstractAuthenticator
             throw new CustomUserMessageAuthenticationException('Token has expired.');
         }
 
-        if (!$token->isAllowedOnRoute($request->attributes->get('_route', ''))) {
-            throw new CustomUserMessageAuthenticationException('Token not permitted for this endpoint.');
-        }
+        $route = $request->attributes->get('_route', '');
 
-        if (!$token->isAllowedFromIp((string) $request->getClientIp())) {
-            throw new CustomUserMessageAuthenticationException('Token not permitted from this IP address.');
+        if ($token->isHostScoped()) {
+            // Host-scoped tokens are restricted to /api/self endpoints — no allowedRoutes check needed
+            if (!str_starts_with($route, 'api_self_')) {
+                throw new CustomUserMessageAuthenticationException('Host-scoped tokens may only access /api/self endpoints.');
+            }
+            // IP is validated against the host's live addresses instead of stored CIDRs
+            $hostIps = $this->collectHostIps($token->getHost());
+            if (!in_array($request->getClientIp(), $hostIps, true)) {
+                throw new CustomUserMessageAuthenticationException('Token not permitted from this IP address.');
+            }
+        } else {
+            if (!$token->isAllowedOnRoute($route)) {
+                throw new CustomUserMessageAuthenticationException('Token not permitted for this endpoint.');
+            }
+            if (!$token->isAllowedFromIp((string) $request->getClientIp())) {
+                throw new CustomUserMessageAuthenticationException('Token not permitted from this IP address.');
+            }
         }
 
         $request->attributes->set('_api_token', $token);
@@ -82,5 +96,22 @@ class ApiTokenAuthenticator extends AbstractAuthenticator
     public function onAuthenticationFailure(Request $request, AuthenticationException $exception): Response
     {
         return new JsonResponse(['error' => $exception->getMessageKey()], Response::HTTP_UNAUTHORIZED);
+    }
+
+    private function collectHostIps(Host $host): array
+    {
+        $ips = [];
+        foreach ($host->getInterfaces() as $iface) {
+            if ($iface->isDeleted()) {
+                continue;
+            }
+            if ($iface->getIpAddress()?->getAddress()) {
+                $ips[] = $iface->getIpAddress()->getAddress();
+            }
+            if ($iface->getIpv6Address()?->getAddress()) {
+                $ips[] = $iface->getIpv6Address()->getAddress();
+            }
+        }
+        return $ips;
     }
 }

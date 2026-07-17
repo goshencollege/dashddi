@@ -231,6 +231,76 @@
 </div>
 {% endif %}
 
+{% if not host.deleted %}
+<div class="card mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-key me-1"></i>Host API Token</span>
+        <a href="{{ path('user_guide_settings') }}#host-scoped-tokens" class="btn btn-sm btn-outline-secondary" title="User Guide" target="_blank">
+            <i class="bi bi-question-circle"></i>
+        </a>
+    </div>
+    {% if newToken %}
+    <div class="card-body pb-2">
+        <div class="alert alert-success mb-3">
+            <strong>Token generated.</strong> Copy it now — it will not be shown again.
+            <div class="input-group mt-2">
+                <input type="text" class="form-control font-monospace" id="hostTokenValue" value="{{ newToken }}" readonly>
+                <button class="btn btn-outline-secondary" type="button"
+                        onclick="navigator.clipboard.writeText(document.getElementById('hostTokenValue').value)">
+                    <i class="bi bi-clipboard"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    {% set apiToken = host.apiToken %}
+    {% if apiToken %}
+    <div class="card-body py-2">
+        <dl class="row mb-0 small">
+            <dt class="col-sm-3">Created</dt>
+            <dd class="col-sm-9">{{ apiToken.createdAt|date('Y-m-d H:i') }} by {{ apiToken.ownerIdentifier }}</dd>
+            <dt class="col-sm-3">Expires</dt>
+            <dd class="col-sm-9 {{ apiToken.expired ? 'text-danger fw-bold' : '' }}">
+                {{ apiToken.expiresAt ? apiToken.expiresAt|date('Y-m-d') : '—' }}
+                {% if apiToken.expired %}<span class="badge bg-danger ms-1">Expired</span>{% endif %}
+            </dd>
+            <dt class="col-sm-3">Last Used</dt>
+            <dd class="col-sm-9">{{ apiToken.lastUsedAt ? apiToken.lastUsedAt|date('Y-m-d H:i') : 'Never' }}</dd>
+        </dl>
+    </div>
+    <div class="card-footer d-flex gap-2">
+        <form method="post" action="{{ path('host_token_generate', {id: host.id}) }}"
+              onsubmit="return confirm('Regenerate the token for {{ host.name|e('js') }}? The existing token will stop working immediately.')">
+            <input type="hidden" name="_token" value="{{ csrf_token('host_token_' ~ host.id) }}">
+            <button type="submit" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-arrow-repeat me-1"></i>Regenerate
+            </button>
+        </form>
+        <form method="post" action="{{ path('host_token_revoke', {id: host.id}) }}"
+              onsubmit="return confirm('Revoke the API token for {{ host.name|e('js') }}? This cannot be undone.')">
+            <input type="hidden" name="_token" value="{{ csrf_token('host_token_' ~ host.id) }}">
+            <button type="submit" class="btn btn-sm btn-outline-danger">
+                <i class="bi bi-trash me-1"></i>Revoke
+            </button>
+        </form>
+    </div>
+    {% else %}
+    <div class="card-body">
+        <p class="text-muted small mb-3">
+            A host-scoped token grants <code>/api/self</code> access restricted to this host's IP addresses.
+            Use it with an ACME DNS-01 hook to automate certificate renewal.
+        </p>
+        <form method="post" action="{{ path('host_token_generate', {id: host.id}) }}">
+            <input type="hidden" name="_token" value="{{ csrf_token('host_token_' ~ host.id) }}">
+            <button type="submit" class="btn btn-sm btn-primary">
+                <i class="bi bi-plus-lg me-1"></i>Generate Token
+            </button>
+        </form>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
 <div class="text-muted small">
     Created {{ host.createdAt|date('Y-m-d H:i') }}{% if host.createdBy %} by {{ host.createdBy }}{% endif %}
     &middot; Updated {{ host.updatedAt|date('Y-m-d H:i') }}{% if host.updatedBy %} by {{ host.updatedBy }}{% endif %}

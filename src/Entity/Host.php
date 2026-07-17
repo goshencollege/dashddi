@@ -52,6 +52,9 @@ class Host
     #[ORM\OneToOne(mappedBy: 'host', targetEntity: SnipeItAssetLink::class)]
     private ?SnipeItAssetLink $snipeItAssetLink = null;
 
+    #[ORM\OneToOne(mappedBy: 'host', targetEntity: ApiToken::class)]
+    private ?ApiToken $apiToken = null;
+
     public function __construct()
     {
         $this->interfaces = new ArrayCollection();
@@ -117,6 +120,8 @@ class Host
 
     public function getSnipeItAssetLink(): ?SnipeItAssetLink { return $this->snipeItAssetLink; }
     public function setSnipeItAssetLink(?SnipeItAssetLink $link): static { $this->snipeItAssetLink = $link; return $this; }
+
+    public function getApiToken(): ?ApiToken { return $this->apiToken; }
 
     /** Soft-deletes the host and cascades to all of its interfaces. */
     public function softDeleteWithInterfaces(): static

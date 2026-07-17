@@ -485,8 +485,69 @@ curl -s -X POST https://dashddi.example.com/api/dhcp/lease \
     <div class="card-header fw-semibold"><i class="bi bi-code-slash me-1"></i>REST API</div>
     <div class="card-body">
         <p>DashDDI exposes a REST API covering all major resources — hosts, interfaces, subnets, domains, records, virtual IPs, and more. Interactive API documentation with request/response schemas and the ability to test calls is available at <a href="{{ path('api_docs') }}"><strong>API Docs</strong></a>.</p>
-        <p>Authentication uses Bearer tokens. Create a token under <strong>Other Settings → API Tokens</strong> and grant only the per-route permissions that integration needs.</p>
-        <p class="mb-0 text-muted small">The repository also includes a <strong>certbot-dns-dashddi</strong> Python plugin that enables Let's Encrypt DNS-01 challenge automation via DashDDI's API. Full endpoint reference — including request parameters, field descriptions, and response examples — is in the <a href="{{ path('api_docs') }}">API Docs</a>.</p>
+        <p>Authentication uses Bearer tokens (<code>Authorization: Bearer &lt;token&gt;</code>). Create a <strong>general token</strong> under <strong>Other Settings → API Tokens</strong> and grant only the per-route permissions that integration needs. For per-host automation, use <strong>host-scoped tokens</strong> instead — see below.</p>
+
+        <h6 id="api-host-token-management" class="mt-3">Host token management (admin API)</h6>
+        <p>These endpoints are available to any general token with the appropriate route permission.</p>
+        <div class="table-responsive mb-3">
+            <table class="table table-sm table-bordered mb-0">
+                <thead class="table-light"><tr><th>Method</th><th>Path</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>POST</code></td><td><code>/api/hosts/{id}/token</code></td><td>Generate (or regenerate) a host-scoped token. Returns the raw token value once — store it immediately.</td></tr>
+                    <tr><td><code>DELETE</code></td><td><code>/api/hosts/{id}/token</code></td><td>Revoke the host's token. Returns 204 on success, 404 if no token exists.</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="text-muted small"><strong>POST</strong> response: <code>{"token": "&lt;raw&gt;", "id": &lt;token_id&gt;, "host_id": &lt;host_id&gt;}</code></p>
+
+        <h6 id="api-self" class="mt-3">Host self-service endpoints (<code>/api/self</code>)</h6>
+        <p>These endpoints are only accessible with a <strong>host-scoped token</strong>. Requests are accepted only from IP addresses assigned to the token's host's network interfaces. They are designed to support ACME DNS-01 certificate automation on each host without granting broad DNS write access.</p>
+        <div class="table-responsive mb-3">
+            <table class="table table-sm table-bordered mb-0">
+                <thead class="table-light"><tr><th>Method</th><th>Path</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>GET</code></td><td><code>/api/self/host</code></td><td>Return the host's name, its interfaces (id, MAC, IPv4, IPv6), and all DNS records attached to each interface.</td></tr>
+                    <tr><td><code>POST</code></td><td><code>/api/self/dns-challenge</code></td><td>Create a <code>_acme-challenge.*</code> TXT record for ACME DNS-01 validation.</td></tr>
+                    <tr><td><code>DELETE</code></td><td><code>/api/self/dns-challenge</code></td><td>Delete the matching <code>_acme-challenge.*</code> TXT record after validation is complete.</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <p><strong><code>POST /api/self/dns-challenge</code></strong> request body:</p>
+        <pre class="bg-light rounded p-2 small mb-2"><code>{
+  "fqdn": "web01.example.com",
+  "validation": "&lt;acme-token-value&gt;"
+}</code></pre>
+        <p class="text-muted small"><code>fqdn</code> must match one of the DNS records already assigned to the host's interfaces. For an apex record (<code>@</code>), pass the bare domain name (e.g. <code>example.com</code>). The challenge record is created as <code>_acme-challenge.web01.example.com</code> (or <code>_acme-challenge.example.com</code> for the apex) and linked to the same interface as the source record. The <strong>DELETE</strong> request uses the same body to identify and remove the record.</p>
+
+        <h6 id="api-acme" class="mt-3">ACME DNS-01 automation example</h6>
+        <p>The following shell script can be used as a Certbot manual-auth hook. It reads the token from an environment variable and uses DashDDI's <code>/api/self</code> endpoints to create and clean up challenge TXT records.</p>
+        <pre class="bg-light rounded p-2 small overflow-auto mb-2"><code>#!/usr/bin/env bash
+# /etc/letsencrypt/renewal-hooks/deploy/dashddi-auth.sh
+# Set DASHDDI_TOKEN to the host-scoped token value.
+
+DASHDDI_URL="https://dashddi.example.com"
+TOKEN="${DASHDDI_TOKEN:?DASHDDI_TOKEN must be set}"
+
+curl -fsSL -X POST "${DASHDDI_URL}/api/self/dns-challenge" \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d "{\"fqdn\": \"${CERTBOT_DOMAIN}\", \"validation\": \"${CERTBOT_VALIDATION}\"}"
+
+# Wait for DNS propagation, then signal Certbot to continue
+sleep 30</code></pre>
+        <pre class="bg-light rounded p-2 small overflow-auto mb-3"><code>#!/usr/bin/env bash
+# /etc/letsencrypt/renewal-hooks/clean/dashddi-cleanup.sh
+
+DASHDDI_URL="https://dashddi.example.com"
+TOKEN="${DASHDDI_TOKEN:?DASHDDI_TOKEN must be set}"
+
+curl -fsSL -X DELETE "${DASHDDI_URL}/api/self/dns-challenge" \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d "{\"fqdn\": \"${CERTBOT_DOMAIN}\", \"validation\": \"${CERTBOT_VALIDATION}\"}"</code></pre>
+
+        <p class="mb-0 text-muted small">Full endpoint reference — including request parameters, field descriptions, and response examples — is in the <a href="{{ path('api_docs') }}">API Docs</a>.</p>
     </div>
 </div>
 
@@ -506,6 +567,9 @@ curl -s -X POST https://dashddi.example.com/api/dhcp/lease \
             <a href="#snipeit" class="list-group-item list-group-item-action py-1">Snipe-IT</a>
             <a href="#aruba" class="list-group-item list-group-item-action py-1">Aruba CX</a>
             <a href="#api" class="list-group-item list-group-item-action py-1">REST API</a>
+            <a href="#api-host-token-management" class="list-group-item list-group-item-action py-1 ps-4">↳ Host token management</a>
+            <a href="#api-self" class="list-group-item list-group-item-action py-1 ps-4">↳ Host self-service (/api/self)</a>
+            <a href="#api-acme" class="list-group-item list-group-item-action py-1 ps-4">↳ ACME DNS-01 example</a>
         </div>
     </div>
 </div>
