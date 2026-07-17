@@ -33,15 +33,20 @@ The token is automatically restricted to requests from this host's IP addresses 
 
 ### 2. Install the plugin script and register the schema entry
 
-Clone the DashDDI repository on the Proxmox node (a shallow clone is sufficient), then run `install.sh` as root. It copies the plugin script, merges the schema snippet (backing up the original first), validates the result, and restarts the necessary services:
+Run `install.sh` as root. It fetches any missing sibling files automatically, so the quickest path is a single curl command:
 
 ```bash
-git clone --depth=1 --filter=blob:none --sparse https://github.com/goshencollege/dashddi.git
-cd dashddi
-git sparse-checkout set proxmox-acme-dashddi
-cd proxmox-acme-dashddi
-sudo bash install.sh
+curl -fsSL https://raw.githubusercontent.com/goshencollege/dashddi/main/proxmox-acme-dashddi/install.sh | bash
 ```
+
+If you prefer to inspect the script before running it:
+
+```bash
+curl -fsSLO https://raw.githubusercontent.com/goshencollege/dashddi/main/proxmox-acme-dashddi/install.sh
+bash install.sh
+```
+
+The script copies the plugin, merges the schema snippet (backing up the original first), validates the JSON, and restarts the necessary services.
 
 To skip the automatic service restart (e.g. if you want to restart manually during a maintenance window):
 

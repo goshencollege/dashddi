@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
 # Install the DashDDI ACME plugin on a Proxmox VE node.
 #
-# Run as root from the proxmox-acme-dashddi/ directory:
-#   sudo bash install.sh [--no-restart]
+# One-liner (no git required):
+#   curl -fsSL https://raw.githubusercontent.com/goshencollege/dashddi/main/proxmox-acme-dashddi/install.sh | bash
+#
+# Or download and inspect first:
+#   curl -fsSLO https://raw.githubusercontent.com/goshencollege/dashddi/main/proxmox-acme-dashddi/install.sh
+#   bash install.sh [--no-restart]
 #
 # Options:
 #   --no-restart   Skip restarting pveproxy and pvedaemon (do it manually later)
@@ -14,6 +18,8 @@ DNSAPI_DIR="/usr/share/proxmox-acme/dnsapi"
 SCHEMA_FILE="/usr/share/proxmox-acme/dns-challenge-schema.json"
 PLUGIN_SRC="$SCRIPT_DIR/dns_dashddi.sh"
 SNIPPET_SRC="$SCRIPT_DIR/dns-challenge-schema.snippet.json"
+
+BASE_URL="https://raw.githubusercontent.com/goshencollege/dashddi/main/proxmox-acme-dashddi"
 
 NO_RESTART=false
 
@@ -44,11 +50,13 @@ if [ ! -f "$SCHEMA_FILE" ]; then
   exit 1
 fi
 
-for f in "$PLUGIN_SRC" "$SNIPPET_SRC"; do
-  if [ ! -f "$f" ]; then
-    echo "Error: source file not found: $f" >&2
-    echo "Run this script from the proxmox-acme-dashddi/ directory." >&2
-    exit 1
+# ── Fetch sibling files if not present (supports running via curl | bash) ─────
+
+for file in dns_dashddi.sh dns-challenge-schema.snippet.json; do
+  dest="$SCRIPT_DIR/$file"
+  if [ ! -f "$dest" ]; then
+    echo "Fetching $file..."
+    curl -fsSL "$BASE_URL/$file" -o "$dest"
   fi
 done
 

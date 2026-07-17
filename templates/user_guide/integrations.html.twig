@@ -646,14 +646,10 @@ curl -fsSL -X DELETE "${DASHDDI_URL}/api/self/dns-challenge" \
         <p>Proxmox VE can use DashDDI to perform DNS-01 challenges for its built-in ACME certificate management. The plugin uses the same host-scoped token and <code>/api/self/dns-challenge</code> endpoints as the certbot plugin.</p>
 
         <h6 id="proxmox-acme-install" class="mt-3">Installation</h6>
-        <p class="text-muted small mb-1">Clone the DashDDI repository on the Proxmox node, then run <code>install.sh</code> as root. It copies the plugin script, merges the schema entry (with a backup), validates the JSON, and restarts the necessary services:</p>
-        <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-3"><code>git clone --depth=1 --filter=blob:none --sparse https://github.com/goshencollege/dashddi.git
-cd dashddi
-git sparse-checkout set proxmox-acme-dashddi
-cd proxmox-acme-dashddi
-sudo bash install.sh</code></pre>
+        <p class="text-muted small mb-1">Run <code>install.sh</code> as root. It fetches any missing sibling files automatically, so no git is required — a single curl command is enough:</p>
+        <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-3"><code>curl -fsSL https://raw.githubusercontent.com/goshencollege/dashddi/main/proxmox-acme-dashddi/install.sh | bash</code></pre>
         <p class="text-muted small mb-1">To skip the automatic restart (e.g. during a maintenance window):</p>
-        <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-3"><code>sudo bash proxmox-acme-dashddi/install.sh --no-restart
+        <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-3"><code>curl -fsSL https://raw.githubusercontent.com/goshencollege/dashddi/main/proxmox-acme-dashddi/install.sh | bash -s -- --no-restart
 systemctl restart pveproxy pvedaemon</code></pre>
         <p class="text-muted small">The script is idempotent — re-running it updates the plugin in place. The schema entry being merged is:</p>
         <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-3"><code>"dashddi": {
