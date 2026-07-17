@@ -570,6 +570,45 @@ WantedBy=timers.target</code></pre>
         <pre class="bg-light rounded p-2 small overflow-auto mb-3"><code>systemctl daemon-reload
 systemctl enable --now dashddi-certbot.timer</code></pre>
 
+        <h6 id="api-ansible" class="mt-4">Ansible role (<code>dashddi_certbot</code>)</h6>
+        <p>An Ansible role is included in the repository at <code>certbot-dns-dashddi/ansible/roles/dashddi_certbot/</code>. It automates the entire setup: generates a host-scoped token via the DashDDI API, installs certbot and the plugin into a virtualenv, writes the credentials file, and deploys a systemd renewal timer.</p>
+
+        <p class="fw-semibold mb-1">Required variables</p>
+        <div class="table-responsive mb-3">
+        <table class="table table-sm table-bordered small mb-0">
+            <thead class="table-light"><tr><th>Variable</th><th>Description</th></tr></thead>
+            <tbody>
+                <tr><td><code>dashddi_url</code></td><td>Base URL of your DashDDI instance</td></tr>
+                <tr><td><code>dashddi_admin_token</code></td><td>General-purpose token with <code>api_hosts_index</code> and <code>api_hosts_token_generate</code> route permissions</td></tr>
+            </tbody>
+        </table>
+        </div>
+
+        <p class="fw-semibold mb-1">Optional variables (with defaults)</p>
+        <div class="table-responsive mb-3">
+        <table class="table table-sm table-bordered small mb-0">
+            <thead class="table-light"><tr><th>Variable</th><th>Default</th><th>Description</th></tr></thead>
+            <tbody>
+                <tr><td><code>dashddi_host_name</code></td><td><code>inventory_hostname</code></td><td>Host name in DashDDI (must match exactly)</td></tr>
+                <tr><td><code>dashddi_credentials_path</code></td><td><code>/etc/letsencrypt/dashddi.ini</code></td><td>Where to write the credentials file</td></tr>
+                <tr><td><code>dashddi_venv_path</code></td><td><code>/opt/certbot</code></td><td>Virtualenv for certbot and the plugin</td></tr>
+                <tr><td><code>dashddi_propagation_seconds</code></td><td><code>30</code></td><td>DNS propagation wait passed to certbot</td></tr>
+                <tr><td><code>dashddi_force_token_regenerate</code></td><td><code>false</code></td><td>Set to <code>true</code> to revoke and replace the existing token</td></tr>
+            </tbody>
+        </table>
+        </div>
+
+        <p class="fw-semibold mb-1">Usage</p>
+        <p class="text-muted small mb-1">Run the included example playbook against your managed hosts. Set credentials in <code>group_vars</code> or pass via vault:</p>
+        <pre class="bg-light rounded p-2 small overflow-auto mb-2"><code>ansible-playbook -i inventory certbot-dns-dashddi/ansible/certbot.yml \
+  -e dashddi_url=https://dashddi.example.com \
+  -e @vault.yml</code></pre>
+        <p class="text-muted small mb-1">To force token regeneration on a specific host:</p>
+        <pre class="bg-light rounded p-2 small overflow-auto mb-3"><code>ansible-playbook -i inventory certbot-dns-dashddi/ansible/certbot.yml \
+  -e dashddi_force_token_regenerate=true \
+  --limit web01.example.com</code></pre>
+        <p class="text-muted small">The role is idempotent: if the credentials file already exists and <code>dashddi_force_token_regenerate</code> is false, token generation is skipped. Installation and systemd unit deployment always run.</p>
+
         <h6 id="api-acme" class="mt-4">Manual hook approach (curl)</h6>
         <p class="text-muted small">If installing Python packages is not practical, you can drive the same endpoints manually using Certbot's <code>--manual</code> authenticator:</p>
         <pre class="bg-light rounded p-2 small overflow-auto mb-2"><code>#!/usr/bin/env bash
@@ -620,6 +659,7 @@ curl -fsSL -X DELETE "${DASHDDI_URL}/api/self/dns-challenge" \
             <a href="#api-host-token-management" class="list-group-item list-group-item-action py-1 ps-4">↳ Host token management</a>
             <a href="#api-self" class="list-group-item list-group-item-action py-1 ps-4">↳ Host self-service (/api/self)</a>
             <a href="#api-certbot-plugin" class="list-group-item list-group-item-action py-1 ps-4">↳ Certbot plugin</a>
+            <a href="#api-ansible" class="list-group-item list-group-item-action py-1 ps-4">↳ Ansible role</a>
             <a href="#api-acme" class="list-group-item list-group-item-action py-1 ps-4">↳ Manual hook (curl)</a>
         </div>
     </div>

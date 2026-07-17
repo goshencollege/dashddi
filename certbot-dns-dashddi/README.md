@@ -101,6 +101,51 @@ dashddi-certbot --credentials /etc/letsencrypt/dashddi.ini \
 
 This is the recommended way to set up automatic renewal — add it to a systemd timer or cron job and it will always request certs for exactly the FQDNs DashDDI knows about for this host. Only A and AAAA record FQDNs in domains with a public view are included.
 
+## Ansible role
+
+An Ansible role is included at `ansible/roles/dashddi_certbot/` that automates the full setup: token generation, plugin installation, credentials file, and systemd renewal timer.
+
+An example playbook is at `ansible/certbot.yml`.
+
+### Role variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `dashddi_url` | *(required)* | Base URL of your DashDDI instance |
+| `dashddi_admin_token` | *(required)* | General-purpose token with `api_hosts_index` and `api_hosts_token_generate` route permissions |
+| `dashddi_host_name` | `{{ inventory_hostname }}` | Name of the host in DashDDI (must match exactly) |
+| `dashddi_credentials_path` | `/etc/letsencrypt/dashddi.ini` | Where to write the credentials file |
+| `dashddi_venv_path` | `/opt/certbot` | Virtualenv path for certbot and the plugin |
+| `dashddi_plugin_source` | `git+https://github.com/goshencollege/dashddi/…` | pip-installable source for the plugin |
+| `dashddi_propagation_seconds` | `30` | DNS propagation wait passed to certbot |
+| `dashddi_force_token_regenerate` | `false` | Set to `true` to revoke and replace the existing host token |
+
+### Usage
+
+Install the role's dependencies (if any) and run the example playbook against your target hosts:
+
+```bash
+ansible-playbook -i inventory ansible/certbot.yml
+```
+
+Set `dashddi_url` and `dashddi_admin_token` in your inventory `group_vars` or `host_vars`, or pass them on the command line:
+
+```bash
+ansible-playbook -i inventory ansible/certbot.yml \
+  -e dashddi_url=https://dashddi.example.com \
+  -e @vault.yml          # encrypted file containing dashddi_admin_token
+```
+
+To force token regeneration on a host (revokes the existing token and writes a new credentials file):
+
+```bash
+ansible-playbook -i inventory ansible/certbot.yml \
+  -e dashddi_force_token_regenerate=true \
+  --limit web01.example.com
+```
+
+The role is idempotent: if the credentials file already exists and `dashddi_force_token_regenerate` is false, token generation and the credentials file write are skipped. Installation and systemd unit deployment always run.
+
 ## Troubleshooting
 
 **`401 Unauthorized`**
