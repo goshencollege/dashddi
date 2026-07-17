@@ -13,8 +13,12 @@ import sys
 import requests
 
 
-def _read_credentials(path: str) -> tuple[str, str]:
-    """Return (url, token) from a dashddi credentials INI file."""
+def _read_credentials(path: str) -> tuple[str, str, "bool | str"]:
+    """Return (url, token, verify) from a dashddi credentials INI file.
+
+    verify follows the requests convention: True (system CA), False (skip),
+    or a path string (custom CA bundle). Controlled by dns_dashddi_ca_cert.
+    """
     cfg = configparser.RawConfigParser()
     # certbot INI files have no section header; inject a dummy one
     with open(path) as f:
@@ -24,16 +28,24 @@ def _read_credentials(path: str) -> tuple[str, str]:
     token = section.get("dns_dashddi_token", "").strip()
     if not url or not token:
         sys.exit("Error: credentials file must contain dns_dashddi_url and dns_dashddi_token")
-    return url, token
+    raw_ca = section.get("dns_dashddi_ca_cert", "").strip()
+    if not raw_ca:
+        verify: "bool | str" = True
+    elif raw_ca.lower() == "false":
+        verify = False
+    else:
+        verify = raw_ca
+    return url, token, verify
 
 
-def _fetch_fqdns(url: str, token: str) -> list[str]:
+def _fetch_fqdns(url: str, token: str, verify: "bool | str" = True) -> list[str]:
     """Return deduplicated A/AAAA FQDNs for this host from DashDDI."""
     try:
         resp = requests.get(
             f"{url}/api/self/host",
             headers={"Authorization": f"Bearer {token}"},
             timeout=15,
+            verify=verify,
         )
     except requests.RequestException as exc:
         sys.exit(f"Error contacting DashDDI at {url}: {exc}")
@@ -92,8 +104,8 @@ def main() -> None:
     if extra and extra[0] == "--":
         extra = extra[1:]
 
-    url, token = _read_credentials(args.credentials)
-    fqdns = _fetch_fqdns(url, token)
+    url, token, verify = _read_credentials(args.credentials)
+    fqdns = _fetch_fqdns(url, token, verify)
 
     if not fqdns:
         sys.exit(

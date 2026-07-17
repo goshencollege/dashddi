@@ -3,6 +3,7 @@
 namespace App\Validator;
 
 use App\Entity\DomainRecord;
+use App\Enum\RecordType;
 use App\Service\DnsViewResolver;
 use Symfony\Component\Validator\Constraint;
 use Symfony\Component\Validator\ConstraintValidator;
@@ -24,6 +25,14 @@ class ViewsAllowedForDomainRecordValidator extends ConstraintValidator
 
         // Only validate view restrictions when an interface is linked (subnet constraint applies)
         if ($value->getNetworkInterface() === null) {
+            return;
+        }
+
+        // Subnet-based view restrictions only apply to address records. TXT, CNAME, MX,
+        // etc. records may legitimately span views that the subnet is not part of — for
+        // example, ACME challenge TXT records must appear in the public view even when
+        // the linked interface is on an internal-only subnet.
+        if (!in_array($value->getType(), [RecordType::A, RecordType::AAAA], true)) {
             return;
         }
 

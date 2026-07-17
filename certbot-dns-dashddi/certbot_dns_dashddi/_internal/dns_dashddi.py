@@ -45,6 +45,20 @@ class Authenticator(dns_common.DNSAuthenticator):
             },
         )
 
+    def _ssl_verify(self) -> "bool | str":
+        """Return the requests verify= value from credentials.
+
+        Unset or empty → True (system CA bundle).
+        'false' (case-insensitive) → False (skip verification).
+        Any other value → treated as a path to a CA bundle file.
+        """
+        raw = (self.credentials.conf("ca_cert") or "").strip()
+        if not raw:
+            return True
+        if raw.lower() == "false":
+            return False
+        return raw
+
     def _perform(self, domain: str, validation_name: str, validation: str) -> None:
         fqdn = self._fqdn_from_validation_name(validation_name)
         url = self.credentials.conf("url").rstrip("/")
@@ -55,6 +69,7 @@ class Authenticator(dns_common.DNSAuthenticator):
             headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
             json={"fqdn": fqdn, "validation": validation},
             timeout=30,
+            verify=self._ssl_verify(),
         )
         if resp.status_code != 201:
             raise errors.PluginError(
@@ -74,6 +89,7 @@ class Authenticator(dns_common.DNSAuthenticator):
             headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
             json={"fqdn": fqdn, "validation": validation},
             timeout=30,
+            verify=self._ssl_verify(),
         )
         if resp.status_code not in (204, 404):
             raise errors.PluginError(
