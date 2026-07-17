@@ -84,6 +84,23 @@ certbot certonly \
 3. DashDDI looks up the matching DNS record on the host, creates the `_acme-challenge.*` TXT record, and assigns it to all views the domain is part of — ensuring Let's Encrypt can reach it via the public view even if the host's A record is internal-only.
 4. After the CA validates the challenge, the plugin calls `DELETE /api/self/dns-challenge` with the same FQDN and token to remove the record.
 
+## Automatic FQDN discovery with `dashddi-certbot`
+
+The package installs a `dashddi-certbot` helper that queries `GET /api/self/host` to discover all A/AAAA FQDNs registered to this host in DashDDI, then runs `certbot certonly` for all of them in a single SAN certificate request.
+
+```bash
+dashddi-certbot --credentials /etc/letsencrypt/dashddi.ini
+```
+
+Extra arguments after `--` are passed through to certbot:
+
+```bash
+dashddi-certbot --credentials /etc/letsencrypt/dashddi.ini \
+  -- --dry-run --dns-dashddi-propagation-seconds 60
+```
+
+This is the recommended way to set up automatic renewal — add it to a systemd timer or cron job and it will always request certs for exactly the FQDNs DashDDI knows about for this host. Only A and AAAA record FQDNs in domains with a public view are included.
+
 ## Troubleshooting
 
 **`401 Unauthorized`**
