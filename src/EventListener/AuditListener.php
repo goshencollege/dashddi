@@ -47,6 +47,11 @@ class AuditListener
         $token = $this->tokenStorage->getToken();
         $user  = $token?->getUser();
 
-        return $user instanceof UserInterface ? $user->getUserIdentifier() : null;
+        if ($user instanceof UserInterface) {
+            return $user->getUserIdentifier();
+        }
+
+        $taskName = getenv('DASHDDI_SCHEDULED_TASK');
+        return $taskName !== false && $taskName !== '' ? $taskName : null;
     }
 }

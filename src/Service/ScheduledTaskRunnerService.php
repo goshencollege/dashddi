@@ -54,6 +54,7 @@ class ScheduledTaskRunnerService
         $consolePath = $this->projectDir . '/bin/console';
         $parts       = array_merge([$consolePath], explode(' ', $schedulable->consoleCommand()));
         $process     = new Process(array_merge(['php'], $parts));
+        $process->setEnv(['DASHDDI_SCHEDULED_TASK' => 'Scheduled: ' . $task->getName()]);
         $process->setTimeout(null);
         $process->run();
 
