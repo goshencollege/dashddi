@@ -47,7 +47,10 @@ class ActivityLogRepository extends ServiceEntityRepository
                ->setParameter('user', '%' . $filters['userIdentifier'] . '%');
         }
 
-        if (($filters['entityType'] ?? null) === 'Host' && !empty($filters['entityLabel'])) {
+        if (!empty($filters['host_id'])) {
+            $qb->andWhere('a.hostId = :hostId')
+               ->setParameter('hostId', (int) $filters['host_id']);
+        } elseif (($filters['entityType'] ?? null) === 'Host' && !empty($filters['entityLabel'])) {
             $this->applyHostWithChildrenFilter($qb, $filters['entityLabel']);
         } else {
             if (!empty($filters['entityType'])) {

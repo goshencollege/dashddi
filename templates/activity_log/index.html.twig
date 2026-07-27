@@ -68,7 +68,7 @@
             </div>
             <div class="col-sm-4 col-md-1 d-flex gap-1">
                 <button type="submit" class="btn btn-sm btn-primary flex-grow-1">Filter</button>
-                {% if filters.userIdentifier or filters.entityType or filters.entityLabel or filters.action or filters.dateFrom or filters.dateTo %}
+                {% if filters.host_id or filters.userIdentifier or filters.entityType or filters.entityLabel or filters.action or filters.dateFrom or filters.dateTo %}
                     <a href="{{ path('activity_log_index') }}" class="btn btn-sm btn-outline-secondary" title="Clear filters"><i class="bi bi-x"></i></a>
                 {% endif %}
             </div>
