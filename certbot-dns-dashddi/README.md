@@ -119,6 +119,7 @@ An example playbook is at `ansible/certbot.yml`.
 | `dashddi_plugin_source` | `git+https://github.com/goshencollege/dashddi/…` | pip-installable source for the plugin |
 | `dashddi_propagation_seconds` | `30` | DNS propagation wait passed to certbot |
 | `dashddi_force_token_regenerate` | `false` | Set to `true` to revoke and replace the existing host token |
+| `dashddi_deploy_hook` | `""` | Optional command passed to certbot as `--deploy-hook` after each successful renewal. For the DashDDI server itself, set this to the absolute path of `docker/certbot-deploy.sh` in the project directory (e.g. `/opt/dashddi/docker/certbot-deploy.sh`) to automatically push the new cert into Docker. Leave empty for other hosts. |
 
 ### Usage
 

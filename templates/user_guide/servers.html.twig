@@ -125,6 +125,36 @@
     </div>
 </div>
 
+<div class="card mb-4" id="letsencrypt">
+    <div class="card-header fw-semibold"><i class="bi bi-shield-lock me-1"></i>Let's Encrypt Certificate</div>
+    <div class="card-body">
+        <p>DashDDI can obtain and automatically renew a trusted TLS certificate for itself using its own DNS-01 challenge API — no port 80 exposure or manual certificate management required.</p>
+
+        <h6 class="mt-3">Prerequisites</h6>
+        <ul>
+            <li>The DashDDI server must be registered in DashDDI as a <strong>Host</strong> with an A or AAAA record linked to one of its interfaces.</li>
+            <li>That record's domain must have at least one <strong>DNS View</strong> marked as <em>Public</em> so Let's Encrypt can reach the <code>_acme-challenge</code> TXT record.</li>
+            <li>DNS must be pushed to a BIND server that is authoritative for the domain.</li>
+            <li>A general-purpose API token with <code>api_hosts_index</code> and <code>api_hosts_token_generate</code> permissions is required to run the Ansible role.</li>
+        </ul>
+
+        <h6 class="mt-3">Ansible setup (recommended)</h6>
+        <p>The <code>certbot-dns-dashddi</code> Ansible role (included at <code>certbot-dns-dashddi/ansible/</code>) automates the entire setup. Run it against the DashDDI host with <code>dashddi_deploy_hook</code> pointing at the deploy script bundled in the repo:</p>
+        <pre class="bg-light p-2 rounded small mb-2">ansible-playbook -i inventory certbot-dns-dashddi/ansible/certbot.yml \
+  -e dashddi_url=https://dashddi.example.com \
+  -e dashddi_admin_token=&lt;token&gt; \
+  -e dashddi_deploy_hook=/opt/dashddi/docker/certbot-deploy.sh</pre>
+        <p class="mb-0">The role generates a host-scoped token, installs certbot and the <code>certbot-dns-dashddi</code> plugin, and configures a systemd timer that renews the certificate twice daily. After each renewal the deploy hook copies the new cert into Docker's <code>ssl_certs</code> volume and restarts nginx automatically.</p>
+
+        <h6 class="mt-3">Manual setup</h6>
+        <p>Without Ansible, install certbot and the plugin manually (see <code>certbot-dns-dashddi/README.md</code>), generate a host-scoped token from the DashDDI host's page, then request the certificate once:</p>
+        <pre class="bg-light p-2 rounded small mb-2">dashddi-certbot --credentials /etc/letsencrypt/dashddi.ini \
+  -- --deploy-hook /opt/dashddi/docker/certbot-deploy.sh</pre>
+        <p>For automatic renewal, copy the deploy hook into certbot's drop-in directory so it runs on every renewal without any extra arguments:</p>
+        <pre class="bg-light p-2 rounded small mb-0">cp /opt/dashddi/docker/certbot-deploy.sh /etc/letsencrypt/renewal-hooks/deploy/</pre>
+    </div>
+</div>
+
 </div>{# /col-lg-9 #}
 
 <div class="col-lg-3 d-none d-lg-block">
@@ -137,6 +167,7 @@
             <a href="#activity-log" class="list-group-item list-group-item-action py-1">Activity Log</a>
             <a href="#worker-queue" class="list-group-item list-group-item-action py-1">Worker Queue</a>
             <a href="#scheduler" class="list-group-item list-group-item-action py-1">Scheduled Tasks</a>
+            <a href="#letsencrypt" class="list-group-item list-group-item-action py-1">Let's Encrypt Certificate</a>
         </div>
     </div>
 </div>
