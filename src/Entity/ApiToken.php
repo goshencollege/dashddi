@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use App\Entity\Trait\AuditableTrait;
 use App\Repository\ApiTokenRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Validator\Constraints as Assert;
@@ -11,6 +12,8 @@ use App\Entity\Host;
 #[ORM\Table(name: 'api_token')]
 class ApiToken
 {
+    use AuditableTrait;
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
@@ -58,12 +61,8 @@ class ApiToken
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
     private ?Host $host = null;
 
-    #[ORM\Column]
-    private \DateTimeImmutable $createdAt;
-
     public function __construct()
     {
-        $this->createdAt = new \DateTimeImmutable();
         $this->expiresAt = new \DateTimeImmutable('+5 years');
     }
 
@@ -89,8 +88,6 @@ class ApiToken
 
     public function getLastUsedAt(): ?\DateTimeImmutable { return $this->lastUsedAt; }
     public function setLastUsedAt(?\DateTimeImmutable $dt): static { $this->lastUsedAt = $dt; return $this; }
-
-    public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
 
     public function getHost(): ?Host { return $this->host; }
     public function setHost(?Host $host): static { $this->host = $host; return $this; }
