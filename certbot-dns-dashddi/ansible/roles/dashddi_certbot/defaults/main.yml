@@ -21,3 +21,10 @@ dashddi_propagation_seconds: 30
 # Set to true to force token regeneration even when a credentials file
 # already exists. The existing token is immediately revoked.
 dashddi_force_token_regenerate: false
+
+# Optional deploy hook command passed to certbot after successful renewal.
+# Set this to any executable path (or inline command) to run post-renewal.
+# For the DashDDI server itself, point it at docker/certbot-deploy.sh in
+# the project directory, e.g. "/opt/dashddi/docker/certbot-deploy.sh".
+# Leave empty to skip (the default for non-DashDDI hosts).
+dashddi_deploy_hook: ""

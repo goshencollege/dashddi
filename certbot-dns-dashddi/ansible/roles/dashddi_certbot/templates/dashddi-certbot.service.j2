@@ -8,5 +8,6 @@ Type=oneshot
 ExecStart=/usr/local/bin/dashddi-certbot \
     --credentials {{ dashddi_credentials_path }} \
     -- \
-    --dns-dashddi-propagation-seconds {{ dashddi_propagation_seconds }}
+    --dns-dashddi-propagation-seconds {{ dashddi_propagation_seconds }}{% if dashddi_deploy_hook %} \
+    --deploy-hook {{ dashddi_deploy_hook }}{% endif %}
 PrivateTmp=true
