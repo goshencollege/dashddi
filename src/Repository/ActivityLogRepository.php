@@ -80,11 +80,9 @@ class ActivityLogRepository extends ServiceEntityRepository
 
     private function applyHostWithChildrenFilter(\Doctrine\ORM\QueryBuilder $qb, string $name): void
     {
-        $em   = $this->getEntityManager();
-        $like = '%' . $name . '%';
-
-        $hostIds = $em->createQuery('SELECT h.id FROM App\Entity\Host h WHERE h.name LIKE :n')
-            ->setParameter('n', $like)
+        $hostIds = $this->getEntityManager()
+            ->createQuery('SELECT h.id FROM App\Entity\Host h WHERE h.name LIKE :n')
+            ->setParameter('n', '%' . $name . '%')
             ->getSingleColumnResult();
 
         if (empty($hostIds)) {
@@ -92,53 +90,7 @@ class ActivityLogRepository extends ServiceEntityRepository
             return;
         }
 
-        $niIds = $em->createQuery('SELECT ni.id FROM App\Entity\NetworkInterface ni WHERE ni.host IN (:ids)')
-            ->setParameter('ids', $hostIds)
-            ->getSingleColumnResult();
-
-        $viIds = $em->createQuery('SELECT vi.id FROM App\Entity\VirtualIp vi JOIN vi.memberInterfaces ni WHERE ni.host IN (:ids)')
-            ->setParameter('ids', $hostIds)
-            ->getSingleColumnResult();
-
-        $drIds = !empty($niIds)
-            ? $em->createQuery('SELECT dr.id FROM App\Entity\DomainRecord dr WHERE dr.networkInterface IN (:ids)')
-                  ->setParameter('ids', $niIds)
-                  ->getSingleColumnResult()
-            : [];
-
-        if (!empty($viIds)) {
-            $drViIds = $em->createQuery('SELECT dr.id FROM App\Entity\DomainRecord dr WHERE dr.virtualIp IN (:ids)')
-                ->setParameter('ids', $viIds)
-                ->getSingleColumnResult();
-            $drIds = array_values(array_unique(array_merge($drIds, $drViIds)));
-        }
-
-        $atIds = $em->createQuery('SELECT at.id FROM App\Entity\ApiToken at WHERE at.host IN (:ids)')
-            ->setParameter('ids', $hostIds)
-            ->getSingleColumnResult();
-
-        $orClauses = [
-            $qb->expr()->andX('a.entityType = :etHost', 'a.entityId IN (:hostIds)'),
-        ];
-        $qb->setParameter('etHost', 'Host')->setParameter('hostIds', $hostIds);
-
-        if (!empty($niIds)) {
-            $orClauses[] = $qb->expr()->andX('a.entityType = :etNi', 'a.entityId IN (:niIds)');
-            $qb->setParameter('etNi', 'NetworkInterface')->setParameter('niIds', $niIds);
-        }
-        if (!empty($viIds)) {
-            $orClauses[] = $qb->expr()->andX('a.entityType = :etVi', 'a.entityId IN (:viIds)');
-            $qb->setParameter('etVi', 'VirtualIp')->setParameter('viIds', $viIds);
-        }
-        if (!empty($drIds)) {
-            $orClauses[] = $qb->expr()->andX('a.entityType = :etDr', 'a.entityId IN (:drIds)');
-            $qb->setParameter('etDr', 'DomainRecord')->setParameter('drIds', $drIds);
-        }
-        if (!empty($atIds)) {
-            $orClauses[] = $qb->expr()->andX('a.entityType = :etAt', 'a.entityId IN (:atIds)');
-            $qb->setParameter('etAt', 'ApiToken')->setParameter('atIds', $atIds);
-        }
-
-        $qb->andWhere($qb->expr()->orX(...$orClauses));
+        $qb->andWhere('a.hostId IN (:hostIds)')
+           ->setParameter('hostIds', $hostIds);
     }
 }

@@ -2,6 +2,9 @@
 
 namespace App\EventListener;
 
+use App\Entity\DomainRecord;
+use App\Entity\Host;
+use App\Entity\VirtualIp;
 use App\EventSubscriber\EncryptedFieldSubscriber;
 use App\Message\SyslogMessage;
 use Doctrine\Bundle\DoctrineBundle\Attribute\AsDoctrineListener;
@@ -118,9 +121,19 @@ class ActivityLogListener
                 array_values($deleted),
             );
 
+            // For VirtualIp memberInterfaces changes, use the specific interface
+            // being linked/unlinked to determine the affected host precisely.
+            $hostId = null;
+            if ($owner instanceof VirtualIp && $fieldName === 'memberInterfaces') {
+                $changedIface = $inserted[0] ?? $deleted[0] ?? null;
+                if ($changedIface !== null && method_exists($changedIface, 'getHost')) {
+                    $hostId = $changedIface->getHost()?->getId();
+                }
+            }
+
             $this->pending[] = $this->buildPending('update', $owner, [
                 $fieldName => [$this->serializeCollection($oldItems), $this->serializeCollection($currentItems)],
-            ]);
+            ], $hostId);
         }
     }
 
@@ -180,6 +193,7 @@ class ActivityLogListener
                 'entity_type'     => $row['entity_type'],
                 'entity_id'       => $row['entity_id'],
                 'entity_label'    => $row['entity_label'],
+                'host_id'         => $row['host_id'],
                 'user_identifier' => $row['user_identifier'],
                 'ip_address'      => $row['ip_address'],
                 'changed_fields'  => $row['changed_fields'] !== null
@@ -201,17 +215,42 @@ class ActivityLogListener
         }
     }
 
-    private function buildPending(string $action, object $entity, ?array $changedFields): array
+    private function buildPending(string $action, object $entity, ?array $changedFields, ?int $hostId = null): array
     {
         return [
             'action'          => $action,
             'entity_type'     => (new \ReflectionClass($entity))->getShortName(),
             'entity_id'       => method_exists($entity, 'getId') ? $entity->getId() : null,
             'entity_label'    => $this->entityLabel($entity),
+            'host_id'         => $hostId ?? $this->resolveHostId($entity),
             'user_identifier' => $this->currentUserIdentifier(),
             'ip_address'      => $this->requestStack->getCurrentRequest()?->getClientIp(),
             'changed_fields'  => $changedFields,
         ];
+    }
+
+    private function resolveHostId(object $entity): ?int
+    {
+        if ($entity instanceof Host) {
+            return $entity->getId();
+        }
+        if (method_exists($entity, 'getHost')) {
+            return $entity->getHost()?->getId();
+        }
+        if ($entity instanceof DomainRecord) {
+            $ni = $entity->getNetworkInterface();
+            if ($ni !== null) {
+                return $ni->getHost()?->getId();
+            }
+            $vip = $entity->getVirtualIp();
+            $iface = $vip?->getMemberInterfaces()->first() ?: null;
+            return $iface?->getHost()?->getId();
+        }
+        if ($entity instanceof VirtualIp) {
+            $iface = $entity->getMemberInterfaces()->first() ?: null;
+            return $iface?->getHost()?->getId();
+        }
+        return null;
     }
 
     private function isAuditable(object $entity): bool
