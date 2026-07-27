@@ -77,8 +77,12 @@ class ApiTokenAuthenticator extends AbstractAuthenticator
 
         $request->attributes->set('_api_token', $token);
 
+        $identifier = $token->isHostScoped()
+            ? 'host_' . $token->getHost()->getName()
+            : 'token_' . $token->getName();
+
         return new SelfValidatingPassport(
-            new UserBadge($token->getOwnerIdentifier(), fn(string $id) => new SamlUser($id))
+            new UserBadge($identifier, fn(string $id) => new SamlUser($id))
         );
     }
 
