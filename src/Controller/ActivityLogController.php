@@ -19,6 +19,7 @@ class ActivityLogController extends AbstractController
         $filters = [
             'userIdentifier' => $request->query->get('user') ?: null,
             'entityType'     => $request->query->get('entity_type') ?: null,
+            'entityLabel'    => $request->query->get('entity_name') ?: null,
             'action'         => $request->query->get('action') ?: null,
             'dateFrom'       => $request->query->get('date_from') ?: null,
             'dateTo'         => $request->query->get('date_to') ?: null,

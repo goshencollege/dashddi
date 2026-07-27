@@ -50,6 +50,10 @@ class ActivityLogRepository extends ServiceEntityRepository
             $qb->andWhere('a.entityType = :entityType')
                ->setParameter('entityType', $filters['entityType']);
         }
+        if (!empty($filters['entityLabel'])) {
+            $qb->andWhere('a.entityLabel LIKE :entityLabel')
+               ->setParameter('entityLabel', '%' . $filters['entityLabel'] . '%');
+        }
         if (!empty($filters['action'])) {
             $qb->andWhere('a.action = :action')
                ->setParameter('action', $filters['action']);
