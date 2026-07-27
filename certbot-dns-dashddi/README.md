@@ -5,7 +5,7 @@ A Certbot DNS authenticator plugin that uses the [DashDDI](https://github.com/go
 ## Requirements
 
 - The host must be registered in DashDDI with at least one network interface whose IP address matches the machine running Certbot.
-- The host's A/AAAA record must exist in DashDDI and be in a domain with at least one **public** DNS view.
+- The host's A, AAAA, or CNAME record must exist in DashDDI and be in a domain with at least one **public** DNS view.
 - A host-scoped token must be generated from the host detail page (see Setup below).
 
 ## Installation
@@ -99,7 +99,7 @@ dashddi-certbot --credentials /etc/letsencrypt/dashddi.ini \
   -- --dry-run --dns-dashddi-propagation-seconds 60
 ```
 
-This is the recommended way to set up automatic renewal — add it to a systemd timer or cron job and it will always request certs for exactly the FQDNs DashDDI knows about for this host. Only A and AAAA record FQDNs in domains with a public view are included.
+This is the recommended way to set up automatic renewal — add it to a systemd timer or cron job and it will always request certs for exactly the FQDNs DashDDI knows about for this host. A, AAAA, and CNAME record FQDNs in domains with a public view are included.
 
 ## Ansible role
 

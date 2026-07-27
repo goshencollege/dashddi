@@ -39,7 +39,7 @@ def _read_credentials(path: str) -> tuple[str, str, "bool | str"]:
 
 
 def _fetch_fqdns(url: str, token: str, verify: "bool | str" = True) -> list[str]:
-    """Return deduplicated A/AAAA FQDNs for this host from DashDDI."""
+    """Return deduplicated A/AAAA/CNAME FQDNs for this host from DashDDI."""
     try:
         resp = requests.get(
             f"{url}/api/self/host",
@@ -63,7 +63,7 @@ def _fetch_fqdns(url: str, token: str, verify: "bool | str" = True) -> list[str]
     fqdns: list[str] = []
     for iface in data.get("interfaces", []):
         for record in iface.get("records", []):
-            if record.get("type") not in ("A", "AAAA"):
+            if record.get("type") not in ("A", "AAAA", "CNAME"):
                 continue
             fqdn = record.get("fqdn", "").rstrip(".")
             if fqdn and fqdn not in seen:
@@ -109,9 +109,9 @@ def main() -> None:
 
     if not fqdns:
         sys.exit(
-            "No publicly-reachable A/AAAA FQDNs found for this host in DashDDI.\n"
+            "No publicly-reachable A/AAAA/CNAME FQDNs found for this host in DashDDI.\n"
             "Check that:\n"
-            "  - The host has A or AAAA records linked to its interfaces.\n"
+            "  - The host has A, AAAA, or CNAME records linked to its interfaces.\n"
             "  - Each domain has at least one view marked Public in DashDDI."
         )
 
