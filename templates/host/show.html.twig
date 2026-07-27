@@ -42,9 +42,12 @@
             <p class="text-muted mt-2 mb-0" style="white-space:pre-wrap">{{ host.notes }}</p>
         {% endif %}
     </div>
-    {% if not host.deleted %}
     <div class="d-flex gap-2">
         <a href="{{ path('user_guide_hosts') }}#interfaces" class="btn btn-sm btn-outline-secondary" title="User Guide" target="_blank"><i class="bi bi-question-circle"></i></a>
+        <a href="{{ path('activity_log_index', {host_id: host.id, entity_type: 'Host', entity_name: host.name}) }}" class="btn btn-outline-secondary">
+            <i class="bi bi-clock-history me-1"></i>View Logs
+        </a>
+        {% if not host.deleted %}
         <a href="{{ path('host_edit', {id: host.id}) }}" class="btn btn-outline-secondary">
             <i class="bi bi-pencil me-1"></i>Edit
         </a>
@@ -55,8 +58,8 @@
                 <i class="bi bi-trash me-1"></i>Delete
             </button>
         </form>
+        {% endif %}
     </div>
-    {% endif %}
 </div>
 
 <div class="card mb-3">

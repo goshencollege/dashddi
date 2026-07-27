@@ -27,7 +27,7 @@
     {# ── Filter bar ──────────────────────────────────────────────────────── #}
     <div class="filter-bar mb-3">
         <form method="get" action="{{ path('activity_log_index') }}" class="row g-2 align-items-end">
-            <div class="col-sm-4 col-md-3">
+            <div class="col-sm-4 col-md-2">
                 <label class="form-label form-label-sm mb-1">User</label>
                 <input type="text" name="user" class="form-control form-control-sm" placeholder="email…"
                        value="{{ filters.userIdentifier ?? '' }}">
@@ -44,6 +44,11 @@
                 </select>
             </div>
             <div class="col-sm-4 col-md-2">
+                <label class="form-label form-label-sm mb-1">Entity Name</label>
+                <input type="text" name="entity_name" class="form-control form-control-sm" placeholder="name…"
+                       value="{{ filters.entityLabel ?? '' }}">
+            </div>
+            <div class="col-sm-4 col-md-2">
                 <label class="form-label form-label-sm mb-1">Action</label>
                 <select name="action" class="form-select form-select-sm">
                     <option value="">All</option>
@@ -52,19 +57,18 @@
                     {% endfor %}
                 </select>
             </div>
-            <div class="col-sm-4 col-md-2">
-                <label class="form-label form-label-sm mb-1">From</label>
-                <input type="date" name="date_from" class="form-control form-control-sm"
-                       value="{{ filters.dateFrom ?? '' }}">
-            </div>
-            <div class="col-sm-4 col-md-2">
-                <label class="form-label form-label-sm mb-1">To</label>
-                <input type="date" name="date_to" class="form-control form-control-sm"
-                       value="{{ filters.dateTo ?? '' }}">
+            <div class="col-sm-8 col-md-3">
+                <label class="form-label form-label-sm mb-1">Date Range</label>
+                <div class="d-flex gap-1">
+                    <input type="date" name="date_from" class="form-control form-control-sm"
+                           value="{{ filters.dateFrom ?? '' }}" title="From">
+                    <input type="date" name="date_to" class="form-control form-control-sm"
+                           value="{{ filters.dateTo ?? '' }}" title="To">
+                </div>
             </div>
             <div class="col-sm-4 col-md-1 d-flex gap-1">
                 <button type="submit" class="btn btn-sm btn-primary flex-grow-1">Filter</button>
-                {% if filters.userIdentifier or filters.entityType or filters.action or filters.dateFrom or filters.dateTo %}
+                {% if filters.host_id or filters.userIdentifier or filters.entityType or filters.entityLabel or filters.action or filters.dateFrom or filters.dateTo %}
                     <a href="{{ path('activity_log_index') }}" class="btn btn-sm btn-outline-secondary" title="Clear filters"><i class="bi bi-x"></i></a>
                 {% endif %}
             </div>

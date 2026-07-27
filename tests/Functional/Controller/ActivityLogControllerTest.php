@@ -24,6 +24,21 @@ class ActivityLogControllerTest extends AppWebTestCase
         $this->assertResponseIsSuccessful();
     }
 
+    public function testIndexWithEntityNameFilter(): void
+    {
+        $this->client->request('GET', '/activity-log', [
+            'entity_type' => 'Host',
+            'entity_name' => 'test-host',
+        ]);
+        $this->assertResponseIsSuccessful();
+    }
+
+    public function testIndexWithHostIdFilter(): void
+    {
+        $this->client->request('GET', '/activity-log', ['host_id' => '1']);
+        $this->assertResponseIsSuccessful();
+    }
+
     public function testIndexWithInvalidPage(): void
     {
         $this->client->request('GET', '/activity-log', ['page' => '-5']);

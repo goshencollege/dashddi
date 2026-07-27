@@ -17,8 +17,10 @@ class ActivityLogController extends AbstractController
     public function index(Request $request, ActivityLogRepository $repo): Response
     {
         $filters = [
+            'host_id'        => ($v = $request->query->get('host_id')) ? (int) $v : null,
             'userIdentifier' => $request->query->get('user') ?: null,
             'entityType'     => $request->query->get('entity_type') ?: null,
+            'entityLabel'    => $request->query->get('entity_name') ?: null,
             'action'         => $request->query->get('action') ?: null,
             'dateFrom'       => $request->query->get('date_from') ?: null,
             'dateTo'         => $request->query->get('date_to') ?: null,

@@ -46,10 +46,23 @@ class ActivityLogRepository extends ServiceEntityRepository
             $qb->andWhere('a.userIdentifier LIKE :user')
                ->setParameter('user', '%' . $filters['userIdentifier'] . '%');
         }
-        if (!empty($filters['entityType'])) {
-            $qb->andWhere('a.entityType = :entityType')
-               ->setParameter('entityType', $filters['entityType']);
+
+        if (!empty($filters['host_id'])) {
+            $qb->andWhere('a.hostId = :hostId')
+               ->setParameter('hostId', (int) $filters['host_id']);
+        } elseif (($filters['entityType'] ?? null) === 'Host' && !empty($filters['entityLabel'])) {
+            $this->applyHostWithChildrenFilter($qb, $filters['entityLabel']);
+        } else {
+            if (!empty($filters['entityType'])) {
+                $qb->andWhere('a.entityType = :entityType')
+                   ->setParameter('entityType', $filters['entityType']);
+            }
+            if (!empty($filters['entityLabel'])) {
+                $qb->andWhere('a.entityLabel LIKE :entityLabel')
+                   ->setParameter('entityLabel', '%' . $filters['entityLabel'] . '%');
+            }
         }
+
         if (!empty($filters['action'])) {
             $qb->andWhere('a.action = :action')
                ->setParameter('action', $filters['action']);
@@ -66,5 +79,21 @@ class ActivityLogRepository extends ServiceEntityRepository
                    ->setParameter('dateTo', new \DateTimeImmutable($filters['dateTo'] . ' 23:59:59'));
             } catch (\Exception) {}
         }
+    }
+
+    private function applyHostWithChildrenFilter(\Doctrine\ORM\QueryBuilder $qb, string $name): void
+    {
+        $hostIds = $this->getEntityManager()
+            ->createQuery('SELECT h.id FROM App\Entity\Host h WHERE h.name LIKE :n')
+            ->setParameter('n', '%' . $name . '%')
+            ->getSingleColumnResult();
+
+        if (empty($hostIds)) {
+            $qb->andWhere('1 = 0');
+            return;
+        }
+
+        $qb->andWhere('a.hostId IN (:hostIds)')
+           ->setParameter('hostIds', $hostIds);
     }
 }

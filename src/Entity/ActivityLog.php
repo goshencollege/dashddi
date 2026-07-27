@@ -11,6 +11,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Index(columns: ['created_at'],       name: 'idx_activity_log_created')]
 #[ORM\Index(columns: ['user_identifier'],  name: 'idx_activity_log_user')]
 #[ORM\Index(columns: ['entity_type'],      name: 'idx_activity_log_type')]
+#[ORM\Index(columns: ['host_id'],          name: 'idx_activity_log_host')]
 class ActivityLog
 {
     #[ORM\Id]
@@ -44,6 +45,10 @@ class ActivityLog
     #[ORM\Column(type: Types::JSON, nullable: true)]
     private ?array $changedFields;
 
+    /** Host associated with this event, captured at log time. Null for non-host-scoped entities. */
+    #[ORM\Column(nullable: true)]
+    private ?int $hostId;
+
     #[ORM\Column]
     private \DateTimeImmutable $createdAt;
 
@@ -72,6 +77,7 @@ class ActivityLog
     public function getEntityType(): ?string     { return $this->entityType; }
     public function getEntityId(): ?int          { return $this->entityId; }
     public function getEntityLabel(): string     { return $this->entityLabel; }
+    public function getHostId(): ?int            { return $this->hostId; }
     public function getUserIdentifier(): ?string { return $this->userIdentifier; }
     public function getIpAddress(): ?string      { return $this->ipAddress; }
     public function getChangedFields(): ?array   { return $this->changedFields; }
