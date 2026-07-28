@@ -28,7 +28,7 @@ class EncryptedFieldSubscriber
     // entity class => list of property names to encrypt
     private const FIELDS = [
         ArubaSwitch::class      => ['password', 'sshPrivateKey'],
-        BackupSetting::class    => ['backupPassword'],
+        BackupSetting::class    => ['cifsPassword', 'backupPassword'],
         ClearpassServer::class  => ['clientSecret'],
         DhcpServer::class       => ['sshPrivateKey'],
         DnsServer::class        => ['sshPrivateKey', 'ddnsSecret'],
