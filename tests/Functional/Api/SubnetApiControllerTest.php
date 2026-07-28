@@ -143,4 +143,23 @@ class SubnetApiControllerTest extends AppWebTestCase
         $this->apiRequest('POST', '/api/subnets', ['name' => 'Terminal', 'ipv4_cidr' => '10.7.0.0/24']);
         $this->assertSame(201, $this->client->getResponse()->getStatusCode());
     }
+
+    public function testCreateRejectsInvalidIpv4Cidr(): void
+    {
+        $this->apiRequest('POST', '/api/subnets', ['name' => 'Bad', 'ipv4_cidr' => 'not-a-cidr']);
+        $this->assertSame(422, $this->client->getResponse()->getStatusCode());
+    }
+
+    public function testCreateRejectsOutOfRangeVlan(): void
+    {
+        $this->apiRequest('POST', '/api/subnets', ['name' => 'BadVlan', 'vlan' => 5000]);
+        $this->assertSame(422, $this->client->getResponse()->getStatusCode());
+    }
+
+    public function testUpdateRejectsInvalidIpv4Cidr(): void
+    {
+        $subnet = $this->makeSubnet('ToUpdate', '10.8.0.0/24');
+        $this->apiRequest('PATCH', "/api/subnets/{$subnet->getId()}", ['ipv4_cidr' => 'not-a-cidr']);
+        $this->assertSame(422, $this->client->getResponse()->getStatusCode());
+    }
 }
