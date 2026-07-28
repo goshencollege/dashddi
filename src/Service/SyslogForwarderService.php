@@ -27,9 +27,9 @@ class SyslogForwarderService
         $hostname = parse_url($_ENV['DEFAULT_URI'] ?? '', PHP_URL_HOST) ?: gethostname() ?: 'dashddi';
         $header   = "<134>1 {$ts} {$hostname} dashddi - - -";
 
-        $kv = 'action=' . $msg->action;
+        $kv = 'action=' . $this->quoteKv($msg->action);
         if ($msg->entityType !== null) {
-            $kv .= ' entity_type=' . $msg->entityType;
+            $kv .= ' entity_type=' . $this->quoteKv($msg->entityType);
         }
         if ($msg->entityId !== null) {
             $kv .= ' entity_id=' . $msg->entityId;
@@ -39,14 +39,15 @@ class SyslogForwarderService
             $kv .= ' user=' . $this->quoteKv($msg->userIdentifier);
         }
         if ($msg->ipAddress !== null) {
-            $kv .= ' ip=' . $msg->ipAddress;
+            $kv .= ' ip=' . $this->quoteKv($msg->ipAddress);
         }
 
         if (!empty($msg->changedFields)) {
             foreach ($msg->changedFields as $field => [$old, $new]) {
                 $oldStr = $this->trunc((string) ($old ?? 'null'), 150);
                 $newStr = $this->trunc((string) ($new ?? 'null'), 150);
-                $kv .= ' ' . $field . '=' . $this->quoteKv($oldStr) . '->' . $this->quoteKv($newStr);
+                $safeField = preg_replace('/[^\w]/', '_', $field);
+                $kv .= ' ' . $safeField . '=' . $this->quoteKv($oldStr) . '->' . $this->quoteKv($newStr);
             }
         }
 
@@ -55,6 +56,8 @@ class SyslogForwarderService
 
     private function quoteKv(string $value): string
     {
+        // Strip control characters (including newlines) to prevent log injection
+        $value = (string) preg_replace('/[\x00-\x1F\x7F]/', '', $value);
         if ($value === '' || preg_match('/[\s=>"<]/', $value)) {
             return '"' . str_replace('"', '\\"', $value) . '"';
         }
