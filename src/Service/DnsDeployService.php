@@ -232,10 +232,25 @@ class DnsDeployService
 
     private function execNsUpdate(string $script, DnsServer $server, SFTP $sftp): array
     {
-        $tmpPath = '/tmp/.dashddi-nsu-' . bin2hex(random_bytes(6)) . '.txt';
-        $sftp->put($tmpPath, $script);
-        $yFlag  = $server->getDdnsAlgorithm()->bindName() . ':' . $server->getDdnsKeyName() . ':' . $server->getDdnsSecret();
-        $output = $sftp->exec('nsupdate -y ' . escapeshellarg($yFlag) . ' ' . escapeshellarg($tmpPath) . '; rm -f ' . escapeshellarg($tmpPath));
+        $rand      = bin2hex(random_bytes(6));
+        $tmpScript = '/tmp/.dashddi-nsu-' . $rand . '.txt';
+        $tmpKey    = '/tmp/.dashddi-key-' . $rand . '.conf';
+
+        // Write the TSIG key to a file so it never appears in the process argument list.
+        // nsupdate -k reads the key file; -y would expose the secret in `ps` output.
+        $keyFile = 'key "' . $server->getDdnsKeyName() . '" {' . "\n"
+            . '    algorithm ' . $server->getDdnsAlgorithm()->bindName() . ';' . "\n"
+            . '    secret "' . $server->getDdnsSecret() . '";' . "\n"
+            . '};' . "\n";
+
+        $sftp->put($tmpKey, $keyFile);
+        $sftp->chmod(0600, $tmpKey);
+        $sftp->put($tmpScript, $script);
+
+        $output = $sftp->exec(
+            'nsupdate -k ' . escapeshellarg($tmpKey) . ' ' . escapeshellarg($tmpScript)
+            . '; rm -f ' . escapeshellarg($tmpKey) . ' ' . escapeshellarg($tmpScript)
+        );
         return ['success' => $sftp->getExitStatus() === 0, 'output' => trim((string) $output)];
     }
 
