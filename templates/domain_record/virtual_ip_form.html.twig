@@ -160,13 +160,28 @@
             if (views.length === 0) {
                 viewsSection.innerHTML = '<p class="text-muted small mb-0">No views configured for this domain.</p>';
             } else {
-                viewsSection.innerHTML = '<div class="d-flex flex-wrap gap-3">' +
-                    views.map(v =>
-                        `<div class="form-check">` +
-                        `<input class="form-check-input" type="checkbox" name="domain_record[views][]" value="${v.id}" id="view_${v.id}" checked>` +
-                        `<label class="form-check-label" for="view_${v.id}">${v.name}</label>` +
-                        `</div>`
-                    ).join('') + '</div>';
+                const wrap = document.createElement('div');
+                wrap.className = 'd-flex flex-wrap gap-3';
+                views.forEach(function (v) {
+                    const div = document.createElement('div');
+                    div.className = 'form-check';
+                    const input = document.createElement('input');
+                    input.className = 'form-check-input';
+                    input.type = 'checkbox';
+                    input.name = 'domain_record[views][]';
+                    input.value = v.id;
+                    input.id = 'view_' + v.id;
+                    input.checked = true;
+                    const label = document.createElement('label');
+                    label.className = 'form-check-label';
+                    label.htmlFor = 'view_' + v.id;
+                    label.textContent = v.name;
+                    div.appendChild(input);
+                    div.appendChild(label);
+                    wrap.appendChild(div);
+                });
+                viewsSection.innerHTML = '';
+                viewsSection.appendChild(wrap);
             }
         } catch {
             viewsSection.innerHTML = '<p class="text-danger small mb-0">Failed to load views.</p>';

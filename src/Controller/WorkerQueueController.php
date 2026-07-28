@@ -13,6 +13,11 @@ use Symfony\Component\Routing\Attribute\Route;
 #[Route('/worker-queue')]
 class WorkerQueueController extends AbstractController
 {
+    private const Q_PRIORITY        = 'priority';
+    private const Q_BULK            = 'bulk';
+    private const Q_FAILED_PRIORITY = 'failed_priority';
+    private const Q_FAILED_BULK     = 'failed_bulk';
+
     #[Route('', name: 'worker_queue', methods: ['GET'])]
     public function index(Connection $conn, ScheduledTaskRepository $taskRepo, AppSettingRepository $settingRepo): Response
     {
@@ -28,28 +33,31 @@ class WorkerQueueController extends AbstractController
         };
 
         $running = array_map($addLabel, $conn->fetchAllAssociative(
-            "SELECT id, queue_name, created_at, available_at, delivered_at, body
+            'SELECT id, queue_name, created_at, available_at, delivered_at, body
              FROM messenger_messages
-             WHERE queue_name NOT IN ('failed_priority', 'failed_bulk')
+             WHERE queue_name NOT IN (?, ?)
                AND delivered_at IS NOT NULL
-             ORDER BY delivered_at ASC"
+             ORDER BY delivered_at ASC',
+            [self::Q_FAILED_PRIORITY, self::Q_FAILED_BULK]
         ));
 
         $pending = array_map($addLabel, $conn->fetchAllAssociative(
-            "SELECT id, queue_name, created_at, available_at, delivered_at, body
+            'SELECT id, queue_name, created_at, available_at, delivered_at, body
              FROM messenger_messages
-             WHERE queue_name NOT IN ('failed_priority', 'failed_bulk')
+             WHERE queue_name NOT IN (?, ?)
                AND delivered_at IS NULL
              ORDER BY available_at ASC
-             LIMIT 500"
+             LIMIT 500',
+            [self::Q_FAILED_PRIORITY, self::Q_FAILED_BULK]
         ));
 
         $failed = array_map($addLabel, $conn->fetchAllAssociative(
-            "SELECT id, queue_name, created_at, available_at, delivered_at, body
+            'SELECT id, queue_name, created_at, available_at, delivered_at, body
              FROM messenger_messages
-             WHERE queue_name IN ('failed_priority', 'failed_bulk')
+             WHERE queue_name IN (?, ?)
              ORDER BY created_at DESC
-             LIMIT 500"
+             LIMIT 500',
+            [self::Q_FAILED_PRIORITY, self::Q_FAILED_BULK]
         ));
 
         return $this->render('worker_queue/index.html.twig', [
@@ -69,14 +77,14 @@ class WorkerQueueController extends AbstractController
         }
 
         $affected = $conn->executeStatement(
-            "UPDATE messenger_messages
+            'UPDATE messenger_messages
              SET queue_name = CASE queue_name
-                 WHEN 'failed_priority' THEN 'priority'
-                 WHEN 'failed_bulk'     THEN 'bulk'
+                 WHEN ? THEN ?
+                 WHEN ? THEN ?
              END,
              available_at = NOW(), delivered_at = NULL
-             WHERE id = ? AND queue_name IN ('failed_priority', 'failed_bulk')",
-            [$id]
+             WHERE id = ? AND queue_name IN (?, ?)',
+            [self::Q_FAILED_PRIORITY, self::Q_PRIORITY, self::Q_FAILED_BULK, self::Q_BULK, $id, self::Q_FAILED_PRIORITY, self::Q_FAILED_BULK]
         );
 
         $this->addFlash(
@@ -94,7 +102,10 @@ class WorkerQueueController extends AbstractController
             return $this->redirectToRoute('worker_queue');
         }
 
-        $count = $conn->executeStatement("DELETE FROM messenger_messages WHERE queue_name IN ('failed_priority', 'failed_bulk')");
+        $count = $conn->executeStatement(
+            'DELETE FROM messenger_messages WHERE queue_name IN (?, ?)',
+            [self::Q_FAILED_PRIORITY, self::Q_FAILED_BULK]
+        );
 
         $this->addFlash('success', $count . ' failed ' . ($count === 1 ? 'message' : 'messages') . ' deleted.');
         return $this->redirectToRoute('worker_queue');
@@ -109,8 +120,8 @@ class WorkerQueueController extends AbstractController
         }
 
         $affected = $conn->executeStatement(
-            "DELETE FROM messenger_messages WHERE id = ? AND queue_name = 'failed'",
-            [$id]
+            'DELETE FROM messenger_messages WHERE id = ? AND queue_name IN (?, ?)',
+            [$id, self::Q_FAILED_PRIORITY, self::Q_FAILED_BULK]
         );
 
         $this->addFlash(
@@ -129,9 +140,9 @@ class WorkerQueueController extends AbstractController
         }
 
         $affected = $conn->executeStatement(
-            "DELETE FROM messenger_messages
-             WHERE id = ? AND queue_name NOT IN ('failed_priority', 'failed_bulk') AND delivered_at IS NOT NULL",
-            [$id]
+            'DELETE FROM messenger_messages
+             WHERE id = ? AND queue_name NOT IN (?, ?) AND delivered_at IS NOT NULL',
+            [$id, self::Q_FAILED_PRIORITY, self::Q_FAILED_BULK]
         );
 
         $this->addFlash(
@@ -150,9 +161,9 @@ class WorkerQueueController extends AbstractController
         }
 
         $affected = $conn->executeStatement(
-            "DELETE FROM messenger_messages
-             WHERE id = ? AND queue_name IN ('priority', 'bulk') AND delivered_at IS NULL",
-            [$id]
+            'DELETE FROM messenger_messages
+             WHERE id = ? AND queue_name IN (?, ?) AND delivered_at IS NULL',
+            [$id, self::Q_PRIORITY, self::Q_BULK]
         );
 
         $this->addFlash(

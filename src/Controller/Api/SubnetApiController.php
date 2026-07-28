@@ -13,6 +13,7 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 #[Route('/api/subnets')]
 class SubnetApiController extends AbstractController
@@ -51,6 +52,7 @@ class SubnetApiController extends AbstractController
         VrfRepository $vrfRepo,
         TagRepository $tagRepo,
         DnsViewRepository $viewRepo,
+        ValidatorInterface $validator,
     ): JsonResponse {
         $data = json_decode($request->getContent(), true) ?? [];
 
@@ -60,6 +62,10 @@ class SubnetApiController extends AbstractController
 
         $subnet = new Subnet();
         $this->applyFields($subnet, $data, $vrfRepo, $tagRepo, $viewRepo);
+
+        if ($error = $this->entityErrors($validator, $subnet)) {
+            return $this->json(['error' => $error], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
 
         if ($error = $this->validateCidrs($subnet, $repo)) {
             return $this->json(['error' => $error], Response::HTTP_UNPROCESSABLE_ENTITY);
@@ -80,6 +86,7 @@ class SubnetApiController extends AbstractController
         VrfRepository $vrfRepo,
         TagRepository $tagRepo,
         DnsViewRepository $viewRepo,
+        ValidatorInterface $validator,
     ): JsonResponse {
         $data = json_decode($request->getContent(), true) ?? [];
 
@@ -88,6 +95,10 @@ class SubnetApiController extends AbstractController
         }
 
         $this->applyFields($subnet, $data, $vrfRepo, $tagRepo, $viewRepo, patch: true);
+
+        if ($error = $this->entityErrors($validator, $subnet)) {
+            return $this->json(['error' => $error], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
 
         if ($error = $this->validateCidrs($subnet, $repo)) {
             return $this->json(['error' => $error], Response::HTTP_UNPROCESSABLE_ENTITY);
@@ -145,6 +156,19 @@ class SubnetApiController extends AbstractController
                 if ($view) { $subnet->addView($view); }
             }
         }
+    }
+
+    private function entityErrors(ValidatorInterface $validator, Subnet $subnet): ?string
+    {
+        $violations = $validator->validate($subnet);
+        if (count($violations) === 0) {
+            return null;
+        }
+        $messages = [];
+        foreach ($violations as $v) {
+            $messages[] = ($v->getPropertyPath() ? $v->getPropertyPath() . ': ' : '') . $v->getMessage();
+        }
+        return implode('; ', $messages);
     }
 
     private function validateCidrs(Subnet $subnet, SubnetRepository $repo): ?string

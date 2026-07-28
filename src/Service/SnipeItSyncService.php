@@ -693,6 +693,9 @@ class SnipeItSyncService
         array $query = [],
     ): array {
         $url = $server->getApiUrl() . $path;
+        if (strtolower(parse_url($url, PHP_URL_SCHEME) ?? '') !== 'https') {
+            throw new \RuntimeException('Snipe-IT API URL must use HTTPS.');
+        }
         if (!empty($query)) {
             $url .= '?' . http_build_query($query);
         }

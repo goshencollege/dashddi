@@ -55,10 +55,15 @@ class Host
     #[ORM\OneToOne(mappedBy: 'host', targetEntity: ApiToken::class)]
     private ?ApiToken $apiToken = null;
 
+    #[ORM\OneToMany(targetEntity: SshHostKey::class, mappedBy: 'host', cascade: ['persist', 'remove'], orphanRemoval: true)]
+    #[ORM\OrderBy(['algorithm' => 'ASC'])]
+    private Collection $sshHostKeys;
+
     public function __construct()
     {
-        $this->interfaces = new ArrayCollection();
-        $this->tags       = new ArrayCollection();
+        $this->interfaces  = new ArrayCollection();
+        $this->tags        = new ArrayCollection();
+        $this->sshHostKeys = new ArrayCollection();
     }
 
     public function getId(): ?int { return $this->id; }
@@ -122,6 +127,19 @@ class Host
     public function setSnipeItAssetLink(?SnipeItAssetLink $link): static { $this->snipeItAssetLink = $link; return $this; }
 
     public function getApiToken(): ?ApiToken { return $this->apiToken; }
+
+    /** @return Collection<int, SshHostKey> */
+    public function getSshHostKeys(): Collection { return $this->sshHostKeys; }
+
+    public function getSshHostKeyByAlgorithm(string $algorithm): ?SshHostKey
+    {
+        foreach ($this->sshHostKeys as $key) {
+            if ($key->getAlgorithm() === $algorithm) {
+                return $key;
+            }
+        }
+        return null;
+    }
 
     /** Soft-deletes the host and cascades to all of its interfaces. */
     public function softDeleteWithInterfaces(): static

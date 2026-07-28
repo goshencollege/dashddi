@@ -40,7 +40,7 @@ class BackupSetting
     #[ORM\Column]
     private bool $decryptFields = false;
 
-    /** Embed the APP_ENCRYPTION_KEY in a SQL comment header (when not decrypting) */
+    /** Embed the APP_ENCRYPTION_KEY in a SQL comment header (requires encryptBackup; ignored when decrypting) */
     #[ORM\Column]
     private bool $includeEncryptionKey = false;
 

@@ -27,7 +27,8 @@ framework:
             'App\Message\PushDnsMessage':          async_priority
             'App\Message\PushDhcpMessage':         async_priority
             'App\Message\PushAllDhcpMessage':      async_priority
-            'App\Message\PushClearpassAllMessage': async_bulk
-            'App\Message\RunScheduledTaskMessage': async_bulk
-            'App\Message\PullSnipeItMessage':      async_bulk
+            'App\Message\PushClearpassAllMessage':  async_bulk
+            'App\Message\RunScheduledTaskMessage':  async_bulk
+            'App\Message\PullSnipeItMessage':       async_bulk
+            'App\Message\PullClearpassLogsMessage': async_bulk
             'App\Message\SyslogMessage':           async_priority

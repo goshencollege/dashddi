@@ -204,6 +204,66 @@
     {% endif %}
 </div>
 
+{% if host.sshHostKeys|length > 0 or not host.deleted %}
+<div class="card mb-3">
+    <div class="card-header"><i class="bi bi-shield-lock me-1"></i>SSH Host Keys</div>
+    <div class="card-body py-2">
+        {% if host.sshHostKeys|length > 0 %}
+        <table class="table table-sm table-borderless mb-2 small">
+            <thead class="text-muted">
+                <tr>
+                    <th>Algorithm</th>
+                    <th>Fingerprint (SHA-256)</th>
+                    {% if not host.deleted %}<th></th>{% endif %}
+                </tr>
+            </thead>
+            <tbody class="font-monospace">
+                {% for key in host.sshHostKeys %}
+                <tr>
+                    <td class="text-nowrap pe-3">{{ key.algorithm }}</td>
+                    <td>{{ key.fingerprint }}</td>
+                    {% if not host.deleted %}
+                    <td class="text-end">
+                        <form method="post" action="{{ path('host_delete_ssh_host_key', {id: host.id, keyId: key.id}) }}"
+                              onsubmit="return confirm('Remove the {{ key.algorithm }} host key?');">
+                            <input type="hidden" name="_token" value="{{ csrf_token('delete_ssh_host_key_' ~ key.id) }}">
+                            <button type="submit" class="btn btn-sm btn-outline-danger py-0">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </form>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="text-muted small mb-2">No SSH host keys stored yet. Keys are learned automatically on first connection, or you can add them manually below.</p>
+        {% endif %}
+        {% if not host.deleted %}
+        <form method="post" action="{{ path('host_scan_ssh_host_keys', {id: host.id}) }}" class="mb-2">
+            <input type="hidden" name="_token" value="{{ csrf_token('scan_ssh_host_keys_' ~ host.id) }}">
+            <button type="submit" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-radar me-1"></i>Scan with ssh-keyscan
+            </button>
+        </form>
+        <details>
+            <summary class="small text-secondary" style="cursor:pointer;">Add / replace keys manually</summary>
+            <form method="post" action="{{ path('host_add_ssh_host_keys', {id: host.id}) }}" class="mt-2">
+                <input type="hidden" name="_token" value="{{ csrf_token('add_ssh_host_keys_' ~ host.id) }}">
+                <textarea name="ssh_host_public_key" class="form-control form-control-sm font-monospace mb-1" rows="4"
+                          placeholder="Paste one or more public host keys — bare key lines or ssh-keyscan output accepted:&#10;ssh-ed25519 AAAA...&#10;ecdsa-sha2-nistp256 AAAA..."></textarea>
+                <div class="form-text small mb-2">Accepts output from <code>ssh-keyscan hostname</code> or the contents of <code>/etc/ssh/ssh_host_*_key.pub</code>. Existing keys for the same algorithm are replaced.</div>
+                <button type="submit" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-floppy me-1"></i>Save keys
+                </button>
+            </form>
+        </details>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
 {% set snipeLink = host.snipeItAssetLink %}
 {% if snipeLink %}
 <div class="card mb-3">

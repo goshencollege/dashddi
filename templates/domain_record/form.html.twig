@@ -194,8 +194,16 @@
                     const icon = item.type === 'vip'
                         ? '<i class="bi bi-layers text-muted" title="Virtual IP"></i>'
                         : '<i class="bi bi-hdd-network text-muted" title="Interface"></i>';
-                    const ip = item.ip ? ' <span class="text-muted">(' + item.ip + ')</span>' : '';
-                    li.innerHTML = icon + '<span>' + item.label + ip + '</span>';
+                    li.innerHTML = icon;
+                    const span = document.createElement('span');
+                    span.textContent = item.label;
+                    if (item.ip) {
+                        const ipSpan = document.createElement('span');
+                        ipSpan.className = 'text-muted';
+                        ipSpan.textContent = ' (' + item.ip + ')';
+                        span.appendChild(ipSpan);
+                    }
+                    li.appendChild(span);
                     li.addEventListener('mousedown', function () { selectItem(item); });
                     resultsList.appendChild(li);
                 });

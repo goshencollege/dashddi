@@ -353,29 +353,32 @@
     const poeBounceUrl = {{ path('api_switch_port_poe_bounce')|json_encode|raw }};
     const mac        = {{ interface.macAddress|json_encode|raw }};
 
+    // Escape HTML entities in any string sourced from API responses.
+    function esc(s) { const d = document.createElement('div'); d.textContent = String(s ?? ''); return d.innerHTML; }
+
     function renderClients(data) {
         if (data.error) {
-            return `<div class="alert alert-danger mb-0 py-2">${data.error}</div>`;
+            return `<div class="alert alert-danger mb-0 py-2">${esc(data.error)}</div>`;
         }
         const rawId = 'raw-' + Math.random().toString(36).slice(2);
         let rawContent = data.raw || '';
         try { rawContent = JSON.stringify(JSON.parse(rawContent), null, 2); } catch (e) { /* plain text */ }
         const rawPanel = rawContent ? `
             <div class="px-3 pb-2 d-flex justify-content-between align-items-center">
-                <span class="text-muted small">Source: ${data.via}</span>
+                <span class="text-muted small">Source: ${esc(data.via)}</span>
                 <button class="btn btn-link btn-sm p-0 text-muted small" onclick="document.getElementById('${rawId}').classList.toggle('d-none')">raw</button>
             </div>
-            <div id="${rawId}" class="d-none mx-3 mb-2 alert alert-success p-0"><pre class="mb-0 p-2 small" style="max-height:200px;overflow:auto">${rawContent}</pre></div>` : `<div class="px-3 pb-2"><span class="text-muted small">Source: ${data.via}</span></div>`;
+            <div id="${rawId}" class="d-none mx-3 mb-2 alert alert-success p-0"><pre class="mb-0 p-2 small" style="max-height:200px;overflow:auto">${esc(rawContent)}</pre></div>` : `<div class="px-3 pb-2"><span class="text-muted small">Source: ${esc(data.via)}</span></div>`;
         if (!data.clients || data.clients.length === 0) {
             return `<div class="px-3 pt-2"><span class="text-muted">No port-access clients found on this port.</span></div>${rawPanel}`;
         }
         const rows = data.clients.map(c => `
             <tr>
-                <td class="font-monospace">${c.mac ?? '—'}</td>
-                <td>${c.vlan || '—'}</td>
-                <td>${c.role ?? '—'}</td>
-                <td>${c.status ?? '—'}</td>
-                <td>${c.auth_method ?? '—'}</td>
+                <td class="font-monospace">${esc(c.mac ?? '—')}</td>
+                <td>${esc(c.vlan ?? '—')}</td>
+                <td>${esc(c.role ?? '—')}</td>
+                <td>${esc(c.status ?? '—')}</td>
+                <td>${esc(c.auth_method ?? '—')}</td>
             </tr>`).join('');
         return `<div class="table-responsive mb-0">
             <table class="table table-sm mb-0">
@@ -427,11 +430,11 @@
                 return r.json();
             })
             .then(data => {
-                const out = data.output ? `<pre class="mt-2 mb-0 p-2 border rounded small" style="max-height:120px;overflow:auto">${data.output}</pre>` : '';
+                const out = data.output ? `<pre class="mt-2 mb-0 p-2 border rounded small" style="max-height:120px;overflow:auto">${esc(data.output)}</pre>` : '';
                 if (data.success) {
                     statusBody.innerHTML = `<div class="alert alert-success mb-0 py-2"><i class="bi bi-check-lg me-1"></i>${successMsg}${out}</div>`;
                 } else {
-                    statusBody.innerHTML = `<div class="alert alert-danger mb-0 py-2">Failed: ${data.error}${out}</div>`;
+                    statusBody.innerHTML = `<div class="alert alert-danger mb-0 py-2">Failed: ${esc(data.error)}${out}</div>`;
                 }
             })
             .catch(err => {

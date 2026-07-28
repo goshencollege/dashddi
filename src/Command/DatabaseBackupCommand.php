@@ -38,7 +38,7 @@ class DatabaseBackupCommand extends Command
             ->addOption('cifs-password', null, InputOption::VALUE_REQUIRED, 'CIFS password (overrides settings)')
             ->addOption('cifs-subdir', null, InputOption::VALUE_REQUIRED, 'Subdirectory on CIFS share (overrides settings)')
             ->addOption('decrypt-fields', null, InputOption::VALUE_NONE, 'Decrypt encrypted DB fields in the backup SQL')
-            ->addOption('include-key', null, InputOption::VALUE_NONE, 'Embed APP_ENCRYPTION_KEY in a SQL comment header')
+            ->addOption('include-key', null, InputOption::VALUE_NONE, 'Embed APP_ENCRYPTION_KEY in a SQL comment header (requires --encrypt-backup)')
             ->addOption('encrypt-backup', null, InputOption::VALUE_NONE, 'Encrypt the backup file with AES-256-CBC')
             ->addOption('backup-password', null, InputOption::VALUE_REQUIRED, 'Password for backup file encryption/decryption')
             ->addOption('retention', null, InputOption::VALUE_REQUIRED, 'Number of backups to keep (0 = unlimited, overrides settings)')
@@ -89,6 +89,11 @@ class DatabaseBackupCommand extends Command
 
         if ($encryptBackup && $backupPassword === '') {
             $io->error('Backup encryption requires a password. Set --backup-password or configure one in Backup Settings.');
+            return Command::FAILURE;
+        }
+
+        if ($includeKey && !$encryptBackup) {
+            $io->error('APP_ENCRYPTION_KEY can only be embedded in an encrypted backup. Enable backup encryption or disable the include-key option.');
             return Command::FAILURE;
         }
 
@@ -319,38 +324,20 @@ class DatabaseBackupCommand extends Command
 
     private function encryptFile(string $inputPath, string $outputPath, string $password): void
     {
-        $salt = random_bytes(16);
-        $key  = openssl_pbkdf2($password, $salt, 32, 100000, 'sha256');
-        $iv   = random_bytes(16);
+        $plaintext = file_get_contents($inputPath);
+        $salt      = random_bytes(16);
+        $iv        = random_bytes(12);  // GCM uses a 12-byte nonce
+        $key       = openssl_pbkdf2($password, $salt, 32, 100000, 'sha256');
+        $tag       = '';
 
-        $in  = fopen($inputPath, 'rb');
-        $out = fopen($outputPath, 'wb');
+        $ciphertext = openssl_encrypt($plaintext, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $iv, $tag, '', 16);
 
-        fwrite($out, 'DASHDDI1' . $salt . $iv);
-
-        // Stream in 64 KB chunks (must be a multiple of the AES block size, 16 bytes).
-        // CBC chaining is preserved by using the last ciphertext block as the IV for
-        // the next chunk, producing identical output to encrypting the whole file at once.
-        $chunkSize = 65536;
-        $currentIv = $iv;
-        $pending   = '';
-
-        while (($data = fread($in, $chunkSize)) !== false && $data !== '') {
-            if ($pending !== '') {
-                $encrypted = openssl_encrypt($pending, 'aes-256-cbc', $key, OPENSSL_RAW_DATA | OPENSSL_ZERO_PADDING, $currentIv);
-                fwrite($out, $encrypted);
-                $currentIv = substr($encrypted, -16);
-            }
-            $pending = $data;
+        if ($ciphertext === false) {
+            throw new \RuntimeException('Backup encryption failed.');
         }
 
-        // Final chunk: apply PKCS7 padding manually before encrypting
-        $padLen   = 16 - (strlen($pending) % 16);
-        $pending .= str_repeat(chr($padLen), $padLen);
-        fwrite($out, openssl_encrypt($pending, 'aes-256-cbc', $key, OPENSSL_RAW_DATA | OPENSSL_ZERO_PADDING, $currentIv));
-
-        fclose($in);
-        fclose($out);
+        // Format: magic(8) + salt(16) + iv(12) + tag(16) + ciphertext
+        file_put_contents($outputPath, 'DASHDDI2' . $salt . $iv . $tag . $ciphertext);
     }
 
     private function mysqlEscape(string $value): string

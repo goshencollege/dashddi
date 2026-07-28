@@ -24,7 +24,7 @@ class ClearpassServer
 
     #[ORM\Column(length: 255)]
     #[Assert\NotBlank]
-    #[Assert\Url]
+    #[Assert\Url(schemes: ['https'], message: 'The API URL must use HTTPS.')]
     private string $apiUrl = '';
 
     #[ORM\Column(length: 255)]

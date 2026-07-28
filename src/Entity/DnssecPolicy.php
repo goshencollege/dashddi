@@ -20,6 +20,10 @@ class DnssecPolicy
     #[ORM\Column(length: 64, unique: true)]
     #[Assert\NotBlank]
     #[Assert\Length(max: 64)]
+    #[Assert\Regex(
+        pattern: '/^[A-Za-z0-9_\-.]+$/',
+        message: 'Policy name may only contain letters, digits, hyphens, underscores, and dots.'
+    )]
     private string $name = '';
 
     #[ORM\Column(type: 'text', nullable: true)]

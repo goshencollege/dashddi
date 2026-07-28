@@ -35,6 +35,43 @@ class HostRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    /**
+     * Finds a non-deleted host whose interface IP matches the given connection target.
+     * If the target is a hostname rather than an IP, a DNS lookup is attempted first.
+     */
+    public function findByConnectionTarget(string $target): ?Host
+    {
+        $ip = filter_var($target, FILTER_VALIDATE_IP) !== false
+            ? $target
+            : (($resolved = gethostbyname($target)) !== $target ? $resolved : null);
+
+        if ($ip === null) {
+            return null;
+        }
+
+        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false) {
+            return $this->createQueryBuilder('h')
+                ->join('h.interfaces', 'i')
+                ->join('i.ipv6Address', 'ip6')
+                ->where('ip6.address = :ip')
+                ->andWhere('h.deletedAt IS NULL')
+                ->setParameter('ip', $ip)
+                ->setMaxResults(1)
+                ->getQuery()
+                ->getOneOrNullResult();
+        }
+
+        return $this->createQueryBuilder('h')
+            ->join('h.interfaces', 'i')
+            ->join('i.ipAddress', 'ipa')
+            ->where('ipa.address = :ip')
+            ->andWhere('h.deletedAt IS NULL')
+            ->setParameter('ip', $ip)
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
     /** @return Host[] */
     public function advancedSearch(array $criteria): array
     {
