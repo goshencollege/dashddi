@@ -241,6 +241,12 @@
         <p class="text-muted small mb-2">No SSH host keys stored yet. Keys are learned automatically on first connection, or you can add them manually below.</p>
         {% endif %}
         {% if not host.deleted %}
+        <form method="post" action="{{ path('host_scan_ssh_host_keys', {id: host.id}) }}" class="mb-2">
+            <input type="hidden" name="_token" value="{{ csrf_token('scan_ssh_host_keys_' ~ host.id) }}">
+            <button type="submit" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-radar me-1"></i>Scan with ssh-keyscan
+            </button>
+        </form>
         <details>
             <summary class="small text-secondary" style="cursor:pointer;">Add / replace keys manually</summary>
             <form method="post" action="{{ path('host_add_ssh_host_keys', {id: host.id}) }}" class="mt-2">

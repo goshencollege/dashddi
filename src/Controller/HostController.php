@@ -478,52 +478,7 @@ class HostController extends AbstractController
             return $this->redirectToRoute('host_show', ['id' => $host->getId()]);
         }
 
-        // Known SSH host key algorithm prefixes — used to detect ssh-keyscan hostname prefix
-        $sshAlgoPrefixes = ['ssh-', 'ecdsa-', 'sk-'];
-
-        $saved = 0;
-        $skipped = 0;
-        foreach (preg_split('/\r?\n/', $input) as $line) {
-            $line = trim($line);
-            if ($line === '' || str_starts_with($line, '#')) {
-                continue;
-            }
-
-            $parts = preg_split('/\s+/', $line, 4);
-
-            // ssh-keyscan format: "hostname algorithm base64key [comment]"
-            // Detect by checking whether the first token looks like an SSH algorithm.
-            $firstIsAlgo = false;
-            foreach ($sshAlgoPrefixes as $prefix) {
-                if (str_starts_with($parts[0], $prefix)) {
-                    $firstIsAlgo = true;
-                    break;
-                }
-            }
-            if (!$firstIsAlgo && count($parts) >= 3) {
-                array_shift($parts); // strip hostname
-            }
-
-            // Take algorithm + base64 key data only (drop any trailing comment)
-            $keyLine = ($parts[0] ?? '') . ' ' . ($parts[1] ?? '');
-
-            try {
-                $normalized = PublicKeyLoader::load(trim($keyLine))->toString('OpenSSH');
-                $np = explode(' ', trim($normalized), 3);
-                $algorithm = $np[0];
-                $fullKey   = $np[0] . ' ' . $np[1];
-
-                $existing = $host->getSshHostKeyByAlgorithm($algorithm);
-                if ($existing !== null) {
-                    $existing->setPublicKey($fullKey);
-                } else {
-                    $em->persist((new SshHostKey())->setHost($host)->setAlgorithm($algorithm)->setPublicKey($fullKey));
-                }
-                $saved++;
-            } catch (\Throwable) {
-                $skipped++;
-            }
-        }
+        [$saved, $skipped] = $this->ingestKeyLines($input, $host, $em);
 
         if ($saved === 0) {
             $this->addFlash('danger', 'No valid SSH public keys found. Paste the contents of the server\'s host public key file(s) or ssh-keyscan output.');
@@ -532,6 +487,67 @@ class HostController extends AbstractController
             $msg = $saved === 1 ? '1 SSH host key saved.' : "$saved SSH host keys saved.";
             if ($skipped > 0) {
                 $msg .= " ($skipped line(s) skipped — not valid SSH public keys.)";
+            }
+            $this->addFlash('success', $msg);
+        }
+
+        return $this->redirectToRoute('host_show', ['id' => $host->getId()]);
+    }
+
+    #[Route('/{id}/scan-ssh-host-keys', name: 'host_scan_ssh_host_keys', methods: ['POST'], requirements: ['id' => '\d+'])]
+    public function scanSshHostKeys(Request $request, Host $host, EntityManagerInterface $em): Response
+    {
+        if (!$this->isCsrfTokenValid('scan_ssh_host_keys_' . $host->getId(), $request->request->get('_token'))) {
+            return $this->redirectToRoute('host_show', ['id' => $host->getId()]);
+        }
+
+        $ip = null;
+        foreach ($host->getInterfaces() as $iface) {
+            if ($iface->isDeleted()) {
+                continue;
+            }
+            if ($iface->getIpAddress() !== null) {
+                $ip = $iface->getIpAddress()->getAddress();
+                break;
+            }
+        }
+
+        if ($ip === null) {
+            $this->addFlash('danger', 'No IPv4 address found on this host — cannot run ssh-keyscan.');
+            return $this->redirectToRoute('host_show', ['id' => $host->getId()]);
+        }
+
+        // proc_open with array avoids shell interpretation entirely
+        $process = proc_open(
+            ['ssh-keyscan', '-T', '5', $ip],
+            [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+            $pipes
+        );
+
+        if ($process === false) {
+            $this->addFlash('danger', 'Failed to run ssh-keyscan.');
+            return $this->redirectToRoute('host_show', ['id' => $host->getId()]);
+        }
+
+        $stdout = stream_get_contents($pipes[1]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        proc_close($process);
+
+        if (trim($stdout) === '') {
+            $this->addFlash('danger', "ssh-keyscan returned no keys for $ip — host may be unreachable or not running SSH.");
+            return $this->redirectToRoute('host_show', ['id' => $host->getId()]);
+        }
+
+        [$saved, $skipped] = $this->ingestKeyLines($stdout, $host, $em);
+
+        if ($saved === 0) {
+            $this->addFlash('danger', "ssh-keyscan ran against $ip but returned no recognisable host keys.");
+        } else {
+            $em->flush();
+            $msg = $saved === 1 ? "1 SSH host key scanned from $ip." : "$saved SSH host keys scanned from $ip.";
+            if ($skipped > 0) {
+                $msg .= " ($skipped line(s) skipped.)";
             }
             $this->addFlash('success', $msg);
         }
@@ -562,6 +578,56 @@ class HostController extends AbstractController
             $this->addFlash('success', 'Host deleted.');
         }
         return $this->redirectToRoute('host_index');
+    }
+
+    /** Parse ssh-keyscan / bare-key text, upsert valid keys, return [saved, skipped]. Does NOT flush. */
+    private function ingestKeyLines(string $input, Host $host, EntityManagerInterface $em): array
+    {
+        $sshAlgoPrefixes = ['ssh-', 'ecdsa-', 'sk-'];
+        $saved = 0;
+        $skipped = 0;
+
+        foreach (preg_split('/\r?\n/', $input) as $line) {
+            $line = trim($line);
+            if ($line === '' || str_starts_with($line, '#')) {
+                continue;
+            }
+
+            $parts = preg_split('/\s+/', $line, 4);
+
+            // ssh-keyscan format: "hostname algorithm base64key [comment]" — strip hostname if first token isn't an algo
+            $firstIsAlgo = false;
+            foreach ($sshAlgoPrefixes as $prefix) {
+                if (str_starts_with($parts[0], $prefix)) {
+                    $firstIsAlgo = true;
+                    break;
+                }
+            }
+            if (!$firstIsAlgo && count($parts) >= 3) {
+                array_shift($parts);
+            }
+
+            $keyLine = ($parts[0] ?? '') . ' ' . ($parts[1] ?? '');
+
+            try {
+                $normalized = PublicKeyLoader::load(trim($keyLine))->toString('OpenSSH');
+                $np = explode(' ', trim($normalized), 3);
+                $algorithm = $np[0];
+                $fullKey   = $np[0] . ' ' . $np[1];
+
+                $existing = $host->getSshHostKeyByAlgorithm($algorithm);
+                if ($existing !== null) {
+                    $existing->setPublicKey($fullKey);
+                } else {
+                    $em->persist((new SshHostKey())->setHost($host)->setAlgorithm($algorithm)->setPublicKey($fullKey));
+                }
+                $saved++;
+            } catch (\Throwable) {
+                $skipped++;
+            }
+        }
+
+        return [$saved, $skipped];
     }
 
     private function assignIps(\Symfony\Component\Form\FormInterface $ifaceForm, \App\Entity\NetworkInterface $interface): void
