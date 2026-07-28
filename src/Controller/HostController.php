@@ -13,6 +13,7 @@ use App\Entity\UserPreference;
 use App\Repository\UserPreferenceRepository;
 use App\Service\IpAddressManager;
 use App\Service\ReservedTagPrefixService;
+use phpseclib3\Crypt\PublicKeyLoader;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -460,6 +461,35 @@ class HostController extends AbstractController
             $em->flush();
             $this->addFlash('success', 'Host "' . $host->getName() . '" and its interfaces have been restored.');
         }
+        return $this->redirectToRoute('host_show', ['id' => $host->getId()]);
+    }
+
+    #[Route('/{id}/set-ssh-host-key', name: 'host_set_ssh_host_key', methods: ['POST'], requirements: ['id' => '\d+'])]
+    public function setSshHostKey(Request $request, Host $host, EntityManagerInterface $em): Response
+    {
+        if (!$this->isCsrfTokenValid('set_ssh_host_key_' . $host->getId(), $request->request->get('_token'))) {
+            return $this->redirectToRoute('host_show', ['id' => $host->getId()]);
+        }
+
+        $input = trim($request->request->get('ssh_host_public_key', ''));
+
+        if ($input === '') {
+            $this->addFlash('danger', 'No key provided.');
+            return $this->redirectToRoute('host_show', ['id' => $host->getId()]);
+        }
+
+        try {
+            $loaded = PublicKeyLoader::load($input);
+            $normalized = $loaded->toString('OpenSSH');
+            // Strip optional trailing comment so stored format matches getServerPublicHostKey()
+            $parts = explode(' ', trim($normalized), 3);
+            $host->setSshHostPublicKey($parts[0] . ' ' . $parts[1]);
+            $em->flush();
+            $this->addFlash('success', 'SSH host key saved. Fingerprint: ' . $host->getSshHostKeyFingerprint());
+        } catch (\Throwable) {
+            $this->addFlash('danger', 'Invalid SSH public key. Paste the contents of the server\'s host public key file (e.g. /etc/ssh/ssh_host_ed25519_key.pub).');
+        }
+
         return $this->redirectToRoute('host_show', ['id' => $host->getId()]);
     }
 
