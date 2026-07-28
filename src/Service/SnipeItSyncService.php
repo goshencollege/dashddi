@@ -456,12 +456,22 @@ class SnipeItSyncService
         $link->setSnipeAssetName($name);
         $link->setSnipeAssetTag($assetTagStr);
 
-        // Refresh category tag: replace any existing snipeit: tag with the current one
-        foreach ($host->getTags()->filter(fn(Tag $t) => str_starts_with($t->getName(), 'snipeit:'))->toArray() as $t) {
-            $host->removeTag($t);
-        }
-        if ($categoryName !== '') {
-            $host->addTag($this->ensureTag('snipeit:' . $categoryName));
+        // Refresh category tag only if it has actually changed
+        $currentCategoryTags = $host->getTags()
+            ->filter(fn(Tag $t) => str_starts_with($t->getName(), 'snipeit:'))
+            ->toArray();
+        $desiredTagName = $categoryName !== '' ? 'snipeit:' . $categoryName : null;
+        $currentTagNames = array_map(fn(Tag $t) => $t->getName(), $currentCategoryTags);
+        $alreadyCorrect = count($currentTagNames) === ($desiredTagName !== null ? 1 : 0)
+            && ($desiredTagName === null || in_array($desiredTagName, $currentTagNames, true));
+
+        if (!$alreadyCorrect) {
+            foreach ($currentCategoryTags as $t) {
+                $host->removeTag($t);
+            }
+            if ($desiredTagName !== null) {
+                $host->addTag($this->ensureTag($desiredTagName));
+            }
         }
 
         $normalizedMacs = array_keys($macAliasMap);
