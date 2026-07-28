@@ -501,19 +501,28 @@ class HostController extends AbstractController
             return $this->redirectToRoute('host_show', ['id' => $host->getId()]);
         }
 
-        $ip = null;
+        // Collect all valid scan targets from non-deleted interfaces
+        $validTargets = [];
         foreach ($host->getInterfaces() as $iface) {
             if ($iface->isDeleted()) {
                 continue;
             }
             if ($iface->getIpAddress() !== null) {
-                $ip = $iface->getIpAddress()->getAddress();
-                break;
+                $validTargets[] = $iface->getIpAddress()->getAddress();
+            }
+            if ($iface->getIpv6Address() !== null) {
+                $validTargets[] = $iface->getIpv6Address()->getAddress();
             }
         }
 
-        if ($ip === null) {
-            $this->addFlash('danger', 'No IPv4 address found on this host — cannot run ssh-keyscan.');
+        if ($validTargets === []) {
+            $this->addFlash('danger', 'No IP addresses found on this host — cannot run ssh-keyscan.');
+            return $this->redirectToRoute('host_show', ['id' => $host->getId()]);
+        }
+
+        $ip = $request->request->getString('scan_target', '');
+        if ($ip === '' || !in_array($ip, $validTargets, true)) {
+            $this->addFlash('danger', 'Invalid scan target.');
             return $this->redirectToRoute('host_show', ['id' => $host->getId()]);
         }
 
