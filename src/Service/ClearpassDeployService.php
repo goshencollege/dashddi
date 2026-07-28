@@ -219,6 +219,9 @@ class ClearpassDeployService
         ?array $body,
     ): array {
         $url     = $server->getApiUrl() . $path;
+        if (strtolower(parse_url($url, PHP_URL_SCHEME) ?? '') !== 'https') {
+            throw new \RuntimeException('ClearPass API URL must use HTTPS.');
+        }
         $payload = $body !== null ? json_encode($body) : null;
 
         $headers = "Content-Type: application/json\r\nAccept: application/json\r\n";
