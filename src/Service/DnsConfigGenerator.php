@@ -306,16 +306,18 @@ class DnsConfigGenerator
         $lines[] = '';
 
         foreach ($this->aclRepo->findBy([], ['name' => 'ASC']) as $acl) {
-            $lines[] = 'acl "' . $acl->getName() . '" {';
+            $lines[] = 'acl "' . $this->sanitizeBindName($acl->getName()) . '" {';
             foreach ($acl->getEntries() as $entry) {
-                $lines[] = '    ' . $entry . ';';
+                // Strip injection characters from unquoted ACL entries (defense-in-depth;
+                // the entity validator already rejects entries with these characters).
+                $lines[] = '    ' . preg_replace('/[;{}\'"\\\\]/', '', (string) $entry) . ';';
             }
             $lines[] = '};';
             $lines[] = '';
         }
 
         foreach ($this->policyRepo->findBy([], ['name' => 'ASC']) as $policy) {
-            $lines[] = 'dnssec-policy "' . $policy->getName() . '" {';
+            $lines[] = 'dnssec-policy "' . $this->sanitizeBindName($policy->getName()) . '" {';
             foreach ([
                 'dnskey-ttl'          => $policy->getDnskeyTtl(),
                 'max-zone-ttl'        => $policy->getMaxZoneTtl(),
@@ -351,9 +353,9 @@ class DnsConfigGenerator
 
         // Emit a TSIG key block if this server has DDNS configured.
         if ($server->getDdnsAlgorithm() && $server->getDdnsSecret()) {
-            $lines[] = 'key "' . $server->getDdnsKeyName() . '" {';
+            $lines[] = 'key "' . $this->sanitizeBindName($server->getDdnsKeyName()) . '" {';
             $lines[] = '    algorithm ' . $server->getDdnsAlgorithm()->bindName() . ';';
-            $lines[] = '    secret "' . $server->getDdnsSecret() . '";';
+            $lines[] = '    secret "' . $this->sanitizeBindName($server->getDdnsSecret()) . '";';
             $lines[] = '};';
             $lines[] = '';
         }
@@ -362,7 +364,7 @@ class DnsConfigGenerator
             $domains = $this->domainsForView($view);
             $subnets = $this->subnetsForView($view);
 
-            $lines[] = 'view "' . $view->getName() . '" {';
+            $lines[] = 'view "' . $this->sanitizeBindName($view->getName()) . '" {';
 
             $matchClients = $view->getMatchClients();
             if (!empty($matchClients)) {
@@ -405,13 +407,13 @@ class DnsConfigGenerator
                     $lines[] = '        type secondary;';
                     $lines[] = '        file "' . $file . '";';
                     if ($primaryHost) {
-                        $lines[] = '        primaries { ' . $primaryHost . '; };';
+                        $lines[] = '        primaries { ' . $this->sanitizeBindName($primaryHost) . '; };';
                     }
                 } else {
                     $lines[] = '        type master;';
                     $lines[] = '        file "' . $file . '";';
                     if ($domain->getDnssecPolicy()) {
-                        $lines[] = '        dnssec-policy "' . $domain->getDnssecPolicy()->getName() . '";';
+                        $lines[] = '        dnssec-policy "' . $this->sanitizeBindName($domain->getDnssecPolicy()->getName()) . '";';
                         if ($keyDirBase) {
                             $lines[] = '        key-directory "' . $keyDirBase . '/' . $domain->getName() . '";';
                             $lines[] = '        inline-signing yes;';
@@ -421,7 +423,7 @@ class DnsConfigGenerator
                         && $domain->getDdnsDnsServer()?->getId() === $server->getId()
                         && $server->getDdnsAlgorithm()
                     ) {
-                        $lines[] = '        allow-update { key "' . $server->getDdnsKeyName() . '"; };';
+                        $lines[] = '        allow-update { key "' . $this->sanitizeBindName($server->getDdnsKeyName()) . '"; };';
                     }
                 }
                 $lines[] = '    };';
@@ -462,7 +464,7 @@ class DnsConfigGenerator
                         $lines[] = '        type master;';
                         $lines[] = '        file "' . $file . '";';
                         if ($subnet->getDnssecPolicy()) {
-                            $lines[] = '        dnssec-policy "' . $subnet->getDnssecPolicy()->getName() . '";';
+                            $lines[] = '        dnssec-policy "' . $this->sanitizeBindName($subnet->getDnssecPolicy()->getName()) . '";';
                             if ($keyDirBase) {
                                 $lines[] = '        key-directory "' . $keyDirBase . '/' . $zoneName . '";';
                                 $lines[] = '        inline-signing yes;';
@@ -472,7 +474,7 @@ class DnsConfigGenerator
                             && $subnet->getDdnsDnsServer()?->getId() === $server->getId()
                             && $server->getDdnsAlgorithm()
                         ) {
-                            $lines[] = '        allow-update { key "' . $server->getDdnsKeyName() . '"; };';
+                            $lines[] = '        allow-update { key "' . $this->sanitizeBindName($server->getDdnsKeyName()) . '"; };';
                         }
                     }
                     $lines[] = '    };';
@@ -809,6 +811,15 @@ class DnsConfigGenerator
             }
         }
         return false;
+    }
+
+    /**
+     * Strip characters that would break out of a BIND double-quoted string context.
+     * Applied to every user-supplied name interpolated as "NAME" in named.conf.
+     */
+    private function sanitizeBindName(string $name): string
+    {
+        return str_replace(['"', '\\', "\n", "\r"], '', $name);
     }
 
     private function ensureTrailingDot(string $s): string
