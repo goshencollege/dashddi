@@ -463,6 +463,17 @@ class HostController extends AbstractController
         return $this->redirectToRoute('host_show', ['id' => $host->getId()]);
     }
 
+    #[Route('/{id}/clear-ssh-host-key', name: 'host_clear_ssh_host_key', methods: ['POST'], requirements: ['id' => '\d+'])]
+    public function clearSshHostKey(Request $request, Host $host, EntityManagerInterface $em): Response
+    {
+        if ($this->isCsrfTokenValid('clear_ssh_host_key_' . $host->getId(), $request->request->get('_token'))) {
+            $host->setSshHostPublicKey(null);
+            $em->flush();
+            $this->addFlash('success', 'SSH host key cleared. The next connection will learn and store the new key.');
+        }
+        return $this->redirectToRoute('host_show', ['id' => $host->getId()]);
+    }
+
     #[Route('/{id}/delete', name: 'host_delete', methods: ['POST'], requirements: ['id' => '\d+'])]
     public function delete(Request $request, Host $host, EntityManagerInterface $em): Response
     {

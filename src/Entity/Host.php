@@ -55,6 +55,9 @@ class Host
     #[ORM\OneToOne(mappedBy: 'host', targetEntity: ApiToken::class)]
     private ?ApiToken $apiToken = null;
 
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $sshHostPublicKey = null;
+
     public function __construct()
     {
         $this->interfaces = new ArrayCollection();
@@ -122,6 +125,33 @@ class Host
     public function setSnipeItAssetLink(?SnipeItAssetLink $link): static { $this->snipeItAssetLink = $link; return $this; }
 
     public function getApiToken(): ?ApiToken { return $this->apiToken; }
+
+    public function getSshHostPublicKey(): ?string { return $this->sshHostPublicKey; }
+    public function setSshHostPublicKey(?string $key): static { $this->sshHostPublicKey = $key; return $this; }
+
+    public function getSshHostKeyFingerprint(): ?string
+    {
+        if ($this->sshHostPublicKey === null) {
+            return null;
+        }
+        $parts = explode(' ', trim($this->sshHostPublicKey), 3);
+        if (count($parts) < 2) {
+            return null;
+        }
+        $raw = base64_decode($parts[1], true);
+        if ($raw === false) {
+            return null;
+        }
+        return 'SHA256:' . rtrim(base64_encode(hash('sha256', $raw, true)), '=');
+    }
+
+    public function getSshHostKeyAlgorithm(): ?string
+    {
+        if ($this->sshHostPublicKey === null) {
+            return null;
+        }
+        return explode(' ', trim($this->sshHostPublicKey), 2)[0] ?? null;
+    }
 
     /** Soft-deletes the host and cascades to all of its interfaces. */
     public function softDeleteWithInterfaces(): static

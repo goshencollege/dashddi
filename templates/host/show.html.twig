@@ -204,6 +204,35 @@
     {% endif %}
 </div>
 
+{% if host.sshHostPublicKey or not host.deleted %}
+<div class="card mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-shield-lock me-1"></i>SSH Host Key</span>
+    </div>
+    <div class="card-body py-2">
+        {% if host.sshHostPublicKey %}
+        <dl class="row mb-0 small">
+            <dt class="col-sm-3">Algorithm</dt>
+            <dd class="col-sm-9 font-monospace">{{ host.sshHostKeyAlgorithm }}</dd>
+            <dt class="col-sm-3">Fingerprint</dt>
+            <dd class="col-sm-9 font-monospace">{{ host.sshHostKeyFingerprint }}</dd>
+        </dl>
+        {% if not host.deleted %}
+        <form method="post" action="{{ path('host_clear_ssh_host_key', {id: host.id}) }}" class="mt-2"
+              onsubmit="return confirm('Clear the stored SSH host key? The next deploy to this host will learn and store the new key.');">
+            <input type="hidden" name="_token" value="{{ csrf_token('clear_ssh_host_key_' ~ host.id) }}">
+            <button type="submit" class="btn btn-sm btn-outline-danger">
+                <i class="bi bi-trash me-1"></i>Clear stored key
+            </button>
+        </form>
+        {% endif %}
+        {% else %}
+        <p class="text-muted small mb-0">No SSH host key stored yet. The key will be learned and pinned automatically on the first SSH connection to this host's IP address.</p>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
 {% set snipeLink = host.snipeItAssetLink %}
 {% if snipeLink %}
 <div class="card mb-3">

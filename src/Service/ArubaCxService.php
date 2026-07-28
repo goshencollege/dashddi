@@ -8,6 +8,7 @@ use phpseclib3\Net\SSH2;
 
 class ArubaCxService
 {
+    public function __construct(private readonly SshKeyService $sshKeys) {}
     // ── REST helpers ──────────────────────────────────────────────────────────
 
     private function baseUrl(ArubaSwitch $creds, string $ip): string
@@ -129,6 +130,8 @@ class ArubaCxService
         if (!$loggedIn) {
             throw new \RuntimeException('SSH login failed for ' . $ip);
         }
+
+        $this->sshKeys->verifyAndLearnHostKey($ssh, $ip);
 
         return $ssh;
     }

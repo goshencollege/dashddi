@@ -2,7 +2,9 @@
 
 namespace App\Tests\Unit\Service;
 
+use App\Repository\HostRepository;
 use App\Service\SshKeyService;
+use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 
 class SshKeyServiceTest extends TestCase
@@ -11,7 +13,10 @@ class SshKeyServiceTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->service = new SshKeyService();
+        $this->service = new SshKeyService(
+            $this->createStub(HostRepository::class),
+            $this->createStub(EntityManagerInterface::class),
+        );
     }
 
     public function testGenerateKeyPairReturnsBothKeys(): void
