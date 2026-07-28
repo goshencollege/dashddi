@@ -63,12 +63,12 @@ class BackupSettingType extends AbstractType
             ->add('includeEncryptionKey', CheckboxType::class, [
                 'label'    => 'Include APP_ENCRYPTION_KEY in backup header',
                 'required' => false,
-                'help'     => 'Adds the encryption key as a SQL comment so the backup can be fully decrypted later even if the key changes. Ignored when "decrypt fields" is enabled.',
+                'help'     => 'Adds the encryption key as a SQL comment so the backup can be fully decrypted later even if the key changes. Requires "Encrypt the backup file" — embedding the key in an unencrypted backup would expose it to anyone with file access.',
             ])
             ->add('encryptBackup', CheckboxType::class, [
                 'label'    => 'Encrypt the backup file',
                 'required' => false,
-                'help'     => 'Uses AES-256-CBC + PBKDF2 to encrypt the backup file. Requires a backup password below.',
+                'help'     => 'Uses AES-256-GCM + PBKDF2 to encrypt the backup file. Requires a backup password below.',
             ])
             ->add('backupPassword', PasswordType::class, [
                 'label'        => 'Backup Encryption Password',

@@ -38,7 +38,7 @@ class DatabaseBackupCommand extends Command
             ->addOption('cifs-password', null, InputOption::VALUE_REQUIRED, 'CIFS password (overrides settings)')
             ->addOption('cifs-subdir', null, InputOption::VALUE_REQUIRED, 'Subdirectory on CIFS share (overrides settings)')
             ->addOption('decrypt-fields', null, InputOption::VALUE_NONE, 'Decrypt encrypted DB fields in the backup SQL')
-            ->addOption('include-key', null, InputOption::VALUE_NONE, 'Embed APP_ENCRYPTION_KEY in a SQL comment header')
+            ->addOption('include-key', null, InputOption::VALUE_NONE, 'Embed APP_ENCRYPTION_KEY in a SQL comment header (requires --encrypt-backup)')
             ->addOption('encrypt-backup', null, InputOption::VALUE_NONE, 'Encrypt the backup file with AES-256-CBC')
             ->addOption('backup-password', null, InputOption::VALUE_REQUIRED, 'Password for backup file encryption/decryption')
             ->addOption('retention', null, InputOption::VALUE_REQUIRED, 'Number of backups to keep (0 = unlimited, overrides settings)')
@@ -89,6 +89,11 @@ class DatabaseBackupCommand extends Command
 
         if ($encryptBackup && $backupPassword === '') {
             $io->error('Backup encryption requires a password. Set --backup-password or configure one in Backup Settings.');
+            return Command::FAILURE;
+        }
+
+        if ($includeKey && !$encryptBackup) {
+            $io->error('APP_ENCRYPTION_KEY can only be embedded in an encrypted backup. Enable backup encryption or disable the include-key option.');
             return Command::FAILURE;
         }
 
