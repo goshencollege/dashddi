@@ -13,6 +13,12 @@ use Symfony\Component\Security\Core\User\UserInterface;
 #[AsDoctrineListener(event: Events::preUpdate)]
 class AuditListener
 {
+    /**
+     * Fields whose changes are system-generated and should not count as a
+     * user edit — mirrors the system-only subset of ActivityLogListener::ALWAYS_IGNORED.
+     */
+    private const SYSTEM_FIELDS = ['lastDhcpAt', 'lastDhcpIp', 'lastAuthAt', 'lastSyncAt', 'lastUsedAt', 'switchIp', 'switchPort'];
+
     public function __construct(private readonly TokenStorageInterface $tokenStorage) {}
 
     public function prePersist(PrePersistEventArgs $args): void
@@ -35,6 +41,11 @@ class AuditListener
     {
         $entity = $args->getObject();
         if (!method_exists($entity, 'setUpdatedAt')) {
+            return;
+        }
+
+        $userChangedFields = array_diff_key($args->getEntityChangeSet(), array_flip(self::SYSTEM_FIELDS));
+        if (empty($userChangedFields)) {
             return;
         }
 
