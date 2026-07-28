@@ -304,19 +304,36 @@ class DatabaseRestoreCommand extends Command
 
     private function decryptContent(string $data, string $password): ?string
     {
-        // Format: magic(8) + salt(16) + iv(16) + ciphertext
-        if (strlen($data) < 40 || substr($data, 0, 8) !== 'DASHDDI1') {
-            return null;
+        $magic = substr($data, 0, 8);
+
+        if ($magic === 'DASHDDI2') {
+            // AES-256-GCM: magic(8) + salt(16) + iv(12) + tag(16) + ciphertext
+            if (strlen($data) < 52) {
+                return null;
+            }
+            $salt       = substr($data, 8, 16);
+            $iv         = substr($data, 24, 12);
+            $tag        = substr($data, 36, 16);
+            $ciphertext = substr($data, 52);
+            $key        = openssl_pbkdf2($password, $salt, 32, 100000, 'sha256');
+            $result     = openssl_decrypt($ciphertext, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $iv, $tag);
+            return $result === false ? null : $result;
         }
 
-        $salt      = substr($data, 8, 16);
-        $iv        = substr($data, 24, 16);
-        $encrypted = substr($data, 40);
+        if ($magic === 'DASHDDI1') {
+            // Legacy AES-256-CBC: magic(8) + salt(16) + iv(16) + ciphertext
+            if (strlen($data) < 40) {
+                return null;
+            }
+            $salt      = substr($data, 8, 16);
+            $iv        = substr($data, 24, 16);
+            $encrypted = substr($data, 40);
+            $key       = openssl_pbkdf2($password, $salt, 32, 100000, 'sha256');
+            $result    = openssl_decrypt($encrypted, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
+            return $result === false ? null : $result;
+        }
 
-        $key    = openssl_pbkdf2($password, $salt, 32, 100000, 'sha256');
-        $result = openssl_decrypt($encrypted, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
-
-        return $result === false ? null : $result;
+        return null;
     }
 
     private function cleanup(?string ...$files): void

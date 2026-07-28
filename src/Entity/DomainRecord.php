@@ -150,6 +150,13 @@ class DomainRecord
             return;
         }
 
+        if (str_contains($this->value, "\n") || str_contains($this->value, "\r")) {
+            $context->buildViolation('Record value must not contain newlines.')
+                ->atPath('value')
+                ->addViolation();
+            return;
+        }
+
         match ($this->type) {
             RecordType::A    => $this->validateIpValue($context, FILTER_FLAG_IPV4, 'Must be a valid IPv4 address.'),
             RecordType::AAAA => $this->validateIpValue($context, FILTER_FLAG_IPV6, 'Must be a valid IPv6 address.'),

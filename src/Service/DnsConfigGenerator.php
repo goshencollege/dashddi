@@ -826,6 +826,10 @@ class DnsConfigGenerator
     // 255 bytes are split into multiple quoted strings (concatenated by resolvers).
     private function formatRecordValue(RecordType $type, string $value): string
     {
+        // Strip newlines — zone files are line-based; embedded newlines in any record
+        // value would allow injecting arbitrary resource records.
+        $value = str_replace(["\r\n", "\r", "\n"], '', $value);
+
         if ($type !== RecordType::TXT) {
             return $value;
         }
