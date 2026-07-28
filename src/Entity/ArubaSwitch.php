@@ -34,8 +34,8 @@ class ArubaSwitch
     #[ORM\Column(length: 20, options: ['default' => 'v10.12'])]
     private string $restApiVersion = 'v10.12';
 
-    #[ORM\Column(options: ['default' => false])]
-    private bool $verifyTls = false;
+    #[ORM\Column(options: ['default' => true])]
+    private bool $verifyTls = true;
 
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $description = null;

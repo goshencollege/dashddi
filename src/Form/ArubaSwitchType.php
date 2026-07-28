@@ -37,7 +37,7 @@ class ArubaSwitchType extends AbstractType
             ->add('verifyTls', CheckboxType::class, [
                 'label'    => 'Verify TLS Certificate',
                 'required' => false,
-                'help'     => 'Disable if the switch uses a self-signed certificate (typical for management interfaces).',
+                'help'     => 'Recommended. Uncheck only if the switch uses a self-signed certificate that cannot be added to the server\'s trust store.',
             ])
             ->add('description', TextareaType::class, [
                 'label'    => 'Description',
