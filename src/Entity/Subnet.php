@@ -11,6 +11,7 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Validator\Constraints as Assert;
+use Symfony\Component\Validator\Context\ExecutionContextInterface;
 
 #[ORM\Entity(repositoryClass: SubnetRepository::class)]
 #[ORM\Table(name: 'subnet')]
@@ -28,17 +29,9 @@ class Subnet
     private string $name = '';
 
     #[ORM\Column(length: 50, nullable: true)]
-    #[Assert\Regex(
-        pattern: '/^(\d{1,3}\.){3}\d{1,3}\/\d{1,2}$/',
-        message: 'Must be a valid IPv4 CIDR (e.g. 192.168.1.0/24)'
-    )]
     private ?string $ipv4Cidr = null;
 
     #[ORM\Column(length: 100, nullable: true)]
-    #[Assert\Regex(
-        pattern: '/^[0-9a-fA-F:]+\/\d{1,3}$/',
-        message: 'Must be a valid IPv6 CIDR (e.g. 2001:db8::/64)'
-    )]
     private ?string $ipv6Cidr = null;
 
     #[ORM\Column(type: 'text', nullable: true)]
@@ -271,6 +264,54 @@ class Subnet
         $count   = (int) ceil((int) $prefix / 4);
         $parts   = array_reverse(array_slice($nibbles, 0, max(1, $count)));
         return implode('.', $parts) . '.ip6.arpa';
+    }
+
+    #[Assert\Callback]
+    public function validateIpv4Cidr(ExecutionContextInterface $context): void
+    {
+        if ($this->ipv4Cidr === null) {
+            return;
+        }
+        $parts = explode('/', $this->ipv4Cidr, 2);
+        if (count($parts) !== 2) {
+            $context->buildViolation('Must be a valid IPv4 CIDR (e.g. 192.168.1.0/24)')
+                ->atPath('ipv4Cidr')->addViolation();
+            return;
+        }
+        [$addr, $prefix] = $parts;
+        $prefixInt = (int) $prefix;
+        if (!filter_var($addr, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)
+            || (string) $prefixInt !== $prefix
+            || $prefixInt < 0
+            || $prefixInt > 32
+        ) {
+            $context->buildViolation('Must be a valid IPv4 CIDR (e.g. 192.168.1.0/24)')
+                ->atPath('ipv4Cidr')->addViolation();
+        }
+    }
+
+    #[Assert\Callback]
+    public function validateIpv6Cidr(ExecutionContextInterface $context): void
+    {
+        if ($this->ipv6Cidr === null) {
+            return;
+        }
+        $parts = explode('/', $this->ipv6Cidr, 2);
+        if (count($parts) !== 2) {
+            $context->buildViolation('Must be a valid IPv6 CIDR (e.g. 2001:db8::/64)')
+                ->atPath('ipv6Cidr')->addViolation();
+            return;
+        }
+        [$addr, $prefix] = $parts;
+        $prefixInt = (int) $prefix;
+        if (!filter_var($addr, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)
+            || (string) $prefixInt !== $prefix
+            || $prefixInt < 0
+            || $prefixInt > 128
+        ) {
+            $context->buildViolation('Must be a valid IPv6 CIDR (e.g. 2001:db8::/64)')
+                ->atPath('ipv6Cidr')->addViolation();
+        }
     }
 
     public function __toString(): string

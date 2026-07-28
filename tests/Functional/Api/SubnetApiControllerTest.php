@@ -150,6 +150,18 @@ class SubnetApiControllerTest extends AppWebTestCase
         $this->assertSame(422, $this->client->getResponse()->getStatusCode());
     }
 
+    public function testCreateRejectsOutOfRangeIpv4Octet(): void
+    {
+        $this->apiRequest('POST', '/api/subnets', ['name' => 'BadOctet', 'ipv4_cidr' => '999.0.0.0/24']);
+        $this->assertSame(422, $this->client->getResponse()->getStatusCode());
+    }
+
+    public function testCreateRejectsOutOfRangeIpv4Prefix(): void
+    {
+        $this->apiRequest('POST', '/api/subnets', ['name' => 'BadPrefix', 'ipv4_cidr' => '10.0.0.0/33']);
+        $this->assertSame(422, $this->client->getResponse()->getStatusCode());
+    }
+
     public function testCreateRejectsOutOfRangeVlan(): void
     {
         $this->apiRequest('POST', '/api/subnets', ['name' => 'BadVlan', 'vlan' => 5000]);
@@ -161,5 +173,24 @@ class SubnetApiControllerTest extends AppWebTestCase
         $subnet = $this->makeSubnet('ToUpdate', '10.8.0.0/24');
         $this->apiRequest('PATCH', "/api/subnets/{$subnet->getId()}", ['ipv4_cidr' => 'not-a-cidr']);
         $this->assertSame(422, $this->client->getResponse()->getStatusCode());
+    }
+
+    public function testCreateRejectsInvalidIpv6Cidr(): void
+    {
+        $this->apiRequest('POST', '/api/subnets', ['name' => 'BadV6', 'ipv6_cidr' => 'notipv6/64']);
+        $this->assertSame(422, $this->client->getResponse()->getStatusCode());
+    }
+
+    public function testCreateRejectsOutOfRangeIpv6Prefix(): void
+    {
+        $this->apiRequest('POST', '/api/subnets', ['name' => 'BadV6Prefix', 'ipv6_cidr' => '2001:db8::/129']);
+        $this->assertSame(422, $this->client->getResponse()->getStatusCode());
+    }
+
+    public function testCreateAcceptsValidIpv6Cidr(): void
+    {
+        $data = $this->apiRequest('POST', '/api/subnets', ['name' => 'ValidV6', 'ipv6_cidr' => '2001:db8::/48']);
+        $this->assertSame(201, $this->client->getResponse()->getStatusCode());
+        $this->assertSame('2001:db8::/48', $data['ipv6_cidr']);
     }
 }
