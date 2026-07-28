@@ -321,6 +321,37 @@
     </div>
 </div>
 
+<div class="card mb-4" id="ssh-host-keys">
+    <div class="card-header fw-semibold"><i class="bi bi-shield-lock me-1"></i>SSH Host Key Pinning</div>
+    <div class="card-body">
+        <p>DashDDI connects to DNS and DHCP servers over SSH to push configuration files. To protect against man-in-the-middle attacks, it pins the SSH host key for each server using a <strong>Trust On First Use (TOFU)</strong> policy: the key presented by the server on the first connection is stored and verified on every subsequent connection.</p>
+
+        <h6 class="mt-3">How TOFU works</h6>
+        <p>The first time DashDDI connects to a server, it saves the host key automatically — no action is required. On every subsequent connection, it compares the presented key against the stored value. If they do not match, the connection is refused and a descriptive error is logged. This prevents an attacker who has intercepted the network path from transparently proxying the SSH session.</p>
+        <p class="text-muted small">Keys are stored per algorithm (e.g. <code>ssh-ed25519</code>, <code>ecdsa-sha2-nistp256</code>). A host may have multiple stored keys — one per algorithm — to support servers that advertise more than one key type.</p>
+
+        <h6 class="mt-3">Viewing stored keys</h6>
+        <p>The <strong>SSH Host Keys</strong> card on the host detail page lists every stored key for that host, showing the algorithm and the SHA-256 fingerprint. Use the fingerprint to verify the key against the server's own record:</p>
+        <pre class="small bg-body-secondary rounded p-2">ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub</pre>
+
+        <h6 class="mt-3">Adding keys automatically (ssh-keyscan)</h6>
+        <p>Click <strong>Scan with ssh-keyscan</strong> on the host detail page. DashDDI will run <code>ssh-keyscan</code> against the host's first IPv4 address and import all returned keys. The scan uses a 5-second timeout and will report an error if the host is unreachable or not running SSH. This is the easiest way to pre-load keys before the first automated connection, or to add keys for additional algorithms.</p>
+
+        <h6 class="mt-3">Adding keys manually</h6>
+        <p>Expand the <strong>Add / replace keys manually</strong> panel and paste one or more public host keys. Both formats are accepted:</p>
+        <ul>
+            <li><strong>Bare key format</strong> — the contents of <code>/etc/ssh/ssh_host_*_key.pub</code>, e.g. <code>ssh-ed25519 AAAA…</code></li>
+            <li><strong>ssh-keyscan output</strong> — lines that include a leading hostname token, e.g. <code>192.168.1.10 ssh-ed25519 AAAA…</code></li>
+        </ul>
+        <p>You can paste multiple lines at once to import several algorithms in one operation. If a key for the same algorithm already exists it is replaced.</p>
+
+        <h6 class="mt-3">Removing or rotating keys</h6>
+        <p>Each stored key has a <i class="bi bi-trash"></i> button on the host detail page. Removing a key causes the next connection to treat that algorithm as a first-use and re-learn the key automatically. This is the correct procedure when a server's host key has been legitimately regenerated (e.g. after an OS reinstall).</p>
+
+        <p class="text-muted small mb-0"><strong>Note:</strong> SSH host key pinning applies to connections DashDDI makes outbound — DNS deploy, DHCP deploy, and Aruba CX switch management. It does not apply to inbound API or SAML connections.</p>
+    </div>
+</div>
+
 </div>{# /col-lg-9 #}
 
 {# On-page nav #}
@@ -338,6 +369,7 @@
             <a href="#csv-import" class="list-group-item list-group-item-action py-1">Importing from CSV</a>
             <a href="#soft-delete" class="list-group-item list-group-item-action py-1">Deleted Hosts</a>
             <a href="#virtual-ips" class="list-group-item list-group-item-action py-1">Virtual IPs (VRRP)</a>
+            <a href="#ssh-host-keys" class="list-group-item list-group-item-action py-1">SSH Host Key Pinning</a>
         </div>
     </div>
 </div>
