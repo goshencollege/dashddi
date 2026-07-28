@@ -11,6 +11,7 @@ use App\Repository\TagRepository;
 use App\Repository\VirtualIpRepository;
 use App\Entity\UserPreference;
 use App\Repository\UserPreferenceRepository;
+use App\Entity\SshHostKey;
 use App\Service\IpAddressManager;
 use App\Service\ReservedTagPrefixService;
 use phpseclib3\Crypt\PublicKeyLoader;
@@ -464,42 +465,90 @@ class HostController extends AbstractController
         return $this->redirectToRoute('host_show', ['id' => $host->getId()]);
     }
 
-    #[Route('/{id}/set-ssh-host-key', name: 'host_set_ssh_host_key', methods: ['POST'], requirements: ['id' => '\d+'])]
-    public function setSshHostKey(Request $request, Host $host, EntityManagerInterface $em): Response
+    #[Route('/{id}/add-ssh-host-keys', name: 'host_add_ssh_host_keys', methods: ['POST'], requirements: ['id' => '\d+'])]
+    public function addSshHostKeys(Request $request, Host $host, EntityManagerInterface $em): Response
     {
-        if (!$this->isCsrfTokenValid('set_ssh_host_key_' . $host->getId(), $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid('add_ssh_host_keys_' . $host->getId(), $request->request->get('_token'))) {
             return $this->redirectToRoute('host_show', ['id' => $host->getId()]);
         }
 
         $input = trim($request->request->get('ssh_host_public_key', ''));
-
         if ($input === '') {
             $this->addFlash('danger', 'No key provided.');
             return $this->redirectToRoute('host_show', ['id' => $host->getId()]);
         }
 
-        try {
-            $loaded = PublicKeyLoader::load($input);
-            $normalized = $loaded->toString('OpenSSH');
-            // Strip optional trailing comment so stored format matches getServerPublicHostKey()
-            $parts = explode(' ', trim($normalized), 3);
-            $host->setSshHostPublicKey($parts[0] . ' ' . $parts[1]);
+        // Known SSH host key algorithm prefixes — used to detect ssh-keyscan hostname prefix
+        $sshAlgoPrefixes = ['ssh-', 'ecdsa-', 'sk-'];
+
+        $saved = 0;
+        $skipped = 0;
+        foreach (preg_split('/\r?\n/', $input) as $line) {
+            $line = trim($line);
+            if ($line === '' || str_starts_with($line, '#')) {
+                continue;
+            }
+
+            $parts = preg_split('/\s+/', $line, 4);
+
+            // ssh-keyscan format: "hostname algorithm base64key [comment]"
+            // Detect by checking whether the first token looks like an SSH algorithm.
+            $firstIsAlgo = false;
+            foreach ($sshAlgoPrefixes as $prefix) {
+                if (str_starts_with($parts[0], $prefix)) {
+                    $firstIsAlgo = true;
+                    break;
+                }
+            }
+            if (!$firstIsAlgo && count($parts) >= 3) {
+                array_shift($parts); // strip hostname
+            }
+
+            // Take algorithm + base64 key data only (drop any trailing comment)
+            $keyLine = ($parts[0] ?? '') . ' ' . ($parts[1] ?? '');
+
+            try {
+                $normalized = PublicKeyLoader::load(trim($keyLine))->toString('OpenSSH');
+                $np = explode(' ', trim($normalized), 3);
+                $algorithm = $np[0];
+                $fullKey   = $np[0] . ' ' . $np[1];
+
+                $existing = $host->getSshHostKeyByAlgorithm($algorithm);
+                if ($existing !== null) {
+                    $existing->setPublicKey($fullKey);
+                } else {
+                    $em->persist((new SshHostKey())->setHost($host)->setAlgorithm($algorithm)->setPublicKey($fullKey));
+                }
+                $saved++;
+            } catch (\Throwable) {
+                $skipped++;
+            }
+        }
+
+        if ($saved === 0) {
+            $this->addFlash('danger', 'No valid SSH public keys found. Paste the contents of the server\'s host public key file(s) or ssh-keyscan output.');
+        } else {
             $em->flush();
-            $this->addFlash('success', 'SSH host key saved. Fingerprint: ' . $host->getSshHostKeyFingerprint());
-        } catch (\Throwable) {
-            $this->addFlash('danger', 'Invalid SSH public key. Paste the contents of the server\'s host public key file (e.g. /etc/ssh/ssh_host_ed25519_key.pub).');
+            $msg = $saved === 1 ? '1 SSH host key saved.' : "$saved SSH host keys saved.";
+            if ($skipped > 0) {
+                $msg .= " ($skipped line(s) skipped — not valid SSH public keys.)";
+            }
+            $this->addFlash('success', $msg);
         }
 
         return $this->redirectToRoute('host_show', ['id' => $host->getId()]);
     }
 
-    #[Route('/{id}/clear-ssh-host-key', name: 'host_clear_ssh_host_key', methods: ['POST'], requirements: ['id' => '\d+'])]
-    public function clearSshHostKey(Request $request, Host $host, EntityManagerInterface $em): Response
+    #[Route('/{id}/delete-ssh-host-key/{keyId}', name: 'host_delete_ssh_host_key', methods: ['POST'], requirements: ['id' => '\d+', 'keyId' => '\d+'])]
+    public function deleteSshHostKey(Request $request, Host $host, int $keyId, EntityManagerInterface $em): Response
     {
-        if ($this->isCsrfTokenValid('clear_ssh_host_key_' . $host->getId(), $request->request->get('_token'))) {
-            $host->setSshHostPublicKey(null);
-            $em->flush();
-            $this->addFlash('success', 'SSH host key cleared. The next connection will learn and store the new key.');
+        if ($this->isCsrfTokenValid('delete_ssh_host_key_' . $keyId, $request->request->get('_token'))) {
+            $key = $em->find(SshHostKey::class, $keyId);
+            if ($key !== null && $key->getHost() === $host) {
+                $em->remove($key);
+                $em->flush();
+                $this->addFlash('success', 'SSH host key removed.');
+            }
         }
         return $this->redirectToRoute('host_show', ['id' => $host->getId()]);
     }

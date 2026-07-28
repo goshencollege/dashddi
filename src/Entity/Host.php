@@ -55,13 +55,15 @@ class Host
     #[ORM\OneToOne(mappedBy: 'host', targetEntity: ApiToken::class)]
     private ?ApiToken $apiToken = null;
 
-    #[ORM\Column(type: 'text', nullable: true)]
-    private ?string $sshHostPublicKey = null;
+    #[ORM\OneToMany(targetEntity: SshHostKey::class, mappedBy: 'host', cascade: ['persist', 'remove'], orphanRemoval: true)]
+    #[ORM\OrderBy(['algorithm' => 'ASC'])]
+    private Collection $sshHostKeys;
 
     public function __construct()
     {
-        $this->interfaces = new ArrayCollection();
-        $this->tags       = new ArrayCollection();
+        $this->interfaces  = new ArrayCollection();
+        $this->tags        = new ArrayCollection();
+        $this->sshHostKeys = new ArrayCollection();
     }
 
     public function getId(): ?int { return $this->id; }
@@ -126,31 +128,17 @@ class Host
 
     public function getApiToken(): ?ApiToken { return $this->apiToken; }
 
-    public function getSshHostPublicKey(): ?string { return $this->sshHostPublicKey; }
-    public function setSshHostPublicKey(?string $key): static { $this->sshHostPublicKey = $key; return $this; }
+    /** @return Collection<int, SshHostKey> */
+    public function getSshHostKeys(): Collection { return $this->sshHostKeys; }
 
-    public function getSshHostKeyFingerprint(): ?string
+    public function getSshHostKeyByAlgorithm(string $algorithm): ?SshHostKey
     {
-        if ($this->sshHostPublicKey === null) {
-            return null;
+        foreach ($this->sshHostKeys as $key) {
+            if ($key->getAlgorithm() === $algorithm) {
+                return $key;
+            }
         }
-        $parts = explode(' ', trim($this->sshHostPublicKey), 3);
-        if (count($parts) < 2) {
-            return null;
-        }
-        $raw = base64_decode($parts[1], true);
-        if ($raw === false) {
-            return null;
-        }
-        return 'SHA256:' . rtrim(base64_encode(hash('sha256', $raw, true)), '=');
-    }
-
-    public function getSshHostKeyAlgorithm(): ?string
-    {
-        if ($this->sshHostPublicKey === null) {
-            return null;
-        }
-        return explode(' ', trim($this->sshHostPublicKey), 2)[0] ?? null;
+        return null;
     }
 
     /** Soft-deletes the host and cascades to all of its interfaces. */

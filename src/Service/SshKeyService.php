@@ -2,6 +2,7 @@
 
 namespace App\Service;
 
+use App\Entity\SshHostKey;
 use App\Repository\HostRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use phpseclib3\Crypt\EC;
@@ -67,23 +68,34 @@ class SshKeyService
             return;
         }
 
-        $storedKey = $host->getSshHostPublicKey();
+        $presented = explode(' ', $presentedKey, 3);
+        $algorithm = $presented[0] ?? '';
+        $keyData   = $presented[1] ?? '';
 
-        if ($storedKey === null) {
-            $host->setSshHostPublicKey($presentedKey);
+        if ($algorithm === '' || $keyData === '') {
+            return;
+        }
+
+        $stored = $host->getSshHostKeyByAlgorithm($algorithm);
+
+        if ($stored === null) {
+            $entry = (new SshHostKey())
+                ->setHost($host)
+                ->setAlgorithm($algorithm)
+                ->setPublicKey($algorithm . ' ' . $keyData);
+            $this->em->persist($entry);
             $this->em->flush();
             return;
         }
 
-        $presented = explode(' ', $presentedKey, 3);
-        $stored    = explode(' ', $storedKey, 3);
-
-        if (($presented[0] ?? '') !== ($stored[0] ?? '') || ($presented[1] ?? '') !== ($stored[1] ?? '')) {
+        $storedParts = explode(' ', $stored->getPublicKey(), 3);
+        if (($storedParts[1] ?? '') !== $keyData) {
             throw new \RuntimeException(sprintf(
-                'SSH host key mismatch for %s — expected %s. ' .
-                'If the server key changed legitimately, clear the stored key from the host page in DashDDI.',
+                'SSH host key mismatch for %s (algorithm: %s) — expected %s. ' .
+                'If the server key changed legitimately, remove the stored key from the host page in DashDDI.',
                 $target,
-                $host->getSshHostKeyFingerprint() ?? 'unknown'
+                $algorithm,
+                $stored->getFingerprint() ?? 'unknown'
             ));
         }
     }
