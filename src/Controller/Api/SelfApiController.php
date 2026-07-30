@@ -9,6 +9,7 @@ use App\Entity\Host;
 use App\Entity\NetworkInterface;
 use App\Enum\RecordType;
 use App\Repository\DomainRecordRepository;
+use App\Repository\DomainRepository;
 use App\Validator\TxtRecordValueValidator;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -21,6 +22,10 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
 #[Route('/api/self')]
 class SelfApiController extends AbstractController
 {
+    public function __construct(
+        private readonly DomainRepository $domainRepository,
+    ) {}
+
     #[Route('/host', name: 'api_self_host', methods: ['GET'])]
     public function host(Request $request): JsonResponse
     {
@@ -58,27 +63,24 @@ class SelfApiController extends AbstractController
 
         [$sourceRecord, $interface] = $match;
 
-        if (!$this->domainHasPublicView($sourceRecord->getDomain())) {
+        $resolved = $this->resolveChallengeDomain($sourceRecord);
+        if ($resolved === null) {
             return $this->json(
                 ['error' => 'The domain for this hostname has no public views — ACME validation from the internet is not possible.'],
                 Response::HTTP_UNPROCESSABLE_ENTITY
             );
         }
-
-        $challengeHostname = $sourceRecord->getHostname() === '@'
-            ? '_acme-challenge'
-            : '_acme-challenge.' . $sourceRecord->getHostname();
+        [$targetDomain, $challengeHostname] = $resolved;
 
         $record = new DomainRecord();
         $record->setHostname($challengeHostname);
         $record->setType(RecordType::TXT);
         $record->setValue(TxtRecordValueValidator::normalizeTxtValue($validation));
-        $record->setDomain($sourceRecord->getDomain());
+        $record->setDomain($targetDomain);
         $record->setNetworkInterface($interface);
-        // Assign all domain views so the record appears in every zone file (including the
-        // public/external one that Let's Encrypt queries), regardless of which views the
-        // source A record itself is restricted to.
-        foreach ($sourceRecord->getDomain()->getViews() as $view) {
+        // Assign all target domain views so the record appears in every zone file (including
+        // the public/external one that Let's Encrypt queries).
+        foreach ($targetDomain->getViews() as $view) {
             $record->addView($view);
         }
 
@@ -94,7 +96,7 @@ class SelfApiController extends AbstractController
         $em->persist($record);
         $em->flush();
 
-        return $this->json(['id' => $record->getId(), 'hostname' => $challengeHostname], Response::HTTP_CREATED);
+        return $this->json(['id' => $record->getId(), 'hostname' => $challengeHostname, 'domain' => $targetDomain->getName()], Response::HTTP_CREATED);
     }
 
     #[Route('/dns-challenge', name: 'api_self_dns_challenge_delete', methods: ['DELETE'])]
@@ -123,23 +125,26 @@ class SelfApiController extends AbstractController
 
         [$sourceRecord, $interface] = $match;
 
-        $challengeHostname = $sourceRecord->getHostname() === '@'
+        // Compute the challenge hostname prefix from the source record so we only match
+        // _acme-challenge records for this specific hostname — not other TXT records on
+        // the same interface. We match both the direct form (_acme-challenge.srv) and the
+        // parent-domain form (_acme-challenge.srv.internal.*) without re-deriving which
+        // domain was chosen at creation time.
+        $hostnameBase = $sourceRecord->getHostname() === '@'
             ? '_acme-challenge'
             : '_acme-challenge.' . $sourceRecord->getHostname();
 
-        // Find challenge records by hostname, domain, interface, and value
         $normalizedValue = TxtRecordValueValidator::normalizeTxtValue($validation);
         $records = $repo->createQueryBuilder('r')
-            ->where('r.hostname = :hostname')
-            ->andWhere('r.domain = :domain')
-            ->andWhere('r.networkInterface = :iface')
+            ->where('r.networkInterface = :iface')
             ->andWhere('r.type = :type')
             ->andWhere('r.value = :value')
-            ->setParameter('hostname', $challengeHostname)
-            ->setParameter('domain', $sourceRecord->getDomain())
+            ->andWhere('r.hostname = :exact OR r.hostname LIKE :prefix')
             ->setParameter('iface', $interface)
             ->setParameter('type', RecordType::TXT)
             ->setParameter('value', $normalizedValue)
+            ->setParameter('exact', $hostnameBase)
+            ->setParameter('prefix', $hostnameBase . '.%')
             ->getQuery()
             ->getResult();
 
@@ -194,8 +199,62 @@ class SelfApiController extends AbstractController
         return false;
     }
 
+    /**
+     * Resolve the domain and hostname for an ACME challenge record.
+     * Returns [$targetDomain, $challengeHostname] or null if no public zone is reachable.
+     *
+     * @return array{0: Domain, 1: string}|null
+     */
+    private function resolveChallengeDomain(DomainRecord $sourceRecord): ?array
+    {
+        $sourceDomain = $sourceRecord->getDomain();
+        $targetDomain = $this->domainHasPublicView($sourceDomain)
+            ? $sourceDomain
+            : $this->findPublicParentDomain($sourceDomain->getName());
+        if ($targetDomain === null) {
+            return null;
+        }
+        return [$targetDomain, $this->challengeHostnameInParentDomain($sourceRecord, $targetDomain)];
+    }
+
+    /**
+     * Walk up the DNS label hierarchy to find the nearest ancestor domain that
+     * exists in DashDDI and has at least one public view. Used as a fallback when
+     * the source record's own domain is internal-only, so the ACME challenge TXT
+     * can be published in the public parent zone instead.
+     */
+    private function findPublicParentDomain(string $domainName): ?Domain
+    {
+        $parts = explode('.', $domainName);
+        // Start at index 1 (skip the source domain itself) and stop before bare TLDs
+        for ($i = 1; $i < count($parts) - 1; $i++) {
+            $candidate = implode('.', array_slice($parts, $i));
+            $domain = $this->domainRepository->findOneBy(['name' => $candidate]);
+            if ($domain !== null && $this->domainHasPublicView($domain)) {
+                return $domain;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Compute the hostname for a challenge TXT record placed in a parent zone.
+     * Example: source = "host" in "internal.example.com", parent = "example.com"
+     * → challenge FQDN = "_acme-challenge.host.internal.example.com"
+     * → relative hostname = "_acme-challenge.host.internal"
+     */
+    private function challengeHostnameInParentDomain(DomainRecord $sourceRecord, Domain $parentDomain): string
+    {
+        $hostname = $sourceRecord->getHostname();
+        $sourceDomainName = $sourceRecord->getDomain()->getName();
+        $sourceFqdn = $hostname === '@' ? $sourceDomainName : $hostname . '.' . $sourceDomainName;
+        $challengeFqdn = '_acme-challenge.' . $sourceFqdn;
+        return substr($challengeFqdn, 0, -(strlen($parentDomain->getName()) + 1));
+    }
+
     private function serializeHost(Host $host): array
     {
+        $reachableCache = []; // domain name → bool, memoizes domainHasPublicView + parent lookup
         $interfaces = [];
         foreach ($host->getInterfaces() as $iface) {
             if ($iface->isDeleted()) {
@@ -204,7 +263,15 @@ class SelfApiController extends AbstractController
             $records = [];
             foreach ($iface->getDomainRecords() as $record) {
                 $domain = $record->getDomain();
-                if ($domain === null || !$this->domainHasPublicView($domain)) {
+                if ($domain === null) {
+                    continue;
+                }
+                $domainName = $domain->getName();
+                if (!isset($reachableCache[$domainName])) {
+                    $reachableCache[$domainName] = $this->domainHasPublicView($domain)
+                        || $this->findPublicParentDomain($domainName) !== null;
+                }
+                if (!$reachableCache[$domainName]) {
                     continue;
                 }
                 $records[] = [
