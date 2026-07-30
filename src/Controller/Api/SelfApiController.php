@@ -63,22 +63,14 @@ class SelfApiController extends AbstractController
 
         [$sourceRecord, $interface] = $match;
 
-        $sourceDomain = $sourceRecord->getDomain();
-        if ($this->domainHasPublicView($sourceDomain)) {
-            $targetDomain = $sourceDomain;
-            $challengeHostname = $sourceRecord->getHostname() === '@'
-                ? '_acme-challenge'
-                : '_acme-challenge.' . $sourceRecord->getHostname();
-        } else {
-            $targetDomain = $this->findPublicParentDomain($sourceDomain->getName());
-            if ($targetDomain === null) {
-                return $this->json(
-                    ['error' => 'The domain for this hostname has no public views — ACME validation from the internet is not possible.'],
-                    Response::HTTP_UNPROCESSABLE_ENTITY
-                );
-            }
-            $challengeHostname = $this->challengeHostnameInParentDomain($sourceRecord, $targetDomain);
+        $resolved = $this->resolveChallengeDomain($sourceRecord);
+        if ($resolved === null) {
+            return $this->json(
+                ['error' => 'The domain for this hostname has no public views — ACME validation from the internet is not possible.'],
+                Response::HTTP_UNPROCESSABLE_ENTITY
+            );
         }
+        [$targetDomain, $challengeHostname] = $resolved;
 
         $record = new DomainRecord();
         $record->setHostname($challengeHostname);
@@ -133,30 +125,15 @@ class SelfApiController extends AbstractController
 
         [$sourceRecord, $interface] = $match;
 
-        $sourceDomain = $sourceRecord->getDomain();
-        if ($this->domainHasPublicView($sourceDomain)) {
-            $targetDomain = $sourceDomain;
-            $challengeHostname = $sourceRecord->getHostname() === '@'
-                ? '_acme-challenge'
-                : '_acme-challenge.' . $sourceRecord->getHostname();
-        } else {
-            $targetDomain = $this->findPublicParentDomain($sourceDomain->getName());
-            if ($targetDomain === null) {
-                return $this->json(['error' => 'No matching challenge record found.'], Response::HTTP_NOT_FOUND);
-            }
-            $challengeHostname = $this->challengeHostnameInParentDomain($sourceRecord, $targetDomain);
-        }
-
-        // Find challenge records by hostname, domain, interface, and value
+        // Search by interface + type + value only, without re-deriving which domain/hostname
+        // was used at creation time. The interface is already validated as belonging to this
+        // host; the ACME token value is unique per issuance, so this uniquely identifies
+        // the record regardless of any domain-view config changes since POST was called.
         $normalizedValue = TxtRecordValueValidator::normalizeTxtValue($validation);
         $records = $repo->createQueryBuilder('r')
-            ->where('r.hostname = :hostname')
-            ->andWhere('r.domain = :domain')
-            ->andWhere('r.networkInterface = :iface')
+            ->where('r.networkInterface = :iface')
             ->andWhere('r.type = :type')
             ->andWhere('r.value = :value')
-            ->setParameter('hostname', $challengeHostname)
-            ->setParameter('domain', $targetDomain)
             ->setParameter('iface', $interface)
             ->setParameter('type', RecordType::TXT)
             ->setParameter('value', $normalizedValue)
@@ -215,6 +192,24 @@ class SelfApiController extends AbstractController
     }
 
     /**
+     * Resolve the domain and hostname for an ACME challenge record.
+     * Returns [$targetDomain, $challengeHostname] or null if no public zone is reachable.
+     *
+     * @return array{0: Domain, 1: string}|null
+     */
+    private function resolveChallengeDomain(DomainRecord $sourceRecord): ?array
+    {
+        $sourceDomain = $sourceRecord->getDomain();
+        $targetDomain = $this->domainHasPublicView($sourceDomain)
+            ? $sourceDomain
+            : $this->findPublicParentDomain($sourceDomain->getName());
+        if ($targetDomain === null) {
+            return null;
+        }
+        return [$targetDomain, $this->challengeHostnameInParentDomain($sourceRecord, $targetDomain)];
+    }
+
+    /**
      * Walk up the DNS label hierarchy to find the nearest ancestor domain that
      * exists in DashDDI and has at least one public view. Used as a fallback when
      * the source record's own domain is internal-only, so the ACME challenge TXT
@@ -251,6 +246,7 @@ class SelfApiController extends AbstractController
 
     private function serializeHost(Host $host): array
     {
+        $reachableCache = []; // domain name → bool, memoizes domainHasPublicView + parent lookup
         $interfaces = [];
         foreach ($host->getInterfaces() as $iface) {
             if ($iface->isDeleted()) {
@@ -262,7 +258,12 @@ class SelfApiController extends AbstractController
                 if ($domain === null) {
                     continue;
                 }
-                if (!$this->domainHasPublicView($domain) && $this->findPublicParentDomain($domain->getName()) === null) {
+                $domainName = $domain->getName();
+                if (!isset($reachableCache[$domainName])) {
+                    $reachableCache[$domainName] = $this->domainHasPublicView($domain)
+                        || $this->findPublicParentDomain($domainName) !== null;
+                }
+                if (!$reachableCache[$domainName]) {
                     continue;
                 }
                 $records[] = [
