@@ -357,4 +357,118 @@ class SelfApiControllerTest extends AppWebTestCase
         $this->tokenRequest('GET', '/api/self/host', $raw);
         $this->assertSame(401, $this->tokenClient->getResponse()->getStatusCode());
     }
+
+    // ── Parent-domain fallback for private subdomains ─────────────────────────
+
+    public function testCreateChallengeForPrivateSubdomainViaParentDomain(): void
+    {
+        // Public parent domain
+        $publicView = (new DnsView())->setName('parent-pub-view')->setIsPublic(true);
+        $this->em->persist($publicView);
+        $parentDomain = (new Domain())->setName('parent-fallback.example.com');
+        $parentDomain->addView($publicView);
+        $this->em->persist($parentDomain);
+
+        // Private child domain — no public view, no parent lookup would succeed
+        $privateView = (new DnsView())->setName('child-priv-view')->setIsPublic(false);
+        $this->em->persist($privateView);
+        $childDomain = (new Domain())->setName('internal.parent-fallback.example.com');
+        $childDomain->addView($privateView);
+        $this->em->persist($childDomain);
+        $this->em->flush();
+
+        [$host, $iface] = $this->makeHostWithIp('fallback-host'); // 127.0.0.1
+        $raw = bin2hex(random_bytes(32));
+        $this->makeHostToken($host, $raw);
+        $this->makeDomainRecord($iface, $childDomain, 'box', RecordType::A, '127.0.0.1');
+
+        $data = $this->tokenRequest('POST', '/api/self/dns-challenge', $raw, [
+            'fqdn'       => 'box.internal.parent-fallback.example.com',
+            'validation' => 'PARENT_FALLBACK_TOKEN',
+        ]);
+
+        $this->assertSame(201, $this->tokenClient->getResponse()->getStatusCode());
+        $this->assertSame('_acme-challenge.box.internal', $data['hostname']);
+        $this->assertSame('parent-fallback.example.com', $data['domain']);
+
+        // Reload from DB: record must live in the parent domain with the multipart label
+        $this->em->clear();
+        $record = $this->em->find(DomainRecord::class, $data['id']);
+        $this->assertNotNull($record);
+        $this->assertSame('_acme-challenge.box.internal', $record->getHostname());
+        $this->assertSame($parentDomain->getId(), $record->getDomain()->getId());
+        $this->assertSame(RecordType::TXT, $record->getType());
+        $viewIds = $record->getViews()->map(fn($v) => $v->getId())->toArray();
+        $this->assertContains($publicView->getId(), $viewIds);
+        $this->assertCount(1, $viewIds);
+    }
+
+    public function testDeleteChallengeForPrivateSubdomainViaParentDomain(): void
+    {
+        $publicView = (new DnsView())->setName('del-parent-pub')->setIsPublic(true);
+        $this->em->persist($publicView);
+        $parentDomain = (new Domain())->setName('del-parent.example.com');
+        $parentDomain->addView($publicView);
+        $this->em->persist($parentDomain);
+
+        $privateView = (new DnsView())->setName('del-child-priv')->setIsPublic(false);
+        $this->em->persist($privateView);
+        $childDomain = (new Domain())->setName('internal.del-parent.example.com');
+        $childDomain->addView($privateView);
+        $this->em->persist($childDomain);
+        $this->em->flush();
+
+        [$host, $iface] = $this->makeHostWithIp('del-fallback-host'); // 127.0.0.1
+        $raw = bin2hex(random_bytes(32));
+        $this->makeHostToken($host, $raw);
+        $this->makeDomainRecord($iface, $childDomain, 'srv', RecordType::A, '127.0.0.1');
+
+        // Create the challenge via parent domain fallback
+        $createData = $this->tokenRequest('POST', '/api/self/dns-challenge', $raw, [
+            'fqdn'       => 'srv.internal.del-parent.example.com',
+            'validation' => 'DEL_PARENT_TOKEN',
+        ]);
+        $this->assertSame(201, $this->tokenClient->getResponse()->getStatusCode());
+        $recordId = $createData['id'];
+
+        // Delete it
+        $this->tokenRequest('DELETE', '/api/self/dns-challenge', $raw, [
+            'fqdn'       => 'srv.internal.del-parent.example.com',
+            'validation' => 'DEL_PARENT_TOKEN',
+        ]);
+        $this->assertSame(204, $this->tokenClient->getResponse()->getStatusCode());
+
+        // Confirm it's gone
+        $this->em->clear();
+        $this->assertNull($this->em->find(DomainRecord::class, $recordId));
+    }
+
+    public function testHostEndpointIncludesPrivateSubdomainWithPublicParent(): void
+    {
+        $publicView = (new DnsView())->setName('host-ep-pub')->setIsPublic(true);
+        $this->em->persist($publicView);
+        $parentDomain = (new Domain())->setName('listing-parent.example.com');
+        $parentDomain->addView($publicView);
+        $this->em->persist($parentDomain);
+
+        $privateView = (new DnsView())->setName('host-ep-priv')->setIsPublic(false);
+        $this->em->persist($privateView);
+        $childDomain = (new Domain())->setName('internal.listing-parent.example.com');
+        $childDomain->addView($privateView);
+        $this->em->persist($childDomain);
+        $this->em->flush();
+
+        [$host, $iface] = $this->makeHostWithIp('listing-host'); // 127.0.0.1
+        $raw = bin2hex(random_bytes(32));
+        $this->makeHostToken($host, $raw);
+        $this->makeDomainRecord($iface, $parentDomain, 'pub', RecordType::A, '127.0.0.1');
+        $this->makeDomainRecord($iface, $childDomain, 'priv', RecordType::A, '127.0.0.1');
+
+        $data = $this->tokenRequest('GET', '/api/self/host', $raw);
+
+        $this->assertSame(200, $this->tokenClient->getResponse()->getStatusCode());
+        $fqdns = array_column($data['interfaces'][0]['records'], 'fqdn');
+        $this->assertContains('pub.listing-parent.example.com', $fqdns);
+        $this->assertContains('priv.internal.listing-parent.example.com', $fqdns);
+    }
 }
