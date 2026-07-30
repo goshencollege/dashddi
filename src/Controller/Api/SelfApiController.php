@@ -125,18 +125,26 @@ class SelfApiController extends AbstractController
 
         [$sourceRecord, $interface] = $match;
 
-        // Search by interface + type + value only, without re-deriving which domain/hostname
-        // was used at creation time. The interface is already validated as belonging to this
-        // host; the ACME token value is unique per issuance, so this uniquely identifies
-        // the record regardless of any domain-view config changes since POST was called.
+        // Compute the challenge hostname prefix from the source record so we only match
+        // _acme-challenge records for this specific hostname — not other TXT records on
+        // the same interface. We match both the direct form (_acme-challenge.srv) and the
+        // parent-domain form (_acme-challenge.srv.internal.*) without re-deriving which
+        // domain was chosen at creation time.
+        $hostnameBase = $sourceRecord->getHostname() === '@'
+            ? '_acme-challenge'
+            : '_acme-challenge.' . $sourceRecord->getHostname();
+
         $normalizedValue = TxtRecordValueValidator::normalizeTxtValue($validation);
         $records = $repo->createQueryBuilder('r')
             ->where('r.networkInterface = :iface')
             ->andWhere('r.type = :type')
             ->andWhere('r.value = :value')
+            ->andWhere('r.hostname = :exact OR r.hostname LIKE :prefix')
             ->setParameter('iface', $interface)
             ->setParameter('type', RecordType::TXT)
             ->setParameter('value', $normalizedValue)
+            ->setParameter('exact', $hostnameBase)
+            ->setParameter('prefix', $hostnameBase . '.%')
             ->getQuery()
             ->getResult();
 
