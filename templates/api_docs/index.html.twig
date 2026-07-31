@@ -253,6 +253,7 @@
                     <div class="collapse" id="nav-virtual-ips">
                         <ul class="nav flex-column gap-0 ms-2 ps-2 border-start api-sub-nav">
                             <li><a class="nav-link px-2 text-start" href="#ep-virtual-ips-list"><span class="method-get me-1">GET</span>List</a></li>
+                            <li><a class="nav-link px-2 text-start" href="#ep-virtual-ips-search"><span class="method-get me-1">GET</span>Search</a></li>
                             <li><a class="nav-link px-2 text-start" href="#ep-virtual-ips-get"><span class="method-get me-1">GET</span>Get</a></li>
                             <li><a class="nav-link px-2 text-start" href="#ep-virtual-ips-create"><span class="method-post me-1">POST</span>Create</a></li>
                             <li><a class="nav-link px-2 text-start" href="#ep-virtual-ips-update"><span class="method-patch me-1">PATCH</span>Update</a></li>
@@ -404,7 +405,7 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
             {% include 'api_docs/_endpoint.html.twig' with {
                 anchor_id: 'ep-dns-servers-list',
                 method: 'GET', path: '/api/dns-servers', name: 'List DNS servers',
-                response_example: '[\n  {\n    "id": 1,\n    "name": "ns1",\n    "hostname": "ns1.example.com",\n    "ssh_user": "root",\n    "ssh_public_key": "ssh-ed25519 AAAA...",\n    "remote_zone_path": "/etc/bind/zones",\n    "key_directory": null,\n    "server_type": "primary",\n    "primary_hostname": null,\n    "description": null,\n    "view_ids": [1],\n    "created_at": "2024-01-01T00:00:00+00:00",\n    "updated_at": "2024-01-01T00:00:00+00:00",\n    "created_by": "user@example.com",\n    "updated_by": "user@example.com"\n  }\n]',
+                response_example: '[\n  {\n    "id": 1,\n    "name": "ns1",\n    "hostname": "192.0.2.1",\n    "ssh_user": "root",\n    "ssh_public_key": "ssh-ed25519 AAAA...",\n    "remote_zone_path": "/etc/bind/zones",\n    "key_directory": null,\n    "server_type": "primary",\n    "primary_hostname": null,\n    "description": null,\n    "view_ids": [1],\n    "created_at": "2024-01-01T00:00:00+00:00",\n    "updated_at": "2024-01-01T00:00:00+00:00",\n    "created_by": "user@example.com",\n    "updated_by": "user@example.com"\n  }\n]',
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
@@ -418,7 +419,7 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
                 notes: 'An SSH key pair is generated automatically. Copy the <code>ssh_public_key</code> from the response to <code>authorized_keys</code> on the target server.',
                 body: [
                     {name: 'name', type: 'string', required: true, desc: 'Display name.'},
-                    {name: 'hostname', type: 'string', required: true, desc: 'Hostname or IP used for SSH connections.'},
+                    {name: 'hostname', type: 'string', required: true, desc: 'IPv4 or IPv6 address used for SSH connections. Hostnames are not accepted.'},
                     {name: 'ssh_user', type: 'string', required: false, desc: 'SSH login user. Default: <code>root</code>.'},
                     {name: 'remote_zone_path', type: 'string', required: false, desc: 'Path on the server where zone files are written. Default: <code>/etc/bind/zones</code>.'},
                     {name: 'key_directory', type: 'string', required: false, desc: 'DNSSEC key directory path.'},
@@ -436,7 +437,7 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
                 notes: 'Only include fields you want to change. SSH keys cannot be updated via this endpoint.',
                 body: [
                     {name: 'name', type: 'string', required: false, desc: 'Display name.'},
-                    {name: 'hostname', type: 'string', required: false, desc: 'Hostname or IP.'},
+                    {name: 'hostname', type: 'string', required: false, desc: 'IPv4 or IPv6 address. Hostnames are not accepted.'},
                     {name: 'ssh_user', type: 'string', required: false, desc: 'SSH login user.'},
                     {name: 'remote_zone_path', type: 'string', required: false, desc: 'Zone file path on server.'},
                     {name: 'key_directory', type: 'string|null', required: false, desc: 'DNSSEC key directory, or null to clear.'},
@@ -625,6 +626,51 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
         </section>
 
         {# ═══════════════════════════════════════════════════════════════════
+           HOST SELF-SERVICE
+           ═══════════════════════════════════════════════════════════════════ #}
+        <section id="host-self" class="mb-5">
+            <h2 class="h5 border-bottom pb-2 mb-3">Host Self-Service <code class="small fw-normal text-muted">/api/self</code></h2>
+            <p class="text-muted small mb-1">Endpoints accessible only with a <strong>host-scoped token</strong>. Requests are accepted only from IP addresses assigned to the token's host's network interfaces — any other source is rejected with <code>401</code>. These endpoints are designed for ACME DNS-01 certificate automation running directly on the host. See <a href="{{ path('user_guide_servers') }}#api-self">the servers guide</a> for setup examples.</p>
+            <table class="table table-sm table-borderless mb-4 small">
+                <tbody>
+                    <tr><td style="width:3.5rem"><span class="badge bg-primary font-monospace">GET</span></td><td><code>/api/self/host</code></td><td class="text-muted">Return host info, interfaces, and publicly-reachable DNS records</td></tr>
+                    <tr><td><span class="badge bg-success font-monospace">POST</span></td><td><code>/api/self/dns-challenge</code></td><td class="text-muted">Create an ACME DNS-01 challenge TXT record</td></tr>
+                    <tr><td><span class="badge bg-danger font-monospace">DELETE</span></td><td><code>/api/self/dns-challenge</code></td><td class="text-muted">Delete the ACME challenge TXT record after validation</td></tr>
+                </tbody>
+            </table>
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-self-host',
+                method: 'GET', path: '/api/self/host', name: 'Get host info',
+                notes: 'Returns the host associated with the token, its network interfaces, and the DNS records linked to each interface. Only records in domains with at least one public DNS view (marked as public in DNS → Views) are included; domains with no view restriction are treated as globally accessible.',
+                response_example: '{\n  "id": 7,\n  "name": "web01",\n  "interfaces": [\n    {\n      "id": 12,\n      "name": "eth0",\n      "mac": "aa:bb:cc:dd:ee:ff",\n      "ipv4": "10.0.0.5",\n      "ipv6": null,\n      "records": [\n        {\n          "id": 44,\n          "hostname": "web01",\n          "fqdn": "web01.example.com",\n          "type": "A",\n          "value": "10.0.0.5",\n          "domain_id": 3\n        }\n      ]\n    }\n  ]\n}',
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-self-challenge-create',
+                method: 'POST', path: '/api/self/dns-challenge', name: 'Create challenge TXT record',
+                notes: 'Creates a <code>_acme-challenge.*</code> TXT record for ACME DNS-01 validation. The <code>fqdn</code> must match a DNS record already assigned to one of the host\'s interfaces. The challenge record is assigned to all views the domain is part of (not just the views of the source record), so Let\'s Encrypt can reach it via whichever view is externally reachable. The domain must have at least one public view (marked as public in DNS → Views); requests for domains with only internal views return <code>422</code>.',
+                body: [
+                    {name: 'fqdn', type: 'string', required: true, desc: 'Fully-qualified domain name to certify (e.g. <code>web01.example.com</code>). For an apex record, pass the bare domain (e.g. <code>example.com</code>).'},
+                    {name: 'validation', type: 'string', required: true, desc: 'ACME token value provided by the CA (the string that must appear in the TXT record).'},
+                ],
+                response_example: '{\n  "id": 99,\n  "hostname": "_acme-challenge.web01",\n  "domain": "example.com"\n}',
+                response_status: '201',
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-self-challenge-delete',
+                method: 'DELETE', path: '/api/self/dns-challenge', name: 'Delete challenge TXT record',
+                notes: 'Removes the matching <code>_acme-challenge.*</code> TXT record after validation is complete. The request body is identical to the create request — both <code>fqdn</code> and <code>validation</code> must match the record to delete. Returns <code>404</code> if no matching record is found.',
+                body: [
+                    {name: 'fqdn', type: 'string', required: true, desc: 'Fully-qualified domain name used when creating the challenge.'},
+                    {name: 'validation', type: 'string', required: true, desc: 'ACME token value used when creating the challenge.'},
+                ],
+                response_status: '204',
+            } %}
+        </section>
+
+        {# ═══════════════════════════════════════════════════════════════════
            INTERFACES
            ═══════════════════════════════════════════════════════════════════ #}
         <section id="interfaces" class="mb-5">
@@ -709,6 +755,7 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
                 query: [
                     {name: 'q', type: 'string', desc: 'Search term (minimum 2 characters). Matched against host name, interface name, IP address, IPv6 address, and MAC address.'},
                     {name: 'limit', type: 'integer', desc: 'Maximum number of results to return. Default: <code>20</code>, max: <code>50</code>.'},
+                    {name: 'subnet_id', type: 'integer', desc: 'Filter results to interfaces in this subnet.'},
                 ],
                 response_example: '[\n  {\n    "id": 1,\n    "label": "server01: eth0",\n    "host_name": "server01",\n    "iface_name": "eth0",\n    "mac": "aa:bb:cc:dd:ee:ff",\n    "ip": "10.0.0.5",\n    "ipv6": null\n  }\n]',
             } %}
@@ -1043,7 +1090,7 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
            ═══════════════════════════════════════════════════════════════════ #}
         <section id="dhcp-lease" class="mb-5">
             <h2 class="h5 border-bottom pb-2 mb-3">DHCP Lease <code class="small fw-normal text-muted">/api/dhcp/lease</code></h2>
-            <p class="text-muted small mb-1">Write-only endpoint used by DHCP servers to record lease events. The subnet is matched automatically from the IP address. Typically called from a Kea <code>run_script</code> hook — see the <a href="{{ path('user_guide_integrations') }}#kea-lease-notifications">integrations guide</a> for setup instructions.</p>
+            <p class="text-muted small mb-1">Write-only endpoint used by DHCP servers to record lease events. The subnet is matched automatically from the IP address. Typically called from a Kea <code>run_script</code> hook — see the <a href="{{ path('user_guide_servers') }}#kea-lease-notifications">servers guide</a> for setup instructions.</p>
             <table class="table table-sm table-borderless mb-4 small">
                 <tbody>
                     <tr><td style="width:3.5rem"><span class="badge bg-success font-monospace">POST</span></td><td><code>/api/dhcp/lease</code></td><td class="text-muted">Record a DHCP lease event</td></tr>
@@ -1145,6 +1192,7 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
             <table class="table table-sm table-borderless mb-4 small">
                 <tbody>
                     <tr><td style="width:3.5rem"><span class="badge bg-primary font-monospace">GET</span></td><td><code>/api/virtual-ips</code></td><td class="text-muted">List virtual IPs (filterable, includes deleted)</td></tr>
+                    <tr><td><span class="badge bg-primary font-monospace">GET</span></td><td><code>/api/virtual-ips/search</code></td><td class="text-muted">Search virtual IPs by label or IP address</td></tr>
                     <tr><td><span class="badge bg-primary font-monospace">GET</span></td><td><code>/api/virtual-ips/{id}</code></td><td class="text-muted">Get a virtual IP</td></tr>
                     <tr><td><span class="badge bg-success font-monospace">POST</span></td><td><code>/api/virtual-ips</code></td><td class="text-muted">Create a virtual IP (supports auto IP assignment)</td></tr>
                     <tr><td><span class="badge bg-warning text-dark font-monospace">PATCH</span></td><td><code>/api/virtual-ips/{id}</code></td><td class="text-muted">Update a virtual IP</td></tr>
@@ -1163,6 +1211,17 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
                     {name: 'deleted', type: 'string', desc: 'Omit or pass <code>false</code> for active VIPs only (default). Pass <code>true</code> for deleted VIPs only. Pass <code>all</code> to return both.'},
                 ],
                 response_example: '[\n  {\n    "id": 1,\n    "label": "core-gw-vrrp",\n    "protocol": "vrrp",\n    "vrid": 10,\n    "notes": null,\n    "subnet_id": 2,\n    "ip_address": "10.0.0.1",\n    "ipv6_address": null,\n    "member_interface_ids": [3, 7],\n    "deleted_at": null,\n    "created_at": "2024-01-01T00:00:00+00:00",\n    "updated_at": "2024-01-01T00:00:00+00:00",\n    "created_by": "user@example.com",\n    "updated_by": "user@example.com"\n  }\n]',
+            } %}
+
+            {% include 'api_docs/_endpoint.html.twig' with {
+                anchor_id: 'ep-virtual-ips-search',
+                method: 'GET', path: '/api/virtual-ips/search', name: 'Search virtual IPs',
+                notes: 'Full-text search across label and IP addresses. Only non-deleted VIPs are returned. Requires at least 2 characters.',
+                query: [
+                    {name: 'q', type: 'string', desc: 'Search term (minimum 2 characters). Matched against label, IPv4 address, and IPv6 address.'},
+                    {name: 'limit', type: 'integer', desc: 'Maximum number of results to return. Default: <code>20</code>, max: <code>50</code>.'},
+                ],
+                response_example: '[\n  {\n    "id": 1,\n    "label": "core-gw-vrrp",\n    "protocol": "vrrp",\n    "ip_address": "10.0.0.1",\n    "ipv6_address": null\n  }\n]',
             } %}
 
             {% include 'api_docs/_endpoint.html.twig' with {
@@ -1227,51 +1286,6 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
                 anchor_id: 'ep-virtual-ips-remove-member',
                 method: 'DELETE', path: '/api/virtual-ips/{id}/members/{interfaceId}', name: 'Remove member interface',
                 notes: 'Removes an interface from the VIP\'s member list. If the interface is not a member, the request is silently ignored. Returns <code>204</code> on success.',
-                response_status: '204',
-            } %}
-        </section>
-
-        {# ═══════════════════════════════════════════════════════════════════
-           HOST SELF-SERVICE
-           ═══════════════════════════════════════════════════════════════════ #}
-        <section id="host-self" class="mb-5">
-            <h2 class="h5 border-bottom pb-2 mb-3">Host Self-Service <code class="small fw-normal text-muted">/api/self</code></h2>
-            <p class="text-muted small mb-1">Endpoints accessible only with a <strong>host-scoped token</strong>. Requests are accepted only from IP addresses assigned to the token's host's network interfaces — any other source is rejected with <code>401</code>. These endpoints are designed for ACME DNS-01 certificate automation running directly on the host. See <a href="{{ path('user_guide_integrations') }}#api-self">the integrations guide</a> for setup examples.</p>
-            <table class="table table-sm table-borderless mb-4 small">
-                <tbody>
-                    <tr><td style="width:3.5rem"><span class="badge bg-primary font-monospace">GET</span></td><td><code>/api/self/host</code></td><td class="text-muted">Return host info, interfaces, and publicly-reachable DNS records</td></tr>
-                    <tr><td><span class="badge bg-success font-monospace">POST</span></td><td><code>/api/self/dns-challenge</code></td><td class="text-muted">Create an ACME DNS-01 challenge TXT record</td></tr>
-                    <tr><td><span class="badge bg-danger font-monospace">DELETE</span></td><td><code>/api/self/dns-challenge</code></td><td class="text-muted">Delete the ACME challenge TXT record after validation</td></tr>
-                </tbody>
-            </table>
-
-            {% include 'api_docs/_endpoint.html.twig' with {
-                anchor_id: 'ep-self-host',
-                method: 'GET', path: '/api/self/host', name: 'Get host info',
-                notes: 'Returns the host associated with the token, its network interfaces, and the DNS records linked to each interface. Only records in domains with at least one public DNS view (marked as public in DNS → Views) are included; domains with no view restriction are treated as globally accessible.',
-                response_example: '{\n  "id": 7,\n  "name": "web01",\n  "interfaces": [\n    {\n      "id": 12,\n      "name": "eth0",\n      "mac": "aa:bb:cc:dd:ee:ff",\n      "ipv4": "10.0.0.5",\n      "ipv6": null,\n      "records": [\n        {\n          "id": 44,\n          "hostname": "web01",\n          "fqdn": "web01.example.com",\n          "type": "A",\n          "value": "10.0.0.5",\n          "domain_id": 3\n        }\n      ]\n    }\n  ]\n}',
-            } %}
-
-            {% include 'api_docs/_endpoint.html.twig' with {
-                anchor_id: 'ep-self-challenge-create',
-                method: 'POST', path: '/api/self/dns-challenge', name: 'Create challenge TXT record',
-                notes: 'Creates a <code>_acme-challenge.*</code> TXT record for ACME DNS-01 validation. The <code>fqdn</code> must match a DNS record already assigned to one of the host\'s interfaces. The challenge record is assigned to all views the domain is part of (not just the views of the source record), so Let\'s Encrypt can reach it via whichever view is externally reachable. The domain must have at least one public view (marked as public in DNS → Views); requests for domains with only internal views return <code>422</code>.',
-                body: [
-                    {name: 'fqdn', type: 'string', required: true, desc: 'Fully-qualified domain name to certify (e.g. <code>web01.example.com</code>). For an apex record, pass the bare domain (e.g. <code>example.com</code>).'},
-                    {name: 'validation', type: 'string', required: true, desc: 'ACME token value provided by the CA (the string that must appear in the TXT record).'},
-                ],
-                response_example: '{\n  "id": 99,\n  "hostname": "_acme-challenge.web01"\n}',
-                response_status: '201',
-            } %}
-
-            {% include 'api_docs/_endpoint.html.twig' with {
-                anchor_id: 'ep-self-challenge-delete',
-                method: 'DELETE', path: '/api/self/dns-challenge', name: 'Delete challenge TXT record',
-                notes: 'Removes the matching <code>_acme-challenge.*</code> TXT record after validation is complete. The request body is identical to the create request — both <code>fqdn</code> and <code>validation</code> must match the record to delete. Returns <code>404</code> if no matching record is found.',
-                body: [
-                    {name: 'fqdn', type: 'string', required: true, desc: 'Fully-qualified domain name used when creating the challenge.'},
-                    {name: 'validation', type: 'string', required: true, desc: 'ACME token value used when creating the challenge.'},
-                ],
                 response_status: '204',
             } %}
         </section>
