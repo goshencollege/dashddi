@@ -468,7 +468,7 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
            ═══════════════════════════════════════════════════════════════════ #}
         <section id="dhcp-servers" class="mb-5">
             <h2 class="h5 border-bottom pb-2 mb-3">DHCP Servers <code class="small fw-normal text-muted">/api/dhcp-servers</code></h2>
-            <p class="text-muted small mb-1">Manage Kea DHCP server connections. SSH keys are generated automatically on create — copy the returned <code>ssh_public_key</code> to <code>authorized_keys</code> on the server. Private keys and control passwords are never returned.</p>
+            <p class="text-muted small mb-1">Manage Kea DHCP server connections. SSH keys are generated automatically on create — copy the returned <code>ssh_public_key</code> to <code>authorized_keys</code> on the server. Private keys are never returned.</p>
             <table class="table table-sm table-borderless mb-4 small">
                 <tbody>
                     <tr><td style="width:3.5rem"><span class="badge bg-primary font-monospace">GET</span></td><td><code>/api/dhcp-servers</code></td><td class="text-muted">List all DHCP servers</td></tr>
