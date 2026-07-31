@@ -53,6 +53,9 @@ class DhcpConfigGenerator
                 ];
                 if ($hostname = $iface->getPrimaryName()) {
                     $res['hostname'] = rtrim($hostname, '.') . '.';
+                    if ($subnet->getDdnsQualifyingSuffix() && !$this->findAnyDdnsLabel($iface)) {
+                        $res['ddns-send-updates'] = false;
+                    }
                 }
                 $reservations[] = $res;
             }
@@ -108,6 +111,9 @@ class DhcpConfigGenerator
                 ];
                 if ($hostname = $iface->getPrimaryName()) {
                     $res['hostname'] = rtrim($hostname, '.') . '.';
+                    if ($subnet->getDdnsQualifyingSuffix() && !$this->findAnyDdnsLabel($iface)) {
+                        $res['ddns-send-updates'] = false;
+                    }
                 }
                 $reservations[] = $res;
             }
