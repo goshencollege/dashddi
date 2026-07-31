@@ -19,15 +19,13 @@ Add a switch under **Settings → Aruba Switches**. The fields are:
 
 | Field | Description |
 |---|---|
-| Name | Display name for this switch |
-| Hostname / IP | Address of the switch (entered when performing an action, not stored on the switch record) |
 | Username | Username for REST API and SSH login |
-| Password | Password for REST API login and SSH password authentication |
-| SSH Private Key | SSH private key for key-based SSH authentication (alternative to password for SSH) |
+| Password | Password for REST API authentication and SSH password fallback |
 | REST API Version | API version for REST calls (default: `v10.12`) |
-| Verify TLS | Whether to validate the switch's TLS certificate (default: off — most switches use self-signed certs) |
+| Verify TLS | Whether to validate the switch's TLS certificate (default: **on** — recommended; uncheck only if the switch uses a self-signed certificate) |
+| Description | Optional notes about this switch configuration |
 
-**Note:** DashDDI stores a set of global credentials. The actual switch IP is provided at action time (from the NAS IP recorded in the ClearPass auth log).
+**Note:** DashDDI stores one global set of credentials. The actual switch IP is provided at action time (from the NAS IP recorded in the ClearPass auth log) and is not stored in this record.
 
 ### Authentication Options
 
@@ -52,4 +50,4 @@ Port IDs in ClearPass auth logs are typically in `NAS-Port-ID` format, for examp
 
 ## TLS Certificate Note
 
-Most Aruba CX switches use self-signed TLS certificates. Leave **Verify TLS** disabled unless you have installed a trusted certificate on the switch.
+TLS verification is enabled by default and recommended. Disable it only if the switch uses a self-signed certificate that cannot be added to the server's trust store.

@@ -127,7 +127,7 @@ To enable DNSSEC for a domain, assign a DNSSEC policy to it. DashDDI will emit `
 ## Console Command
 
 ```bash
-docker compose exec app bin/console app:dns:generate-config [--output-dir=/tmp/dns-zones] [--deploy]
+docker compose exec app bin/console app:generate-dns-config [--output-dir=/tmp/dns-zones] [--deploy]
 ```
 
 | Option | Description |
@@ -139,7 +139,7 @@ Run without `--deploy` to preview what would be generated.
 
 ## Scheduled Deployment
 
-DNS pushes can be scheduled under **Settings → Scheduled Tasks**. The task runs `app:dns:generate-config --deploy` via the bulk message queue on the configured cron schedule.
+DNS pushes can be scheduled under **Settings → Scheduled Tasks**. The task runs `app:generate-dns-config --deploy` via the bulk message queue on the configured cron schedule.
 
 ## Push Logs
 
