@@ -23,9 +23,7 @@ Add a DHCP server under **Settings → DHCP Servers**. The fields are:
 | SSH User | User account for the SSH connection (default: `root`) |
 | SSH Private Key | Private key used to authenticate. Generate one in DashDDI and copy the public key to the server's `authorized_keys`. |
 | Remote Path | Directory on the server where config files are written (default: `/etc/kea`) |
-| Control URL | HTTP(S) URL of the Kea Control Agent (e.g., `http://localhost:8000`). Required for config reload. |
-| Control User | Basic auth username for the Control Agent (optional) |
-| Control Password | Basic auth password for the Control Agent (optional) |
+| Control Port | TCP port the Kea Control Agent listens on (default: `8000`). DashDDI connects to this port via the SSH tunnel to issue a config reload — it does not connect to the Control Agent from outside the server. |
 | DDNS Enabled | When checked, DashDDI also generates and deploys `kea-dhcp-ddns.conf` for the Kea D2 daemon (see Dynamic DNS below). |
 
 ### SSH Key Setup
@@ -160,7 +158,7 @@ Add `reservations-global: true` to `kea-dhcp4.conf` and include the global reser
 ## Console Command
 
 ```bash
-docker compose exec app bin/console app:dhcp:generate-config [--output-dir=/tmp/dhcp] [--reload]
+docker compose exec app bin/console app:generate-dhcp-config [--output-dir=/tmp/dhcp] [--reload]
 ```
 
 | Option | Description |
@@ -170,7 +168,7 @@ docker compose exec app bin/console app:dhcp:generate-config [--output-dir=/tmp/
 
 ## Scheduled Deployment
 
-DHCP pushes can be scheduled under **Settings → Scheduled Tasks**. The task runs `app:dhcp:generate-config --reload` via the bulk message queue on the configured cron schedule.
+DHCP pushes can be scheduled under **Settings → Scheduled Tasks**. The task runs `app:generate-dhcp-config --reload` via the bulk message queue on the configured cron schedule.
 
 ## Push Logs
 

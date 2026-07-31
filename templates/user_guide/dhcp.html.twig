@@ -1,4 +1,5 @@
 {% extends 'base.html.twig' %}
+{% block body_class %}user-guide{% endblock %}
 {% block title %}User Guide – DHCP Management{% endblock %}
 
 {% block content %}
@@ -26,24 +27,24 @@
 <div class="card mb-4" id="dhcp-servers">
     <div class="card-header fw-semibold"><i class="bi bi-server me-1"></i>DHCP Servers</div>
     <div class="card-body">
-        <p>Register your Kea DHCP servers at <strong>Servers → Servers</strong> (DHCP section) or via the <strong>Servers</strong> overview. Each server needs:</p>
+        <p>Register your Kea DHCP servers at <strong>Servers → Servers</strong> (DHCP section). Each server needs:</p>
         <dl class="row mb-0">
             <dt class="col-sm-3">Name <span class="text-danger">*</span></dt>
             <dd class="col-sm-9">A label for this server, e.g. <code>kea-primary</code>.</dd>
-            <dt class="col-sm-3">Hostname</dt>
-            <dd class="col-sm-9">The IP or DNS name DashDDI uses to SSH into this server.</dd>
-            <dt class="col-sm-3">SSH Username</dt>
-            <dd class="col-sm-9">The Linux user account used for the SSH connection (must have permission to write Kea config and reload the service).</dd>
-            <dt class="col-sm-3">SSH Public Key</dt>
-            <dd class="col-sm-9">Generated automatically by DashDDI. Copy the displayed key to <code>~/.ssh/authorized_keys</code> on the DHCP server.</dd>
-            <dt class="col-sm-3">Config Path</dt>
-            <dd class="col-sm-9">Path on the remote server where DashDDI should write the generated Kea config file.</dd>
-            <dt class="col-sm-3">Reload Command</dt>
-            <dd class="col-sm-9">Shell command to reload Kea after the config is uploaded, e.g. <code>sudo systemctl reload kea-dhcp4</code>.</dd>
+            <dt class="col-sm-3">Hostname / IP</dt>
+            <dd class="col-sm-9">The IP address or hostname DashDDI uses to SSH into this server.</dd>
+            <dt class="col-sm-3">SSH User</dt>
+            <dd class="col-sm-9">The Linux user account for the SSH connection (default: <code>root</code>).</dd>
+            <dt class="col-sm-3">SSH Private Key</dt>
+            <dd class="col-sm-9">Generated automatically by DashDDI. Copy the displayed public key to <code>~/.ssh/authorized_keys</code> on the Kea server.</dd>
+            <dt class="col-sm-3">Remote Path</dt>
+            <dd class="col-sm-9">Directory on the server where DashDDI writes the generated Kea config files (default: <code>/etc/kea</code>).</dd>
+            <dt class="col-sm-3">Control Port</dt>
+            <dd class="col-sm-9">TCP port the Kea Control Agent listens on (default: <code>8000</code>). DashDDI uses this to trigger a config reload over the SSH session — the agent does not need to be exposed externally.</dd>
             <dt class="col-sm-3">DDNS Enabled</dt>
-            <dd class="col-sm-9">When checked, DashDDI generates and deploys a <code>kea-dhcp-ddns.conf</code> file for Kea's D2 daemon in addition to the regular subnet config files. Requires DDNS to be configured on at least one DNS server and domain (see the DNS guide).</dd>
+            <dd class="col-sm-9">When checked, DashDDI generates and deploys a <code>kea-dhcp-ddns.conf</code> file for Kea's D2 daemon alongside the regular subnet files. Requires DDNS to be configured on at least one DNS server and domain (see the DNS guide).</dd>
         </dl>
-        <p class="mt-3 mb-0 text-muted small">For SSH key installation, generated config file layout, and the Kea reload command, see the <a href="{{ path('user_guide_integrations') }}#dhcp-kea">DHCP/Kea integration guide</a>.</p>
+        <p class="mt-3 mb-0 text-muted small">For SSH key installation, generated config file layout, and Kea D2 setup, see the <a href="{{ path('user_guide_servers') }}#dhcp-integration">Servers &amp; Integrations guide → DHCP / Kea</a>.</p>
     </div>
 </div>
 
@@ -88,7 +89,7 @@
             <li>Check <strong>DDNS Enabled</strong> on this DHCP server and push config.</li>
         </ol>
         <p>DashDDI generates <code>kea-dhcp-ddns.conf</code> from the configured domains and subnets and deploys it alongside the regular subnet files. The file contains TSIG key definitions and forward/reverse zone entries for the Kea D2 daemon.</p>
-        <p class="mb-0 text-muted small">The Kea D2 daemon is a separate package (<code>kea-dhcp-ddns-server</code>) and requires a matching entry in <code>kea-ctrl-agent.conf</code>. See the <a href="{{ path('user_guide_integrations') }}#dhcp-kea">DHCP/Kea integration guide</a> for full setup details.</p>
+        <p class="mb-0 text-muted small">The Kea D2 daemon is a separate package (<code>kea-dhcp-ddns-server</code>) and requires a matching entry in <code>kea-ctrl-agent.conf</code>. See the <a href="{{ path('user_guide_servers') }}#kea-ddns">Servers &amp; Integrations guide → DHCP / Kea → Dynamic DNS</a> for full setup details.</p>
     </div>
 </div>
 
@@ -104,7 +105,7 @@
             <li>Whether the lease is currently active</li>
         </ul>
         <p class="mb-2">The host list and host detail pages show the <strong>current active lease</strong> for each interface's MAC address alongside any static IP — making it easy to see if a device is getting the expected address.</p>
-        <p class="mb-0 text-muted small">To enable lease tracking, configure Kea to post lease events to DashDDI using the <code>run_script</code> hook — see <a href="{{ path('user_guide_integrations') }}#kea-lease-notifications">Kea lease notifications</a> in the integrations guide.</p>
+        <p class="mb-0 text-muted small">To enable lease tracking, configure Kea to post lease events to DashDDI using the <code>run_script</code> hook — see <a href="{{ path('user_guide_servers') }}#kea-lease-notifications">Kea lease notifications</a> in the Servers &amp; Integrations guide.</p>
     </div>
 </div>
 
@@ -112,7 +113,7 @@
     <div class="card-header fw-semibold"><i class="bi bi-shield-lock me-1"></i>ClearPass Authentication Logs</div>
     <div class="card-body">
         <p>If ClearPass is configured, authentication events are available at <strong>DHCP → ClearPass Auth Logs</strong>. Each entry shows the MAC address, username, IP address, and authentication outcome for network access requests.</p>
-        <p class="mb-0 text-muted small">See the <a href="{{ path('user_guide_integrations') }}#clearpass">ClearPass integration guide</a> for setup details.</p>
+        <p class="mb-0 text-muted small">See the <a href="{{ path('user_guide_servers') }}#clearpass">Servers &amp; Integrations guide → ClearPass</a> for setup details.</p>
     </div>
 </div>
 

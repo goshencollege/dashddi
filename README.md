@@ -105,10 +105,10 @@ docker compose exec app bin/console doctrine:migrations:migrate
 docker compose exec app bin/console cache:warmup
 
 # Import SAML IdP metadata from a URL or file
-docker compose exec app bin/console app:saml:import-idp-metadata
+docker compose exec app bin/console app:saml:import-metadata
 
 # Generate DNS config
-docker compose exec app bin/console app:dns:generate-config
+docker compose exec app bin/console app:generate-dns-config
 
 # Backup the database
 docker compose exec app bin/console app:database:backup
@@ -134,7 +134,7 @@ Key variables written to the generated compose file by `setup.sh`:
 
 ```bash
 git pull
-docker compose -f docker-compose.prod.yml build app worker
+docker compose -f docker-compose.prod.yml build app worker_priority worker_bulk
 docker compose -f docker-compose.prod.yml up -d
 docker compose exec app bin/console doctrine:migrations:migrate
 docker compose exec app bin/console cache:warmup

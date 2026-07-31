@@ -70,20 +70,20 @@ Failed messages go to `failed_priority` or `failed_bulk`. Message classes are in
 All commands run inside the `app` container:
 
 ```bash
-app:saml:import-idp-metadata      # import IdP XML from URL or file path
+app:saml:import-metadata          # import IdP XML from URL or file path
 app:generate-encryption-key       # generate a new APP_ENCRYPTION_KEY value
-app:dns:generate-config           # generate BIND zone files (--deploy to push)
-app:dhcp:generate-config          # generate Kea config (--reload to deploy)
+app:generate-dns-config           # generate BIND zone files (--deploy to push)
+app:generate-dhcp-config          # generate Kea config (--reload to deploy)
 app:database:backup               # encrypted database backup
 app:database:restore              # restore from backup
 app:push-clearpass                # push interfaces to ClearPass NAC
 app:pull-clearpass-logs           # pull auth logs from ClearPass
 app:pull-snipe-it                 # sync assets from Snipe-IT
 app:run-scheduled-tasks           # execute all due scheduled tasks
-app:purge-clearpass-logs          # purge old ClearPass auth logs
+app:purge-clearpass-auth-logs     # purge old ClearPass auth logs
 app:purge-push-logs               # purge old push logs
 app:purge-dhcp-leases             # purge expired DHCP leases
-app:purge-deleted-entities        # hard-delete soft-deleted records past retention
+app:purge-deleted-hosts           # hard-delete soft-deleted records past retention
 ```
 
 ## Database migrations
@@ -156,8 +156,7 @@ Whenever a feature is added or changed, update the relevant user guide page(s) i
 | `subnets.html.twig` | Subnets, address blocks, VRFs, import |
 | `dns.html.twig` | Domains, records, views, ACLs, DNSSEC, zone import |
 | `dhcp.html.twig` | DHCP config generation, pushing config, leases, ClearPass auth logs |
-| `servers.html.twig` | DNS/DHCP servers, push logs, worker queue, scheduled tasks |
-| `integrations.html.twig` | Server-side setup for BIND, Kea, ClearPass, Snipe-IT, Aruba CX, REST API |
+| `servers.html.twig` | DNS/DHCP servers, server-side setup for BIND, Kea, ClearPass, Snipe-IT, Aruba CX, REST API, Proxmox ACME, push logs, worker queue, scheduled tasks |
 | `settings.html.twig` | Buildings, tags, app settings, backup/restore, API tokens, SAML, themes |
 
 If a new section is added to a guide page, add it to the on-page nav (the sticky `list-group` in `col-lg-3`). If a new app page is created, add a contextual help link following the `btn btn-sm btn-outline-secondary` + `bi-question-circle` pattern used on all other pages.

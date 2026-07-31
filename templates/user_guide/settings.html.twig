@@ -1,4 +1,5 @@
 {% extends 'base.html.twig' %}
+{% block body_class %}user-guide{% endblock %}
 {% block title %}User Guide – Settings & Administration{% endblock %}
 
 {% block content %}
@@ -39,10 +40,26 @@
             <table class="table table-sm table-bordered mb-0">
                 <thead><tr><th>Setting</th><th>Description</th></tr></thead>
                 <tbody>
-                    <tr><td>Timezone</td><td>Timezone used for scheduled task evaluation and timestamps throughout the UI</td></tr>
-                    <tr><td>SMTP Host / Port / From</td><td>Outbound mail configuration for notifications. Use <strong>Send Test Email</strong> to verify.</td></tr>
-                    <tr><td>Default Lease Retention (days)</td><td>How many days soft-deleted hosts are kept before being permanently purged. Subnets can override this.</td></tr>
-                    <tr><td>Backup Retention (days)</td><td>How long database backup files are kept before being deleted by the scheduled backup task</td></tr>
+                    <tr><th colspan="2" class="table-light small text-muted">General</th></tr>
+                    <tr><td>Display Timezone</td><td>Timezone used for scheduled task evaluation and timestamps throughout the UI</td></tr>
+                    <tr><th colspan="2" class="table-light small text-muted">Retention</th></tr>
+                    <tr><td>Default DHCP Lease Retention (days)</td><td>How many days DHCP lease records are kept. Older records are purged by the scheduled task.</td></tr>
+                    <tr><td>Push Log Retention (days)</td><td>How many days push log entries are kept before being purged</td></tr>
+                    <tr><td>Deleted Host/Interface Retention (days)</td><td>How many days soft-deleted hosts and interfaces are kept before being permanently purged. Individual subnets can override this.</td></tr>
+                    <tr><td>Default Retention for New Subnets (days)</td><td>Default lease retention applied when a new subnet is created (can be changed per-subnet)</td></tr>
+                    <tr><td>ClearPass Auth Log Retention (days)</td><td>How many days ClearPass auth log entries are kept before being purged</td></tr>
+                    <tr><td>Switch Info Max Age (days)</td><td>How long cached switch port info is considered fresh before being re-fetched from the switch</td></tr>
+                    <tr><td>Activity Log Retention (days)</td><td>How many days activity log entries are kept. Leave blank to keep entries indefinitely.</td></tr>
+                    <tr><th colspan="2" class="table-light small text-muted">SMTP</th></tr>
+                    <tr><td>SMTP Host / Port</td><td>Outbound mail server hostname and port for sending notification emails</td></tr>
+                    <tr><td>Encryption</td><td>TLS mode: None, STARTTLS, or TLS/SSL</td></tr>
+                    <tr><td>SMTP Username / Password</td><td>Credentials for authenticated SMTP (leave blank for unauthenticated relay)</td></tr>
+                    <tr><td>From Address / From Name</td><td>Sender address and display name for outbound emails. Use <strong>Send Test Email</strong> to verify configuration.</td></tr>
+                    <tr><th colspan="2" class="table-light small text-muted">Remote Syslog</th></tr>
+                    <tr><td>Enable remote syslog forwarding</td><td>When enabled, every activity log entry is forwarded asynchronously to a syslog server in RFC 5424 format, including field-level change details</td></tr>
+                    <tr><td>Syslog Server Host</td><td>Hostname or IP of the syslog server to receive forwarded log entries</td></tr>
+                    <tr><td>Syslog Port</td><td>UDP or TCP port the syslog server listens on (default: 514)</td></tr>
+                    <tr><td>Syslog Protocol</td><td>UDP or TCP. TCP connections are kept alive across messages by the background worker.</td></tr>
                 </tbody>
             </table>
         </div>
@@ -59,8 +76,8 @@
             <li><strong>Scheduled</strong> — configure a cron schedule in <strong>Other Settings → Scheduler</strong> for the Database Backup task</li>
         </ul>
         <h6>What's included</h6>
-        <p>Each backup is an encrypted MySQL dump of the entire application database. Optionally, the backup can embed the <code>APP_ENCRYPTION_KEY</code> so encrypted fields (SSH keys, passwords) remain readable after a restore to a different server.</p>
-        <p>Three tables can be excluded to keep backup files smaller: <strong>DHCP lease log</strong> (<code>dhcp_lease</code>), <strong>Activity log</strong> (<code>activity_log</code>), and <strong>ClearPass auth logs</strong> (<code>clearpass_auth_log</code>). Enable the corresponding checkboxes in Backup Settings if this data is not needed for a restore.</p>
+        <p>Each backup is a MySQL dump of the entire application database. Options in Backup Settings control how many backups to keep (<strong>Backups to Keep</strong> — older files are deleted automatically), whether to encrypt the file (AES-256-GCM + PBKDF2), and whether to embed the <code>APP_ENCRYPTION_KEY</code> in the backup so encrypted fields (SSH keys, passwords) remain readable after a restore to a different server.</p>
+        <p>Three high-volume tables can be excluded to keep backup files smaller: <strong>DHCP lease log</strong>, <strong>Activity log</strong>, and <strong>ClearPass auth logs</strong>. Enable the corresponding checkboxes in Backup Settings if this data is not needed for a restore.</p>
         <h6>Restoring a backup</h6>
         <ol class="mb-0">
             <li>On the Backup page, click <strong>Restore</strong> next to the backup you want, or upload a backup file from another server</li>
@@ -83,7 +100,7 @@
         </ol>
         <p>Each general token has granular per-route permissions. Click <strong>Edit Permissions</strong> to toggle access to individual API endpoints. By default, new tokens have no access — you must explicitly grant the routes they need. You can also restrict a general token to a list of allowed source IP addresses or CIDR ranges.</p>
 
-        <h6>Host-scoped tokens</h6>
+        <h6 id="host-scoped-tokens">Host-scoped tokens</h6>
         <p>A host-scoped token is a special token tied to a single host. It can <strong>only</strong> access the <code>/api/self/*</code> endpoints, and only from the IP addresses on that host's own network interfaces — no manual IP configuration needed.</p>
         <p>Use these when a host needs to manage its own DNS records for ACME (DNS-01) certificate validation. Each host may have at most one token at a time.</p>
         <h6 class="mt-3">Managing host-scoped tokens</h6>
@@ -93,7 +110,7 @@
             <li>Click <strong>Regenerate Token</strong> at any time to invalidate the current token and issue a new one</li>
             <li>Click <strong>Revoke Token</strong> to permanently delete the token</li>
         </ul>
-        <p>You can also generate and revoke host tokens via the API (<code>POST /api/hosts/{id}/token</code> and <code>DELETE /api/hosts/{id}/token</code>) — see the <a href="{{ path('user_guide_integrations') }}#api">Integrations guide → REST API</a> for details.</p>
+        <p>You can also generate and revoke host tokens via the API (<code>POST /api/hosts/{id}/token</code> and <code>DELETE /api/hosts/{id}/token</code>) — see the <a href="{{ path('user_guide_servers') }}#api">Servers &amp; Integrations guide → REST API</a> for details.</p>
 
         <p class="mb-0 text-muted small">All tokens are used in the <code>Authorization: Bearer &lt;token&gt;</code> HTTP header. General tokens can be regenerated at any time by editing them from the API Tokens page. The API Tokens list shows general tokens first, followed by all host-scoped tokens grouped by host.</p>
     </div>
@@ -143,7 +160,7 @@
             <a href="#app-settings" class="list-group-item list-group-item-action py-1">Application Settings</a>
             <a href="#backup" class="list-group-item list-group-item-action py-1">Backup &amp; Restore</a>
             <a href="#api-tokens" class="list-group-item list-group-item-action py-1">API Tokens</a>
-            <a href="#api-tokens" class="list-group-item list-group-item-action py-1 ps-4">↳ Host-scoped tokens</a>
+            <a href="#host-scoped-tokens" class="list-group-item list-group-item-action py-1 ps-4">↳ Host-scoped tokens</a>
             <a href="#saml" class="list-group-item list-group-item-action py-1">SAML Authentication</a>
             <a href="#themes" class="list-group-item list-group-item-action py-1">Themes</a>
         </div>
