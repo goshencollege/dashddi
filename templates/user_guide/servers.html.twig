@@ -1,4 +1,5 @@
 {% extends 'base.html.twig' %}
+{% block body_class %}user-guide{% endblock %}
 {% block title %}User Guide – Servers & Integrations{% endblock %}
 
 {% block content %}
@@ -831,6 +832,8 @@ systemctl restart pveproxy pvedaemon</code></pre>
             <a href="#api-ansible" class="list-group-item list-group-item-action py-1 ps-4">↳ Ansible role</a>
             <a href="#api-acme" class="list-group-item list-group-item-action py-1 ps-4">↳ Manual hook (curl)</a>
             <a href="#proxmox-acme" class="list-group-item list-group-item-action py-1">Proxmox VE ACME</a>
+            <a href="#proxmox-acme-install" class="list-group-item list-group-item-action py-1 ps-4">↳ Installation</a>
+            <a href="#proxmox-acme-configure" class="list-group-item list-group-item-action py-1 ps-4">↳ Configuration</a>
             <a href="#letsencrypt" class="list-group-item list-group-item-action py-1">Let's Encrypt (DashDDI cert)</a>
             <div class="list-group-item py-1 text-muted small fw-semibold" style="font-size:0.7rem;letter-spacing:.05em;text-transform:uppercase;">Operations</div>
             <a href="#push-logs" class="list-group-item list-group-item-action py-1">Push Logs</a>

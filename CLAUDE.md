@@ -156,8 +156,7 @@ Whenever a feature is added or changed, update the relevant user guide page(s) i
 | `subnets.html.twig` | Subnets, address blocks, VRFs, import |
 | `dns.html.twig` | Domains, records, views, ACLs, DNSSEC, zone import |
 | `dhcp.html.twig` | DHCP config generation, pushing config, leases, ClearPass auth logs |
-| `servers.html.twig` | DNS/DHCP servers, push logs, worker queue, scheduled tasks |
-| `integrations.html.twig` | Server-side setup for BIND, Kea, ClearPass, Snipe-IT, Aruba CX, REST API |
+| `servers.html.twig` | DNS/DHCP servers, server-side setup for BIND, Kea, ClearPass, Snipe-IT, Aruba CX, REST API, Proxmox ACME, push logs, worker queue, scheduled tasks |
 | `settings.html.twig` | Buildings, tags, app settings, backup/restore, API tokens, SAML, themes |
 
 If a new section is added to a guide page, add it to the on-page nav (the sticky `list-group` in `col-lg-3`). If a new app page is created, add a contextual help link following the `btn btn-sm btn-outline-secondary` + `bi-question-circle` pattern used on all other pages.

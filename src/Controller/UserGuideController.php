@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
@@ -46,9 +47,9 @@ class UserGuideController extends AbstractController
     }
 
     #[Route('/integrations', name: 'integrations')]
-    public function integrations(): Response
+    public function integrations(): RedirectResponse
     {
-        return $this->render('user_guide/servers.html.twig');
+        return $this->redirectToRoute('user_guide_servers', [], 301);
     }
 
     #[Route('/settings', name: 'settings')]
