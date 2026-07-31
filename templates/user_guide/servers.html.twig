@@ -714,7 +714,7 @@ systemctl restart pveproxy pvedaemon</code></pre>
 
         <h6 class="mt-3">Ansible setup (recommended)</h6>
         <p>The <code>certbot-dns-dashddi</code> Ansible role (included at <code>certbot-dns-dashddi/ansible/</code>) automates the entire setup. Run it against the DashDDI host with <code>dashddi_deploy_hook</code> pointing at the deploy script bundled in the repo:</p>
-        <pre class="bg-light p-2 rounded small mb-2">ansible-playbook -i inventory certbot-dns-dashddi/ansible/certbot.yml \
+        <pre class="bg-body-secondary p-2 rounded small mb-2">ansible-playbook -i inventory certbot-dns-dashddi/ansible/certbot.yml \
   -e dashddi_url=https://dashddi.example.com \
   -e dashddi_admin_token=&lt;token&gt; \
   -e dashddi_deploy_hook=/opt/dashddi/docker/certbot-deploy.sh</pre>
@@ -722,10 +722,10 @@ systemctl restart pveproxy pvedaemon</code></pre>
 
         <h6 class="mt-3">Manual setup</h6>
         <p>Without Ansible, install certbot and the plugin manually (see <code>certbot-dns-dashddi/README.md</code>), generate a host-scoped token from the DashDDI host's page, then request the certificate once:</p>
-        <pre class="bg-light p-2 rounded small mb-2">dashddi-certbot --credentials /etc/letsencrypt/dashddi.ini \
+        <pre class="bg-body-secondary p-2 rounded small mb-2">dashddi-certbot --credentials /etc/letsencrypt/dashddi.ini \
   -- --deploy-hook /opt/dashddi/docker/certbot-deploy.sh</pre>
         <p>For automatic renewal, copy the deploy hook into certbot's drop-in directory so it runs on every renewal without any extra arguments:</p>
-        <pre class="bg-light p-2 rounded small mb-0">cp /opt/dashddi/docker/certbot-deploy.sh /etc/letsencrypt/renewal-hooks/deploy/</pre>
+        <pre class="bg-body-secondary p-2 rounded small mb-0">cp /opt/dashddi/docker/certbot-deploy.sh /etc/letsencrypt/renewal-hooks/deploy/</pre>
     </div>
 </div>
 
