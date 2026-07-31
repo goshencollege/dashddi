@@ -48,7 +48,7 @@ class UserGuideController extends AbstractController
     #[Route('/integrations', name: 'integrations')]
     public function integrations(): Response
     {
-        return $this->render('user_guide/integrations.html.twig');
+        return $this->render('user_guide/servers.html.twig');
     }
 
     #[Route('/settings', name: 'settings')]
