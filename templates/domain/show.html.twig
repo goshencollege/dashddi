@@ -696,8 +696,23 @@
 
             // Zone-signing status for the managed zone.
             if (signing) {
-                html += '<div class="d-flex align-items-center gap-2 small mt-1">'
-                      + tcIcon(signing.status) + ' <span class="text-muted">' + signing.detail + '</span></div>';
+                if (signing.status === 'ok') {
+                    var soaSignedBadge = signing.soa_signer_key_tag
+                        ? '<span class="badge bg-success-subtle text-success-emphasis border border-success-subtle">'
+                          + '<i class="bi bi-check-lg me-1"></i>signed by id=' + signing.soa_signer_key_tag + '</span>'
+                        : '<span class="badge bg-success-subtle text-success-emphasis border border-success-subtle">'
+                          + '<i class="bi bi-check-lg me-1"></i>signed</span>';
+                    html += '<div class="d-flex align-items-center gap-2 flex-wrap mb-1">'
+                          + '<span class="badge bg-body-secondary text-body border font-monospace">SOA</span>'
+                          + soaSignedBadge + '</div>';
+                    if (signing.records && signing.records.length) {
+                        html += '<pre class="bg-body-secondary border rounded p-1 mt-0 mb-2" style="font-size:.8em;white-space:pre-wrap;word-break:break-all">'
+                              + signing.records.join('\n') + '</pre>';
+                    }
+                } else {
+                    html += '<div class="d-flex align-items-center gap-2 small">'
+                          + tcIcon('error') + ' <span class="text-danger small">' + signing.detail + '</span></div>';
+                }
             }
         });
 

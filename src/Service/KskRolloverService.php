@@ -604,6 +604,7 @@ class KskRolloverService
                     'dig +noall +answer +dnssec SOA %s 2>/dev/null',
                     escapeshellarg($zone)
                 ));
+                $soaLines      = $this->extractAnswerRecords($soaOut, 'SOA');
                 $soaSigs       = $this->extractAnswerRecords($soaOut, 'RRSIG');
                 $soaSignerTag  = $this->parseRrsigKeyTag($soaSigs);
 
@@ -612,7 +613,7 @@ class KskRolloverService
                     'label'              => $zone . ' zone signing',
                     'zone'               => $zone,
                     'status'             => empty($soaSigs) ? 'error' : 'ok',
-                    'records'            => [],
+                    'records'            => $soaLines,
                     'soa_signer_key_tag' => $soaSignerTag,
                     'detail'             => empty($soaSigs)
                         ? 'SOA record is not signed'
