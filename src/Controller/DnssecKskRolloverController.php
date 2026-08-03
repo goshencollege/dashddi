@@ -36,9 +36,9 @@ class DnssecKskRolloverController extends AbstractController
 
         $defaultZone = null;
         if ($domainId = $request->query->getInt('domain')) {
-            $preselect = $em->find(Domain::class, $domainId);
-            if ($preselect?->getDnssecPolicy()) {
-                $defaultZone = 'domain:' . $preselect->getId();
+            $candidate = 'domain:' . $domainId;
+            if (array_key_exists($candidate, $zonePolicyMap)) {
+                $defaultZone = $candidate;
             }
         }
 

@@ -102,7 +102,7 @@ class DhcpConfigGenerator
 
             $reservations = [];
             foreach ($subnet->getInterfaces() as $iface) {
-                if (!$iface->getIpv6Address() || $iface->getMacAddress() === '00:00:00:00:00:00') {
+                if ($iface->isDeleted() || !$iface->getIpv6Address() || $iface->getMacAddress() === '00:00:00:00:00:00') {
                     continue;
                 }
                 $res = [

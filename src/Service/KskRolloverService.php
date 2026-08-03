@@ -241,47 +241,36 @@ class KskRolloverService
             $base     = sprintf('K%s.+%03d+%05d', $zone, $alg, $tag);
             $path     = $keyDir . '/' . $base . '.key';
 
-            // Read the .key file via exec/cat — same SSH exec path used by all other
-            // commands in this service. BIND writes timing as comments at the top:
-            //   ; Created: YYYYMMDDHHMMSS (human-readable)
-            $keyContent = (string)$sftp->exec('cat ' . escapeshellarg($path) . ' 2>/dev/null');
+            // dnssec-settime is in sudoers (sudo -u bind) so it works even when
+            // the key directory is bind:bind 750 and the SSH user cannot enter it directly.
+            $timing = (string)$sftp->exec(
+                'sudo -u bind dnssec-settime -p all ' . escapeshellarg($path) . ' 2>/dev/null'
+            );
 
             $keys[] = [
                 'key_tag'   => $tag,
                 'type'      => $flags === 257 ? 'KSK' : 'ZSK',
                 'algorithm' => $alg,
                 'flags'     => $flags,
-                'created'   => $this->parseKeyFileDate($keyContent, 'Created'),
-                'publish'   => $this->parseKeyFileDate($keyContent, 'Publish'),
-                'activate'  => $this->parseKeyFileDate($keyContent, 'Activate'),
-                'inactive'  => $this->parseKeyFileDate($keyContent, 'Inactive'),
-                'delete'    => $this->parseKeyFileDate($keyContent, 'Delete'),
+                'created'   => $this->parseSettime($timing, 'Created'),
+                'publish'   => $this->parseSettime($timing, 'Publish'),
+                'activate'  => $this->parseSettime($timing, 'Activate'),
+                'inactive'  => $this->parseSettime($timing, 'Inactive'),
+                'delete'    => $this->parseSettime($timing, 'Delete'),
             ];
         }
 
         return $keys;
     }
 
+    /**
+     * Parses a timing field from `dnssec-settime -p all` output.
+     * Returns the 14-digit YYYYMMDDHHMMSS timestamp, or null if the field is unset/absent.
+     * Example line: "Created: 20231201120000 (Fri Dec  1 12:00:00 2023)"
+     */
     private function parseSettime(string $output, string $field): ?string
     {
-        if (!preg_match('/^' . preg_quote($field, '/') . ':\s*(.+)$/im', $output, $m)) {
-            return null;
-        }
-        $val = strtolower(trim($m[1]));
-        if ($val === '' || $val === 'unset' || $val === 'none' || $val === 'not set') {
-            return null;
-        }
-        return trim($m[1]);
-    }
-
-    /**
-     * Parses a timing field from a BIND .key file comment block.
-     * BIND writes lines like: "; Created: 20231201120000 (Fri Dec  1 12:00:00 2023)"
-     * Returns the 14-digit YYYYMMDDHHMMSS timestamp, or null if unset/absent.
-     */
-    private function parseKeyFileDate(string $content, string $field): ?string
-    {
-        if (!preg_match('/^;\s*' . preg_quote($field, '/') . ':\s*(\d{14})/im', $content, $m)) {
+        if (!preg_match('/^' . preg_quote($field, '/') . ':\s*(\d{14})/im', $output, $m)) {
             return null;
         }
         return $m[1];

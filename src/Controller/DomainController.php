@@ -131,27 +131,9 @@ class DomainController extends AbstractController
         DnsServerRepository $serverRepo,
         KskRolloverService $kskService,
     ): JsonResponse {
-        if (!$domain->getDnssecPolicy()) {
-            return $this->json(['error' => 'This domain does not have a DNSSEC policy.'], 400);
-        }
-
-        $domainViewIds = array_map(fn($v) => $v->getId(), $domain->getViews()->toArray());
-        if (empty($domainViewIds)) {
-            return $this->json(['error' => 'This domain is not assigned to any DNS views.'], 400);
-        }
-
-        $servers = array_filter(
-            $serverRepo->findAll(),
-            fn($s) => $s->isPrimary()
-                && $s->getKeyDirectory()
-                && !empty(array_intersect(
-                    array_map(fn($v) => $v->getId(), $s->getViews()->toArray()),
-                    $domainViewIds
-                ))
-        );
-
-        if (empty($servers)) {
-            return $this->json(['error' => 'No primary DNS server with a configured key directory serves this domain.'], 400);
+        $servers = $this->resolveDnssecServers($domain, $serverRepo);
+        if ($servers instanceof JsonResponse) {
+            return $servers;
         }
 
         $allDs  = [];
@@ -181,37 +163,20 @@ class DomainController extends AbstractController
     #[Route('/{id}/keys', name: 'domain_keys', methods: ['GET'])]
     public function keys(Domain $domain, DnsServerRepository $serverRepo, KskRolloverService $kskService): JsonResponse
     {
-        if (!$domain->getDnssecPolicy()) {
-            return $this->json(['error' => 'This domain does not have a DNSSEC policy.'], 400);
+        $servers = $this->resolveDnssecServers($domain, $serverRepo);
+        if ($servers instanceof JsonResponse) {
+            return $servers;
         }
 
-        $domainViewIds = array_map(fn($v) => $v->getId(), $domain->getViews()->toArray());
-        if (empty($domainViewIds)) {
-            return $this->json(['error' => 'This domain is not assigned to any DNS views.'], 400);
-        }
-
-        $servers = array_filter(
-            $serverRepo->findAll(),
-            fn($s) => $s->isPrimary()
-                && $s->getKeyDirectory()
-                && !empty(array_intersect(
-                    array_map(fn($v) => $v->getId(), $s->getViews()->toArray()),
-                    $domainViewIds
-                ))
-        );
-
-        if (empty($servers)) {
-            return $this->json(['error' => 'No primary DNS server with a configured key directory serves this domain.'], 400);
-        }
-
-        $seenTags = [];
+        $seenKeys = [];
         $allKeys  = [];
         $errors   = [];
         foreach ($servers as $server) {
             try {
                 foreach ($kskService->fetchAllKeyInfo($domain, $server) as $key) {
-                    if (!in_array($key['key_tag'], $seenTags, true)) {
-                        $seenTags[] = $key['key_tag'];
+                    $dedupKey = $key['algorithm'] . ':' . $key['key_tag'];
+                    if (!in_array($dedupKey, $seenKeys, true)) {
+                        $seenKeys[] = $dedupKey;
                         $allKeys[]  = $key;
                     }
                 }
@@ -238,14 +203,12 @@ class DomainController extends AbstractController
     #[Route('/{id}/edit', name: 'domain_edit', methods: ['GET', 'POST'])]
     public function edit(Request $request, Domain $domain, EntityManagerInterface $em): Response
     {
-        $originalPolicy = $domain->getDnssecPolicy();
-        $form = $this->createForm(DomainType::class, $domain);
+        $form = $this->createForm(DomainType::class, $domain, [
+            'locked_policy' => $domain->getDnssecPolicy() !== null,
+        ]);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            if ($originalPolicy !== null) {
-                $domain->setDnssecPolicy($originalPolicy);
-            }
             $em->flush();
             $this->addFlash('success', 'Domain updated.');
             return $this->redirectToRoute('domain_show', ['id' => $domain->getId()]);
@@ -321,5 +284,39 @@ class DomainController extends AbstractController
         }
 
         return $this->redirectToRoute('domain_show', ['id' => $domain->getId()]);
+    }
+
+    /**
+     * Returns the primary DNS servers with a key directory that serve this domain,
+     * or a JSON error response if the prerequisites aren't met.
+     *
+     * @return array<\App\Entity\DnsServer>|JsonResponse
+     */
+    private function resolveDnssecServers(Domain $domain, DnsServerRepository $serverRepo): array|JsonResponse
+    {
+        if (!$domain->getDnssecPolicy()) {
+            return $this->json(['error' => 'This domain does not have a DNSSEC policy.'], 400);
+        }
+
+        $domainViewIds = array_map(fn($v) => $v->getId(), $domain->getViews()->toArray());
+        if (empty($domainViewIds)) {
+            return $this->json(['error' => 'This domain is not assigned to any DNS views.'], 400);
+        }
+
+        $servers = array_values(array_filter(
+            $serverRepo->findAll(),
+            fn($s) => $s->isPrimary()
+                && $s->getKeyDirectory()
+                && !empty(array_intersect(
+                    array_map(fn($v) => $v->getId(), $s->getViews()->toArray()),
+                    $domainViewIds
+                ))
+        ));
+
+        if (empty($servers)) {
+            return $this->json(['error' => 'No primary DNS server with a configured key directory serves this domain.'], 400);
+        }
+
+        return $servers;
     }
 }

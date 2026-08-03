@@ -69,6 +69,7 @@ class DomainType extends AbstractType
                 'placeholder'  => '— None —',
                 'required'     => false,
                 'label'        => 'DNSSEC Policy',
+                'disabled'     => $options['locked_policy'],
             ])
             ->add('ddnsEnabled', CheckboxType::class, [
                 'label'    => 'Enable DDNS (allow dynamic updates from Kea)',
@@ -94,6 +95,10 @@ class DomainType extends AbstractType
 
     public function configureOptions(OptionsResolver $resolver): void
     {
-        $resolver->setDefaults(['data_class' => Domain::class]);
+        $resolver->setDefaults([
+            'data_class'    => Domain::class,
+            'locked_policy' => false,
+        ]);
+        $resolver->setAllowedTypes('locked_policy', 'bool');
     }
 }
