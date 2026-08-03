@@ -238,10 +238,14 @@ class DomainController extends AbstractController
     #[Route('/{id}/edit', name: 'domain_edit', methods: ['GET', 'POST'])]
     public function edit(Request $request, Domain $domain, EntityManagerInterface $em): Response
     {
+        $originalPolicy = $domain->getDnssecPolicy();
         $form = $this->createForm(DomainType::class, $domain);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
+            if ($originalPolicy !== null) {
+                $domain->setDnssecPolicy($originalPolicy);
+            }
             $em->flush();
             $this->addFlash('success', 'Domain updated.');
             return $this->redirectToRoute('domain_show', ['id' => $domain->getId()]);

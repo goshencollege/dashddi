@@ -3,6 +3,7 @@
 namespace App\Form;
 
 use App\Entity\DnsServer;
+use App\Entity\DnssecPolicy;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
@@ -27,6 +28,14 @@ class KskRolloverStartType extends AbstractType
                 'choice_label' => 'name',
                 'data'         => $options['first_server'],
                 'constraints'  => [new NotBlank()],
+                'attr'         => ['class' => 'form-select'],
+            ])
+            ->add('dnssecPolicy', EntityType::class, [
+                'class'        => DnssecPolicy::class,
+                'choice_label' => 'name',
+                'placeholder'  => '— use zone\'s policy —',
+                'required'     => false,
+                'label'        => 'Algorithm Policy',
                 'attr'         => ['class' => 'form-select'],
             ]);
     }
