@@ -181,6 +181,28 @@
                 <i class="bi bi-clipboard me-1"></i>Copy
             </button>
         </div>
+        <div id="key-info-result" class="mt-3" style="display:none">
+            <div class="text-muted small mb-2">DNSSEC Keys</div>
+            <div id="key-info-error" class="text-danger small" style="display:none"></div>
+            <div class="table-responsive">
+                <table class="table table-sm table-bordered mb-1" style="font-size:.85em">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Key Tag</th>
+                            <th>Type</th>
+                            <th>Algorithm</th>
+                            <th>Created</th>
+                            <th>Published</th>
+                            <th>Activated</th>
+                            <th>Inactive</th>
+                            <th>Deleted</th>
+                        </tr>
+                    </thead>
+                    <tbody id="key-info-tbody"></tbody>
+                </table>
+            </div>
+            <div id="key-info-warnings" class="text-warning small" style="display:none"></div>
+        </div>
         <div class="card-footer d-flex align-items-center gap-2">
             <a href="{{ path('ksk_rollover_start') }}?domain={{ domain.id }}" class="btn btn-sm btn-outline-primary">
                 <i class="bi bi-key me-1"></i>Start KSK Rollover
@@ -190,6 +212,11 @@
                 <i class="bi bi-search me-1"></i>Fetch DS Record
             </button>
             <span id="ds-spinner" class="spinner-border spinner-border-sm text-secondary d-none" role="status" aria-hidden="true"></span>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="fetch-keys-btn"
+                    data-url="{{ path('domain_keys', {id: domain.id}) }}">
+                <i class="bi bi-key-fill me-1"></i>Fetch Keys
+            </button>
+            <span id="keys-spinner" class="spinner-border spinner-border-sm text-secondary d-none" role="status" aria-hidden="true"></span>
         </div>
     </div>
 </div>
@@ -455,6 +482,85 @@
                 copyBtn.innerHTML = '<i class="bi bi-clipboard me-1"></i>Copy';
             }, 2000);
         });
+    });
+
+    var keysBtn      = document.getElementById('fetch-keys-btn');
+    var keysSpinner  = document.getElementById('keys-spinner');
+    var keyResult    = document.getElementById('key-info-result');
+    var keyTbody     = document.getElementById('key-info-tbody');
+    var keyError     = document.getElementById('key-info-error');
+    var keyWarnings  = document.getElementById('key-info-warnings');
+
+    var ALG_NAMES = {
+        5: 'RSASHA1', 7: 'NSEC3RSASHA1', 8: 'RSASHA256', 10: 'RSASHA512',
+        13: 'ECDSAP256SHA256', 14: 'ECDSAP384SHA384', 15: 'ED25519', 16: 'ED448'
+    };
+
+    function fmtDate(raw) {
+        if (!raw) return '—';
+        var s = String(raw).replace(/\D/g, '');
+        if (s.length < 12) return raw;
+        return s.slice(0, 4) + '-' + s.slice(4, 6) + '-' + s.slice(6, 8) + ' ' + s.slice(8, 10) + ':' + s.slice(10, 12);
+    }
+
+    function fmtAlg(num) {
+        return ALG_NAMES[num] ? ALG_NAMES[num] + ' (' + num + ')' : String(num);
+    }
+
+    keysBtn.addEventListener('click', function () {
+        keysBtn.disabled = true;
+        keysSpinner.classList.remove('d-none');
+        keyResult.style.display = 'none';
+
+        fetch(keysBtn.dataset.url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                keyError.style.display = 'none';
+                keyWarnings.style.display = 'none';
+                keyTbody.innerHTML = '';
+
+                if (data.error) {
+                    keyError.textContent = data.error;
+                    keyError.style.display = '';
+                } else if (!data.keys || data.keys.length === 0) {
+                    keyError.textContent = 'No keys found yet — BIND may still be generating keys. Try again in a moment.';
+                    keyError.style.display = '';
+                } else {
+                    data.keys.forEach(function (k) {
+                        var tr = document.createElement('tr');
+                        [
+                            String(k.key_tag),
+                            k.type === 'KSK' ? '<span class="badge bg-primary">KSK</span>' : '<span class="badge bg-secondary">ZSK</span>',
+                            fmtAlg(k.algorithm),
+                            fmtDate(k.created),
+                            fmtDate(k.publish),
+                            fmtDate(k.activate),
+                            fmtDate(k.inactive),
+                            fmtDate(k['delete'])
+                        ].forEach(function (cell, i) {
+                            var td = document.createElement('td');
+                            if (i === 0) { td.className = 'font-monospace'; }
+                            td.innerHTML = cell;
+                            tr.appendChild(td);
+                        });
+                        keyTbody.appendChild(tr);
+                    });
+                    if (data.errors && data.errors.length) {
+                        keyWarnings.textContent = 'Warnings: ' + data.errors.join('; ');
+                        keyWarnings.style.display = '';
+                    }
+                }
+                keyResult.style.display = '';
+            })
+            .catch(function (err) {
+                keyError.textContent = 'Request failed: ' + err;
+                keyError.style.display = '';
+                keyResult.style.display = '';
+            })
+            .finally(function () {
+                keysBtn.disabled = false;
+                keysSpinner.classList.add('d-none');
+            });
     });
 }());
 </script>

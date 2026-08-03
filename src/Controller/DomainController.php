@@ -178,6 +178,58 @@ class DomainController extends AbstractController
         ]);
     }
 
+    #[Route('/{id}/keys', name: 'domain_keys', methods: ['GET'])]
+    public function keys(Domain $domain, DnsServerRepository $serverRepo, KskRolloverService $kskService): JsonResponse
+    {
+        if (!$domain->getDnssecPolicy()) {
+            return $this->json(['error' => 'This domain does not have a DNSSEC policy.'], 400);
+        }
+
+        $domainViewIds = array_map(fn($v) => $v->getId(), $domain->getViews()->toArray());
+        if (empty($domainViewIds)) {
+            return $this->json(['error' => 'This domain is not assigned to any DNS views.'], 400);
+        }
+
+        $servers = array_filter(
+            $serverRepo->findAll(),
+            fn($s) => $s->isPrimary()
+                && $s->getKeyDirectory()
+                && !empty(array_intersect(
+                    array_map(fn($v) => $v->getId(), $s->getViews()->toArray()),
+                    $domainViewIds
+                ))
+        );
+
+        if (empty($servers)) {
+            return $this->json(['error' => 'No primary DNS server with a configured key directory serves this domain.'], 400);
+        }
+
+        $seenTags = [];
+        $allKeys  = [];
+        $errors   = [];
+        foreach ($servers as $server) {
+            try {
+                foreach ($kskService->fetchAllKeyInfo($domain, $server) as $key) {
+                    if (!in_array($key['key_tag'], $seenTags, true)) {
+                        $seenTags[] = $key['key_tag'];
+                        $allKeys[]  = $key;
+                    }
+                }
+            } catch (\Throwable $e) {
+                $errors[] = $server->getName() . ': ' . $e->getMessage();
+            }
+        }
+
+        if (empty($allKeys) && !empty($errors)) {
+            return $this->json(['error' => implode('; ', $errors)], 500);
+        }
+
+        return $this->json([
+            'keys'   => $allKeys,
+            'errors' => $errors,
+        ]);
+    }
+
     #[Route('/{id}/edit', name: 'domain_edit', methods: ['GET', 'POST'])]
     public function edit(Request $request, Domain $domain, EntityManagerInterface $em): Response
     {

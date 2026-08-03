@@ -210,6 +210,70 @@ class KskRolloverService
     }
 
     /**
+     * Returns metadata for all published DNSKEY records (KSK and ZSK) for a domain.
+     * Each entry contains key_tag, type, algorithm, flags, and lifecycle timestamps.
+     * Private key material is never read.
+     *
+     * @return array<int, array{key_tag: int, type: string, algorithm: int, flags: int, created: string|null, publish: string|null, activate: string|null, inactive: string|null, delete: string|null}>
+     */
+    public function fetchAllKeyInfo(Domain $domain, DnsServer $server): array
+    {
+        $sftp   = $this->connectServer($server);
+        $zone   = $domain->getName();
+        $keyDir = rtrim($server->getKeyDirectory() ?? '', '/') . '/' . $zone;
+
+        $out = (string)$sftp->exec(sprintf('dig +short DNSKEY %s 2>/dev/null', escapeshellarg($zone)));
+
+        $keys = [];
+        foreach (explode("\n", $out) as $line) {
+            $line  = trim($line);
+            $parts = preg_split('/\s+/', $line, 4);
+            if (!isset($parts[3])) {
+                continue;
+            }
+            [$flagStr, $protoStr, $algStr, $pubKey] = $parts;
+            $flags = (int)$flagStr;
+            if ($flags !== 257 && $flags !== 256) {
+                continue;
+            }
+            $alg     = (int)$algStr;
+            $tag     = $this->computeKeyTag($flags, (int)$protoStr, $alg, $pubKey);
+            $base    = sprintf('K%s.+%03d+%05d', $zone, $alg, $tag);
+            $path    = $keyDir . '/' . $base . '.key';
+
+            $info = (string)$sftp->exec(
+                'sudo -u bind dnssec-settime -p all ' . escapeshellarg($path) . ' 2>/dev/null'
+            );
+
+            $keys[] = [
+                'key_tag'   => $tag,
+                'type'      => $flags === 257 ? 'KSK' : 'ZSK',
+                'algorithm' => $alg,
+                'flags'     => $flags,
+                'created'   => $this->parseSettime($info, 'Created'),
+                'publish'   => $this->parseSettime($info, 'Publish'),
+                'activate'  => $this->parseSettime($info, 'Activate'),
+                'inactive'  => $this->parseSettime($info, 'Inactive'),
+                'delete'    => $this->parseSettime($info, 'Delete'),
+            ];
+        }
+
+        return $keys;
+    }
+
+    private function parseSettime(string $output, string $field): ?string
+    {
+        if (!preg_match('/^' . preg_quote($field, '/') . ':\s*(.+)$/im', $output, $m)) {
+            return null;
+        }
+        $val = strtolower(trim($m[1]));
+        if ($val === '' || $val === 'unset' || $val === 'none' || $val === 'not set') {
+            return null;
+        }
+        return trim($m[1]);
+    }
+
+    /**
      * Finds the currently active KSK base name in keyDir for zone.
      *
      * Stage 1: query the live DNSKEY RRset with dig (no sudo, no directory access).
