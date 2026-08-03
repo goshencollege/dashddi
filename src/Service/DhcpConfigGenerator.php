@@ -53,6 +53,9 @@ class DhcpConfigGenerator
                 ];
                 if ($hostname = $iface->getPrimaryName()) {
                     $res['hostname'] = rtrim($hostname, '.') . '.';
+                    if ($subnet->getDdnsQualifyingSuffix() && !$this->findAnyDdnsLabel($iface)) {
+                        $res['ddns-send-updates'] = false;
+                    }
                 }
                 $reservations[] = $res;
             }
@@ -99,7 +102,7 @@ class DhcpConfigGenerator
 
             $reservations = [];
             foreach ($subnet->getInterfaces() as $iface) {
-                if (!$iface->getIpv6Address() || $iface->getMacAddress() === '00:00:00:00:00:00') {
+                if ($iface->isDeleted() || !$iface->getIpv6Address() || $iface->getMacAddress() === '00:00:00:00:00:00') {
                     continue;
                 }
                 $res = [
@@ -108,6 +111,9 @@ class DhcpConfigGenerator
                 ];
                 if ($hostname = $iface->getPrimaryName()) {
                     $res['hostname'] = rtrim($hostname, '.') . '.';
+                    if ($subnet->getDdnsQualifyingSuffix() && !$this->findAnyDdnsLabel($iface)) {
+                        $res['ddns-send-updates'] = false;
+                    }
                 }
                 $reservations[] = $res;
             }

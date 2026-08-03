@@ -13,7 +13,7 @@
 </div>
 
 <div class="alert alert-info">
-    <strong>What this does:</strong> Generates a new KSK on the DNS server using the algorithm from the zone's DNSSEC policy, calls <code>rndc loadkeys</code>, then walks you through the manual registrar DS update and old-key retirement.
+    <strong>What this does:</strong> Generates a new KSK on the DNS server using the algorithm from the selected policy (defaulting to the zone's own policy), calls <code>rndc loadkeys</code>, then walks you through the manual registrar DS update and old-key retirement.
 </div>
 
 {{ form_start(form) }}
@@ -32,8 +32,29 @@
             {{ form_widget(form.dnsServer) }}
             {{ form_errors(form.dnsServer) }}
         </div>
+        <div class="col-12">
+            {{ form_label(form.dnssecPolicy) }}
+            {{ form_widget(form.dnssecPolicy) }}
+            {{ form_errors(form.dnssecPolicy) }}
+            <div class="form-text">Defaults to the zone's assigned policy. Override to generate a key for a different algorithm (algorithm migration).</div>
+        </div>
     </div>
 </div>
+
+<script>
+(function () {
+    var zoneMap = {{ zonePolicyMap|json_encode|raw }};
+    var zoneEl  = document.querySelector('[name="ksk_rollover_start[zone]"]');
+    var polEl   = document.querySelector('[name="ksk_rollover_start[dnssecPolicy]"]');
+    if (!zoneEl || !polEl) return;
+    function syncPolicy() {
+        var mapped = zoneMap[zoneEl.value];
+        polEl.value = (mapped !== undefined) ? String(mapped) : '';
+    }
+    zoneEl.addEventListener('change', syncPolicy);
+    syncPolicy();
+}());
+</script>
 
 <div class="d-flex gap-2">
     <button type="submit" class="btn btn-primary">

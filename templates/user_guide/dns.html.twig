@@ -111,10 +111,21 @@
     <div class="card-header fw-semibold"><i class="bi bi-shield-check me-1"></i>DNSSEC Policies</div>
     <div class="card-body">
         <p>DNSSEC adds cryptographic signatures to DNS records, allowing resolvers to verify authenticity. DashDDI supports BIND 9's <strong>inline signing</strong> approach via named policy definitions.</p>
-        <p>Create a DNSSEC policy at <strong>DNS → DNSSEC Policies</strong> with a name and key parameters. Assign the policy to a domain or subnet on the respective edit page. DashDDI includes the policy reference in the generated BIND configuration.</p>
+        <p>Create a DNSSEC policy at <strong>DNS → DNSSEC Policies</strong> with a name and key parameters. Assign the policy to a domain on the domain edit page. DashDDI includes the policy reference in the generated BIND configuration.</p>
+
+        <h6 class="mt-3">Policy lock</h6>
+        <p>Once a DNSSEC policy has been assigned to a domain and BIND has begun signing, changing the policy through the normal edit form is intentionally blocked. Simply swapping policies would cause BIND to generate a new key for the new algorithm without properly retiring the old one, leaving orphaned keys and a broken trust chain at the registrar. The policy field shows a lock icon and the current policy name when editing a domain that is already signed. To migrate to a different algorithm, use the <strong>KSK Rollover</strong> workflow (see below).</p>
+
+        <h6 class="mt-3">Viewing published keys</h6>
+        <p>On the domain detail page, the DNSSEC card has a <strong>Fetch Keys</strong> button. Click it to query the primary DNS server and display all published DNSKEY records for that zone — including key tag, type (KSK / ZSK), algorithm, and timing dates (created, published, activated, inactive, deleted). Keys are sorted with KSKs first, then by algorithm number. Private key material is never shown.</p>
+        <p class="mb-0 text-muted small">Requires the domain to have a DNSSEC policy set, be assigned to at least one DNS view, and have a primary server in that view with a key directory configured.</p>
 
         <h6 class="mt-3">KSK Rollover</h6>
-        <p class="mb-0">The Key Signing Key (KSK) must be rolled over periodically. DashDDI provides a guided rollover workflow at <strong>DNS → KSK Rollovers</strong>. The rollover steps through the required phases (pre-publication, active, post-rollover) with prompts for each action you need to take on the authoritative DNS server.</p>
+        <p>The Key Signing Key (KSK) must be rolled over periodically. DashDDI provides a guided rollover workflow at <strong>DNS → KSK Rollovers</strong>. The rollover steps through the required phases (pre-publication, active, post-rollover) with prompts for each action you need to take on the authoritative DNS server.</p>
+        <p>The rollover start form includes an optional <strong>Algorithm Policy</strong> selector. By default it inherits the zone's current policy. Override it to generate the new KSK under a different DNSSEC policy — this is the supported path for algorithm migration (e.g. from RSASHA256 to ECDSAP256SHA256). Setting an override does not change the policy assigned to the domain; the override only controls which algorithm is used when generating the new KSK for this rollover.</p>
+        <div class="alert alert-info py-2 small mb-0">
+            <i class="bi bi-lightbulb me-1"></i><strong>Algorithm migration:</strong> assign the new policy to the domain first (possible before any keys exist), then start a KSK rollover and select the new policy as the Algorithm Policy override. Follow the rollover steps to publish the new KSK DS record at your registrar before retiring the old key.
+        </div>
     </div>
 </div>
 
