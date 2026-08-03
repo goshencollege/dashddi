@@ -121,6 +121,60 @@
                 <div><span class="badge bg-success"><i class="bi bi-check-lg me-1"></i>Yes</span></div>
             </div>
         </div>
+        <div id="ds-record-result" class="mt-3" style="display:none">
+            <div class="text-muted small mb-1">DS Record(s) — publish in parent zone</div>
+            <pre id="ds-record-output" class="bg-body-secondary border rounded p-2 mb-1" style="white-space:pre-wrap;word-break:break-all;font-size:.85em;margin-bottom:0"></pre>
+            <button type="button" class="btn btn-sm btn-outline-secondary mt-2" id="ds-record-copy">
+                <i class="bi bi-clipboard me-1"></i>Copy
+            </button>
+        </div>
+        <div id="trust-chain-result" class="mt-3" style="display:none">
+            <div class="text-muted small mb-2">Trust Chain Validation</div>
+            <div id="trust-chain-steps" class="list-group list-group-flush small mb-2"></div>
+            <div id="trust-chain-summary" class="small fw-semibold"></div>
+        </div>
+        <div id="key-info-result" class="mt-3" style="display:none">
+            <div class="text-muted small mb-2">DNSSEC Keys</div>
+            <div id="key-info-error" class="text-danger small" style="display:none"></div>
+            <div class="table-responsive">
+                <table class="table table-sm table-bordered mb-1" style="font-size:.85em">
+                    <thead>
+                        <tr>
+                            <th>Key Tag</th>
+                            <th>Type</th>
+                            <th>Algorithm</th>
+                            <th>Created</th>
+                            <th>Published</th>
+                            <th>Activated</th>
+                            <th>Inactive</th>
+                            <th>Deleted</th>
+                        </tr>
+                    </thead>
+                    <tbody id="key-info-tbody"></tbody>
+                </table>
+            </div>
+            <div id="key-info-warnings" class="text-warning small" style="display:none"></div>
+        </div>
+        <div class="card-footer d-flex align-items-center gap-2">
+            <a href="{{ path('ksk_rollover_start') }}?subnet={{ subnet.id }}" class="btn btn-sm btn-outline-primary">
+                <i class="bi bi-key me-1"></i>Start KSK Rollover
+            </a>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="fetch-ds-btn"
+                    data-url="{{ path('subnet_ds_record', {id: subnet.id}) }}">
+                <i class="bi bi-search me-1"></i>Fetch DS Record
+            </button>
+            <span id="ds-spinner" class="spinner-border spinner-border-sm text-secondary d-none" role="status" aria-hidden="true"></span>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="fetch-keys-btn"
+                    data-url="{{ path('subnet_keys', {id: subnet.id}) }}">
+                <i class="bi bi-key-fill me-1"></i>Fetch Keys
+            </button>
+            <span id="keys-spinner" class="spinner-border spinner-border-sm text-secondary d-none" role="status" aria-hidden="true"></span>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="validate-chain-btn"
+                    data-url="{{ path('subnet_validate_trust_chain', {id: subnet.id}) }}">
+                <i class="bi bi-shield-check me-1"></i>Validate Trust Chain
+            </button>
+            <span id="chain-spinner" class="spinner-border spinner-border-sm text-secondary d-none" role="status" aria-hidden="true"></span>
+        </div>
     </div>
 </div>
 {% endif %}
@@ -392,4 +446,314 @@
     </div>
     {% endif %}
 </div>
+{% endblock %}
+
+{% block scripts %}
+{% if subnet.dnssecPolicy %}
+<script>
+(function () {
+    var btn     = document.getElementById('fetch-ds-btn');
+    var spinner = document.getElementById('ds-spinner');
+    var result  = document.getElementById('ds-record-result');
+    var output  = document.getElementById('ds-record-output');
+    var copyBtn = document.getElementById('ds-record-copy');
+
+    if (!btn) return;
+
+    btn.addEventListener('click', function () {
+        btn.disabled = true;
+        spinner.classList.remove('d-none');
+        result.style.display = 'none';
+
+        fetch(btn.dataset.url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (data.error) {
+                    output.textContent = 'Error: ' + data.error;
+                } else if (!data.ds_records || data.ds_records.length === 0) {
+                    output.textContent = 'No DS records found yet — BIND may still be generating keys. Try again in a moment.';
+                    if (data.errors && data.errors.length) {
+                        output.textContent += '\n\n' + data.errors.join('\n');
+                    }
+                } else {
+                    output.textContent = data.ds_records.join('\n');
+                    if (data.errors && data.errors.length) {
+                        output.textContent += '\n\n(Warnings: ' + data.errors.join('; ') + ')';
+                    }
+                }
+                result.style.display = '';
+            })
+            .catch(function (err) {
+                output.textContent = 'Request failed: ' + err;
+                result.style.display = '';
+            })
+            .finally(function () {
+                btn.disabled = false;
+                spinner.classList.add('d-none');
+            });
+    });
+
+    copyBtn.addEventListener('click', function () {
+        navigator.clipboard.writeText(output.textContent).then(function () {
+            copyBtn.innerHTML = '<i class="bi bi-clipboard-check me-1"></i>Copied';
+            setTimeout(function () {
+                copyBtn.innerHTML = '<i class="bi bi-clipboard me-1"></i>Copy';
+            }, 2000);
+        });
+    });
+
+    var keysBtn      = document.getElementById('fetch-keys-btn');
+    var keysSpinner  = document.getElementById('keys-spinner');
+    var keyResult    = document.getElementById('key-info-result');
+    var keyTbody     = document.getElementById('key-info-tbody');
+    var keyError     = document.getElementById('key-info-error');
+    var keyWarnings  = document.getElementById('key-info-warnings');
+
+    var ALG_NAMES = {
+        5: 'RSASHA1', 7: 'NSEC3RSASHA1', 8: 'RSASHA256', 10: 'RSASHA512',
+        13: 'ECDSAP256SHA256', 14: 'ECDSAP384SHA384', 15: 'ED25519', 16: 'ED448'
+    };
+
+    function fmtDate(raw) {
+        if (!raw) return '—';
+        var s = String(raw).replace(/\D/g, '');
+        if (s.length < 12) return raw;
+        return s.slice(0, 4) + '-' + s.slice(4, 6) + '-' + s.slice(6, 8) + ' ' + s.slice(8, 10) + ':' + s.slice(10, 12);
+    }
+
+    function fmtAlg(num) {
+        return ALG_NAMES[num] ? ALG_NAMES[num] + ' (' + num + ')' : String(num);
+    }
+
+    keysBtn.addEventListener('click', function () {
+        keysBtn.disabled = true;
+        keysSpinner.classList.remove('d-none');
+        keyResult.style.display = 'none';
+
+        fetch(keysBtn.dataset.url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                keyError.style.display = 'none';
+                keyWarnings.style.display = 'none';
+                keyTbody.innerHTML = '';
+
+                if (data.error) {
+                    keyError.textContent = data.error;
+                    keyError.style.display = '';
+                } else if (!data.keys || data.keys.length === 0) {
+                    keyError.textContent = 'No keys found yet — BIND may still be generating keys. Try again in a moment.';
+                    keyError.style.display = '';
+                } else {
+                    data.keys.forEach(function (k) {
+                        var tr = document.createElement('tr');
+                        [
+                            String(k.key_tag),
+                            k.type === 'KSK' ? '<span class="badge bg-primary">KSK</span>' : '<span class="badge bg-secondary">ZSK</span>',
+                            fmtAlg(k.algorithm),
+                            fmtDate(k.created),
+                            fmtDate(k.publish),
+                            fmtDate(k.activate),
+                            fmtDate(k.inactive),
+                            fmtDate(k['delete'])
+                        ].forEach(function (cell, i) {
+                            var td = document.createElement('td');
+                            if (i === 0) { td.className = 'font-monospace'; }
+                            td.innerHTML = cell;
+                            tr.appendChild(td);
+                        });
+                        keyTbody.appendChild(tr);
+                    });
+                    if (data.errors && data.errors.length) {
+                        keyWarnings.textContent = 'Warnings: ' + data.errors.join('; ');
+                        keyWarnings.style.display = '';
+                    }
+                }
+                keyResult.style.display = '';
+            })
+            .catch(function (err) {
+                keyError.textContent = 'Request failed: ' + err;
+                keyError.style.display = '';
+                keyResult.style.display = '';
+            })
+            .finally(function () {
+                keysBtn.disabled = false;
+                keysSpinner.classList.add('d-none');
+            });
+    });
+
+    var chainBtn     = document.getElementById('validate-chain-btn');
+    var chainSpinner = document.getElementById('chain-spinner');
+    var chainResult  = document.getElementById('trust-chain-result');
+    var chainSteps   = document.getElementById('trust-chain-steps');
+    var chainSummary = document.getElementById('trust-chain-summary');
+
+    function tcIcon(s) {
+        return s === 'ok'      ? '<i class="bi bi-check-circle-fill text-success"></i>'
+             : s === 'warning' ? '<i class="bi bi-exclamation-triangle-fill text-warning"></i>'
+             :                   '<i class="bi bi-x-circle-fill text-danger"></i>';
+    }
+
+    function renderDsBlock(step) {
+        var ok   = step.status === 'ok';
+        var warn = step.status === 'warning';
+        var h    = '<div class="py-1 mb-1">';
+        if (step.ds_parsed && step.ds_parsed.length) {
+            var signedBadge;
+            if (ok) {
+                var who = step.rrsig_key_tag ? ' id=' + step.rrsig_key_tag : '';
+                signedBadge = '<span class="badge bg-success-subtle text-success-emphasis border border-success-subtle">'
+                            + '<i class="bi bi-check-lg me-1"></i>signed by' + who + '</span>';
+            } else if (warn) {
+                signedBadge = '<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">no RRSIG</span>';
+            } else {
+                signedBadge = '<span class="badge bg-danger-subtle text-danger-emphasis border border-danger-subtle">missing</span>';
+            }
+            step.ds_parsed.forEach(function (ds) {
+                h += '<div class="d-flex align-items-center gap-2 flex-wrap mb-1">'
+                   + '<span class="badge bg-primary font-monospace">id=' + ds.key_tag + '</span>'
+                   + signedBadge + '</div>';
+            });
+            if (step.records && step.records.length) {
+                h += '<pre class="bg-body-secondary border rounded p-1 mt-1 mb-0" style="font-size:.8em;white-space:pre-wrap;word-break:break-all">'
+                   + step.records.join('\n') + '</pre>';
+            }
+        } else {
+            h += '<div class="small text-danger">' + tcIcon('error') + ' ' + step.detail + '</div>';
+        }
+        return h + '</div>';
+    }
+
+    function renderTrustChain(data) {
+        if (data.error) {
+            chainSteps.innerHTML = '<div class="text-danger small">' + data.error + '</div>';
+            chainSummary.textContent = '';
+            chainResult.style.display = '';
+            return;
+        }
+
+        var signingByZone = {};
+        var dsByParent    = {};
+        (data.steps || []).forEach(function (s) {
+            if (s.type === 'signing') { signingByZone[s.zone] = s; }
+            if (s.type === 'ds')     { dsByParent[s.parent]   = s; }
+        });
+
+        var html = '';
+
+        html += '<div class="d-flex align-items-center gap-2 small text-muted mb-2">'
+              + '<i class="bi bi-globe2"></i>'
+              + '<span class="font-monospace fw-semibold">.</span>'
+              + '<span>(root — trust anchor)</span></div>';
+        if (dsByParent['.']) { html += renderDsBlock(dsByParent['.']); }
+
+        (data.steps || []).forEach(function (step) {
+            if (step.type !== 'dnskey') { return; }
+
+            var signing         = signingByZone[step.zone] || null;
+            var soaSignerKeyTag = signing ? signing.soa_signer_key_tag : null;
+            var dnskeySignerTag = step.dnskey_signer_key_tag || null;
+            var anchors         = step.anchored_by || [];
+
+            html += '<hr class="my-2" style="opacity:.15">';
+            html += '<div class="d-flex align-items-center gap-2 mb-2">'
+                  + tcIcon(step.status)
+                  + '<span class="font-monospace fw-semibold">' + step.zone + '</span>'
+                  + '<span class="text-muted small">DNSKEY</span></div>';
+
+            if (step.dnskeys_parsed && step.dnskeys_parsed.length) {
+                var order = step.dnskeys_parsed.map(function (_, i) { return i; });
+                order.sort(function (a, b) {
+                    return (step.dnskeys_parsed[b].flags || 0) - (step.dnskeys_parsed[a].flags || 0);
+                });
+
+                order.forEach(function (idx) {
+                    var key      = step.dnskeys_parsed[idx];
+                    var record   = step.records && step.records[idx];
+                    var isKsk    = key.type === 'KSK';
+                    var anchored = anchors.indexOf(key.key_tag) !== -1;
+
+                    var idBadge   = '<span class="badge font-monospace ' + (anchored ? 'bg-primary' : 'bg-secondary') + '">id=' + key.key_tag + '</span>';
+                    var typeBadge = isKsk
+                        ? '<span class="badge bg-info-subtle text-info border border-info-subtle">KSK</span>'
+                        : '<span class="badge bg-body-secondary text-body border">ZSK</span>';
+
+                    var notes = [];
+                    if (dnskeySignerTag !== null) {
+                        notes.push('<span class="badge bg-success-subtle text-success-emphasis border border-success-subtle">'
+                            + '<i class="bi bi-check-lg me-1"></i>signed by id=' + dnskeySignerTag + '</span>');
+                    }
+
+                    if (anchored) { notes.push('<span class="text-success-emphasis small"><i class="bi bi-link-45deg me-1"></i>anchored by DS above</span>'); }
+
+                    html += '<div class="d-flex align-items-center gap-2 flex-wrap mb-1">'
+                          + idBadge + typeBadge + notes.join('') + '</div>';
+                    if (record) {
+                        html += '<pre class="bg-body-secondary border rounded p-1 mt-0 mb-2" style="font-size:.8em;white-space:pre-wrap;word-break:break-all">'
+                              + record + '</pre>';
+                    }
+                });
+            } else {
+                html += '<div class="text-danger small">' + step.detail + '</div>';
+            }
+
+            if (dsByParent[step.zone]) { html += renderDsBlock(dsByParent[step.zone]); }
+
+            if (signing) {
+                if (signing.status === 'ok') {
+                    var soaSignedBadge = signing.soa_signer_key_tag
+                        ? '<span class="badge bg-success-subtle text-success-emphasis border border-success-subtle">'
+                          + '<i class="bi bi-check-lg me-1"></i>signed by id=' + signing.soa_signer_key_tag + '</span>'
+                        : '<span class="badge bg-success-subtle text-success-emphasis border border-success-subtle">'
+                          + '<i class="bi bi-check-lg me-1"></i>signed</span>';
+                    html += '<div class="d-flex align-items-center gap-2 flex-wrap mb-1">'
+                          + '<span class="badge bg-body-secondary text-body border font-monospace">SOA</span>'
+                          + soaSignedBadge + '</div>';
+                    if (signing.records && signing.records.length) {
+                        html += '<pre class="bg-body-secondary border rounded p-1 mt-0 mb-2" style="font-size:.8em;white-space:pre-wrap;word-break:break-all">'
+                              + signing.records.join('\n') + '</pre>';
+                    }
+                } else {
+                    html += '<div class="d-flex align-items-center gap-2 small">'
+                          + tcIcon('error') + ' <span class="text-danger small">' + signing.detail + '</span></div>';
+                }
+            }
+        });
+
+        chainSteps.innerHTML = html;
+
+        if (data.valid) {
+            chainSummary.innerHTML = '<i class="bi bi-shield-fill-check text-success me-1"></i>Trust chain is complete and valid';
+            chainSummary.className = 'small fw-semibold text-success mt-1';
+        } else {
+            chainSummary.innerHTML = '<i class="bi bi-shield-fill-x text-danger me-1"></i>Trust chain has gaps — review the errors above';
+            chainSummary.className = 'small fw-semibold text-danger mt-1';
+        }
+        chainResult.style.display = '';
+    }
+
+    if (chainBtn) {
+        chainBtn.addEventListener('click', function () {
+            chainBtn.disabled = true;
+            chainSpinner.classList.remove('d-none');
+            chainResult.style.display = 'none';
+            chainSteps.innerHTML = '';
+            chainSummary.textContent = '';
+            chainSummary.className = 'small fw-semibold';
+
+            fetch(chainBtn.dataset.url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                .then(function (r) { return r.json(); })
+                .then(renderTrustChain)
+                .catch(function (err) {
+                    chainSteps.innerHTML = '<div class="text-danger small">Request failed: ' + err + '</div>';
+                    chainResult.style.display = '';
+                })
+                .finally(function () {
+                    chainBtn.disabled = false;
+                    chainSpinner.classList.add('d-none');
+                });
+        });
+    }
+}());
+</script>
+{% endif %}
 {% endblock %}

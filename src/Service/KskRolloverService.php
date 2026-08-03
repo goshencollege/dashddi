@@ -5,6 +5,7 @@ namespace App\Service;
 use App\Entity\DnssecKskRollover;
 use App\Entity\DnsServer;
 use App\Entity\Domain;
+use App\Entity\Subnet;
 use App\Enum\KskRolloverStatus;
 use phpseclib3\Net\SFTP;
 
@@ -180,8 +181,28 @@ class KskRolloverService
      */
     public function fetchCurrentDsRecords(Domain $domain, DnsServer $server): array
     {
+        return $this->fetchCurrentDsRecordsByZone($domain->getName(), $server);
+    }
+
+    /**
+     * Returns DS record lines for all current KSKs for a subnet's reverse zone.
+     * Returns an empty array when BIND has not yet generated any keys.
+     *
+     * @return string[]
+     */
+    public function fetchCurrentDsRecordsForSubnet(Subnet $subnet, DnsServer $server): array
+    {
+        $zone = $subnet->getReverseZoneName();
+        if ($zone === null) {
+            throw new \RuntimeException('Subnet has no CIDR — cannot determine reverse zone name.');
+        }
+        return $this->fetchCurrentDsRecordsByZone($zone, $server);
+    }
+
+    /** @return string[] */
+    private function fetchCurrentDsRecordsByZone(string $zone, DnsServer $server): array
+    {
         $sftp   = $this->connectServer($server);
-        $zone   = $domain->getName();
         $keyDir = rtrim($server->getKeyDirectory() ?? '', '/') . '/' . $zone;
 
         $out = (string)$sftp->exec(sprintf('dig +short DNSKEY %s 2>/dev/null', escapeshellarg($zone)));
@@ -218,8 +239,30 @@ class KskRolloverService
      */
     public function fetchAllKeyInfo(Domain $domain, DnsServer $server): array
     {
+        return $this->fetchAllKeyInfoByZone($domain->getName(), $server);
+    }
+
+    /**
+     * Returns metadata for all published DNSKEY records for a subnet's reverse zone.
+     * Private key material is never read.
+     *
+     * @return array<int, array{key_tag: int, type: string, algorithm: int, flags: int, created: string|null, publish: string|null, activate: string|null, inactive: string|null, delete: string|null}>
+     */
+    public function fetchAllKeyInfoForSubnet(Subnet $subnet, DnsServer $server): array
+    {
+        $zone = $subnet->getReverseZoneName();
+        if ($zone === null) {
+            throw new \RuntimeException('Subnet has no CIDR — cannot determine reverse zone name.');
+        }
+        return $this->fetchAllKeyInfoByZone($zone, $server);
+    }
+
+    /**
+     * @return array<int, array{key_tag: int, type: string, algorithm: int, flags: int, created: string|null, publish: string|null, activate: string|null, inactive: string|null, delete: string|null}>
+     */
+    private function fetchAllKeyInfoByZone(string $zone, DnsServer $server): array
+    {
         $sftp   = $this->connectServer($server);
-        $zone   = $domain->getName();
         $keyDir = rtrim($server->getKeyDirectory() ?? '', '/') . '/' . $zone;
 
         $out = (string)$sftp->exec(sprintf('dig +short DNSKEY %s 2>/dev/null', escapeshellarg($zone)));
@@ -488,6 +531,30 @@ class KskRolloverService
     /**
      * Validates the DNSSEC trust chain from the root zone down to the domain.
      *
+     * @return array{steps: list<array<string,mixed>>, valid: bool}
+     */
+    public function validateTrustChain(Domain $domain, DnsServer $server): array
+    {
+        return $this->validateTrustChainByZone(rtrim($domain->getName(), '.') . '.', $server);
+    }
+
+    /**
+     * Validates the DNSSEC trust chain for a subnet's reverse zone.
+     *
+     * @return array{steps: list<array<string,mixed>>, valid: bool}
+     */
+    public function validateTrustChainForSubnet(Subnet $subnet, DnsServer $server): array
+    {
+        $zone = $subnet->getReverseZoneName();
+        if ($zone === null) {
+            throw new \RuntimeException('Subnet has no CIDR — cannot determine reverse zone name.');
+        }
+        return $this->validateTrustChainByZone(rtrim($zone, '.') . '.', $server);
+    }
+
+    /**
+     * Validates the DNSSEC trust chain from the root zone down to $zone.
+     *
      * Steps alternate DS → DNSKEY for every zone in the chain (TLD, …, zone), so
      * the caller can visually link each DS key tag to the DNSKEY it anchors.
      * The final zone also gets a 'signing' step that checks SOA RRSIG coverage.
@@ -496,10 +563,9 @@ class KskRolloverService
      *
      * @return array{steps: list<array<string,mixed>>, valid: bool}
      */
-    public function validateTrustChain(Domain $domain, DnsServer $server): array
+    private function validateTrustChainByZone(string $zone, DnsServer $server): array
     {
         $sftp   = $this->connectServer($server);
-        $zone   = rtrim($domain->getName(), '.') . '.';
         $labels = $this->buildChainLabels($zone);
 
         $steps = [];
