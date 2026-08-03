@@ -18,6 +18,7 @@ class KskRolloverStartType extends AbstractType
         $builder
             ->add('zone', ChoiceType::class, [
                 'choices'     => $options['zone_choices'],
+                'data'        => $options['default_zone'],
                 'placeholder' => '— select zone —',
                 'required'    => true,
                 'constraints' => [new NotBlank(message: 'Please select a zone.')],
@@ -45,8 +46,10 @@ class KskRolloverStartType extends AbstractType
         $resolver->setDefaults([
             'first_server' => null,
             'zone_choices' => [],
+            'default_zone' => null,
         ]);
         $resolver->setAllowedTypes('first_server', ['null', DnsServer::class]);
         $resolver->setAllowedTypes('zone_choices', 'array');
+        $resolver->setAllowedTypes('default_zone', ['null', 'string']);
     }
 }

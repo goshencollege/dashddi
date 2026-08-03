@@ -34,9 +34,18 @@ class DnssecKskRolloverController extends AbstractController
         $firstServer    = $serverRepo->findOneBy([], ['name' => 'ASC']);
         [$zoneChoices, $zonePolicyMap] = $this->buildZoneChoices($em);
 
+        $defaultZone = null;
+        if ($domainId = $request->query->getInt('domain')) {
+            $preselect = $em->find(Domain::class, $domainId);
+            if ($preselect?->getDnssecPolicy()) {
+                $defaultZone = 'domain:' . $preselect->getId();
+            }
+        }
+
         $form = $this->createForm(KskRolloverStartType::class, null, [
             'first_server' => $firstServer,
             'zone_choices' => $zoneChoices,
+            'default_zone' => $defaultZone,
         ]);
         $form->handleRequest($request);
 
