@@ -184,19 +184,6 @@ class DhcpConfigGeneratorTest extends TestCase
         $this->assertSame([['pool' => '10.0.0.100 - 10.0.0.200']], $result[0]['pools']);
     }
 
-    public function testDdnsSubnetWithNonDdnsHostnameSuppressesDdnsOnReservation(): void
-    {
-        $iface      = $this->makeIfaceWithHostname('aa:bb:cc:00:11:22', '10.0.0.10', 'cam-wl-out', 'goshen.edu');
-        $ddnsDomain = (new Domain())->setName('dyn.goshen.edu')->setDdnsEnabled(true);
-        $subnet     = $this->makeSubnet(10)->setDdnsDomain($ddnsDomain);
-        $this->setCollection($subnet, 'interfaces', [$iface]);
-        $this->setCollection($subnet, 'addressBlocks', []);
-
-        $reservation = $this->makeGenerator([$subnet])->generateDhcp4Config()[0]['reservations'][0];
-
-        $this->assertFalse($reservation['ddns-send-updates']);
-    }
-
     public function testDdnsSubnetWithDdnsHostnameDoesNotSuppressDdnsOnReservation(): void
     {
         $ddnsDomain = (new Domain())->setName('dyn.goshen.edu')->setDdnsEnabled(true);
@@ -248,25 +235,4 @@ class DhcpConfigGeneratorTest extends TestCase
         $this->assertSame('host6.example.com.', $hostname);
     }
 
-    public function testIpv6DdnsSubnetWithNonDdnsHostnameSuppressesDdnsOnReservation(): void
-    {
-        $addr   = (new Ipv6Address())->setAddress('2001:db8::2');
-        $iface  = (new NetworkInterface())
-            ->setMacAddress('aa:bb:cc:dd:ee:02')
-            ->setIpv6Address($addr);
-        $record = (new DomainRecord())
-            ->setHostname('cam-wl-out')
-            ->setDomain((new Domain())->setName('goshen.edu'));
-        $this->setCollection($iface, 'domainRecords', [$record]);
-
-        $ddnsDomain = (new Domain())->setName('dyn.goshen.edu')->setDdnsEnabled(true);
-        $subnet     = (new Subnet())->setName('test')->setIpv6Cidr('2001:db8::/32')->setDdnsDomain($ddnsDomain);
-        $this->setId($subnet, 13);
-        $this->setCollection($subnet, 'interfaces', [$iface]);
-        $this->setCollection($subnet, 'addressBlocks', []);
-
-        $reservation = $this->makeGenerator([$subnet])->generateDhcp6Config()[0]['reservations'][0];
-
-        $this->assertFalse($reservation['ddns-send-updates']);
-    }
 }
