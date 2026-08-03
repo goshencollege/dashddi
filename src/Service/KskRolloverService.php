@@ -236,25 +236,27 @@ class KskRolloverService
             if ($flags !== 257 && $flags !== 256) {
                 continue;
             }
-            $alg     = (int)$algStr;
-            $tag     = $this->computeKeyTag($flags, (int)$protoStr, $alg, $pubKey);
-            $base    = sprintf('K%s.+%03d+%05d', $zone, $alg, $tag);
-            $path    = $keyDir . '/' . $base . '.key';
+            $alg      = (int)$algStr;
+            $tag      = $this->computeKeyTag($flags, (int)$protoStr, $alg, $pubKey);
+            $base     = sprintf('K%s.+%03d+%05d', $zone, $alg, $tag);
+            $path     = $keyDir . '/' . $base . '.key';
 
-            $info = (string)$sftp->exec(
-                'sudo -u bind dnssec-settime -p all ' . escapeshellarg($path) . ' 2>/dev/null'
-            );
+            // Read the public .key file directly — no sudo needed, .key files are world-readable.
+            // BIND writes timing metadata as comments at the top of every .key file:
+            //   ; Created: YYYYMMDDHHMMSS (human-readable)
+            //   ; Publish:  YYYYMMDDHHMMSS (human-readable)
+            $keyContent = (string)$sftp->get($path);
 
             $keys[] = [
                 'key_tag'   => $tag,
                 'type'      => $flags === 257 ? 'KSK' : 'ZSK',
                 'algorithm' => $alg,
                 'flags'     => $flags,
-                'created'   => $this->parseSettime($info, 'Created'),
-                'publish'   => $this->parseSettime($info, 'Publish'),
-                'activate'  => $this->parseSettime($info, 'Activate'),
-                'inactive'  => $this->parseSettime($info, 'Inactive'),
-                'delete'    => $this->parseSettime($info, 'Delete'),
+                'created'   => $this->parseKeyFileDate($keyContent, 'Created'),
+                'publish'   => $this->parseKeyFileDate($keyContent, 'Publish'),
+                'activate'  => $this->parseKeyFileDate($keyContent, 'Activate'),
+                'inactive'  => $this->parseKeyFileDate($keyContent, 'Inactive'),
+                'delete'    => $this->parseKeyFileDate($keyContent, 'Delete'),
             ];
         }
 
@@ -271,6 +273,19 @@ class KskRolloverService
             return null;
         }
         return trim($m[1]);
+    }
+
+    /**
+     * Parses a timing field from a BIND .key file comment block.
+     * BIND writes lines like: "; Created: 20231201120000 (Fri Dec  1 12:00:00 2023)"
+     * Returns the 14-digit YYYYMMDDHHMMSS timestamp, or null if unset/absent.
+     */
+    private function parseKeyFileDate(string $content, string $field): ?string
+    {
+        if (!preg_match('/^;\s*' . preg_quote($field, '/') . ':\s*(\d{14})/im', $content, $m)) {
+            return null;
+        }
+        return $m[1];
     }
 
     /**
