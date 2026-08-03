@@ -591,7 +591,8 @@
         if (step.ds_parsed && step.ds_parsed.length) {
             var signedBadge;
             if (ok) {
-                var who = step.rrsig_key_tag ? ' id=' + step.rrsig_key_tag : '';
+                var rrsigTags = step.rrsig_key_tags || [];
+                var who = rrsigTags.length ? ' id=' + rrsigTags.join(', id=') : '';
                 signedBadge = '<span class="badge bg-success-subtle text-success-emphasis border border-success-subtle">'
                             + '<i class="bi bi-check-lg me-1"></i>signed by' + who + '</span>';
             } else if (warn) {
@@ -643,10 +644,9 @@
         (data.steps || []).forEach(function (step) {
             if (step.type !== 'dnskey') { return; }
 
-            var signing         = signingByZone[step.zone] || null;
-            var soaSignerKeyTag = signing ? signing.soa_signer_key_tag : null;
-            var dnskeySignerTag = step.dnskey_signer_key_tag || null;
-            var anchors         = step.anchored_by || [];
+            var signing          = signingByZone[step.zone] || null;
+            var dnskeySignerTags = step.dnskey_signer_key_tags || [];
+            var anchors          = step.anchored_by || [];
 
             html += '<hr class="my-2" style="opacity:.15">';
             html += '<div class="d-flex align-items-center gap-2 mb-2">'
@@ -673,9 +673,9 @@
                         : '<span class="badge bg-body-secondary text-body border">ZSK</span>';
 
                     var notes = [];
-                    if (dnskeySignerTag !== null) {
+                    if (dnskeySignerTags.length) {
                         notes.push('<span class="badge bg-success-subtle text-success-emphasis border border-success-subtle">'
-                            + '<i class="bi bi-check-lg me-1"></i>signed by id=' + dnskeySignerTag + '</span>');
+                            + '<i class="bi bi-check-lg me-1"></i>signed by id=' + dnskeySignerTags.join(', id=') + '</span>');
                     }
 
                     if (anchored) { notes.push('<span class="text-success-emphasis small"><i class="bi bi-link-45deg me-1"></i>anchored by DS above</span>'); }
@@ -697,9 +697,10 @@
             // Zone-signing status for the managed zone.
             if (signing) {
                 if (signing.status === 'ok') {
-                    var soaSignedBadge = signing.soa_signer_key_tag
+                    var soaTags = signing.soa_signer_key_tags || [];
+                    var soaSignedBadge = soaTags.length
                         ? '<span class="badge bg-success-subtle text-success-emphasis border border-success-subtle">'
-                          + '<i class="bi bi-check-lg me-1"></i>signed by id=' + signing.soa_signer_key_tag + '</span>'
+                          + '<i class="bi bi-check-lg me-1"></i>signed by id=' + soaTags.join(', id=') + '</span>'
                         : '<span class="badge bg-success-subtle text-success-emphasis border border-success-subtle">'
                           + '<i class="bi bi-check-lg me-1"></i>signed</span>';
                     html += '<div class="d-flex align-items-center gap-2 flex-wrap mb-1">'
