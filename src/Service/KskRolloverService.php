@@ -241,11 +241,16 @@ class KskRolloverService
             $base     = sprintf('K%s.+%03d+%05d', $zone, $alg, $tag);
             $path     = $keyDir . '/' . $base . '.key';
 
-            // dnssec-settime is in sudoers (sudo -u bind) so it works even when
-            // the key directory is bind:bind 750 and the SSH user cannot enter it directly.
-            $timing = (string)$sftp->exec(
-                'sudo -u bind dnssec-settime -p all ' . escapeshellarg($path) . ' 2>/dev/null'
-            );
+            // Try reading the .key file directly first — BIND writes timing metadata as
+            // comment lines ("; Created: YYYYMMDDHHMMSS …") and the file is typically
+            // world-readable. Fall back to dnssec-settime only when cat returns nothing,
+            // which happens on deployments where the key directory is bind:bind 750.
+            $timing = (string)$sftp->exec('cat ' . escapeshellarg($path) . ' 2>/dev/null');
+            if (!str_contains($timing, 'Created:')) {
+                $timing = (string)$sftp->exec(
+                    'sudo -u bind dnssec-settime -p all ' . escapeshellarg($path) . ' 2>/dev/null'
+                );
+            }
 
             $keys[] = [
                 'key_tag'   => $tag,
@@ -264,13 +269,14 @@ class KskRolloverService
     }
 
     /**
-     * Parses a timing field from `dnssec-settime -p all` output.
+     * Parses a timing field from either source:
+     *  - .key file comments:      "; Created: 20231201120000 (Fri Dec  1 12:00:00 2023)"
+     *  - dnssec-settime -p all:   "Created: 20231201120000 (Fri Dec  1 12:00:00 2023)"
      * Returns the 14-digit YYYYMMDDHHMMSS timestamp, or null if the field is unset/absent.
-     * Example line: "Created: 20231201120000 (Fri Dec  1 12:00:00 2023)"
      */
     private function parseSettime(string $output, string $field): ?string
     {
-        if (!preg_match('/^' . preg_quote($field, '/') . ':\s*(\d{14})/im', $output, $m)) {
+        if (!preg_match('/^;?\s*' . preg_quote($field, '/') . ':\s*(\d{14})/im', $output, $m)) {
             return null;
         }
         return $m[1];
