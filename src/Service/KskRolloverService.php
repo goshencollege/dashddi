@@ -568,13 +568,13 @@ class KskRolloverService
         $sftp   = $this->connectServer($server);
         $labels = $this->buildChainLabels($zone);
 
-        $steps = [];
+        $steps          = [];
+        $lastRealParent = '.';
 
         foreach ($labels as $i => $child) {
-            $parent = $i === 0 ? '.' : $labels[$i - 1];
             $isZone = ($i === count($labels) - 1);
 
-            // DS step: does the parent have a signed DS record for this child?
+            // Fetch DS and DNSKEY up front so we can detect non-existent intermediate zones.
             $dsOut      = (string) $sftp->exec(sprintf(
                 'dig +noall +answer +dnssec DS %s 2>/dev/null',
                 escapeshellarg($child)
@@ -586,10 +586,30 @@ class KskRolloverService
                 $this->extractAnswerRecords($dsOut, 'NSEC3')
             );
 
+            $dnskeyOut    = (string) $sftp->exec(sprintf(
+                'dig +noall +answer +dnssec DNSKEY %s 2>/dev/null',
+                escapeshellarg($child)
+            ));
+            $dnskeyLines     = $this->extractAnswerRecords($dnskeyOut, 'DNSKEY');
+            $dnskeySigs      = $this->extractAnswerRecords($dnskeyOut, 'RRSIG');
+            $dnskeyParsed    = $this->parseDnskeyRecords($dnskeyLines);
+            $dnskeySignerTag = $this->parseRrsigKeyTag($dnskeySigs);
+
+            // Skip intermediate labels that have no DS and no DNSKEY — the
+            // parent zone delegates directly across this label (e.g. 198.in-addr.arpa.
+            // delegates straight to 243.51.198.in-addr.arpa., skipping
+            // 51.198.in-addr.arpa.).  $lastRealParent is not updated so the next
+            // real zone uses the correct parent in its DS step label.
+            if (!$isZone && empty($dsLines) && empty($dnskeyLines)) {
+                continue;
+            }
+
+            $parent        = $lastRealParent;
             $dsParsed      = $this->parseDsRecords($dsLines);
             $rrsigSignerTag = $this->parseRrsigKeyTag($dsSigLines);
             $dsKeyTags     = array_column($dsParsed, 'key_tag');
 
+            // DS step: does the (last real) parent have a signed DS record for this child?
             if (empty($dsLines)) {
                 $steps[] = [
                     'type'          => 'ds',
@@ -620,16 +640,7 @@ class KskRolloverService
                 ];
             }
 
-            // DNSKEY step: fetch keys for this zone (intermediate zones included).
-            $dnskeyOut    = (string) $sftp->exec(sprintf(
-                'dig +noall +answer +dnssec DNSKEY %s 2>/dev/null',
-                escapeshellarg($child)
-            ));
-            $dnskeyLines  = $this->extractAnswerRecords($dnskeyOut, 'DNSKEY');
-            $dnskeySigs   = $this->extractAnswerRecords($dnskeyOut, 'RRSIG');
-            $dnskeyParsed    = $this->parseDnskeyRecords($dnskeyLines);
-            $dnskeySignerTag = $this->parseRrsigKeyTag($dnskeySigs);
-
+            // DNSKEY step.
             $kskCount = count(array_filter($dnskeyParsed, static fn($k) => $k['type'] === 'KSK'));
             $zskCount = count($dnskeyParsed) - $kskCount;
 
@@ -686,6 +697,8 @@ class KskRolloverService
                         : 'Zone records are signed (SOA has RRSIG)',
                 ];
             }
+
+            $lastRealParent = $child;
         }
 
         $valid = !in_array('error', array_column($steps, 'status'), true);
