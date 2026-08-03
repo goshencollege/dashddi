@@ -200,6 +200,26 @@ class DomainController extends AbstractController
         ]);
     }
 
+    #[Route('/{id}/validate-trust-chain', name: 'domain_validate_trust_chain', methods: ['GET'])]
+    public function validateTrustChain(
+        Domain $domain,
+        DnsServerRepository $serverRepo,
+        KskRolloverService $kskService,
+    ): JsonResponse {
+        $servers = $this->resolveDnssecServers($domain, $serverRepo);
+        if ($servers instanceof JsonResponse) {
+            return $servers;
+        }
+
+        try {
+            $result = $kskService->validateTrustChain($domain, $servers[0]);
+        } catch (\Throwable $e) {
+            return $this->json(['error' => $servers[0]->getName() . ': ' . $e->getMessage()], 500);
+        }
+
+        return $this->json($result);
+    }
+
     #[Route('/{id}/edit', name: 'domain_edit', methods: ['GET', 'POST'])]
     public function edit(Request $request, Domain $domain, EntityManagerInterface $em): Response
     {

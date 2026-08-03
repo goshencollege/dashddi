@@ -485,6 +485,256 @@ class KskRolloverService
         return null;
     }
 
+    /**
+     * Validates the DNSSEC trust chain from the root zone down to the domain.
+     *
+     * Steps alternate DS → DNSKEY for every zone in the chain (TLD, …, zone), so
+     * the caller can visually link each DS key tag to the DNSKEY it anchors.
+     * The final zone also gets a 'signing' step that checks SOA RRSIG coverage.
+     *
+     * No sudo is required — all queries use dig against the configured resolver.
+     *
+     * @return array{steps: list<array<string,mixed>>, valid: bool}
+     */
+    public function validateTrustChain(Domain $domain, DnsServer $server): array
+    {
+        $sftp   = $this->connectServer($server);
+        $zone   = rtrim($domain->getName(), '.') . '.';
+        $labels = $this->buildChainLabels($zone);
+
+        $steps = [];
+
+        foreach ($labels as $i => $child) {
+            $parent = $i === 0 ? '.' : $labels[$i - 1];
+            $isZone = ($i === count($labels) - 1);
+
+            // DS step: does the parent have a signed DS record for this child?
+            $dsOut      = (string) $sftp->exec(sprintf(
+                'dig +noall +answer +dnssec DS %s 2>/dev/null',
+                escapeshellarg($child)
+            ));
+            $dsLines    = $this->extractAnswerRecords($dsOut, 'DS');
+            $dsSigLines = $this->extractAnswerRecords($dsOut, 'RRSIG');
+            $nsecLines  = array_merge(
+                $this->extractAnswerRecords($dsOut, 'NSEC'),
+                $this->extractAnswerRecords($dsOut, 'NSEC3')
+            );
+
+            $dsParsed      = $this->parseDsRecords($dsLines);
+            $rrsigSignerTag = $this->parseRrsigKeyTag($dsSigLines);
+            $dsKeyTags     = array_column($dsParsed, 'key_tag');
+
+            if (empty($dsLines)) {
+                $steps[] = [
+                    'type'          => 'ds',
+                    'label'         => $parent . ' → ' . $child,
+                    'parent'        => $parent,
+                    'child'         => $child,
+                    'status'        => 'error',
+                    'records'       => [],
+                    'ds_parsed'     => [],
+                    'rrsig_key_tag' => null,
+                    'detail'        => !empty($nsecLines)
+                        ? 'Parent zone is signed but carries no DS record for this zone — chain is broken'
+                        : 'No DS record found in parent zone',
+                ];
+            } else {
+                $steps[] = [
+                    'type'          => 'ds',
+                    'label'         => $parent . ' → ' . $child,
+                    'parent'        => $parent,
+                    'child'         => $child,
+                    'status'        => empty($dsSigLines) ? 'warning' : 'ok',
+                    'records'       => $dsLines,
+                    'ds_parsed'     => $dsParsed,
+                    'rrsig_key_tag' => $rrsigSignerTag,
+                    'detail'        => empty($dsSigLines)
+                        ? sprintf('%d DS record(s) found — no RRSIG covering them', count($dsLines))
+                        : sprintf('%d DS record(s) — signed by parent zone', count($dsLines)),
+                ];
+            }
+
+            // DNSKEY step: fetch keys for this zone (intermediate zones included).
+            $dnskeyOut    = (string) $sftp->exec(sprintf(
+                'dig +noall +answer +dnssec DNSKEY %s 2>/dev/null',
+                escapeshellarg($child)
+            ));
+            $dnskeyLines  = $this->extractAnswerRecords($dnskeyOut, 'DNSKEY');
+            $dnskeySigs   = $this->extractAnswerRecords($dnskeyOut, 'RRSIG');
+            $dnskeyParsed    = $this->parseDnskeyRecords($dnskeyLines);
+            $dnskeySignerTag = $this->parseRrsigKeyTag($dnskeySigs);
+
+            $kskCount = count(array_filter($dnskeyParsed, static fn($k) => $k['type'] === 'KSK'));
+            $zskCount = count($dnskeyParsed) - $kskCount;
+
+            if (empty($dnskeyLines)) {
+                $steps[] = [
+                    'type'                  => 'dnskey',
+                    'label'                 => $child . ' DNSKEY',
+                    'zone'                  => $child,
+                    'status'                => 'error',
+                    'records'               => [],
+                    'dnskeys_parsed'        => [],
+                    'anchored_by'           => $dsKeyTags,
+                    'dnskey_signer_key_tag' => null,
+                    'detail'                => 'No DNSKEY records found',
+                ];
+            } else {
+                $steps[] = [
+                    'type'                  => 'dnskey',
+                    'label'                 => $child . ' DNSKEY',
+                    'zone'                  => $child,
+                    'status'                => empty($dnskeySigs) ? 'warning' : 'ok',
+                    'records'               => $dnskeyLines,
+                    'dnskeys_parsed'        => $dnskeyParsed,
+                    'anchored_by'           => $dsKeyTags,
+                    'dnskey_signer_key_tag' => $dnskeySignerTag,
+                    'detail'                => sprintf(
+                        '%d KSK, %d ZSK%s',
+                        $kskCount,
+                        $zskCount,
+                        empty($dnskeySigs) ? ' — no RRSIG' : ' — signed by zone\'s own KSK (normal)'
+                    ),
+                ];
+            }
+
+            // Signing step: only for the managed zone itself.
+            if ($isZone) {
+                $soaOut        = (string) $sftp->exec(sprintf(
+                    'dig +noall +answer +dnssec SOA %s 2>/dev/null',
+                    escapeshellarg($zone)
+                ));
+                $soaSigs       = $this->extractAnswerRecords($soaOut, 'RRSIG');
+                $soaSignerTag  = $this->parseRrsigKeyTag($soaSigs);
+
+                $steps[] = [
+                    'type'               => 'signing',
+                    'label'              => $zone . ' zone signing',
+                    'zone'               => $zone,
+                    'status'             => empty($soaSigs) ? 'error' : 'ok',
+                    'records'            => [],
+                    'soa_signer_key_tag' => $soaSignerTag,
+                    'detail'             => empty($soaSigs)
+                        ? 'SOA record is not signed'
+                        : 'Zone records are signed (SOA has RRSIG)',
+                ];
+            }
+        }
+
+        $valid = !in_array('error', array_column($steps, 'status'), true);
+
+        return ['steps' => $steps, 'valid' => $valid];
+    }
+
+    /**
+     * Builds the chain of DNS labels from TLD to zone.
+     * Example: 'example.com.' → ['com.', 'example.com.']
+     *
+     * @return list<string>
+     */
+    private function buildChainLabels(string $zone): array
+    {
+        $parts  = explode('.', rtrim($zone, '.'));
+        $result = [];
+        for ($i = 1; $i <= count($parts); $i++) {
+            $result[] = implode('.', array_slice($parts, -$i)) . '.';
+        }
+        return $result;
+    }
+
+    /**
+     * Extracts answer-section lines of the given RR type from dig +noall +answer output.
+     *
+     * @return list<string>
+     */
+    private function extractAnswerRecords(string $digOutput, string $type): array
+    {
+        $lines = [];
+        foreach (explode("\n", $digOutput) as $line) {
+            $line = trim($line);
+            if ($line === '' || str_starts_with($line, ';')) {
+                continue;
+            }
+            $parts = preg_split('/\s+/', $line);
+            if (isset($parts[3]) && strtoupper($parts[3]) === strtoupper($type)) {
+                $lines[] = $line;
+            }
+        }
+        return $lines;
+    }
+
+    /**
+     * Parses DS record lines into structured arrays.
+     * Format: name ttl IN DS key_tag algorithm digest_type digest
+     *
+     * @param  list<string> $lines
+     * @return list<array{key_tag: int, algorithm: int, digest_type: int}>
+     */
+    private function parseDsRecords(array $lines): array
+    {
+        $parsed = [];
+        foreach ($lines as $line) {
+            $parts = preg_split('/\s+/', $line);
+            if (count($parts) < 7) {
+                continue;
+            }
+            $parsed[] = [
+                'key_tag'     => (int) $parts[4],
+                'algorithm'   => (int) $parts[5],
+                'digest_type' => (int) $parts[6],
+            ];
+        }
+        return $parsed;
+    }
+
+    /**
+     * Parses DNSKEY record lines and computes the key tag for each.
+     * Format: name ttl IN DNSKEY flags protocol algorithm pubkey...
+     *
+     * @param  list<string> $lines
+     * @return list<array{key_tag: int, type: string, algorithm: int, flags: int}>
+     */
+    private function parseDnskeyRecords(array $lines): array
+    {
+        $parsed = [];
+        foreach ($lines as $line) {
+            $parts = preg_split('/\s+/', $line);
+            if (count($parts) < 8) {
+                continue;
+            }
+            $flags  = (int) $parts[4];
+            $proto  = (int) $parts[5];
+            $alg    = (int) $parts[6];
+            // dig may wrap long base64 keys with a space; strip all whitespace before decoding
+            $pubKey = preg_replace('/\s+/', '', implode('', array_slice($parts, 7)));
+            $tag    = $this->computeKeyTag($flags, $proto, $alg, $pubKey);
+            $parsed[] = [
+                'key_tag'   => $tag,
+                'type'      => $flags === 257 ? 'KSK' : 'ZSK',
+                'algorithm' => $alg,
+                'flags'     => $flags,
+            ];
+        }
+        return $parsed;
+    }
+
+    /**
+     * Returns the signing key tag from the first RRSIG line, or null.
+     * RRSIG format: name ttl IN RRSIG type alg labels orig_ttl expiry inception key_tag signer sig
+     *
+     * @param list<string> $rrsigLines
+     */
+    private function parseRrsigKeyTag(array $rrsigLines): ?int
+    {
+        foreach ($rrsigLines as $line) {
+            $parts = preg_split('/\s+/', $line);
+            if (isset($parts[10]) && ctype_digit($parts[10])) {
+                return (int) $parts[10];
+            }
+        }
+        return null;
+    }
+
     /** Probes the DNSKEY TTL via dig — no sudo required. */
     private function probeDnskeyTtl(SFTP $sftp, string $zone): ?int
     {

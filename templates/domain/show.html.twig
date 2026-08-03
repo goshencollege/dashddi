@@ -181,6 +181,11 @@
                 <i class="bi bi-clipboard me-1"></i>Copy
             </button>
         </div>
+        <div id="trust-chain-result" class="mt-3" style="display:none">
+            <div class="text-muted small mb-2">Trust Chain Validation</div>
+            <div id="trust-chain-steps" class="list-group list-group-flush small mb-2"></div>
+            <div id="trust-chain-summary" class="small fw-semibold"></div>
+        </div>
         <div id="key-info-result" class="mt-3" style="display:none">
             <div class="text-muted small mb-2">DNSSEC Keys</div>
             <div id="key-info-error" class="text-danger small" style="display:none"></div>
@@ -217,6 +222,11 @@
                 <i class="bi bi-key-fill me-1"></i>Fetch Keys
             </button>
             <span id="keys-spinner" class="spinner-border spinner-border-sm text-secondary d-none" role="status" aria-hidden="true"></span>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="validate-chain-btn"
+                    data-url="{{ path('domain_validate_trust_chain', {id: domain.id}) }}">
+                <i class="bi bi-shield-check me-1"></i>Validate Trust Chain
+            </button>
+            <span id="chain-spinner" class="spinner-border spinner-border-sm text-secondary d-none" role="status" aria-hidden="true"></span>
         </div>
     </div>
 </div>
@@ -562,6 +572,169 @@
                 keysSpinner.classList.add('d-none');
             });
     });
+    var chainBtn     = document.getElementById('validate-chain-btn');
+    var chainSpinner = document.getElementById('chain-spinner');
+    var chainResult  = document.getElementById('trust-chain-result');
+    var chainSteps   = document.getElementById('trust-chain-steps');
+    var chainSummary = document.getElementById('trust-chain-summary');
+
+    function tcIcon(s) {
+        return s === 'ok'      ? '<i class="bi bi-check-circle-fill text-success"></i>'
+             : s === 'warning' ? '<i class="bi bi-exclamation-triangle-fill text-warning"></i>'
+             :                   '<i class="bi bi-x-circle-fill text-danger"></i>';
+    }
+
+    function renderDsBlock(step) {
+        var ok   = step.status === 'ok';
+        var warn = step.status === 'warning';
+        var h    = '<div class="py-1 mb-1">';
+        if (step.ds_parsed && step.ds_parsed.length) {
+            var signedBadge;
+            if (ok) {
+                var who = step.rrsig_key_tag ? ' id=' + step.rrsig_key_tag : '';
+                signedBadge = '<span class="badge bg-success-subtle text-success-emphasis border border-success-subtle">'
+                            + '<i class="bi bi-check-lg me-1"></i>signed by' + who + '</span>';
+            } else if (warn) {
+                signedBadge = '<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">no RRSIG</span>';
+            } else {
+                signedBadge = '<span class="badge bg-danger-subtle text-danger-emphasis border border-danger-subtle">missing</span>';
+            }
+            step.ds_parsed.forEach(function (ds) {
+                h += '<div class="d-flex align-items-center gap-2 flex-wrap mb-1">'
+                   + '<span class="badge bg-primary font-monospace">id=' + ds.key_tag + '</span>'
+                   + signedBadge + '</div>';
+            });
+            if (step.records && step.records.length) {
+                h += '<pre class="bg-body-secondary border rounded p-1 mt-1 mb-0" style="font-size:.8em;white-space:pre-wrap;word-break:break-all">'
+                   + step.records.join('\n') + '</pre>';
+            }
+        } else {
+            h += '<div class="small text-danger">' + tcIcon('error') + ' ' + step.detail + '</div>';
+        }
+        return h + '</div>';
+    }
+
+    function renderTrustChain(data) {
+        if (data.error) {
+            chainSteps.innerHTML = '<div class="text-danger small">' + data.error + '</div>';
+            chainSummary.textContent = '';
+            chainResult.style.display = '';
+            return;
+        }
+
+        // Index DS steps by the parent zone that holds them, and signing steps by zone.
+        var signingByZone = {};
+        var dsByParent    = {};
+        (data.steps || []).forEach(function (s) {
+            if (s.type === 'signing') { signingByZone[s.zone] = s; }
+            if (s.type === 'ds')     { dsByParent[s.parent]   = s; }
+        });
+
+        var html = '';
+
+        // Root trust anchor, then the DS that lives in the root zone.
+        html += '<div class="d-flex align-items-center gap-2 small text-muted mb-2">'
+              + '<i class="bi bi-globe2"></i>'
+              + '<span class="font-monospace fw-semibold">.</span>'
+              + '<span>(root — trust anchor)</span></div>';
+        if (dsByParent['.']) { html += renderDsBlock(dsByParent['.']); }
+
+        // Each zone section: KSK first, ZSK second, outgoing DS third.
+        (data.steps || []).forEach(function (step) {
+            if (step.type !== 'dnskey') { return; }
+
+            var signing         = signingByZone[step.zone] || null;
+            var soaSignerKeyTag = signing ? signing.soa_signer_key_tag : null;
+            var dnskeySignerTag = step.dnskey_signer_key_tag || null;
+            var anchors         = step.anchored_by || [];
+
+            html += '<hr class="my-2" style="opacity:.15">';
+            html += '<div class="d-flex align-items-center gap-2 mb-2">'
+                  + tcIcon(step.status)
+                  + '<span class="font-monospace fw-semibold">' + step.zone + '</span>'
+                  + '<span class="text-muted small">DNSKEY</span></div>';
+
+            if (step.dnskeys_parsed && step.dnskeys_parsed.length) {
+                // Sort indices so KSK (flags 257) renders before ZSK (flags 256).
+                var order = step.dnskeys_parsed.map(function (_, i) { return i; });
+                order.sort(function (a, b) {
+                    return (step.dnskeys_parsed[b].flags || 0) - (step.dnskeys_parsed[a].flags || 0);
+                });
+
+                order.forEach(function (idx) {
+                    var key      = step.dnskeys_parsed[idx];
+                    var record   = step.records && step.records[idx];
+                    var isKsk    = key.type === 'KSK';
+                    var anchored = anchors.indexOf(key.key_tag) !== -1;
+
+                    var idBadge   = '<span class="badge font-monospace ' + (anchored ? 'bg-primary' : 'bg-secondary') + '">id=' + key.key_tag + '</span>';
+                    var typeBadge = isKsk
+                        ? '<span class="badge bg-info-subtle text-info border border-info-subtle">KSK</span>'
+                        : '<span class="badge bg-body-secondary text-body border">ZSK</span>';
+
+                    var notes = [];
+                    if (dnskeySignerTag !== null) {
+                        notes.push('<span class="badge bg-success-subtle text-success-emphasis border border-success-subtle">'
+                            + '<i class="bi bi-check-lg me-1"></i>signed by id=' + dnskeySignerTag + '</span>');
+                    }
+
+                    if (anchored) { notes.push('<span class="text-success-emphasis small"><i class="bi bi-link-45deg me-1"></i>anchored by DS above</span>'); }
+
+                    html += '<div class="d-flex align-items-center gap-2 flex-wrap mb-1">'
+                          + idBadge + typeBadge + notes.join('') + '</div>';
+                    if (record) {
+                        html += '<pre class="bg-body-secondary border rounded p-1 mt-0 mb-2" style="font-size:.8em;white-space:pre-wrap;word-break:break-all">'
+                              + record + '</pre>';
+                    }
+                });
+            } else {
+                html += '<div class="text-danger small">' + step.detail + '</div>';
+            }
+
+            // Outgoing DS from this zone (delegating to a child zone) — third after KSK and ZSK.
+            if (dsByParent[step.zone]) { html += renderDsBlock(dsByParent[step.zone]); }
+
+            // Zone-signing status for the managed zone.
+            if (signing) {
+                html += '<div class="d-flex align-items-center gap-2 small mt-1">'
+                      + tcIcon(signing.status) + ' <span class="text-muted">' + signing.detail + '</span></div>';
+            }
+        });
+
+        chainSteps.innerHTML = html;
+
+        if (data.valid) {
+            chainSummary.innerHTML = '<i class="bi bi-shield-fill-check text-success me-1"></i>Trust chain is complete and valid';
+            chainSummary.className = 'small fw-semibold text-success mt-1';
+        } else {
+            chainSummary.innerHTML = '<i class="bi bi-shield-fill-x text-danger me-1"></i>Trust chain has gaps — review the errors above';
+            chainSummary.className = 'small fw-semibold text-danger mt-1';
+        }
+        chainResult.style.display = '';
+    }
+
+    if (chainBtn) {
+        chainBtn.addEventListener('click', function () {
+            chainBtn.disabled = true;
+            chainSpinner.classList.remove('d-none');
+            chainResult.style.display = 'none';
+            chainSteps.innerHTML = '';
+            chainSummary.textContent = '';
+            chainSummary.className = 'small fw-semibold';
+
+            fetch(chainBtn.dataset.url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                .then(function (r) { return r.json(); })
+                .then(renderTrustChain)
+                .catch(function (err) {
+                    chainSteps.innerHTML = '<div class="text-danger small">Request failed: ' + err + '</div>';
+                    chainResult.style.display = '';
+                })
+                .finally(function () {
+                    chainBtn.disabled = false;
+                    chainSpinner.classList.add('d-none');
+                });
+        });
+    }
 }());
 </script>
 {% endif %}
