@@ -224,6 +224,11 @@ class DomainController extends AbstractController
             return $this->json(['error' => implode('; ', $errors)], 500);
         }
 
+        usort($allKeys, fn($a, $b) =>
+            $b['flags'] <=> $a['flags']         // KSK (257) before ZSK (256)
+            ?: $a['algorithm'] <=> $b['algorithm']
+        );
+
         return $this->json([
             'keys'   => $allKeys,
             'errors' => $errors,
