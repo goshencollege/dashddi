@@ -72,7 +72,11 @@ class DhcpDdnsConfigGenerator
                 'reverse-ddns' => ['ddns-domains' => $reverseDomains],
                 'loggers'      => [[
                     'name'           => 'kea-dhcp-ddns',
-                    'output_options' => [['output' => 'syslog']],
+                    'output_options' => [[
+                        'output'  => '/var/log/kea/kea-dhcp-ddns.log',
+                        'maxsize' => 10485760,
+                        'maxver'  => 5,
+                    ]],
                     'severity'       => 'INFO',
                 ]],
             ],
