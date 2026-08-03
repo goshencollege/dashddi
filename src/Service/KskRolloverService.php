@@ -392,32 +392,6 @@ class KskRolloverService
     }
 
     /**
-     * Marks an expired KSK for immediate deletion and reloads keys on the server.
-     * Intended for keys whose delete date has already passed but that BIND is still
-     * advertising (e.g. keys created before DashDDI managed the rollover lifecycle).
-     *
-     * Runs `dnssec-settime -D now` (idempotent when the date is already in the past)
-     * then `rndc loadkeys` so BIND drops the key from the DNSKEY RRset immediately.
-     */
-    public function removeExpiredKey(Domain $domain, DnsServer $server, int $alg, int $tag): void
-    {
-        $sftp   = $this->connectServer($server);
-        $zone   = $domain->getName();
-        $keyDir = rtrim($server->getKeyDirectory() ?? '', '/') . '/' . $zone;
-        $path   = $keyDir . '/' . sprintf('K%s.+%03d+%05d', $zone, $alg, $tag) . '.key';
-
-        $out  = (string)$sftp->exec('sudo -u bind dnssec-settime -D now ' . escapeshellarg($path) . ' 2>&1');
-        $exit = $sftp->getExitStatus();
-        if ($exit !== 0) {
-            throw new \RuntimeException('dnssec-settime failed: ' . trim($out));
-        }
-
-        foreach ($this->domainViewNamesForServer($domain, $server) as $view) {
-            $sftp->exec('sudo rndc loadkeys ' . escapeshellarg($zone) . ' IN ' . escapeshellarg($view) . ' 2>&1');
-        }
-    }
-
-    /**
      * Returns the view names that the domain belongs to on the rollover's DNS server.
      *
      * @return string[]
@@ -436,28 +410,6 @@ class KskRolloverService
 
         $names = [];
         foreach ($rollover->getEffectiveViews() as $v) {
-            if (isset($serverViewIds[$v->getId()])) {
-                $names[] = $v->getName();
-            }
-        }
-
-        return $names;
-    }
-
-    /**
-     * Returns the view names shared between $domain and $server.
-     *
-     * @return string[]
-     */
-    private function domainViewNamesForServer(Domain $domain, DnsServer $server): array
-    {
-        $serverViewIds = [];
-        foreach ($server->getViews() as $v) {
-            $serverViewIds[$v->getId()] = $v->getName();
-        }
-
-        $names = [];
-        foreach ($domain->getViews() as $v) {
             if (isset($serverViewIds[$v->getId()])) {
                 $names[] = $v->getName();
             }
