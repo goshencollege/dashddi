@@ -241,22 +241,27 @@ class KskRolloverService
             $base     = sprintf('K%s.+%03d+%05d', $zone, $alg, $tag);
             $path     = $keyDir . '/' . $base . '.key';
 
-            // Read the public .key file directly — no sudo needed, .key files are world-readable.
-            // BIND writes timing metadata as comments at the top of every .key file:
-            //   ; Created: YYYYMMDDHHMMSS (human-readable)
-            //   ; Publish:  YYYYMMDDHHMMSS (human-readable)
+            // Try reading the .key file directly first (world-readable, no sudo needed).
+            // BIND writes timing as comments: "; Created: YYYYMMDDHHMMSS (human-readable)"
+            // Fall back to dnssec-settime -p all if the file read yields no timing data.
             $keyContent = (string)$sftp->get($path);
+            $useSettime = ($keyContent === '' || !preg_match('/^;\s*(?:Created|Publish|Activate):/im', $keyContent));
+            if ($useSettime) {
+                $keyContent = (string)$sftp->exec(
+                    'sudo -u bind dnssec-settime -p all ' . escapeshellarg($path) . ' 2>/dev/null'
+                );
+            }
 
             $keys[] = [
                 'key_tag'   => $tag,
                 'type'      => $flags === 257 ? 'KSK' : 'ZSK',
                 'algorithm' => $alg,
                 'flags'     => $flags,
-                'created'   => $this->parseKeyFileDate($keyContent, 'Created'),
-                'publish'   => $this->parseKeyFileDate($keyContent, 'Publish'),
-                'activate'  => $this->parseKeyFileDate($keyContent, 'Activate'),
-                'inactive'  => $this->parseKeyFileDate($keyContent, 'Inactive'),
-                'delete'    => $this->parseKeyFileDate($keyContent, 'Delete'),
+                'created'   => $useSettime ? $this->parseSettime($keyContent, 'Created')  : $this->parseKeyFileDate($keyContent, 'Created'),
+                'publish'   => $useSettime ? $this->parseSettime($keyContent, 'Publish')  : $this->parseKeyFileDate($keyContent, 'Publish'),
+                'activate'  => $useSettime ? $this->parseSettime($keyContent, 'Activate') : $this->parseKeyFileDate($keyContent, 'Activate'),
+                'inactive'  => $useSettime ? $this->parseSettime($keyContent, 'Inactive') : $this->parseKeyFileDate($keyContent, 'Inactive'),
+                'delete'    => $useSettime ? $this->parseSettime($keyContent, 'Delete')   : $this->parseKeyFileDate($keyContent, 'Delete'),
             ];
         }
 
