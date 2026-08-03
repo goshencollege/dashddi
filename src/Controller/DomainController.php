@@ -200,45 +200,6 @@ class DomainController extends AbstractController
         ]);
     }
 
-    #[Route('/{id}/keys/retire', name: 'domain_key_retire', methods: ['POST'])]
-    public function retireKey(
-        Request $request,
-        Domain $domain,
-        DnsServerRepository $serverRepo,
-        KskRolloverService $kskService,
-    ): JsonResponse {
-        if (!$this->isCsrfTokenValid('retire_key_' . $domain->getId(), $request->request->get('_token'))) {
-            return $this->json(['error' => 'Invalid CSRF token.'], 403);
-        }
-
-        $alg = (int) $request->request->get('algorithm');
-        $tag = (int) $request->request->get('key_tag');
-
-        if ($alg <= 0 || $tag <= 0) {
-            return $this->json(['error' => 'Invalid algorithm or key tag.'], 400);
-        }
-
-        $servers = $this->resolveDnssecServers($domain, $serverRepo);
-        if ($servers instanceof JsonResponse) {
-            return $servers;
-        }
-
-        $errors = [];
-        foreach ($servers as $server) {
-            try {
-                $kskService->removeExpiredKey($domain, $server, $alg, $tag);
-            } catch (\Throwable $e) {
-                $errors[] = $server->getName() . ': ' . $e->getMessage();
-            }
-        }
-
-        if (!empty($errors)) {
-            return $this->json(['error' => implode('; ', $errors)], 500);
-        }
-
-        return $this->json(['success' => true]);
-    }
-
     #[Route('/{id}/edit', name: 'domain_edit', methods: ['GET', 'POST'])]
     public function edit(Request $request, Domain $domain, EntityManagerInterface $em): Response
     {
