@@ -8,14 +8,17 @@ use App\Entity\UserPreference;
 use App\Enum\BlockType;
 use App\Form\SubnetType;
 use App\Repository\AppSettingRepository;
+use App\Repository\DnsServerRepository;
 use App\Repository\SubnetRepository;
 use App\Repository\TagRepository;
 use App\Repository\UserPreferenceRepository;
 use App\Repository\VrfRepository;
 use App\Service\IpAddressManager;
+use App\Service\KskRolloverService;
 use IPLib\Factory;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -364,6 +367,130 @@ class SubnetController extends AbstractController
 
         return $startA->getComparableString() <= $endB->getComparableString()
             && $startB->getComparableString() <= $endA->getComparableString();
+    }
+
+    #[Route('/{id}/ds-record', name: 'subnet_ds_record', methods: ['GET'])]
+    public function dsRecord(Subnet $subnet, DnsServerRepository $serverRepo, KskRolloverService $kskService): JsonResponse
+    {
+        $servers = $this->resolveSubnetDnssecServers($subnet, $serverRepo);
+        if ($servers instanceof JsonResponse) {
+            return $servers;
+        }
+
+        $allDs  = [];
+        $errors = [];
+        foreach ($servers as $server) {
+            try {
+                foreach ($kskService->fetchCurrentDsRecordsForSubnet($subnet, $server) as $record) {
+                    $allDs[] = $record;
+                }
+            } catch (\Throwable $e) {
+                $errors[] = $server->getName() . ': ' . $e->getMessage();
+            }
+        }
+
+        $allDs = array_values(array_unique($allDs));
+
+        if (empty($allDs) && !empty($errors)) {
+            return $this->json(['error' => implode('; ', $errors)], 500);
+        }
+
+        return $this->json([
+            'ds_records' => $allDs,
+            'errors'     => $errors,
+        ]);
+    }
+
+    #[Route('/{id}/keys', name: 'subnet_keys', methods: ['GET'])]
+    public function keys(Subnet $subnet, DnsServerRepository $serverRepo, KskRolloverService $kskService): JsonResponse
+    {
+        $servers = $this->resolveSubnetDnssecServers($subnet, $serverRepo);
+        if ($servers instanceof JsonResponse) {
+            return $servers;
+        }
+
+        $seenKeys = [];
+        $allKeys  = [];
+        $errors   = [];
+        foreach ($servers as $server) {
+            try {
+                foreach ($kskService->fetchAllKeyInfoForSubnet($subnet, $server) as $key) {
+                    $dedupKey = $key['algorithm'] . ':' . $key['key_tag'];
+                    if (!in_array($dedupKey, $seenKeys, true)) {
+                        $seenKeys[] = $dedupKey;
+                        $allKeys[]  = $key;
+                    }
+                }
+            } catch (\Throwable $e) {
+                $errors[] = $server->getName() . ': ' . $e->getMessage();
+            }
+        }
+
+        if (empty($allKeys) && !empty($errors)) {
+            return $this->json(['error' => implode('; ', $errors)], 500);
+        }
+
+        usort($allKeys, fn($a, $b) =>
+            $b['flags'] <=> $a['flags']
+            ?: $a['algorithm'] <=> $b['algorithm']
+        );
+
+        return $this->json([
+            'keys'   => $allKeys,
+            'errors' => $errors,
+        ]);
+    }
+
+    #[Route('/{id}/validate-trust-chain', name: 'subnet_validate_trust_chain', methods: ['GET'])]
+    public function validateTrustChain(Subnet $subnet, DnsServerRepository $serverRepo, KskRolloverService $kskService): JsonResponse
+    {
+        $servers = $this->resolveSubnetDnssecServers($subnet, $serverRepo);
+        if ($servers instanceof JsonResponse) {
+            return $servers;
+        }
+
+        try {
+            $result = $kskService->validateTrustChainForSubnet($subnet, $servers[0]);
+        } catch (\Throwable $e) {
+            return $this->json(['error' => $servers[0]->getName() . ': ' . $e->getMessage()], 500);
+        }
+
+        return $this->json($result);
+    }
+
+    /**
+     * @return array<\App\Entity\DnsServer>|JsonResponse
+     */
+    private function resolveSubnetDnssecServers(Subnet $subnet, DnsServerRepository $serverRepo): array|JsonResponse
+    {
+        if (!$subnet->getDnssecPolicy()) {
+            return $this->json(['error' => 'This subnet does not have a DNSSEC policy.'], 400);
+        }
+
+        if ($subnet->getReverseZoneName() === null) {
+            return $this->json(['error' => 'This subnet has no CIDR — cannot determine reverse zone name.'], 400);
+        }
+
+        $subnetViewIds = array_map(fn($v) => $v->getId(), $subnet->getViews()->toArray());
+        if (empty($subnetViewIds)) {
+            return $this->json(['error' => 'This subnet is not assigned to any DNS views.'], 400);
+        }
+
+        $servers = array_values(array_filter(
+            $serverRepo->findAll(),
+            fn($s) => $s->isPrimary()
+                && $s->getKeyDirectory()
+                && !empty(array_intersect(
+                    array_map(fn($v) => $v->getId(), $s->getViews()->toArray()),
+                    $subnetViewIds
+                ))
+        ));
+
+        if (empty($servers)) {
+            return $this->json(['error' => 'No primary DNS server with a configured key directory serves this subnet.'], 400);
+        }
+
+        return $servers;
     }
 
     #[Route('/{id}/delete', name: 'subnet_delete', methods: ['POST'])]

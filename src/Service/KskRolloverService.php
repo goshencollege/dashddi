@@ -5,6 +5,7 @@ namespace App\Service;
 use App\Entity\DnssecKskRollover;
 use App\Entity\DnsServer;
 use App\Entity\Domain;
+use App\Entity\Subnet;
 use App\Enum\KskRolloverStatus;
 use phpseclib3\Net\SFTP;
 
@@ -180,8 +181,28 @@ class KskRolloverService
      */
     public function fetchCurrentDsRecords(Domain $domain, DnsServer $server): array
     {
+        return $this->fetchCurrentDsRecordsByZone($domain->getName(), $server);
+    }
+
+    /**
+     * Returns DS record lines for all current KSKs for a subnet's reverse zone.
+     * Returns an empty array when BIND has not yet generated any keys.
+     *
+     * @return string[]
+     */
+    public function fetchCurrentDsRecordsForSubnet(Subnet $subnet, DnsServer $server): array
+    {
+        $zone = $subnet->getReverseZoneName();
+        if ($zone === null) {
+            throw new \RuntimeException('Subnet has no CIDR — cannot determine reverse zone name.');
+        }
+        return $this->fetchCurrentDsRecordsByZone($zone, $server);
+    }
+
+    /** @return string[] */
+    private function fetchCurrentDsRecordsByZone(string $zone, DnsServer $server): array
+    {
         $sftp   = $this->connectServer($server);
-        $zone   = $domain->getName();
         $keyDir = rtrim($server->getKeyDirectory() ?? '', '/') . '/' . $zone;
 
         $out = (string)$sftp->exec(sprintf('dig +short DNSKEY %s 2>/dev/null', escapeshellarg($zone)));
@@ -218,8 +239,30 @@ class KskRolloverService
      */
     public function fetchAllKeyInfo(Domain $domain, DnsServer $server): array
     {
+        return $this->fetchAllKeyInfoByZone($domain->getName(), $server);
+    }
+
+    /**
+     * Returns metadata for all published DNSKEY records for a subnet's reverse zone.
+     * Private key material is never read.
+     *
+     * @return array<int, array{key_tag: int, type: string, algorithm: int, flags: int, created: string|null, publish: string|null, activate: string|null, inactive: string|null, delete: string|null}>
+     */
+    public function fetchAllKeyInfoForSubnet(Subnet $subnet, DnsServer $server): array
+    {
+        $zone = $subnet->getReverseZoneName();
+        if ($zone === null) {
+            throw new \RuntimeException('Subnet has no CIDR — cannot determine reverse zone name.');
+        }
+        return $this->fetchAllKeyInfoByZone($zone, $server);
+    }
+
+    /**
+     * @return array<int, array{key_tag: int, type: string, algorithm: int, flags: int, created: string|null, publish: string|null, activate: string|null, inactive: string|null, delete: string|null}>
+     */
+    private function fetchAllKeyInfoByZone(string $zone, DnsServer $server): array
+    {
         $sftp   = $this->connectServer($server);
-        $zone   = $domain->getName();
         $keyDir = rtrim($server->getKeyDirectory() ?? '', '/') . '/' . $zone;
 
         $out = (string)$sftp->exec(sprintf('dig +short DNSKEY %s 2>/dev/null', escapeshellarg($zone)));
@@ -488,6 +531,30 @@ class KskRolloverService
     /**
      * Validates the DNSSEC trust chain from the root zone down to the domain.
      *
+     * @return array{steps: list<array<string,mixed>>, valid: bool}
+     */
+    public function validateTrustChain(Domain $domain, DnsServer $server): array
+    {
+        return $this->validateTrustChainByZone(rtrim($domain->getName(), '.') . '.', $server);
+    }
+
+    /**
+     * Validates the DNSSEC trust chain for a subnet's reverse zone.
+     *
+     * @return array{steps: list<array<string,mixed>>, valid: bool}
+     */
+    public function validateTrustChainForSubnet(Subnet $subnet, DnsServer $server): array
+    {
+        $zone = $subnet->getReverseZoneName();
+        if ($zone === null) {
+            throw new \RuntimeException('Subnet has no CIDR — cannot determine reverse zone name.');
+        }
+        return $this->validateTrustChainByZone(rtrim($zone, '.') . '.', $server);
+    }
+
+    /**
+     * Validates the DNSSEC trust chain from the root zone down to $zone.
+     *
      * Steps alternate DS → DNSKEY for every zone in the chain (TLD, …, zone), so
      * the caller can visually link each DS key tag to the DNSKEY it anchors.
      * The final zone also gets a 'signing' step that checks SOA RRSIG coverage.
@@ -496,19 +563,18 @@ class KskRolloverService
      *
      * @return array{steps: list<array<string,mixed>>, valid: bool}
      */
-    public function validateTrustChain(Domain $domain, DnsServer $server): array
+    private function validateTrustChainByZone(string $zone, DnsServer $server): array
     {
         $sftp   = $this->connectServer($server);
-        $zone   = rtrim($domain->getName(), '.') . '.';
         $labels = $this->buildChainLabels($zone);
 
-        $steps = [];
+        $steps          = [];
+        $lastRealParent = '.';
 
         foreach ($labels as $i => $child) {
-            $parent = $i === 0 ? '.' : $labels[$i - 1];
             $isZone = ($i === count($labels) - 1);
 
-            // DS step: does the parent have a signed DS record for this child?
+            // Fetch DS and DNSKEY up front so we can detect non-existent intermediate zones.
             $dsOut      = (string) $sftp->exec(sprintf(
                 'dig +noall +answer +dnssec DS %s 2>/dev/null',
                 escapeshellarg($child)
@@ -520,21 +586,41 @@ class KskRolloverService
                 $this->extractAnswerRecords($dsOut, 'NSEC3')
             );
 
-            $dsParsed      = $this->parseDsRecords($dsLines);
-            $rrsigSignerTag = $this->parseRrsigKeyTag($dsSigLines);
-            $dsKeyTags     = array_column($dsParsed, 'key_tag');
+            $dnskeyOut    = (string) $sftp->exec(sprintf(
+                'dig +noall +answer +dnssec DNSKEY %s 2>/dev/null',
+                escapeshellarg($child)
+            ));
+            $dnskeyLines      = $this->extractAnswerRecords($dnskeyOut, 'DNSKEY');
+            $dnskeySigs       = $this->extractAnswerRecords($dnskeyOut, 'RRSIG');
+            $dnskeyParsed     = $this->parseDnskeyRecords($dnskeyLines);
+            $dnskeySignerTags = $this->parseRrsigKeyTags($dnskeySigs);
 
+            // Skip intermediate labels that have no DS and no DNSKEY — the
+            // parent zone delegates directly across this label (e.g. 198.in-addr.arpa.
+            // delegates straight to 243.51.198.in-addr.arpa., skipping
+            // 51.198.in-addr.arpa.).  $lastRealParent is not updated so the next
+            // real zone uses the correct parent in its DS step label.
+            if (!$isZone && empty($dsLines) && empty($dnskeyLines)) {
+                continue;
+            }
+
+            $parent        = $lastRealParent;
+            $dsParsed        = $this->parseDsRecords($dsLines);
+            $rrsigSignerTags = $this->parseRrsigKeyTags($dsSigLines);
+            $dsKeyTags       = array_column($dsParsed, 'key_tag');
+
+            // DS step: does the (last real) parent have a signed DS record for this child?
             if (empty($dsLines)) {
                 $steps[] = [
                     'type'          => 'ds',
                     'label'         => $parent . ' → ' . $child,
                     'parent'        => $parent,
                     'child'         => $child,
-                    'status'        => 'error',
-                    'records'       => [],
-                    'ds_parsed'     => [],
-                    'rrsig_key_tag' => null,
-                    'detail'        => !empty($nsecLines)
+                    'status'         => 'error',
+                    'records'        => [],
+                    'ds_parsed'      => [],
+                    'rrsig_key_tags' => [],
+                    'detail'         => !empty($nsecLines)
                         ? 'Parent zone is signed but carries no DS record for this zone — chain is broken'
                         : 'No DS record found in parent zone',
                 ];
@@ -544,26 +630,17 @@ class KskRolloverService
                     'label'         => $parent . ' → ' . $child,
                     'parent'        => $parent,
                     'child'         => $child,
-                    'status'        => empty($dsSigLines) ? 'warning' : 'ok',
-                    'records'       => $dsLines,
-                    'ds_parsed'     => $dsParsed,
-                    'rrsig_key_tag' => $rrsigSignerTag,
+                    'status'         => empty($dsSigLines) ? 'warning' : 'ok',
+                    'records'        => $dsLines,
+                    'ds_parsed'      => $dsParsed,
+                    'rrsig_key_tags' => $rrsigSignerTags,
                     'detail'        => empty($dsSigLines)
                         ? sprintf('%d DS record(s) found — no RRSIG covering them', count($dsLines))
                         : sprintf('%d DS record(s) — signed by parent zone', count($dsLines)),
                 ];
             }
 
-            // DNSKEY step: fetch keys for this zone (intermediate zones included).
-            $dnskeyOut    = (string) $sftp->exec(sprintf(
-                'dig +noall +answer +dnssec DNSKEY %s 2>/dev/null',
-                escapeshellarg($child)
-            ));
-            $dnskeyLines  = $this->extractAnswerRecords($dnskeyOut, 'DNSKEY');
-            $dnskeySigs   = $this->extractAnswerRecords($dnskeyOut, 'RRSIG');
-            $dnskeyParsed    = $this->parseDnskeyRecords($dnskeyLines);
-            $dnskeySignerTag = $this->parseRrsigKeyTag($dnskeySigs);
-
+            // DNSKEY step.
             $kskCount = count(array_filter($dnskeyParsed, static fn($k) => $k['type'] === 'KSK'));
             $zskCount = count($dnskeyParsed) - $kskCount;
 
@@ -575,9 +652,9 @@ class KskRolloverService
                     'status'                => 'error',
                     'records'               => [],
                     'dnskeys_parsed'        => [],
-                    'anchored_by'           => $dsKeyTags,
-                    'dnskey_signer_key_tag' => null,
-                    'detail'                => 'No DNSKEY records found',
+                    'anchored_by'            => $dsKeyTags,
+                    'dnskey_signer_key_tags' => [],
+                    'detail'                 => 'No DNSKEY records found',
                 ];
             } else {
                 $steps[] = [
@@ -587,8 +664,8 @@ class KskRolloverService
                     'status'                => empty($dnskeySigs) ? 'warning' : 'ok',
                     'records'               => $dnskeyLines,
                     'dnskeys_parsed'        => $dnskeyParsed,
-                    'anchored_by'           => $dsKeyTags,
-                    'dnskey_signer_key_tag' => $dnskeySignerTag,
+                    'anchored_by'            => $dsKeyTags,
+                    'dnskey_signer_key_tags' => $dnskeySignerTags,
                     'detail'                => sprintf(
                         '%d KSK, %d ZSK%s',
                         $kskCount,
@@ -604,22 +681,24 @@ class KskRolloverService
                     'dig +noall +answer +dnssec SOA %s 2>/dev/null',
                     escapeshellarg($zone)
                 ));
-                $soaLines      = $this->extractAnswerRecords($soaOut, 'SOA');
-                $soaSigs       = $this->extractAnswerRecords($soaOut, 'RRSIG');
-                $soaSignerTag  = $this->parseRrsigKeyTag($soaSigs);
+                $soaLines       = $this->extractAnswerRecords($soaOut, 'SOA');
+                $soaSigs        = $this->extractAnswerRecords($soaOut, 'RRSIG');
+                $soaSignerTags  = $this->parseRrsigKeyTags($soaSigs);
 
                 $steps[] = [
-                    'type'               => 'signing',
-                    'label'              => $zone . ' zone signing',
-                    'zone'               => $zone,
-                    'status'             => empty($soaSigs) ? 'error' : 'ok',
-                    'records'            => $soaLines,
-                    'soa_signer_key_tag' => $soaSignerTag,
+                    'type'                => 'signing',
+                    'label'               => $zone . ' zone signing',
+                    'zone'                => $zone,
+                    'status'              => empty($soaSigs) ? 'error' : 'ok',
+                    'records'             => $soaLines,
+                    'soa_signer_key_tags' => $soaSignerTags,
                     'detail'             => empty($soaSigs)
                         ? 'SOA record is not signed'
                         : 'Zone records are signed (SOA has RRSIG)',
                 ];
             }
+
+            $lastRealParent = $child;
         }
 
         $valid = !in_array('error', array_column($steps, 'status'), true);
@@ -720,20 +799,22 @@ class KskRolloverService
     }
 
     /**
-     * Returns the signing key tag from the first RRSIG line, or null.
+     * Returns all unique signing key tags from a set of RRSIG lines.
      * RRSIG format: name ttl IN RRSIG type alg labels orig_ttl expiry inception key_tag signer sig
      *
-     * @param list<string> $rrsigLines
+     * @param  list<string> $rrsigLines
+     * @return list<int>
      */
-    private function parseRrsigKeyTag(array $rrsigLines): ?int
+    private function parseRrsigKeyTags(array $rrsigLines): array
     {
+        $tags = [];
         foreach ($rrsigLines as $line) {
             $parts = preg_split('/\s+/', $line);
             if (isset($parts[10]) && ctype_digit($parts[10])) {
-                return (int) $parts[10];
+                $tags[] = (int) $parts[10];
             }
         }
-        return null;
+        return array_values(array_unique($tags));
     }
 
     /** Probes the DNSKEY TTL via dig — no sudo required. */
