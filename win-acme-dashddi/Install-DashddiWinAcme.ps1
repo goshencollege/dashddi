@@ -132,7 +132,7 @@ if (-not $SkipCertRequest) {
             -Uri "$Url/api/self/host" `
             -Headers @{ Authorization = "Bearer $Token" }
     } catch {
-        Write-Error "Failed to contact DashDDI at $Url: $_"
+        Write-Error "Failed to contact DashDDI at ${Url}: $_"
         exit 1
     }
 
