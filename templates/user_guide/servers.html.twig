@@ -626,8 +626,7 @@ systemctl enable --now dashddi-certbot.timer</code></pre>
         <p>A PowerShell setup script is provided at <code>certbot-dns-dashddi/windows/Install-DashddiCertbot.ps1</code>. It installs Certbot and the plugin into a virtualenv at <code>C:\Certbot</code>, writes a credentials file, requests an initial certificate, and registers a Windows Scheduled Task that runs <code>dashddi-certbot</code> daily — re-querying DashDDI on every run so the certificate's SAN list stays in sync with the FQDNs registered for this host.</p>
 
         <p class="fw-semibold mb-1">Prerequisites</p>
-        <p class="text-muted small mb-1">Python 3.9+ must be on PATH. If not installed, download from <a href="https://www.python.org/downloads/" target="_blank" rel="noopener">python.org/downloads</a> and check <strong>Add python.exe to PATH</strong> during setup. Alternatively, if <code>winget</code> is available:</p>
-        <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-3"><code>winget install Python.Python.3</code></pre>
+        <p class="text-muted small mb-1">Python 3.9+ must be on PATH. If not installed, download from <a href="https://www.python.org/downloads/" target="_blank" rel="noopener">python.org/downloads</a> and check <strong>Add python.exe to PATH</strong> during setup.</p>
 
         <p class="fw-semibold mb-1">Run the installer</p>
         <p class="text-muted small mb-1">From an elevated PowerShell prompt, download and run the script:</p>

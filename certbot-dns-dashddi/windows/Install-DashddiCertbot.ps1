@@ -59,10 +59,8 @@ $python = Get-Command python -ErrorAction SilentlyContinue
 if (-not $python) {
     Write-Error @"
 Python 3.9 or higher is required but was not found on PATH.
-Install it from https://www.python.org/downloads/ (check "Add python.exe to PATH"),
-or if winget is available:
-  winget install Python.Python.3
-Then re-run this script.
+Download and install it from https://www.python.org/downloads/
+Be sure to check "Add python.exe to PATH" during setup, then re-run this script.
 "@
     exit 1
 }

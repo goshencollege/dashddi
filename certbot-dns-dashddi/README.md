@@ -38,10 +38,7 @@ A PowerShell setup script is provided at `windows/Install-DashddiCertbot.ps1`. I
 
 **Prerequisites:** Python 3.9+ on PATH. If not installed, download from
 [python.org/downloads](https://www.python.org/downloads/) and check **Add python.exe to PATH**
-during setup. Alternatively, if `winget` is available:
-```powershell
-winget install Python.Python.3
-```
+during setup.
 
 **Run the installer** (from an elevated PowerShell prompt):
 ```powershell
