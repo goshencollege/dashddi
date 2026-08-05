@@ -208,13 +208,43 @@ class SelfApiController extends AbstractController
     private function resolveChallengeDomain(DomainRecord $sourceRecord): ?array
     {
         $sourceDomain = $sourceRecord->getDomain();
-        $targetDomain = $this->domainHasPublicView($sourceDomain)
-            ? $sourceDomain
-            : $this->findPublicParentDomain($sourceDomain->getName());
+
+        if ($this->domainHasExplicitPublicView($sourceDomain)) {
+            $targetDomain = $sourceDomain;
+        } else {
+            // Walk up to a public parent. This handles both private subdomains (has
+            // views but none public) and view-less domains whose DNS is managed
+            // externally (e.g. Active Directory), where the challenge must be
+            // published via a DashDDI-managed public ancestor instead.
+            $targetDomain = $this->findPublicParentDomain($sourceDomain->getName());
+
+            // If no public parent exists, fall back to the source domain only when
+            // it has no view restrictions — meaning DashDDI serves it globally.
+            if ($targetDomain === null && $sourceDomain->getViews()->isEmpty()) {
+                $targetDomain = $sourceDomain;
+            }
+        }
+
         if ($targetDomain === null) {
             return null;
         }
         return [$targetDomain, $this->challengeHostnameInParentDomain($sourceRecord, $targetDomain)];
+    }
+
+    /**
+     * Returns true only when the domain has at least one view explicitly marked
+     * as public. Unlike domainHasPublicView(), view-less domains return false —
+     * a domain with no views may not be actively managed by DashDDI for DNS, so
+     * placing a challenge record there may not publish it to the internet.
+     */
+    private function domainHasExplicitPublicView(Domain $domain): bool
+    {
+        foreach ($domain->getViews() as $view) {
+            if ($view->isPublic()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
