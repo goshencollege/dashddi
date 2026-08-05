@@ -403,6 +403,43 @@ class SelfApiControllerTest extends AppWebTestCase
         $this->assertCount(1, $viewIds);
     }
 
+    public function testCreateChallengeForViewlessDomainFallsBackToPublicParent(): void
+    {
+        // View-less domain — exists in DashDDI for IPAM only; DNS managed externally (e.g. AD)
+        $childDomain = (new Domain())->setName('ad.viewless-parent.example.com');
+        $this->em->persist($childDomain);
+
+        // Public parent domain managed by DashDDI
+        $publicView = (new DnsView())->setName('vl-parent-pub')->setIsPublic(true);
+        $this->em->persist($publicView);
+        $parentDomain = (new Domain())->setName('viewless-parent.example.com');
+        $parentDomain->addView($publicView);
+        $this->em->persist($parentDomain);
+        $this->em->flush();
+
+        [$host, $iface] = $this->makeHostWithIp('ad-host'); // 127.0.0.1
+        $raw = bin2hex(random_bytes(32));
+        $this->makeHostToken($host, $raw);
+        $this->makeDomainRecord($iface, $childDomain, 'srv', RecordType::A, '127.0.0.1');
+
+        $data = $this->tokenRequest('POST', '/api/self/dns-challenge', $raw, [
+            'fqdn'       => 'srv.ad.viewless-parent.example.com',
+            'validation' => 'AD_FALLBACK_TOKEN',
+        ]);
+
+        $this->assertSame(201, $this->tokenClient->getResponse()->getStatusCode());
+        $this->assertSame('_acme-challenge.srv.ad', $data['hostname']);
+        $this->assertSame('viewless-parent.example.com', $data['domain']);
+
+        $this->em->clear();
+        $record = $this->em->find(DomainRecord::class, $data['id']);
+        $this->assertNotNull($record);
+        $this->assertSame($parentDomain->getId(), $record->getDomain()->getId());
+        $viewIds = $record->getViews()->map(fn($v) => $v->getId())->toArray();
+        $this->assertContains($publicView->getId(), $viewIds);
+        $this->assertCount(1, $viewIds);
+    }
+
     public function testDeleteChallengeForPrivateSubdomainViaParentDomain(): void
     {
         $publicView = (new DnsView())->setName('del-parent-pub')->setIsPublic(true);

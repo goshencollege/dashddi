@@ -21,7 +21,7 @@ def _read_credentials(path: str) -> tuple[str, str, "bool | str"]:
     """
     cfg = configparser.RawConfigParser()
     # certbot INI files have no section header; inject a dummy one
-    with open(path) as f:
+    with open(path, encoding="utf-8-sig") as f:
         cfg.read_string("[dashddi]\n" + f.read())
     section = cfg["dashddi"]
     url = section.get("dns_dashddi_url", "").strip().rstrip("/")
