@@ -10,8 +10,6 @@ A Certbot DNS authenticator plugin that uses the [DashDDI](https://github.com/go
 
 ## Installation
 
-### Linux / macOS
-
 Certbot and the plugin must share the same Python environment. On modern Debian/Ubuntu systems, install both into a virtualenv to avoid the `externally-managed-environment` error:
 
 ```bash
@@ -32,41 +30,7 @@ You should see `dns-dashddi` in the list.
 
 > **Note:** If you later upgrade Certbot (`/opt/certbot/bin/pip install --upgrade certbot`), re-run the plugin install line to keep the two in sync.
 
-### Windows
-
-A PowerShell setup script is provided at `windows/Install-DashddiCertbot.ps1`. It installs Certbot and the plugin into a virtualenv at `C:\Certbot`, writes a credentials file, requests an initial certificate, and registers a Windows Scheduled Task that re-runs `dashddi-certbot` daily to keep the certificate renewed and its SANs in sync with DashDDI.
-
-**Prerequisites:** Python 3.9+ on PATH. If not installed, download from
-[python.org/downloads](https://www.python.org/downloads/) and check **Add python.exe to PATH**
-during setup.
-
-**Run the installer** (from an elevated PowerShell prompt):
-```powershell
-# Download and inspect first (recommended):
-Invoke-WebRequest -Uri https://raw.githubusercontent.com/goshencollege/dashddi/main/certbot-dns-dashddi/windows/Install-DashddiCertbot.ps1 -OutFile Install-DashddiCertbot.ps1
-.\Install-DashddiCertbot.ps1
-
-# Or pass credentials directly for unattended use:
-.\Install-DashddiCertbot.ps1 -Url https://dashddi.example.com -Token your-host-scoped-token
-```
-
-The installer prompts for the DashDDI URL and host-scoped token if not supplied on the command line.
-
-**What gets created:**
-
-| Path | Purpose |
-|------|---------|
-| `C:\Certbot\` | Python virtualenv with Certbot and the plugin |
-| `C:\Certbot\dashddi.ini` | Credentials file (ACL restricted to SYSTEM + Administrators) |
-| `C:\Certbot\Renew-DashddiCertbot.ps1` | Renewal wrapper called by the Scheduled Task |
-| Task Scheduler → `DashddiCertbotRenew` | Daily task that runs `dashddi-certbot` as SYSTEM |
-
-> **Note:** Certbot stores its renewal configuration under `C:\Windows\System32\config\systemprofile\AppData\Local\certbot` when run as SYSTEM.
-
-To trigger a manual renewal run:
-```powershell
-Start-ScheduledTask -TaskName DashddiCertbotRenew
-```
+> **Windows:** Use [win-acme-dashddi](../win-acme-dashddi/) instead. win-acme integrates natively with the Windows Certificate Store and does not require Python.
 
 ## Setup
 
