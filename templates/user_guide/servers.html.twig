@@ -653,7 +653,7 @@ systemctl enable --now dashddi-certbot.timer</code></pre>
         </table>
         </div>
         <p class="text-muted small mb-1">To trigger a manual renewal:</p>
-        <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-3"><code>& "C:\win-acme\wacs.exe" --renew --force</code></pre>
+        <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-3"><code>& "C:\win-acme\Renew-DashddiWinAcme.ps1"</code></pre>
         <p class="text-muted small mb-1">The SAN list updates automatically — <code>Get-Hosts.ps1</code> re-queries DashDDI on every renewal, so adding or removing a DNS record in DashDDI is reflected on the next daily run with no reinstallation required.</p>
 
         <h6 id="api-acme" class="mt-4">Manual hook approach (curl)</h6>
