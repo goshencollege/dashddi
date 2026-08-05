@@ -641,12 +641,13 @@ systemctl enable --now dashddi-certbot.timer</code></pre>
             <thead><tr><th>Path / Item</th><th>Purpose</th></tr></thead>
             <tbody>
                 <tr><td><code>C:\win-acme\wacs.exe</code></td><td>win-acme ACME client</td></tr>
-                <tr><td><code>C:\win-acme\Get-Hosts.ps1</code></td><td>Queries DashDDI for current FQDNs on every renewal run</td></tr>
+                <tr><td><code>C:\win-acme\Renew-DashddiWinAcme.ps1</code></td><td>Daily renewal wrapper: re-queries DashDDI then calls wacs.exe</td></tr>
+                <tr><td><code>C:\win-acme\Get-Hosts.ps1</code></td><td>Called by the renewal wrapper to discover current FQDNs from DashDDI</td></tr>
                 <tr><td><code>C:\win-acme\Create-AcmeChallenge.ps1</code></td><td>Hook script that creates TXT records via DashDDI</td></tr>
                 <tr><td><code>C:\win-acme\Delete-AcmeChallenge.ps1</code></td><td>Hook script that removes TXT records after validation</td></tr>
                 <tr><td><code>C:\win-acme\dashddi.ini</code></td><td>Credentials file (ACL restricted to SYSTEM + Administrators)</td></tr>
                 <tr><td>Windows Certificate Store &rarr; <code>LocalMachine\My</code></td><td>Issued certificate</td></tr>
-                <tr><td>Task Scheduler &rarr; <code>win-acme renewal (SYSTEM)</code></td><td>Daily renewal task created automatically by win-acme</td></tr>
+                <tr><td>Task Scheduler &rarr; <code>win-acme renewal (SYSTEM)</code></td><td>Daily task running <code>Renew-DashddiWinAcme.ps1</code> as SYSTEM</td></tr>
             </tbody>
         </table>
         </div>

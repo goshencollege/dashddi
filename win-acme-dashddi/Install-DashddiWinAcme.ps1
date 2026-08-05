@@ -8,12 +8,12 @@
     DashDDI credentials file, deploys the challenge hook scripts, and requests
     an initial certificate.
 
-    FQDNs are discovered from DashDDI on every renewal run via Get-Hosts.ps1,
-    so the certificate's SAN list automatically stays in sync as DNS records
-    are added or removed in DashDDI — no re-installation required.
+    A renewal wrapper (Renew-DashddiWinAcme.ps1) is registered as the daily
+    Scheduled Task. It re-queries DashDDI for the current FQDN list on every
+    run so the certificate's SAN list automatically stays in sync as records
+    are added or removed - matching the Linux dashddi-certbot behaviour.
 
     Certificates are stored in the Windows Certificate Store (LocalMachine\My).
-    win-acme automatically creates a daily Scheduled Task for renewal.
 
 .PARAMETER Url
     Base URL of your DashDDI instance (e.g. https://dashddi.example.com).
@@ -93,7 +93,7 @@ if (-not (Test-Path (Join-Path $InstallPath 'wacs.exe'))) {
 $baseRaw = 'https://raw.githubusercontent.com/goshencollege/dashddi/main/win-acme-dashddi'
 $scriptDir = if ($PSScriptRoot) { $PSScriptRoot } else { $PWD.Path }
 
-foreach ($script in 'Create-AcmeChallenge.ps1', 'Delete-AcmeChallenge.ps1', 'Get-Hosts.ps1') {
+foreach ($script in 'Create-AcmeChallenge.ps1', 'Delete-AcmeChallenge.ps1', 'Get-Hosts.ps1', 'Renew-DashddiWinAcme.ps1') {
     $src = Join-Path $scriptDir $script
     if (-not (Test-Path $src)) {
         Write-Host "Downloading $script..."
@@ -109,7 +109,7 @@ $credPath = Join-Path $InstallPath 'dashddi.ini'
 if (-not (Test-Path $credPath)) {
     [System.IO.File]::WriteAllText(
         $credPath,
-        "dns_dashddi_url = $Url`ndns_dashddi_token = $Token`n",
+        "dns_dashddi_url = $Url`ndns_dashddi_token = $Token`nacme_email = $Email`n",
         [System.Text.Encoding]::ASCII
     )
 
@@ -163,14 +163,13 @@ Check that:
 
     # ── 6. Request certificate via win-acme ───────────────────────────────────
 
-    $wacs     = Join-Path $InstallPath 'wacs.exe'
-    $create   = Join-Path $InstallPath 'Create-AcmeChallenge.ps1'
-    $delete   = Join-Path $InstallPath 'Delete-AcmeChallenge.ps1'
-    $getHosts = Join-Path $InstallPath 'Get-Hosts.ps1'
+    $wacs   = Join-Path $InstallPath 'wacs.exe'
+    $create = Join-Path $InstallPath 'Create-AcmeChallenge.ps1'
+    $delete = Join-Path $InstallPath 'Delete-AcmeChallenge.ps1'
 
     & $wacs `
-        --source script `
-        --hostsscript $getHosts `
+        --source manual `
+        --host ($fqdns -join ',') `
         --validationmode dns-01 `
         --validation script `
         --dnscreatescript $create `
@@ -186,6 +185,29 @@ Check that:
         Write-Error "win-acme exited with code $LASTEXITCODE"
         exit $LASTEXITCODE
     }
+
+    # ── 7. Replace win-acme's renewal task with our FQDN-aware wrapper ────────
+    # win-acme registers a task that calls 'wacs.exe --renew' with the static
+    # host list from the initial install. Replace it with Renew-DashddiWinAcme.ps1
+    # which re-queries DashDDI on every run so the SAN list stays current.
+
+    $taskName   = 'win-acme renewal (SYSTEM)'
+    $renewScript = Join-Path $InstallPath 'Renew-DashddiWinAcme.ps1'
+    $taskAction  = New-ScheduledTaskAction `
+        -Execute 'powershell.exe' `
+        -Argument "-NonInteractive -ExecutionPolicy Bypass -File `"$renewScript`""
+    $taskTrigger  = New-ScheduledTaskTrigger -Daily -At '09:00AM'
+    $taskSettings = New-ScheduledTaskSettingsSet `
+        -ExecutionTimeLimit (New-TimeSpan -Hours 2) `
+        -MultipleInstances IgnoreNew
+    $taskPrincipal = New-ScheduledTaskPrincipal `
+        -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
+
+    Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
+    Register-ScheduledTask -TaskName $taskName `
+        -Action $taskAction -Trigger $taskTrigger `
+        -Settings $taskSettings -Principal $taskPrincipal -Force | Out-Null
+    Write-Host "Scheduled Task '$taskName' configured for DashDDI FQDN-aware renewal."
 }
 
 Write-Host ''
@@ -198,5 +220,7 @@ Write-Host ''
 Write-Host 'To trigger a manual renewal:'
 Write-Host "  & `"$InstallPath\wacs.exe`" --renew --force"
 Write-Host ''
-Write-Host 'FQDNs are re-queried from DashDDI on every renewal — the SAN list updates'
+Write-Host "  Renewal task:   'win-acme renewal (SYSTEM)' -> Renew-DashddiWinAcme.ps1"
+Write-Host ''
+Write-Host 'FQDNs are re-queried from DashDDI on every renewal - the SAN list updates'
 Write-Host 'automatically as records are added or removed. No re-installation needed.'
