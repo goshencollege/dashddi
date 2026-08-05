@@ -1,0 +1,28 @@
+<script>
+(function () {
+    document.querySelectorAll('pre').forEach(function (pre) {
+        pre.style.position = 'relative';
+
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.title = 'Copy to clipboard';
+        btn.className = 'btn btn-sm btn-outline-secondary position-absolute top-0 end-0 m-1 copy-code-btn';
+        btn.innerHTML = '<i class="bi bi-clipboard"></i>';
+
+        btn.addEventListener('click', function () {
+            var code = pre.querySelector('code');
+            var text = code ? code.innerText : pre.innerText;
+            navigator.clipboard.writeText(text).then(function () {
+                btn.innerHTML = '<i class="bi bi-check-lg"></i>';
+                btn.classList.replace('btn-outline-secondary', 'btn-success');
+                setTimeout(function () {
+                    btn.innerHTML = '<i class="bi bi-clipboard"></i>';
+                    btn.classList.replace('btn-success', 'btn-outline-secondary');
+                }, 2000);
+            });
+        });
+
+        pre.appendChild(btn);
+    });
+}());
+</script>
