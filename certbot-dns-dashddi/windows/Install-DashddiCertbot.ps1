@@ -117,10 +117,13 @@ if (-not (Test-Path $CredentialsPath)) {
         New-Item -ItemType Directory -Path $credDir | Out-Null
     }
 
-    @"
-dns_dashddi_url = $Url
-dns_dashddi_token = $Token
-"@ | Set-Content -Path $CredentialsPath -Encoding UTF8
+    # Write without BOM — PowerShell 5.1's UTF8 encoding adds a BOM that
+    # confuses Python's configparser. ASCII is safe for URLs and tokens.
+    [System.IO.File]::WriteAllText(
+        $CredentialsPath,
+        "dns_dashddi_url = $Url`ndns_dashddi_token = $Token`n",
+        [System.Text.Encoding]::ASCII
+    )
 
     # Restrict ACL: SYSTEM + Administrators only, no inheritance.
     $acl = Get-Acl $CredentialsPath
