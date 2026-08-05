@@ -42,24 +42,24 @@ The installer prompts for your DashDDI URL, host-scoped token, and an email addr
 | Path / Item | Purpose |
 |---|---|
 | `C:\win-acme\wacs.exe` | win-acme ACME client |
-| `C:\win-acme\Get-Hosts.ps1` | Called by win-acme on each renewal to query current FQDNs from DashDDI |
+| `C:\win-acme\Renew-DashddiWinAcme.ps1` | Daily renewal wrapper: re-queries DashDDI then calls wacs.exe |
+| `C:\win-acme\Get-Hosts.ps1` | Called by the renewal wrapper to discover current FQDNs from DashDDI |
 | `C:\win-acme\Create-AcmeChallenge.ps1` | Hook called by win-acme to create TXT records via DashDDI |
 | `C:\win-acme\Delete-AcmeChallenge.ps1` | Hook called by win-acme to remove TXT records after validation |
 | `C:\win-acme\dashddi.ini` | Credentials file (ACL restricted to SYSTEM + Administrators) |
 | Windows Certificate Store → `LocalMachine\My` | Issued certificate |
-| Task Scheduler → `win-acme renewal (SYSTEM)` | Daily renewal task created automatically by win-acme |
+| Task Scheduler → `win-acme renewal (SYSTEM)` | Daily task running `Renew-DashddiWinAcme.ps1` as SYSTEM |
 
 ## How it works
 
-On every renewal (initial and subsequent), win-acme runs `Get-Hosts.ps1` to discover the current set of FQDNs from DashDDI before requesting or renewing the certificate. This means the SAN list stays in sync with DNS records automatically — adding or removing a record in DashDDI takes effect on the next renewal without any manual intervention.
+The installer registers `Renew-DashddiWinAcme.ps1` as the `win-acme renewal (SYSTEM)` Scheduled Task. On every daily run (and on the initial install) the wrapper re-queries DashDDI for the current FQDN list before calling wacs.exe, so the certificate's SAN list stays in sync as DNS records are added or removed — matching the behaviour of `dashddi-certbot` on Linux.
 
-1. win-acme calls `Get-Hosts.ps1`, which queries `GET /api/self/host` and outputs the current A/AAAA/CNAME FQDNs registered to this host.
-2. win-acme requests a Let's Encrypt certificate covering all discovered FQDNs as SANs.
-3. For each domain, Let's Encrypt asks win-acme to prove control via a DNS-01 challenge. win-acme calls `Create-AcmeChallenge.ps1`, which posts to `POST /api/self/dns-challenge` with the FQDN and validation token.
+1. `Renew-DashddiWinAcme.ps1` calls `Get-Hosts.ps1`, which queries `GET /api/self/host` and returns the current A/AAAA/CNAME FQDNs registered to this host in DashDDI.
+2. The wrapper calls wacs.exe with the current FQDN list. win-acme renews the certificate if it is within its renewal window; otherwise it exits cleanly.
+3. For each domain that needs validation, Let's Encrypt asks win-acme to prove control via a DNS-01 challenge. win-acme calls `Create-AcmeChallenge.ps1`, which posts to `POST /api/self/dns-challenge` with the FQDN and validation token.
 4. DashDDI creates the `_acme-challenge.*` TXT record in the appropriate public DNS view (or a multipart label in a public parent domain if the host's domain is managed externally, e.g. Active Directory).
 5. After validation, win-acme calls `Delete-AcmeChallenge.ps1`, which posts to `DELETE /api/self/dns-challenge`.
 6. The issued certificate is installed into the Windows Certificate Store under `LocalMachine\My`.
-7. win-acme registers a daily Scheduled Task (`win-acme renewal (SYSTEM)`) that automatically renews certificates before they expire.
 
 ## Operations
 
