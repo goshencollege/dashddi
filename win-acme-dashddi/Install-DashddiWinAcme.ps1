@@ -5,8 +5,12 @@
 
 .DESCRIPTION
     Downloads win-acme, installs it to C:\win-acme (configurable), writes a
-    DashDDI credentials file, deploys the challenge hook scripts, discovers
-    this host's FQDNs from DashDDI, and requests an initial certificate.
+    DashDDI credentials file, deploys the challenge hook scripts, and requests
+    an initial certificate.
+
+    FQDNs are discovered from DashDDI on every renewal run via Get-Hosts.ps1,
+    so the certificate's SAN list automatically stays in sync as DNS records
+    are added or removed in DashDDI — no re-installation required.
 
     Certificates are stored in the Windows Certificate Store (LocalMachine\My).
     win-acme automatically creates a daily Scheduled Task for renewal.
@@ -89,7 +93,7 @@ if (-not (Test-Path (Join-Path $InstallPath 'wacs.exe'))) {
 $baseRaw = 'https://raw.githubusercontent.com/goshencollege/dashddi/main/win-acme-dashddi'
 $scriptDir = if ($PSScriptRoot) { $PSScriptRoot } else { $PWD.Path }
 
-foreach ($script in 'Create-AcmeChallenge.ps1', 'Delete-AcmeChallenge.ps1') {
+foreach ($script in 'Create-AcmeChallenge.ps1', 'Delete-AcmeChallenge.ps1', 'Get-Hosts.ps1') {
     $src = Join-Path $scriptDir $script
     if (-not (Test-Path $src)) {
         Write-Host "Downloading $script..."
@@ -155,17 +159,18 @@ Check that:
         exit 1
     }
 
-    Write-Host "Requesting certificate for $($fqdns.Count) domain(s): $($fqdns -join ', ')"
+    Write-Host "Found $($fqdns.Count) domain(s) for initial request: $($fqdns -join ', ')"
 
     # ── 6. Request certificate via win-acme ───────────────────────────────────
 
-    $wacs   = Join-Path $InstallPath 'wacs.exe'
-    $create = Join-Path $InstallPath 'Create-AcmeChallenge.ps1'
-    $delete = Join-Path $InstallPath 'Delete-AcmeChallenge.ps1'
+    $wacs     = Join-Path $InstallPath 'wacs.exe'
+    $create   = Join-Path $InstallPath 'Create-AcmeChallenge.ps1'
+    $delete   = Join-Path $InstallPath 'Delete-AcmeChallenge.ps1'
+    $getHosts = Join-Path $InstallPath 'Get-Hosts.ps1'
 
     & $wacs `
-        --source manual `
-        --host ($fqdns -join ',') `
+        --source script `
+        --hostsscript $getHosts `
         --validationmode dns-01 `
         --validation script `
         --dnscreatescript $create `
@@ -193,5 +198,5 @@ Write-Host ''
 Write-Host 'To trigger a manual renewal:'
 Write-Host "  & `"$InstallPath\wacs.exe`" --renew --force"
 Write-Host ''
-Write-Host 'To add or remove domains (re-run after updating DNS records in DashDDI):'
-Write-Host "  .\Install-DashddiWinAcme.ps1 -SkipCertRequest  # re-discovers FQDNs"
+Write-Host 'FQDNs are re-queried from DashDDI on every renewal — the SAN list updates'
+Write-Host 'automatically as records are added or removed. No re-installation needed.'

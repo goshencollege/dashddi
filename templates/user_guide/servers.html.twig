@@ -641,6 +641,7 @@ systemctl enable --now dashddi-certbot.timer</code></pre>
             <thead><tr><th>Path / Item</th><th>Purpose</th></tr></thead>
             <tbody>
                 <tr><td><code>C:\win-acme\wacs.exe</code></td><td>win-acme ACME client</td></tr>
+                <tr><td><code>C:\win-acme\Get-Hosts.ps1</code></td><td>Queries DashDDI for current FQDNs on every renewal run</td></tr>
                 <tr><td><code>C:\win-acme\Create-AcmeChallenge.ps1</code></td><td>Hook script that creates TXT records via DashDDI</td></tr>
                 <tr><td><code>C:\win-acme\Delete-AcmeChallenge.ps1</code></td><td>Hook script that removes TXT records after validation</td></tr>
                 <tr><td><code>C:\win-acme\dashddi.ini</code></td><td>Credentials file (ACL restricted to SYSTEM + Administrators)</td></tr>
@@ -651,7 +652,7 @@ systemctl enable --now dashddi-certbot.timer</code></pre>
         </div>
         <p class="text-muted small mb-1">To trigger a manual renewal:</p>
         <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-3"><code>& "C:\win-acme\wacs.exe" --renew --force</code></pre>
-        <p class="text-muted small mb-1">To update the certificate after adding or removing DNS records in DashDDI, re-run the installer — it re-queries DashDDI and registers a new renewal with the updated FQDN list.</p>
+        <p class="text-muted small mb-1">The SAN list updates automatically — <code>Get-Hosts.ps1</code> re-queries DashDDI on every renewal, so adding or removing a DNS record in DashDDI is reflected on the next daily run with no reinstallation required.</p>
 
         <h6 id="api-acme" class="mt-4">Manual hook approach (curl)</h6>
         <p class="text-muted small">If installing Python packages is not practical, you can drive the same endpoints manually using Certbot's <code>--manual</code> authenticator:</p>

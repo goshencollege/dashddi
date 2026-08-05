@@ -42,6 +42,7 @@ The installer prompts for your DashDDI URL, host-scoped token, and an email addr
 | Path / Item | Purpose |
 |---|---|
 | `C:\win-acme\wacs.exe` | win-acme ACME client |
+| `C:\win-acme\Get-Hosts.ps1` | Called by win-acme on each renewal to query current FQDNs from DashDDI |
 | `C:\win-acme\Create-AcmeChallenge.ps1` | Hook called by win-acme to create TXT records via DashDDI |
 | `C:\win-acme\Delete-AcmeChallenge.ps1` | Hook called by win-acme to remove TXT records after validation |
 | `C:\win-acme\dashddi.ini` | Credentials file (ACL restricted to SYSTEM + Administrators) |
@@ -50,7 +51,9 @@ The installer prompts for your DashDDI URL, host-scoped token, and an email addr
 
 ## How it works
 
-1. The installer queries `GET /api/self/host` to discover all A/AAAA/CNAME FQDNs registered to this host in DashDDI.
+On every renewal (initial and subsequent), win-acme runs `Get-Hosts.ps1` to discover the current set of FQDNs from DashDDI before requesting or renewing the certificate. This means the SAN list stays in sync with DNS records automatically — adding or removing a record in DashDDI takes effect on the next renewal without any manual intervention.
+
+1. win-acme calls `Get-Hosts.ps1`, which queries `GET /api/self/host` and outputs the current A/AAAA/CNAME FQDNs registered to this host.
 2. win-acme requests a Let's Encrypt certificate covering all discovered FQDNs as SANs.
 3. For each domain, Let's Encrypt asks win-acme to prove control via a DNS-01 challenge. win-acme calls `Create-AcmeChallenge.ps1`, which posts to `POST /api/self/dns-challenge` with the FQDN and validation token.
 4. DashDDI creates the `_acme-challenge.*` TXT record in the appropriate public DNS view (or a multipart label in a public parent domain if the host's domain is managed externally, e.g. Active Directory).
@@ -72,12 +75,12 @@ The installer prompts for your DashDDI URL, host-scoped token, and an email addr
 & "C:\win-acme\wacs.exe" --list
 ```
 
-**Update the certificate after adding or removing DNS records in DashDDI:**
+**Adding or removing DNS records in DashDDI:**
 
-win-acme stores the SAN list at issuance time. To pick up new FQDNs, re-run the installer — it re-queries DashDDI and creates a new renewal covering the updated list:
+No action required. `Get-Hosts.ps1` re-queries DashDDI on every renewal, so the certificate's SAN list updates automatically on the next daily renewal run. To pick up a change immediately, force a renewal:
 
 ```powershell
-.\Install-DashddiWinAcme.ps1 -Url https://dashddi.example.com -Token your-token -Email admin@example.com
+& "C:\win-acme\wacs.exe" --renew --force
 ```
 
 ## Troubleshooting
