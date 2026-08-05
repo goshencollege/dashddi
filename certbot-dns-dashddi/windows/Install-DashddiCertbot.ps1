@@ -136,7 +136,7 @@ dns_dashddi_token = $Token
 
     Write-Host "Credentials written to $CredentialsPath"
 } else {
-    Write-Host "Credentials file already exists at $CredentialsPath — skipping."
+    Write-Host "Credentials file already exists at $CredentialsPath - skipping."
 }
 
 # ── 5. Write renewal wrapper ──────────────────────────────────────────────────
