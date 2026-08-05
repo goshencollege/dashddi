@@ -36,7 +36,9 @@ You should see `dns-dashddi` in the list.
 
 A PowerShell setup script is provided at `windows/Install-DashddiCertbot.ps1`. It installs Certbot and the plugin into a virtualenv at `C:\Certbot`, writes a credentials file, requests an initial certificate, and registers a Windows Scheduled Task that re-runs `dashddi-certbot` daily to keep the certificate renewed and its SANs in sync with DashDDI.
 
-**Prerequisites:** Python 3.9+ on PATH. If not installed:
+**Prerequisites:** Python 3.9+ on PATH. If not installed, download from
+[python.org/downloads](https://www.python.org/downloads/) and check **Add python.exe to PATH**
+during setup. Alternatively, if `winget` is available:
 ```powershell
 winget install Python.Python.3
 ```
