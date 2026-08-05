@@ -88,7 +88,26 @@ if (-not (Test-Path (Join-Path $InstallPath 'wacs.exe'))) {
     Write-Host "win-acme already present at $InstallPath."
 }
 
-# ── 3. Deploy hook scripts ────────────────────────────────────────────────────
+# ── 3. Write settings.json ───────────────────────────────────────────────────
+# Use public DNS resolvers for win-acme's pre-validation check. Without this,
+# win-acme queries authoritative nameservers directly, which fails for domains
+# hosted on internal/AD DNS servers where the challenge record is not present
+# (it is published in the public parent zone by DashDDI instead).
+
+$settingsPath = Join-Path $InstallPath 'settings.json'
+if (-not (Test-Path $settingsPath)) {
+    $settingsJson = '{
+  "Validation": {
+    "DnsServers": ["8.8.8.8", "1.1.1.1"]
+  }
+}'
+    [System.IO.File]::WriteAllText($settingsPath, $settingsJson, [System.Text.Encoding]::ASCII)
+    Write-Host "Settings written to $settingsPath"
+} else {
+    Write-Host "Settings file already exists at $settingsPath - skipping."
+}
+
+# ── 4. Deploy hook scripts ────────────────────────────────────────────────────
 
 $baseRaw = 'https://raw.githubusercontent.com/goshencollege/dashddi/main/win-acme-dashddi'
 $scriptDir = if ($PSScriptRoot) { $PSScriptRoot } else { $PWD.Path }
@@ -103,7 +122,7 @@ foreach ($script in 'Create-AcmeChallenge.ps1', 'Delete-AcmeChallenge.ps1', 'Get
     }
 }
 
-# ── 4. Credentials file ───────────────────────────────────────────────────────
+# ── 5. Credentials file ───────────────────────────────────────────────────────
 
 $credPath = Join-Path $InstallPath 'dashddi.ini'
 if (-not (Test-Path $credPath)) {
@@ -127,7 +146,7 @@ if (-not (Test-Path $credPath)) {
     Write-Host "Credentials file already exists at $credPath - skipping."
 }
 
-# ── 5. Discover FQDNs from DashDDI ───────────────────────────────────────────
+# ── 6. Discover FQDNs from DashDDI ───────────────────────────────────────────
 
 if (-not $SkipCertRequest) {
     Write-Host 'Querying DashDDI for registered FQDNs...'
@@ -161,7 +180,7 @@ Check that:
 
     Write-Host "Found $($fqdns.Count) domain(s) for initial request: $($fqdns -join ', ')"
 
-    # ── 6. Request certificate via win-acme ───────────────────────────────────
+    # ── 7. Request certificate via win-acme ───────────────────────────────────
 
     $wacs   = Join-Path $InstallPath 'wacs.exe'
     $create = Join-Path $InstallPath 'Create-AcmeChallenge.ps1'
@@ -186,7 +205,7 @@ Check that:
         exit $LASTEXITCODE
     }
 
-    # ── 7. Replace win-acme's renewal task with our FQDN-aware wrapper ────────
+    # ── 8. Replace win-acme's renewal task with our FQDN-aware wrapper ────────
     # win-acme registers a task that calls 'wacs.exe --renew' with the static
     # host list from the initial install. Replace it with Renew-DashddiWinAcme.ps1
     # which re-queries DashDDI on every run so the SAN list stays current.

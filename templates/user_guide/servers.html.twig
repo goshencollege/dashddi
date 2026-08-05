@@ -641,6 +641,7 @@ systemctl enable --now dashddi-certbot.timer</code></pre>
             <thead><tr><th>Path / Item</th><th>Purpose</th></tr></thead>
             <tbody>
                 <tr><td><code>C:\win-acme\wacs.exe</code></td><td>win-acme ACME client</td></tr>
+                <tr><td><code>C:\win-acme\settings.json</code></td><td>Configures win-acme to use public DNS (8.8.8.8, 1.1.1.1) for pre-validation</td></tr>
                 <tr><td><code>C:\win-acme\Renew-DashddiWinAcme.ps1</code></td><td>Daily renewal wrapper: re-queries DashDDI then calls wacs.exe</td></tr>
                 <tr><td><code>C:\win-acme\Get-Hosts.ps1</code></td><td>Called by the renewal wrapper to discover current FQDNs from DashDDI</td></tr>
                 <tr><td><code>C:\win-acme\Create-AcmeChallenge.ps1</code></td><td>Hook script that creates TXT records via DashDDI</td></tr>

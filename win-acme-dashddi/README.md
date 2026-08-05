@@ -42,6 +42,7 @@ The installer prompts for your DashDDI URL, host-scoped token, and an email addr
 | Path / Item | Purpose |
 |---|---|
 | `C:\win-acme\wacs.exe` | win-acme ACME client |
+| `C:\win-acme\settings.json` | win-acme configuration: uses public DNS (8.8.8.8, 1.1.1.1) for pre-validation |
 | `C:\win-acme\Renew-DashddiWinAcme.ps1` | Daily renewal wrapper: re-queries DashDDI then calls wacs.exe |
 | `C:\win-acme\Get-Hosts.ps1` | Called by the renewal wrapper to discover current FQDNs from DashDDI |
 | `C:\win-acme\Create-AcmeChallenge.ps1` | Hook called by win-acme to create TXT records via DashDDI |
@@ -84,6 +85,22 @@ No action required. `Get-Hosts.ps1` re-queries DashDDI on every renewal, so the 
 ```
 
 ## Troubleshooting
+
+**Preliminary validation failed — "No TXT records found" on internal nameservers**
+
+This happens when the domain is hosted on internal/AD DNS servers that are not reachable from the internet. DashDDI publishes the challenge record in the public parent zone instead, but win-acme's pre-validation step queries the authoritative nameservers it finds via local DNS and cannot see the record there.
+
+The installer writes `settings.json` configuring win-acme to use public DNS resolvers (8.8.8.8, 1.1.1.1) for its pre-validation check, which resolves via the public DNS hierarchy and finds the record correctly. If this file is missing or was not present when win-acme was first run, create it manually:
+
+```json
+{
+  "Validation": {
+    "DnsServers": ["8.8.8.8", "1.1.1.1"]
+  }
+}
+```
+
+Save it as `C:\win-acme\settings.json` and retry.
 
 **`401 Unauthorized`**
 
