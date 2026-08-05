@@ -622,6 +622,35 @@ systemctl enable --now dashddi-certbot.timer</code></pre>
   --limit web01.example.com</code></pre>
         <p class="text-muted small">The role is idempotent: if the credentials file already exists and <code>dashddi_force_token_regenerate</code> is false, token generation is skipped. Installation and systemd unit deployment always run.</p>
 
+        <h6 id="api-windows" class="mt-4">Windows</h6>
+        <p>A PowerShell setup script is provided at <code>certbot-dns-dashddi/windows/Install-DashddiCertbot.ps1</code>. It installs Certbot and the plugin into a virtualenv at <code>C:\Certbot</code>, writes a credentials file, requests an initial certificate, and registers a Windows Scheduled Task that runs <code>dashddi-certbot</code> daily — re-querying DashDDI on every run so the certificate's SAN list stays in sync with the FQDNs registered for this host.</p>
+
+        <p class="fw-semibold mb-1">Prerequisites</p>
+        <p class="text-muted small mb-1">Python 3.9+ must be on PATH. If not installed:</p>
+        <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-3"><code>winget install Python.Python.3</code></pre>
+
+        <p class="fw-semibold mb-1">Run the installer</p>
+        <p class="text-muted small mb-1">From an elevated PowerShell prompt, download and run the script:</p>
+        <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-3"><code>Invoke-WebRequest -Uri https://raw.githubusercontent.com/goshencollege/dashddi/main/certbot-dns-dashddi/windows/Install-DashddiCertbot.ps1 -OutFile Install-DashddiCertbot.ps1
+.\Install-DashddiCertbot.ps1</code></pre>
+        <p class="text-muted small mb-1">Credentials can be passed directly for unattended use:</p>
+        <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-3"><code>.\Install-DashddiCertbot.ps1 -Url https://dashddi.example.com -Token &lt;host-scoped-token&gt;</code></pre>
+
+        <p class="fw-semibold mb-1">What gets created</p>
+        <div class="table-responsive mb-3">
+        <table class="table table-sm table-bordered small mb-0">
+            <thead><tr><th>Path / Item</th><th>Purpose</th></tr></thead>
+            <tbody>
+                <tr><td><code>C:\Certbot\</code></td><td>Python virtualenv with Certbot and the plugin</td></tr>
+                <tr><td><code>C:\Certbot\dashddi.ini</code></td><td>Credentials file (ACL restricted to SYSTEM + Administrators)</td></tr>
+                <tr><td><code>C:\Certbot\Renew-DashddiCertbot.ps1</code></td><td>Renewal wrapper called by the Scheduled Task</td></tr>
+                <tr><td>Task Scheduler → <code>DashddiCertbotRenew</code></td><td>Daily task that runs <code>dashddi-certbot</code> as SYSTEM</td></tr>
+            </tbody>
+        </table>
+        </div>
+        <p class="text-muted small mb-1">To trigger a manual renewal run:</p>
+        <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-3"><code>Start-ScheduledTask -TaskName DashddiCertbotRenew</code></pre>
+
         <h6 id="api-acme" class="mt-4">Manual hook approach (curl)</h6>
         <p class="text-muted small">If installing Python packages is not practical, you can drive the same endpoints manually using Certbot's <code>--manual</code> authenticator:</p>
         <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-2"><code>#!/usr/bin/env bash
@@ -830,6 +859,7 @@ systemctl restart pveproxy pvedaemon</code></pre>
             <a href="#api-self" class="list-group-item list-group-item-action py-1 ps-4">↳ Host self-service (/api/self)</a>
             <a href="#api-certbot-plugin" class="list-group-item list-group-item-action py-1 ps-4">↳ Certbot plugin</a>
             <a href="#api-ansible" class="list-group-item list-group-item-action py-1 ps-4">↳ Ansible role</a>
+            <a href="#api-windows" class="list-group-item list-group-item-action py-1 ps-4">↳ Windows</a>
             <a href="#api-acme" class="list-group-item list-group-item-action py-1 ps-4">↳ Manual hook (curl)</a>
             <a href="#proxmox-acme" class="list-group-item list-group-item-action py-1">Proxmox VE ACME</a>
             <a href="#proxmox-acme-install" class="list-group-item list-group-item-action py-1 ps-4">↳ Installation</a>
