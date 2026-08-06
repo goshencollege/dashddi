@@ -18,6 +18,8 @@ class RecommendationService
         private readonly DnsViewResolver $viewResolver,
     ) {}
 
+    private ?array $reparentCandidatesCache = null;
+
     /**
      * Finds A/AAAA domain records whose IP value matches a network interface or VIP
      * but are not linked to that entity.
@@ -574,7 +576,234 @@ class RecommendationService
         return $this->em->getConnection()->fetchAllAssociative($sql);
     }
 
+    /**
+     * Finds domain records that currently live in a domain by naming convention only,
+     * when a more specific domain already exists in DashDDI that should own them
+     * (e.g. a record hostnamed "host.switches" in "example.com" when "switches.example.com"
+     * also exists). Moving a record rewrites its hostname to be relative to the more
+     * specific domain while preserving its resulting FQDN.
+     *
+     * Deliberately excludes two categories of record that must stay put even though
+     * they match by name, since BIND needs them co-located with the delegating zone:
+     *   - the NS record that itself delegates to the more specific domain
+     *   - any A/AAAA record referenced as the target of an NS record in the same
+     *     source domain (glue for that domain's own delegations)
+     * See countExcludedReparentRecords() for a count of what was excluded and why.
+     *
+     * Each row contains: record_id, hostname, record_type, source_domain_id,
+     * source_domain_name, target_domain_id, target_domain_name, new_hostname,
+     * view_warning (nullable string).
+     */
+    public function findReparentableDnsRecords(): array
+    {
+        return $this->computeReparentCandidates()['toMove'];
+    }
+
+    /**
+     * Number of records left in place by findReparentableDnsRecords() because they
+     * are NS delegation records or their glue A/AAAA counterparts.
+     */
+    public function countExcludedReparentRecords(): int
+    {
+        return $this->computeReparentCandidates()['excludedCount'];
+    }
+
+    /**
+     * Removes any views from $record that are not valid for $targetDomain (via
+     * DnsViewResolver), for interface-linked A/AAAA records being moved into it.
+     * No-op for records that aren't view-constrained in the first place.
+     */
+    public function narrowViewsForDomain(DomainRecord $record, Domain $targetDomain): void
+    {
+        $iface = $record->getNetworkInterface();
+        if ($iface === null || !in_array($record->getType(), [RecordType::A, RecordType::AAAA], true)) {
+            return;
+        }
+
+        $allowedIds = array_map(
+            fn($v) => $v->getId(),
+            $this->viewResolver->availableViewsFor($targetDomain, $iface->getSubnet()),
+        );
+
+        foreach ($record->getViews()->toArray() as $view) {
+            if (!in_array($view->getId(), $allowedIds, true)) {
+                $record->removeView($view);
+            }
+        }
+    }
+
     // ── private helpers ───────────────────────────────────────────────────────
+
+    private function computeReparentCandidates(): array
+    {
+        if ($this->reparentCandidatesCache !== null) {
+            return $this->reparentCandidatesCache;
+        }
+
+        $domains = $this->em->getRepository(Domain::class)->findAll();
+
+        $byLowerName = [];
+        foreach ($domains as $d) {
+            $byLowerName[strtolower($d->getName())] = $d;
+        }
+
+        // NS delegation targets, grouped by the domain the NS record itself lives in —
+        // glue only counts if it's co-located with the NS record that needs it.
+        $nsTargetsByDomainId = [];
+        foreach ($domains as $d) {
+            foreach ($d->getRecords() as $r) {
+                if ($r->getType() !== RecordType::NS) {
+                    continue;
+                }
+                $nsTargetsByDomainId[$d->getId()][] = $this->normalizeNsTarget($r->getValue(), $d);
+            }
+        }
+
+        $toMove = [];
+        $excludedCount = 0;
+
+        foreach ($domains as $source) {
+            foreach ($source->getRecords() as $record) {
+                $match = $this->deepestMatchingChild($record->getHostname(), $source, $byLowerName);
+                if ($match === null) {
+                    continue;
+                }
+                [$targetDomain, $newHostname] = $match;
+
+                if ($record->getType() === RecordType::NS && $newHostname === '@') {
+                    $excludedCount++;
+                    continue;
+                }
+
+                if (in_array($record->getType(), [RecordType::A, RecordType::AAAA], true)) {
+                    $fqdn = strtolower(rtrim($record->getFullyQualifiedHostname(), '.'));
+                    $localNsTargets = $nsTargetsByDomainId[$source->getId()] ?? [];
+                    if (in_array($fqdn, $localNsTargets, true)) {
+                        $excludedCount++;
+                        continue;
+                    }
+                }
+
+                $toMove[] = [
+                    'record_id'          => $record->getId(),
+                    'hostname'           => $record->getHostname(),
+                    'record_type'        => $record->getType()->value,
+                    'source_domain_id'   => $source->getId(),
+                    'source_domain_name' => $source->getName(),
+                    'target_domain_id'   => $targetDomain->getId(),
+                    'target_domain_name' => $targetDomain->getName(),
+                    'new_hostname'       => $newHostname,
+                    'view_warning'       => $this->computeViewWarning($record, $targetDomain),
+                ];
+            }
+        }
+
+        usort($toMove, fn($a, $b) => [$a['source_domain_name'], $a['hostname']] <=> [$b['source_domain_name'], $b['hostname']]);
+
+        return $this->reparentCandidatesCache = ['toMove' => $toMove, 'excludedCount' => $excludedCount];
+    }
+
+    /**
+     * Finds the most specific existing domain that a record's hostname belongs under,
+     * given the domain it currently lives in. A candidate domain C qualifies when its
+     * name is C = "<labelChain>.<source domain name>" and the record's hostname ends
+     * with (or exactly equals) that label chain. When more than one candidate matches
+     * (nested domains both exist), the one with the longest label chain wins.
+     *
+     * Returns [Domain $targetDomain, string $newHostname] or null if no domain matches.
+     */
+    private function deepestMatchingChild(string $hostname, Domain $source, array $byLowerName): ?array
+    {
+        if ($hostname === '' || $hostname === '@') {
+            return null;
+        }
+
+        $hostLabels = array_map('strtolower', explode('.', rtrim($hostname, '.')));
+        $suffix     = '.' . strtolower($source->getName());
+
+        $bestDomain = null;
+        $bestChainLabelCount = 0;
+
+        foreach ($byLowerName as $nameLower => $candidate) {
+            if ($candidate === $source || !str_ends_with($nameLower, $suffix)) {
+                continue;
+            }
+
+            $chain = substr($nameLower, 0, -strlen($suffix));
+            if ($chain === '') {
+                continue;
+            }
+
+            $chainLabels = explode('.', $chain);
+            $n = count($chainLabels);
+            if (count($hostLabels) < $n || array_slice($hostLabels, -$n) !== $chainLabels) {
+                continue;
+            }
+
+            if ($bestDomain === null || $n > $bestChainLabelCount) {
+                $bestDomain = $candidate;
+                $bestChainLabelCount = $n;
+            }
+        }
+
+        if ($bestDomain === null) {
+            return null;
+        }
+
+        $originalLabels = explode('.', rtrim($hostname, '.'));
+        $remaining      = array_slice($originalLabels, 0, count($originalLabels) - $bestChainLabelCount);
+        $newHostname    = empty($remaining) ? '@' : implode('.', $remaining);
+
+        return [$bestDomain, $newHostname];
+    }
+
+    /**
+     * Resolves an NS record's value to an absolute, lowercased FQDN (no trailing dot),
+     * treating a trailing-dot value as already absolute and any other value as relative
+     * to $domain — matching BIND's own $ORIGIN-relative semantics for zone file names.
+     */
+    private function normalizeNsTarget(string $value, Domain $domain): string
+    {
+        $value = trim($value);
+        $zone   = rtrim($domain->getName(), '.');
+
+        if ($value === '' || $value === '@') {
+            return strtolower($zone);
+        }
+        if (str_ends_with($value, '.')) {
+            return strtolower(rtrim($value, '.'));
+        }
+        return strtolower($value . '.' . $zone);
+    }
+
+    private function computeViewWarning(DomainRecord $record, Domain $targetDomain): ?string
+    {
+        $iface = $record->getNetworkInterface();
+        if ($iface === null || !in_array($record->getType(), [RecordType::A, RecordType::AAAA], true)) {
+            return null;
+        }
+
+        $allowedIds = array_map(
+            fn($v) => $v->getId(),
+            $this->viewResolver->availableViewsFor($targetDomain, $iface->getSubnet()),
+        );
+
+        $dropped = array_filter(
+            $record->getViews()->toArray(),
+            fn($v) => !in_array($v->getId(), $allowedIds, true),
+        );
+
+        if (empty($dropped)) {
+            return null;
+        }
+
+        $names = array_map(fn($v) => $v->getName(), $dropped);
+        return sprintf(
+            'View%s %s not available on the target domain and will be removed',
+            count($names) !== 1 ? 's' : '',
+            implode(', ', $names),
+        );
+    }
 
     private function fetchCnameTargetRows(?int $cnameId = null): array
     {

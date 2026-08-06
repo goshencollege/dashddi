@@ -14,6 +14,7 @@
     <span id="csrf-dhcp-mismatch-tag">{{ csrf_token('dhcp_mismatch_tag') }}</span>
     <span id="csrf-dhcp-mismatch-move">{{ csrf_token('dhcp_mismatch_move') }}</span>
     <span id="csrf-expire-stale-api-tokens">{{ csrf_token('expire_stale_api_tokens') }}</span>
+    <span id="csrf-reparent-dns">{{ csrf_token('reparent_dns_bulk') }}</span>
 </div>
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1 class="h3 mb-0"><i class="bi bi-lightbulb me-2"></i>Recommendations</h1>
@@ -566,6 +567,85 @@
 </div>
 {% endif %}
 
+{# ── Reparent DNS Records ─────────────────────────────────────────────────── #}
+{% if reparentable_dns is empty %}
+<div class="card mb-2 border-success-subtle" id="reparent-dns-card">
+    <div class="card-header bg-success-subtle text-success-emphasis d-flex justify-content-between align-items-center py-2">
+        <span><i class="bi bi-signpost-split me-1"></i><strong>Reparent DNS Records</strong></span>
+        <small><i class="bi bi-check-circle me-1"></i>None found</small>
+    </div>
+</div>
+{% else %}
+<div class="card mb-4" id="reparent-dns-card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>
+            <i class="bi bi-signpost-split me-1"></i>
+            <strong>Reparent DNS Records</strong>
+            <span class="badge bg-secondary ms-2">{{ reparentable_dns|length }}</span>
+        </span>
+    </div>
+    <div class="card-body pb-0">
+        <p class="text-muted small mb-3">
+            These records live in a domain purely by naming convention, but a more specific domain
+            already exists in DashDDI to hold them. Moving a record rewrites its hostname to be
+            relative to the more specific domain — the resulting FQDN does not change.
+            {% if reparent_excluded_count > 0 %}
+                {{ reparent_excluded_count }} additional record{{ reparent_excluded_count != 1 ? 's' : '' }}
+                matched by name but {{ reparent_excluded_count != 1 ? 'were' : 'was' }} left in place because
+                {{ reparent_excluded_count != 1 ? 'they are' : 'it is' }} an NS delegation record or its glue
+                A/AAAA counterpart — moving those would break the delegation.
+            {% endif %}
+        </p>
+    </div>
+    <form method="post" action="{{ path('recommendation_apply_reparent_dns') }}" id="reparent-dns-form">
+        <input type="hidden" name="_token" value="{{ csrf_token('reparent_dns_bulk') }}">
+        <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom border-top">
+            <div class="form-check mb-0">
+                <input class="form-check-input" type="checkbox" id="select-all-reparent">
+                <label class="form-check-label small text-muted" for="select-all-reparent">Select all</label>
+            </div>
+            <button type="submit" class="btn btn-sm btn-success" id="reparent-apply-btn" disabled
+                    onclick="return confirm('Reparent ' + document.getElementById('reparent-selected-count').textContent + ' DNS record(s) to their more specific domain?')">
+                <i class="bi bi-signpost-split me-1"></i>
+                Implement Selected (<span id="reparent-selected-count">0</span>)
+            </button>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th style="width: 2.25rem"></th>
+                        <th>Type</th>
+                        <th>Current Location</th>
+                        <th>New Location</th>
+                        <th>Notes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in reparentable_dns %}
+                    <tr>
+                        <td><input class="form-check-input reparent-checkbox" type="checkbox" name="ids[]" value="{{ row.record_id }}"></td>
+                        <td><span class="badge bg-primary-subtle text-primary-emphasis">{{ row.record_type }}</span></td>
+                        <td class="font-monospace">
+                            {% if row.hostname != '@' %}{{ row.hostname }}.{% endif %}<a href="{{ path('domain_show', {id: row.source_domain_id}) }}">{{ row.source_domain_name }}</a>
+                        </td>
+                        <td class="font-monospace">
+                            {% if row.new_hostname != '@' %}{{ row.new_hostname }}.{% endif %}<a href="{{ path('domain_show', {id: row.target_domain_id}) }}">{{ row.target_domain_name }}</a>
+                        </td>
+                        <td>
+                            {% if row.view_warning %}
+                                <span class="badge bg-warning-subtle text-warning-emphasis">{{ row.view_warning }}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </form>
+</div>
+{% endif %}
+
 </div>
 
 <script>
@@ -620,6 +700,7 @@ initCheckboxGroup('select-all-orphaned-cname', 'orphaned-cname-checkbox', 'orpha
 initCheckboxGroup('select-all-dualstack',    'dualstack-checkbox',    'dualstack-apply-btn',     'dualstack-selected-count');
 initCheckboxGroup('select-all-missingviews', 'missingviews-checkbox', 'missingviews-apply-btn',  'missingviews-selected-count');
 initCheckboxGroup('select-all-stale-tokens', 'stale-token-checkbox',  'stale-tokens-apply-btn',  'stale-tokens-count');
+initCheckboxGroup('select-all-reparent',     'reparent-checkbox',     'reparent-apply-btn',      'reparent-selected-count');
 
 // DHCP mismatch card — two apply buttons, single count span
 (function () {

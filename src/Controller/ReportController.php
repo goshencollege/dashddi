@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\ApiToken;
 use App\Entity\DnsView;
+use App\Entity\Domain;
 use App\Entity\DomainRecord;
 use App\Entity\NetworkInterface;
 use App\Entity\Tag;
@@ -11,6 +12,7 @@ use App\Entity\VirtualIp;
 use App\Enum\RecordType;
 use App\Service\DnsViewResolver;
 use App\Repository\DhcpLeaseRepository;
+use App\Repository\DomainRepository;
 use App\Service\IpAddressManager;
 use App\Service\RecommendationService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -55,6 +57,8 @@ class ReportController extends AbstractController
             'missing_views'       => $service->findRecordsWithMissingViews(),
             'dhcp_mismatches'     => $service->findDhcpSubnetMismatches(),
             'stale_api_tokens'    => $service->findStaleApiTokens(),
+            'reparentable_dns'    => $service->findReparentableDnsRecords(),
+            'reparent_excluded_count' => $service->countExcludedReparentRecords(),
         ]);
     }
 
@@ -526,6 +530,62 @@ class ReportController extends AbstractController
 
         if ($expired > 0) {
             $this->addFlash('success', sprintf('%d API token%s expired.', $expired, $expired !== 1 ? 's' : ''));
+        }
+
+        return $this->redirectToRoute('recommendation_index');
+    }
+
+    #[Route('/recommendations/apply/reparent-dns', name: 'recommendation_apply_reparent_dns', methods: ['POST'])]
+    public function applyReparentDns(
+        Request $request,
+        EntityManagerInterface $em,
+        RecommendationService $service,
+        DomainRepository $domainRepo,
+    ): Response {
+        if (!$this->isCsrfTokenValid('reparent_dns_bulk', $request->request->get('_token'))) {
+            $this->addFlash('danger', 'Invalid CSRF token.');
+            return $this->redirectToRoute('recommendation_index');
+        }
+
+        $ids = array_filter(array_map('intval', (array) $request->request->all('ids')));
+        if (empty($ids)) {
+            $this->addFlash('warning', 'No records selected.');
+            return $this->redirectToRoute('recommendation_index');
+        }
+
+        // Re-derive current candidates rather than trusting the posted state — a record
+        // may have been moved or a domain deleted since the page was rendered.
+        $candidatesById = [];
+        foreach ($service->findReparentableDnsRecords() as $row) {
+            $candidatesById[$row['record_id']] = $row;
+        }
+
+        $moved   = 0;
+        $skipped = 0;
+
+        foreach ($ids as $id) {
+            $candidate = $candidatesById[$id] ?? null;
+            $record    = $candidate !== null ? $em->find(DomainRecord::class, $id) : null;
+            $target    = $candidate !== null ? $domainRepo->find($candidate['target_domain_id']) : null;
+
+            if ($record === null || $target === null) {
+                $skipped++;
+                continue;
+            }
+
+            $service->narrowViewsForDomain($record, $target);
+            $record->setDomain($target);
+            $record->setHostname($candidate['new_hostname']);
+            $moved++;
+        }
+
+        $em->flush();
+
+        if ($moved > 0) {
+            $this->addFlash('success', sprintf('%d DNS record%s reparented to a more specific domain.', $moved, $moved !== 1 ? 's' : ''));
+        }
+        if ($skipped > 0) {
+            $this->addFlash('warning', sprintf('%d record%s skipped (no longer applicable).', $skipped, $skipped !== 1 ? 's' : ''));
         }
 
         return $this->redirectToRoute('recommendation_index');

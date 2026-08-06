@@ -12,6 +12,7 @@ use App\Repository\DomainAliasRepository;
 use App\Repository\DomainRecordRepository;
 use App\Repository\DomainRepository;
 use App\Service\KskRolloverService;
+use App\Service\RecommendationService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -33,7 +34,7 @@ class DomainController extends AbstractController
     }
 
     #[Route('/new', name: 'domain_new', methods: ['GET', 'POST'])]
-    public function new(Request $request, EntityManagerInterface $em): Response
+    public function new(Request $request, EntityManagerInterface $em, RecommendationService $recommendationService): Response
     {
         $domain = new Domain();
         $form   = $this->createForm(DomainType::class, $domain);
@@ -43,6 +44,21 @@ class DomainController extends AbstractController
             $em->persist($domain);
             $em->flush();
             $this->addFlash('success', 'Domain "' . $domain->getName() . '" created.');
+
+            $claimable = array_filter(
+                $recommendationService->findReparentableDnsRecords(),
+                fn($row) => $row['target_domain_id'] === $domain->getId(),
+            );
+            if (!empty($claimable)) {
+                $this->addFlash('info', sprintf(
+                    '%d existing DNS record%s can be reparented into "%s" — see Reparent DNS Records below.',
+                    count($claimable),
+                    count($claimable) !== 1 ? 's' : '',
+                    $domain->getName(),
+                ));
+                return $this->redirectToRoute('recommendation_index', ['_fragment' => 'reparent-dns-card']);
+            }
+
             return $this->redirectToRoute('domain_show', ['id' => $domain->getId()]);
         }
 
