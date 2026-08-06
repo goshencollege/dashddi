@@ -3,9 +3,15 @@
 namespace App\Tests\Functional\Controller;
 
 use App\Entity\ApiToken;
+use App\Entity\DnsView;
+use App\Entity\Domain;
+use App\Entity\DomainRecord;
 use App\Entity\Host;
+use App\Entity\IpAddress;
+use App\Entity\Ipv6Address;
 use App\Entity\NetworkInterface;
 use App\Entity\Subnet;
+use App\Enum\RecordType;
 use App\Tests\Functional\AppWebTestCase;
 
 class HostControllerTest extends AppWebTestCase
@@ -223,5 +229,222 @@ class HostControllerTest extends AppWebTestCase
         $this->client->request('GET', '/hosts?' . http_build_query(['q' => 'dhcp_mismatch:1']));
         $this->assertResponseIsSuccessful();
         $this->assertStringNotContainsString('no-dhcp-host', $this->client->getResponse()->getContent());
+    }
+
+    // -------------------------------------------------------------------------
+    // Bulk create interface DNS records
+    // -------------------------------------------------------------------------
+
+    private function makeInterfaceWithIps(
+        Host $host,
+        Subnet $subnet,
+        string $mac,
+        ?string $name,
+        ?string $ipv4 = null,
+        ?string $ipv6 = null,
+    ): NetworkInterface {
+        $iface = (new NetworkInterface())
+            ->setHost($host)
+            ->setSubnet($subnet)
+            ->setMacAddress($mac)
+            ->setName($name);
+        if ($ipv4 !== null) {
+            $ip = (new IpAddress())->setAddress($ipv4)->setSubnet($subnet);
+            $this->em->persist($ip);
+            $iface->setIpAddress($ip);
+        }
+        if ($ipv6 !== null) {
+            $ip6 = (new Ipv6Address())->setAddress($ipv6)->setSubnet($subnet);
+            $this->em->persist($ip6);
+            $iface->setIpv6Address($ip6);
+        }
+        $this->em->persist($iface);
+        return $iface;
+    }
+
+    public function testCreateInterfaceDnsRecordsCreatesAAndAaaaForNamedInterfaces(): void
+    {
+        $subnet = (new Subnet())->setName('bulk-dns-subnet')->setIpv4Cidr('10.5.0.0/24');
+        $this->em->persist($subnet);
+        $domain = (new Domain())->setName('bulk-dns.test');
+        $this->em->persist($domain);
+        $host = (new Host())->setName('switch1');
+        $this->em->persist($host);
+
+        $dualStack = $this->makeInterfaceWithIps($host, $subnet, 'aa:bb:cc:dd:ee:01', 'eth0', '10.5.0.10', '2001:db8::10');
+        $ipv4Only  = $this->makeInterfaceWithIps($host, $subnet, 'aa:bb:cc:dd:ee:02', 'eth1', '10.5.0.11');
+        $unnamed   = $this->makeInterfaceWithIps($host, $subnet, 'aa:bb:cc:dd:ee:03', null, '10.5.0.12');
+        $invalid   = $this->makeInterfaceWithIps($host, $subnet, 'aa:bb:cc:dd:ee:04', 'Gi1/0/24', '10.5.0.13');
+        $deleted   = $this->makeInterfaceWithIps($host, $subnet, 'aa:bb:cc:dd:ee:05', 'eth2', '10.5.0.14');
+        $deleted->softDelete();
+        $this->em->flush();
+
+        $hostId   = $host->getId();
+        $domainId = $domain->getId();
+        $ids      = [
+            'dualStack' => $dualStack->getId(),
+            'ipv4Only'  => $ipv4Only->getId(),
+            'unnamed'   => $unnamed->getId(),
+            'invalid'   => $invalid->getId(),
+            'deleted'   => $deleted->getId(),
+        ];
+        $this->em->clear(); // evict identity map so Host::interfaces lazy-loads fresh from the DB
+
+        $crawler = $this->client->request('GET', "/hosts/{$hostId}");
+        $this->client->submit(
+            $crawler->filter('form[action="/hosts/' . $hostId . '/create-interface-dns-records"]')->form(),
+            ['domain_id' => $domainId],
+        );
+        $this->assertResponseRedirects('/hosts/' . $hostId);
+
+        $this->em->clear();
+        $recordRepo = $this->em->getRepository(DomainRecord::class);
+
+        $dualStackRecords = $recordRepo->findBy(['networkInterface' => $ids['dualStack']]);
+        $this->assertCount(2, $dualStackRecords);
+        $types = array_map(fn($r) => $r->getType(), $dualStackRecords);
+        $this->assertContains(RecordType::A, $types);
+        $this->assertContains(RecordType::AAAA, $types);
+        foreach ($dualStackRecords as $r) {
+            $this->assertSame('eth0.switch1', $r->getHostname());
+            $this->assertTrue($r->isCanonical(), 'First record of each type for an interface should be canonical');
+        }
+
+        $ipv4OnlyRecords = $recordRepo->findBy(['networkInterface' => $ids['ipv4Only']]);
+        $this->assertCount(1, $ipv4OnlyRecords);
+        $this->assertSame(RecordType::A, $ipv4OnlyRecords[0]->getType());
+        $this->assertSame('eth1.switch1', $ipv4OnlyRecords[0]->getHostname());
+
+        $this->assertCount(0, $recordRepo->findBy(['networkInterface' => $ids['unnamed']]));
+        $this->assertCount(0, $recordRepo->findBy(['networkInterface' => $ids['invalid']]));
+        $this->assertCount(0, $recordRepo->findBy(['networkInterface' => $ids['deleted']]));
+    }
+
+    public function testCreateInterfaceDnsRecordsSkipsHostWithInvalidName(): void
+    {
+        $subnet = (new Subnet())->setName('bad-host-subnet')->setIpv4Cidr('10.6.0.0/24');
+        $this->em->persist($subnet);
+        $domain = (new Domain())->setName('bad-host-dns.test');
+        $this->em->persist($domain);
+        $host = (new Host())->setName('switch one'); // space is not a valid DNS label character
+        $this->em->persist($host);
+        $iface = $this->makeInterfaceWithIps($host, $subnet, 'bb:cc:dd:ee:ff:01', 'eth0', '10.6.0.10');
+        $this->em->flush();
+
+        $hostId = $host->getId();
+        $ifaceId = $iface->getId();
+        $domainId = $domain->getId();
+        $this->em->clear();
+
+        $crawler = $this->client->request('GET', "/hosts/{$hostId}");
+        $this->client->submit(
+            $crawler->filter('form[action="/hosts/' . $hostId . '/create-interface-dns-records"]')->form(),
+            ['domain_id' => $domainId],
+        );
+        $this->assertResponseRedirects('/hosts/' . $hostId);
+
+        $this->em->clear();
+        $recordRepo = $this->em->getRepository(DomainRecord::class);
+        $this->assertCount(0, $recordRepo->findBy(['networkInterface' => $ifaceId]));
+    }
+
+    public function testCreateInterfaceDnsRecordsIsIdempotentOnRepeatSubmit(): void
+    {
+        $subnet = (new Subnet())->setName('idem-dns-subnet')->setIpv4Cidr('10.7.0.0/24');
+        $this->em->persist($subnet);
+        $domain = (new Domain())->setName('idem-dns.test');
+        $this->em->persist($domain);
+        $host = (new Host())->setName('switch2');
+        $this->em->persist($host);
+        $iface = $this->makeInterfaceWithIps($host, $subnet, 'cc:dd:ee:ff:00:01', 'eth0', '10.7.0.10', '2001:db8::20');
+        $this->em->flush();
+
+        $hostId   = $host->getId();
+        $ifaceId  = $iface->getId();
+        $domainId = $domain->getId();
+        $this->em->clear();
+
+        $formAction = '/hosts/' . $hostId . '/create-interface-dns-records';
+
+        $crawler = $this->client->request('GET', "/hosts/{$hostId}");
+        $this->client->submit(
+            $crawler->filter('form[action="' . $formAction . '"]')->form(),
+            ['domain_id' => $domainId],
+        );
+        $this->assertResponseRedirects('/hosts/' . $hostId);
+
+        $this->em->clear();
+        $crawler = $this->client->request('GET', "/hosts/{$hostId}");
+        $this->client->submit(
+            $crawler->filter('form[action="' . $formAction . '"]')->form(),
+            ['domain_id' => $domainId],
+        );
+        $this->assertResponseRedirects('/hosts/' . $hostId);
+
+        $this->em->clear();
+        $recordRepo = $this->em->getRepository(DomainRecord::class);
+        $this->assertCount(2, $recordRepo->findBy(['networkInterface' => $ifaceId]), 'Repeat submission must not create duplicate records');
+    }
+
+    public function testCreateInterfaceDnsRecordsRejectsInvalidCsrfToken(): void
+    {
+        $subnet = (new Subnet())->setName('csrf-dns-subnet')->setIpv4Cidr('10.8.0.0/24');
+        $this->em->persist($subnet);
+        $domain = (new Domain())->setName('csrf-dns.test');
+        $this->em->persist($domain);
+        $host = (new Host())->setName('switch3');
+        $this->em->persist($host);
+        $iface = $this->makeInterfaceWithIps($host, $subnet, 'dd:ee:ff:00:11:22', 'eth0', '10.8.0.10');
+        $this->em->flush();
+
+        $hostId   = $host->getId();
+        $ifaceId  = $iface->getId();
+        $domainId = $domain->getId();
+        $this->em->clear(); // evict identity map so Host::interfaces lazy-loads fresh from the DB
+
+        $crawler = $this->client->request('GET', "/hosts/{$hostId}");
+        $form = $crawler->filter('form[action="/hosts/' . $hostId . '/create-interface-dns-records"]')->form();
+        $form['domain_id'] = $domainId;
+        $form['_token']    = 'not-a-valid-token';
+        $this->client->submit($form);
+        $this->assertResponseRedirects('/hosts/' . $hostId);
+
+        $this->em->clear();
+        $recordRepo = $this->em->getRepository(DomainRecord::class);
+        $this->assertCount(0, $recordRepo->findBy(['networkInterface' => $ifaceId]));
+    }
+
+    public function testCreateInterfaceDnsRecordsAutoAssignsAvailableViews(): void
+    {
+        $view = (new DnsView())->setName('bulk-dns-view');
+        $this->em->persist($view);
+        $subnet = (new Subnet())->setName('view-dns-subnet')->setIpv4Cidr('10.9.0.0/24');
+        $subnet->addView($view);
+        $this->em->persist($subnet);
+        $domain = (new Domain())->setName('view-dns.test');
+        $domain->addView($view);
+        $this->em->persist($domain);
+        $host = (new Host())->setName('switch4');
+        $this->em->persist($host);
+        $iface = $this->makeInterfaceWithIps($host, $subnet, 'ee:ff:00:11:22:33', 'eth0', '10.9.0.10');
+        $this->em->flush();
+
+        $hostId   = $host->getId();
+        $ifaceId  = $iface->getId();
+        $domainId = $domain->getId();
+        $this->em->clear();
+
+        $crawler = $this->client->request('GET', "/hosts/{$hostId}");
+        $this->client->submit(
+            $crawler->filter('form[action="/hosts/' . $hostId . '/create-interface-dns-records"]')->form(),
+            ['domain_id' => $domainId],
+        );
+        $this->assertResponseRedirects('/hosts/' . $hostId);
+
+        $this->em->clear();
+        $record = $this->em->getRepository(DomainRecord::class)->findOneBy(['networkInterface' => $ifaceId]);
+        $this->assertNotNull($record);
+        $viewNames = $record->getViews()->map(fn($v) => $v->getName())->toArray();
+        $this->assertContains('bulk-dns-view', $viewNames);
     }
 }

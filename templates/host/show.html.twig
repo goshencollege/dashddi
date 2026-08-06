@@ -71,11 +71,39 @@
             {%- if deletedInterfaces|length > 0 %}, <span class="text-warning-emphasis">{{ deletedInterfaces|length }} deleted</span>{% endif %})
         </span>
         {% if not host.deleted %}
-        <a href="{{ path('interface_new', {id: host.id}) }}" class="btn btn-sm btn-primary">
-            <i class="bi bi-plus-lg me-1"></i>Add Interface
-        </a>
+        <span>
+            <a href="{{ path('interface_new', {id: host.id}) }}" class="btn btn-sm btn-primary">
+                <i class="bi bi-plus-lg me-1"></i>Add Interface
+            </a>
+            {% if activeInterfaces|length > 0 %}
+            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#create-interface-dns-records-panel">
+                <i class="bi bi-hdd-network me-1"></i>Create DNS Records
+            </button>
+            {% endif %}
+        </span>
         {% endif %}
     </div>
+    {% if not host.deleted and activeInterfaces|length > 0 %}
+    <div class="collapse" id="create-interface-dns-records-panel">
+        <div class="card-body border-bottom">
+            <p class="text-muted small mb-2">
+                Creates an A and/or AAAA record (whichever addresses are present) for every named interface on this host, in the domain you choose, with hostname <code>&lt;interface name&gt;.{{ host.name }}</code>. Unnamed interfaces, and interfaces whose name isn't a valid DNS label, are skipped.
+            </p>
+            <form method="post" action="{{ path('host_create_interface_dns_records', {id: host.id}) }}" class="d-flex align-items-center gap-2">
+                <input type="hidden" name="_token" value="{{ csrf_token('create_interface_dns_records_' ~ host.id) }}">
+                <select name="domain_id" class="form-select form-select-sm" style="max-width:20rem" required>
+                    <option value="">-- Select a domain --</option>
+                    {% for domain in domains %}
+                        <option value="{{ domain.id }}">{{ domain.name }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-sm btn-primary text-nowrap">
+                    <i class="bi bi-hdd-network me-1"></i>Create Records
+                </button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
     {% if host.interfaces is empty %}
         <div class="card-body text-center text-muted py-4">
             No interfaces yet. <a href="{{ path('interface_new', {id: host.id}) }}">Add one →</a>

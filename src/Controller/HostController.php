@@ -5,13 +5,20 @@ namespace App\Controller;
 use App\Entity\Host;
 use App\Form\HostType;
 use App\Repository\BuildingRepository;
+use App\Repository\DomainRecordRepository;
+use App\Repository\DomainRepository;
 use App\Repository\HostRepository;
 use App\Repository\SubnetRepository;
 use App\Repository\TagRepository;
 use App\Repository\VirtualIpRepository;
 use App\Entity\UserPreference;
 use App\Repository\UserPreferenceRepository;
+use App\Entity\Domain;
+use App\Entity\DomainRecord;
+use App\Entity\NetworkInterface;
 use App\Entity\SshHostKey;
+use App\Enum\RecordType;
+use App\Service\DnsViewResolver;
 use App\Service\IpAddressManager;
 use App\Service\ReservedTagPrefixService;
 use phpseclib3\Crypt\PublicKeyLoader;
@@ -28,6 +35,7 @@ class HostController extends AbstractController
     public function __construct(
         private readonly IpAddressManager $ipManager,
         private readonly ReservedTagPrefixService $reservedPrefixes,
+        private readonly DomainRepository $domainRepo,
     ) {}
 
     private const PER_PAGE = 50;
@@ -421,6 +429,7 @@ class HostController extends AbstractController
         return $this->render('host/show.html.twig', [
             'host'     => $host,
             'newToken' => $newToken,
+            'domains'  => $this->domainRepo->findBy(['excludeFromInterfaces' => false], ['name' => 'ASC']),
         ]);
     }
 
@@ -463,6 +472,151 @@ class HostController extends AbstractController
             $this->addFlash('success', 'Host "' . $host->getName() . '" and its interfaces have been restored.');
         }
         return $this->redirectToRoute('host_show', ['id' => $host->getId()]);
+    }
+
+    #[Route('/{id}/create-interface-dns-records', name: 'host_create_interface_dns_records', methods: ['POST'], requirements: ['id' => '\d+'])]
+    public function createInterfaceDnsRecords(
+        Request $request,
+        Host $host,
+        EntityManagerInterface $em,
+        DomainRecordRepository $recordRepo,
+        DnsViewResolver $viewResolver,
+    ): Response {
+        if (!$this->isCsrfTokenValid('create_interface_dns_records_' . $host->getId(), $request->request->get('_token'))) {
+            $this->addFlash('danger', 'Invalid CSRF token.');
+            return $this->redirectToRoute('host_show', ['id' => $host->getId()]);
+        }
+
+        $domain = $this->domainRepo->find($request->request->getInt('domain_id'));
+        if ($domain === null) {
+            $this->addFlash('warning', 'Select a domain.');
+            return $this->redirectToRoute('host_show', ['id' => $host->getId()]);
+        }
+
+        if (!$this->isValidDnsLabel($host->getName())) {
+            $this->addFlash('danger', 'Host name contains characters not valid in a DNS label; no records were created.');
+            return $this->redirectToRoute('host_show', ['id' => $host->getId()]);
+        }
+
+        $createdA = 0;
+        $createdAaaa = 0;
+        $skippedNoName = 0;
+        $skippedInvalidChars = 0;
+        $skippedNoIp = 0;
+        $skippedExisting = 0;
+
+        foreach ($host->getInterfaces() as $iface) {
+            if ($iface->isDeleted()) {
+                continue;
+            }
+
+            $name = trim((string) $iface->getName());
+            if ($name === '') {
+                $skippedNoName++;
+                continue;
+            }
+            if (!$this->isValidDnsLabel($name)) {
+                $skippedInvalidChars++;
+                continue;
+            }
+
+            $hostname = $name . '.' . $host->getName();
+            $hadIp = false;
+
+            if ($iface->getIpAddress() !== null) {
+                $hadIp = true;
+                if ($this->interfaceHasRecord($iface, $domain, $hostname, RecordType::A)) {
+                    $skippedExisting++;
+                } else {
+                    $record = (new DomainRecord())
+                        ->setNetworkInterface($iface)
+                        ->setDomain($domain)
+                        ->setHostname($hostname)
+                        ->setType(RecordType::A);
+                    if (!$recordRepo->hasAnyForInterface($iface, RecordType::A)) {
+                        $record->setIsCanonical(true);
+                    }
+                    foreach ($viewResolver->availableViewsFor($domain, $iface->getSubnet()) as $view) {
+                        $record->addView($view);
+                    }
+                    $em->persist($record);
+                    $createdA++;
+                }
+            }
+
+            if ($iface->getIpv6Address() !== null) {
+                $hadIp = true;
+                if ($this->interfaceHasRecord($iface, $domain, $hostname, RecordType::AAAA)) {
+                    $skippedExisting++;
+                } else {
+                    $record = (new DomainRecord())
+                        ->setNetworkInterface($iface)
+                        ->setDomain($domain)
+                        ->setHostname($hostname)
+                        ->setType(RecordType::AAAA);
+                    if (!$recordRepo->hasAnyForInterface($iface, RecordType::AAAA)) {
+                        $record->setIsCanonical(true);
+                    }
+                    foreach ($viewResolver->availableViewsFor($domain, $iface->getSubnet()) as $view) {
+                        $record->addView($view);
+                    }
+                    $em->persist($record);
+                    $createdAaaa++;
+                }
+            }
+
+            if (!$hadIp) {
+                $skippedNoIp++;
+            }
+        }
+
+        $em->flush();
+
+        if ($createdA > 0 || $createdAaaa > 0) {
+            $this->addFlash('success', sprintf(
+                'Created %d A and %d AAAA record%s in "%s".',
+                $createdA,
+                $createdAaaa,
+                ($createdA + $createdAaaa) !== 1 ? 's' : '',
+                $domain->getName(),
+            ));
+        }
+        $skipMessages = [];
+        if ($skippedNoName > 0) {
+            $skipMessages[] = sprintf('%d interface%s with no name', $skippedNoName, $skippedNoName !== 1 ? 's' : '');
+        }
+        if ($skippedInvalidChars > 0) {
+            $skipMessages[] = sprintf('%d interface%s with characters not valid in a DNS label', $skippedInvalidChars, $skippedInvalidChars !== 1 ? 's' : '');
+        }
+        if ($skippedNoIp > 0) {
+            $skipMessages[] = sprintf('%d interface%s with no IP address', $skippedNoIp, $skippedNoIp !== 1 ? 's' : '');
+        }
+        if ($skippedExisting > 0) {
+            $skipMessages[] = sprintf('%d record%s already existed', $skippedExisting, $skippedExisting !== 1 ? 's' : '');
+        }
+        if (!empty($skipMessages)) {
+            $this->addFlash('warning', 'Skipped: ' . implode('; ', $skipMessages) . '.');
+        }
+        if ($createdA === 0 && $createdAaaa === 0 && empty($skipMessages)) {
+            $this->addFlash('warning', 'No interfaces to process.');
+        }
+
+        return $this->redirectToRoute('host_show', ['id' => $host->getId()]);
+    }
+
+    private function isValidDnsLabel(string $label): bool
+    {
+        return (bool) preg_match('/^[a-zA-Z0-9_]([a-zA-Z0-9_\-]*[a-zA-Z0-9_])?$/', $label);
+    }
+
+    private function interfaceHasRecord(NetworkInterface $iface, Domain $domain, string $hostname, RecordType $type): bool
+    {
+        foreach ($iface->getDomainRecords() as $record) {
+            if ($record->getDomain() === $domain && $record->getType() === $type && $record->getHostname() === $hostname) {
+                return true;
+            }
+        }
+        return false;
     }
 
     #[Route('/{id}/add-ssh-host-keys', name: 'host_add_ssh_host_keys', methods: ['POST'], requirements: ['id' => '\d+'])]
