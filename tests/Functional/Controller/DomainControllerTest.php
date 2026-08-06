@@ -4,6 +4,8 @@ namespace App\Tests\Functional\Controller;
 
 use App\Entity\DnsView;
 use App\Entity\Domain;
+use App\Entity\DomainRecord;
+use App\Enum\RecordType;
 use App\Tests\Functional\AppWebTestCase;
 
 class DomainControllerTest extends AppWebTestCase
@@ -35,6 +37,39 @@ class DomainControllerTest extends AppWebTestCase
             'domain[name]' => 'functional-create.example.com',
         ]);
         $this->assertResponseRedirects();
+    }
+
+    public function testCreateWithoutMatchingParentRedirectsToShow(): void
+    {
+        $crawler = $this->client->request('GET', '/domains/new');
+        $this->client->submit($crawler->filter('form')->form(), [
+            'domain[name]' => 'no-reparent-match.example.com',
+        ]);
+
+        $domain = $this->em->getRepository(Domain::class)->findOneBy(['name' => 'no-reparent-match.example.com']);
+        $this->assertNotNull($domain);
+        $this->assertResponseRedirects('/domains/' . $domain->getId());
+    }
+
+    public function testCreateWithMatchingParentRecordsRedirectsToRecommendations(): void
+    {
+        $parent = (new Domain())->setName('reparent-trigger.example.com');
+        $this->em->persist($parent);
+        $record = (new DomainRecord())
+            ->setDomain($parent)
+            ->setHostname('host.switches')
+            ->setType(RecordType::A)
+            ->setValue('10.0.0.1');
+        $this->em->persist($record);
+        $this->em->flush();
+        $this->em->clear(); // evict identity map so Domain::records lazy-loads fresh from the DB
+
+        $crawler = $this->client->request('GET', '/domains/new');
+        $this->client->submit($crawler->filter('form')->form(), [
+            'domain[name]' => 'switches.reparent-trigger.example.com',
+        ]);
+
+        $this->assertResponseRedirects('/recommendations#reparent-dns-card');
     }
 
     public function testShowLoads(): void

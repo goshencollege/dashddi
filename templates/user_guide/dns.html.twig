@@ -51,7 +51,8 @@
             <dt class="col-sm-3">Exclude from interface forms</dt>
             <dd class="col-sm-9">When checked, this domain will not appear in the domain selector when adding or editing DNS records from a host interface. Use this for zones that are managed exclusively through manual records — e.g. reverse zones, external zones, or infrastructure zones that should never have interface A/AAAA records assigned to them.</dd>
         </dl>
-        <p class="mb-0">The domain detail page shows all DNS records in the zone in a single unified table. Records linked to a host interface or Virtual IP include a <em>Host</em> column with a link to the host or VIP, and canonical records carry a <span class="badge bg-primary">PTR</span> badge indicating they are used as the reverse DNS name for their IP.</p>
+        <p>The domain detail page shows all DNS records in the zone in a single unified table. Records linked to a host interface or Virtual IP include a <em>Host</em> column with a link to the host or VIP, and canonical records carry a <span class="badge bg-primary">PTR</span> badge indicating they are used as the reverse DNS name for their IP.</p>
+        <p class="mb-0">If creating a domain reveals existing records elsewhere that belong under it by name (e.g. creating <code>switches.example.com</code> when <code>example.com</code> already has records like <code>host.switches</code>), you'll be taken straight to <strong>Reports → Recommendations</strong> to review and claim them — see <a href="{{ path('user_guide_recommendations') }}#reparent-dns-records">Reparent DNS Records</a> in the Recommendations guide.</p>
     </div>
 </div>
 

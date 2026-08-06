@@ -105,6 +105,23 @@
     </div>
 </div>
 
+<div class="card mb-4" id="reparent-dns-records">
+    <div class="card-header fw-semibold"><i class="bi bi-signpost-split me-1"></i>Reparent DNS Records</div>
+    <div class="card-body">
+        <p>Records are sometimes created inside a broad domain following a naming convention that anticipates a more specific domain — for example, a record hostnamed <code>host.switches</code> inside <code>example.com</code>, before a dedicated <code>switches.example.com</code> domain exists. Once that more specific domain is created, DashDDI can detect every record in the broader domain whose hostname belongs under it and offer to move them.</p>
+        <p>A record qualifies when its hostname ends with (or exactly equals) the label(s) that distinguish the more specific domain's name from the broader one. Moving a record only rewrites its hostname to be relative to the new domain — the record's fully-qualified name does not change, so its resolution behavior is unaffected. If more than one matching domain exists at different levels of specificity, the deepest one is used.</p>
+        <h6 class="mt-3">What is deliberately left behind</h6>
+        <p>Two kinds of matching records are always excluded, because BIND requires them to stay physically co-located with the domain that delegates to the more specific zone:</p>
+        <ul>
+            <li><strong>The delegation NS record</strong> — the record in the broader domain whose hostname exactly matches the more specific domain's name is what delegates to it. It must remain in the broader domain's zone file.</li>
+            <li><strong>Glue A/AAAA records</strong> — if a delegation's nameserver target lives inside the more specific domain's own namespace (an "in-bailiwick" nameserver), the address record for that nameserver must also stay in the broader domain. Without it, resolvers could never reach the more specific zone to look the nameserver up in the first place.</li>
+        </ul>
+        <p>The card's description text reports how many additional records were excluded for these reasons, so you can confirm nothing was silently dropped.</p>
+        <p><strong>Remediation:</strong> Select one or more records and click <em>Implement Selected</em>. Each record's domain and hostname are updated in place. If a record is linked to a network interface and currently has views assigned that are not valid for the new domain and subnet combination, those views are dropped — this is called out per-row before you apply.</p>
+        <p class="mb-0 text-muted small"><i class="bi bi-info-circle me-1"></i>Creating a new domain (<strong>DNS → Domains → New</strong>) automatically checks for matching records in a broader existing domain. If any are found, you're taken directly here instead of to the new domain's page.</p>
+    </div>
+</div>
+
 </div>{# /col-lg-9 #}
 
 <div class="col-lg-3 d-none d-lg-block">
@@ -119,6 +136,7 @@
             <a href="#missing-views"      class="list-group-item list-group-item-action py-1">Missing View Assignments</a>
             <a href="#dhcp-mismatches"    class="list-group-item list-group-item-action py-1">DHCP Subnet Mismatches</a>
             <a href="#stale-api-tokens"   class="list-group-item list-group-item-action py-1">Stale API Tokens</a>
+            <a href="#reparent-dns-records" class="list-group-item list-group-item-action py-1">Reparent DNS Records</a>
         </div>
     </div>
 </div>

@@ -435,4 +435,81 @@ class ReportControllerTest extends AppWebTestCase
         $refreshed = $this->em->find(ApiToken::class, $token->getId());
         $this->assertEquals($alreadyExpired->getTimestamp(), $refreshed->getExpiresAt()->getTimestamp(), 'Already-expired token expiry should not be changed');
     }
+
+    // ── reparent-dns ──────────────────────────────────────────────────────────
+
+    public function testReparentDnsMovesMatchingRecordAndRewritesHostname(): void
+    {
+        $parent = $this->makeDomain('goshen-reparent.edu');
+        $child  = $this->makeDomain('switches.goshen-reparent.edu');
+        $record = (new DomainRecord())
+            ->setDomain($parent)
+            ->setHostname('1-1-1.cx-core-un.switches')
+            ->setType(RecordType::A)
+            ->setValue('10.0.0.1');
+        $this->em->persist($record);
+        $this->em->flush();
+        $recordId = $record->getId();
+        $childId  = $child->getId();
+        $this->em->clear(); // evict identity map so Domain::records lazy-loads fresh from the DB
+
+        $crawler = $this->getRecommendationsPage();
+        $token   = $this->extractToken($crawler, 'csrf-reparent-dns');
+
+        $this->client->request('POST', '/recommendations/apply/reparent-dns', [
+            '_token' => $token,
+            'ids'    => [$recordId],
+        ]);
+        $this->assertResponseRedirects('/recommendations');
+
+        $this->em->clear();
+        $refreshed = $this->em->find(DomainRecord::class, $recordId);
+        $this->assertSame($childId, $refreshed->getDomain()->getId());
+        $this->assertSame('1-1-1.cx-core-un', $refreshed->getHostname());
+    }
+
+    public function testReparentDnsLeavesDelegationAndGlueRecordsUntouched(): void
+    {
+        $parent = $this->makeDomain('goshen-glue.edu');
+        $child  = $this->makeDomain('switches.goshen-glue.edu');
+
+        $nsRecord = (new DomainRecord())
+            ->setDomain($parent)
+            ->setHostname('switches')
+            ->setType(RecordType::NS)
+            ->setValue('ns1.switches.goshen-glue.edu.');
+        $this->em->persist($nsRecord);
+
+        $glueRecord = (new DomainRecord())
+            ->setDomain($parent)
+            ->setHostname('ns1.switches')
+            ->setType(RecordType::A)
+            ->setValue('10.0.0.1');
+        $this->em->persist($glueRecord);
+        $this->em->flush();
+        $nsRecordId   = $nsRecord->getId();
+        $glueRecordId = $glueRecord->getId();
+        $parentId     = $parent->getId();
+        $this->em->clear(); // evict identity map so Domain::records lazy-loads fresh from the DB
+
+        $service = static::getContainer()->get(RecommendationService::class);
+        $rows    = $service->findReparentableDnsRecords();
+        $ids     = array_column($rows, 'record_id');
+        $this->assertNotContains($nsRecordId, $ids, 'Delegation NS record must not be offered for reparenting');
+        $this->assertNotContains($glueRecordId, $ids, 'Glue A record must not be offered for reparenting');
+
+        $crawler = $this->getRecommendationsPage();
+        $token   = $this->extractToken($crawler, 'csrf-reparent-dns');
+
+        // Attempt to move them anyway via a crafted request — must be skipped, not applied.
+        $this->client->request('POST', '/recommendations/apply/reparent-dns', [
+            '_token' => $token,
+            'ids'    => [$nsRecordId, $glueRecordId],
+        ]);
+        $this->assertResponseRedirects('/recommendations');
+
+        $this->em->clear();
+        $this->assertSame($parentId, $this->em->find(DomainRecord::class, $nsRecordId)->getDomain()->getId());
+        $this->assertSame($parentId, $this->em->find(DomainRecord::class, $glueRecordId)->getDomain()->getId());
+    }
 }
