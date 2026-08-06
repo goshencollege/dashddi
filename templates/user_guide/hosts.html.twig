@@ -193,6 +193,10 @@
         </ul>
         <p class="text-muted small mb-0">Records with the <span class="badge bg-primary">PTR</span> badge are canonical and appear in reverse DNS zones. All interface-linked records appear in the domain's unified record list with a <em>Host</em> column showing the host name.</p>
         <p class="text-muted small mb-0 mt-2">In the <strong>host list</strong>, the DNS Names column shows a type badge before each hostname: <span class="badge text-bg-info">A</span> for IPv4-only, <span class="badge text-bg-success">AAAA</span> for IPv6-only, or <span class="badge text-bg-secondary">A+AAAA</span> when both an A and AAAA record exist for the same hostname — in which case the pair is shown as a single line.</p>
+
+        <h6 class="mt-4">Create DNS Records for All Interfaces</h6>
+        <p>Useful for devices with many interfaces (e.g. switches): click <strong>Create DNS Records</strong> in the Interfaces card header, choose a domain, and DashDDI creates an A record (if the interface has an IPv4 address) and/or an AAAA record (if it has an IPv6 address) for every interface, linked to that interface, with hostname <code>&lt;interface name&gt;.&lt;host name&gt;</code>.</p>
+        <p class="mb-0">Interfaces are skipped — without creating anything — when they have no name, when their name (or the host's own name) contains characters that aren't valid in a DNS label, when they have neither an IPv4 nor IPv6 address, or when a matching record already exists (so running this again after adding new interfaces is safe and won't create duplicates).</p>
     </div>
 </div>
 
