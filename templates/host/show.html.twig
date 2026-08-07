@@ -1,6 +1,14 @@
 {% extends 'base.html.twig' %}
 {% block title %}{{ host.name }}{% endblock %}
 
+{% block stylesheets %}
+<style>
+.host-interfaces-table { --vip-row-bg: rgba(0,0,0,.05); }
+[data-bs-theme="dark"] .host-interfaces-table { --vip-row-bg: rgba(255,255,255,.05); }
+.host-interfaces-table .vip-row { --bs-table-bg: var(--vip-row-bg); }
+</style>
+{% endblock %}
+
 {% block content %}
 <nav aria-label="breadcrumb" class="mb-3">
     <ol class="breadcrumb">
@@ -110,7 +118,7 @@
         </div>
     {% else %}
         <div class="table-responsive">
-            <table class="table table-hover mb-0">
+            <table class="table table-hover mb-0 host-interfaces-table">
                 <thead>
                     <tr>
                         <th>Interface</th>
@@ -225,6 +233,63 @@
                                 {% endif %}
                             </td>
                         </tr>
+                        {% for vip in vip_map[iface.id] ?? [] %}
+                            <tr class="vip-row">
+                                <td class="small">
+                                    <i class="bi bi-layers text-muted me-1"></i>
+                                    <a href="{{ path('virtual_ip_show', {id: vip.id, from: 'interface', interfaceId: iface.id}) }}" class="text-decoration-none">{{ vip.label }}</a>
+                                    <div>
+                                        <span class="badge bg-secondary">{{ vip.protocol.label() }}</span>
+                                        {% if vip.vrid %}<span class="text-muted small ms-1">VRID&nbsp;{{ vip.vrid }}</span>{% endif %}
+                                    </div>
+                                </td>
+                                <td>{{ vip.subnet ? vip.subnet.name : '—' }}</td>
+                                <td class="ip-address">{{ vip.ipAddress ? vip.ipAddress.address : '—' }}</td>
+                                <td class="ip-address small">{{ vip.ipv6Address ? vip.ipv6Address.address : '—' }}</td>
+                                <td class="font-monospace">
+                                    {% set fqdn_types = {} %}
+                                    {% for record in vip.domainRecords %}
+                                        {% if record.domain and record.type.value in ['A', 'AAAA'] %}
+                                            {% set fqdn = record.fullyQualifiedHostname %}
+                                            {% set t = record.type.value %}
+                                            {% if fqdn_types[fqdn] is defined %}
+                                                {% set fqdn_types = fqdn_types|merge({(fqdn): fqdn_types[fqdn]|merge([t])}) %}
+                                            {% else %}
+                                                {% set fqdn_types = fqdn_types|merge({(fqdn): [t]}) %}
+                                            {% endif %}
+                                        {% endif %}
+                                    {% endfor %}
+                                    {% if fqdn_types is empty %}
+                                        <span class="text-muted">—</span>
+                                    {% else %}
+                                        {% for fqdn, types in fqdn_types %}
+                                            {% set has_a    = 'A'    in types %}
+                                            {% set has_aaaa = 'AAAA' in types %}
+                                            <div class="d-flex align-items-center" style="max-width:14rem">
+                                                {% if has_a and has_aaaa %}
+                                                    <span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle flex-shrink-0" style="border-radius:0.375rem 0 0 0.375rem;border-right-width:0">A</span><span class="badge bg-info-subtle text-info-emphasis border border-info-subtle flex-shrink-0 me-1" style="border-radius:0 0.375rem 0.375rem 0;border-left-width:0">AAAA</span>
+                                                {% elseif has_a %}
+                                                    <span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle flex-shrink-0 me-1">A</span>
+                                                {% elseif has_aaaa %}
+                                                    <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle flex-shrink-0 me-1">AAAA</span>
+                                                {% endif %}
+                                                <span class="text-truncate" style="min-width:0" title="{{ fqdn }}">{{ fqdn }}</span>
+                                            </div>
+                                        {% endfor %}
+                                    {% endif %}
+                                </td>
+                                <td class="text-muted small">—</td>
+                                <td class="text-muted small">
+                                    {{ vip.updatedAt|date('Y-m-d H:i') }}
+                                    {% if vip.updatedBy %}<br>{{ vip.updatedBy }}{% endif %}
+                                </td>
+                                <td class="text-end">
+                                    <a href="{{ path('virtual_ip_edit', {id: vip.id, from: 'interface', interfaceId: iface.id}) }}" class="btn btn-sm btn-outline-secondary">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                        {% endfor %}
                     {% endfor %}
                 </tbody>
             </table>
