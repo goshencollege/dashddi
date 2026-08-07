@@ -583,9 +583,11 @@ class RecommendationService
      * also exists). Moving a record rewrites its hostname to be relative to the more
      * specific domain while preserving its resulting FQDN.
      *
-     * Deliberately excludes two categories of record that must stay put even though
-     * they match by name, since BIND needs them co-located with the delegating zone:
+     * Deliberately excludes categories of record that must stay put even though
+     * they match by name, since BIND/DNSSEC need them co-located with the
+     * delegating zone:
      *   - the NS record that itself delegates to the more specific domain
+     *   - the DS record (DNSSEC delegation signer) at that same delegation point
      *   - any A/AAAA record referenced as the target of an NS record in the same
      *     source domain (glue for that domain's own delegations)
      * See countExcludedReparentRecords() for a count of what was excluded and why.
@@ -601,7 +603,7 @@ class RecommendationService
 
     /**
      * Number of records left in place by findReparentableDnsRecords() because they
-     * are NS delegation records or their glue A/AAAA counterparts.
+     * are NS/DS delegation records or their glue A/AAAA counterparts.
      */
     public function countExcludedReparentRecords(): int
     {
@@ -670,7 +672,7 @@ class RecommendationService
                 }
                 [$targetDomain, $newHostname] = $match;
 
-                if ($record->getType() === RecordType::NS && $newHostname === '@') {
+                if (in_array($record->getType(), [RecordType::NS, RecordType::DS], true) && $newHostname === '@') {
                     $excludedCount++;
                     continue;
                 }
