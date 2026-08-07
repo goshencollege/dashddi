@@ -25,7 +25,7 @@
         <ul class="mt-2 mb-0">
             <li><strong>Host</strong> → name, location (building + room), tags, notes</li>
             <li><strong>Network Interface</strong> → MAC address, subnet assignment, IPv4/IPv6 addresses, DNS names</li>
-            <li><strong>Virtual IP</strong> → floating IP address shared by member interfaces for VRRP/HSRP/Active-Gateway failover groups</li>
+            <li><strong>Virtual IP</strong> → floating IP address shared by member interfaces for VRRP/HSRP/Active-Gateway/Anycast failover groups</li>
         </ul>
     </div>
 </div>
@@ -290,15 +290,15 @@
 
 {# Virtual IPs #}
 <div class="card mb-4" id="virtual-ips">
-    <div class="card-header fw-semibold"><i class="bi bi-layers me-1"></i>Virtual IPs (VRRP / HSRP / Active-Gateway)</div>
+    <div class="card-header fw-semibold"><i class="bi bi-layers me-1"></i>Virtual IPs (VRRP / HSRP / Active-Gateway / Anycast)</div>
     <div class="card-body">
-        <p>A <strong>Virtual IP</strong> (VIP) is a floating IP address shared by a group of physical routers using a redundancy protocol such as VRRP, HSRP, or an Active-Gateway (as used in Aruba CX). Unlike a regular interface address, a VIP is not bound to a single host — it moves automatically between the member routers when a failover occurs.</p>
+        <p>A <strong>Virtual IP</strong> (VIP) is a floating IP address shared by a group of physical routers using a redundancy protocol such as VRRP, HSRP, an Active-Gateway (as used in Aruba CX), or Anycast. Unlike a regular interface address, a VIP is not bound to a single host — it moves automatically between the member routers when a failover occurs.</p>
 
         <h6 class="mt-3">Creating a Virtual IP</h6>
         <p>Navigate to a subnet and click <strong>Add Virtual IP</strong>. Fill in:</p>
         <ul>
             <li><strong>Label</strong> — a descriptive name, e.g. <em>core-switch-gateway</em></li>
-            <li><strong>Protocol</strong> — VRRP, HSRP, Active-Gateway, or Other</li>
+            <li><strong>Protocol</strong> — VRRP, HSRP, Active-Gateway, Anycast, or Other</li>
             <li><strong>VRID / Group ID</strong> — optional group number (1–255)</li>
             <li><strong>Member Interfaces</strong> — the physical interfaces that participate in the redundancy group; select multiple with Ctrl/Cmd</li>
             <li><strong>IPv4 / IPv6 Address</strong> — assign automatically from the available pool, enter a specific address, or leave unassigned</li>
