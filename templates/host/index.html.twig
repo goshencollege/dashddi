@@ -283,7 +283,8 @@
                                     {% endfor %}
                                 </td>
                                 <td class="text-muted small">
-                                    {{ host.updatedAt|date('Y-m-d') }}{% if host.updatedBy %} · {{ host.updatedBy }}{% endif %}
+                                    {{ host.updatedAt|date('Y-m-d H:i') }}
+                                    {% if host.updatedBy %}<br>{{ host.updatedBy }}{% endif %}
                                 </td>
                                 <td class="text-end">
                                     <div class="d-flex gap-1 justify-content-end align-items-center">
@@ -380,7 +381,8 @@
                                         {% endif %}
                                     </td>
                                     <td class="text-muted small">
-                                        {{ iface.updatedAt|date('Y-m-d') }}{% if iface.updatedBy %} · {{ iface.updatedBy }}{% endif %}
+                                        {{ iface.updatedAt|date('Y-m-d H:i') }}
+                                        {% if iface.updatedBy %}<br>{{ iface.updatedBy }}{% endif %}
                                     </td>
                                     <td class="text-end">
                                         <div class="d-flex gap-1 justify-content-end align-items-center">
@@ -454,7 +456,8 @@
                                         {% endif %}
                                     </td>
                                     <td class="text-muted small">
-                                        {{ vip.updatedAt|date('Y-m-d') }}{% if vip.updatedBy %} · {{ vip.updatedBy }}{% endif %}
+                                        {{ vip.updatedAt|date('Y-m-d H:i') }}
+                                        {% if vip.updatedBy %}<br>{{ vip.updatedBy }}{% endif %}
                                     </td>
                                     <td class="text-end">
                                         <a href="{{ path('virtual_ip_edit', {id: vip.id, from: 'interface', interfaceId: iface.id}) }}" class="btn btn-sm btn-outline-secondary me-1">
