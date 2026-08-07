@@ -198,6 +198,16 @@ class VirtualIpApiControllerTest extends AppWebTestCase
         $this->assertSame('test note', $data['notes']);
     }
 
+    public function testUpdateAcceptsAnycastProtocol(): void
+    {
+        $vip = $this->makeVip($this->makeSubnet());
+        $data = $this->apiRequest('PATCH', "/api/virtual-ips/{$vip->getId()}", [
+            'protocol' => 'anycast',
+        ]);
+        $this->assertSame(200, $this->client->getResponse()->getStatusCode());
+        $this->assertSame('anycast', $data['protocol']);
+    }
+
     public function testUpdateLabelCannotBeEmpty(): void
     {
         $vip = $this->makeVip($this->makeSubnet());

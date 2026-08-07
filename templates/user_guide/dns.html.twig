@@ -23,7 +23,7 @@
         <p class="mb-0">DNS records can come from three sources:</p>
         <ul class="mt-2 mb-3">
             <li><strong>Host interface records</strong> — A/AAAA (and other types) linked to a specific host interface. The IP address for A/AAAA records is derived automatically from the interface. These appear in the domain record list with a <em>Host</em> column linking to the host.</li>
-            <li><strong>Virtual IP records</strong> — A/AAAA (and other types) linked to a Virtual IP (VRRP/HSRP/Active-Gateway). The IP address for A/AAAA records is derived from the VIP's assigned address. These appear in the domain record list with a <em>Host</em> column linking to the VIP detail page.</li>
+            <li><strong>Virtual IP records</strong> — A/AAAA (and other types) linked to a Virtual IP (VRRP/HSRP/Active-Gateway/Anycast). The IP address for A/AAAA records is derived from the VIP's assigned address. These appear in the domain record list with a <em>Host</em> column linking to the VIP detail page.</li>
             <li><strong>Manual records</strong> — MX, CNAME, TXT, NS, or any other records added directly from the domain detail page.</li>
         </ul>
         <p>Records can be linked to an interface or VIP in two ways: by adding them from the interface or VIP detail page, or by editing an existing record from the domain detail page and using the <strong>Linked to</strong> search field. Linking an existing A or AAAA record to an interface or VIP clears its stored value so the live IP is derived from the linked entity going forward.</p>
