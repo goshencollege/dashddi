@@ -143,6 +143,14 @@ class VirtualIpController extends AbstractController
             $em->flush();
             $this->addFlash('success', 'Virtual IP deleted.');
         }
+
+        $referer = $request->headers->get('referer', '');
+        if (preg_match('#/hosts/(\d+)#', $referer, $m)) {
+            return $this->redirectToRoute('host_show', ['id' => (int) $m[1]]);
+        }
+        if (str_contains($referer, '/hosts')) {
+            return $this->redirectToRoute('host_index');
+        }
         return $this->redirectToRoute('subnet_show', ['id' => $subnetId]);
     }
 
@@ -175,6 +183,14 @@ class VirtualIpController extends AbstractController
                 $vip->removeMemberInterface($interface);
                 $em->flush();
             }
+        }
+
+        $referer = $request->headers->get('referer', '');
+        if (preg_match('#/hosts/(\d+)#', $referer, $m)) {
+            return $this->redirectToRoute('host_show', ['id' => (int) $m[1]]);
+        }
+        if (str_contains($referer, '/hosts')) {
+            return $this->redirectToRoute('host_index');
         }
         return $this->redirectToRoute('interface_show', ['id' => $interfaceId]);
     }

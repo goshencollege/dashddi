@@ -418,7 +418,7 @@ class HostController extends AbstractController
     }
 
     #[Route('/{id}', name: 'host_show', methods: ['GET'], requirements: ['id' => '\d+'])]
-    public function show(Host $host, Request $request): Response
+    public function show(Host $host, Request $request, VirtualIpRepository $vipRepo): Response
     {
         $sessionKey = '_host_token_raw_' . $host->getId();
         $newToken   = $request->getSession()->get($sessionKey);
@@ -426,10 +426,13 @@ class HostController extends AbstractController
             $request->getSession()->remove($sessionKey);
         }
 
+        $ifaceIds = array_map(fn($iface) => $iface->getId(), $host->getInterfaces()->toArray());
+
         return $this->render('host/show.html.twig', [
             'host'     => $host,
             'newToken' => $newToken,
             'domains'  => $this->domainRepo->findBy(['excludeFromInterfaces' => false], ['name' => 'ASC']),
+            'vip_map'  => $vipRepo->findMapByInterfaceIds($ifaceIds),
         ]);
     }
 

@@ -283,7 +283,8 @@
                                     {% endfor %}
                                 </td>
                                 <td class="text-muted small">
-                                    {{ host.updatedAt|date('Y-m-d') }}{% if host.updatedBy %} · {{ host.updatedBy }}{% endif %}
+                                    {{ host.updatedAt|date('Y-m-d H:i') }}
+                                    {% if host.updatedBy %}<br>{{ host.updatedBy }}{% endif %}
                                 </td>
                                 <td class="text-end">
                                     <div class="d-flex gap-1 justify-content-end align-items-center">
@@ -380,7 +381,8 @@
                                         {% endif %}
                                     </td>
                                     <td class="text-muted small">
-                                        {{ iface.updatedAt|date('Y-m-d') }}{% if iface.updatedBy %} · {{ iface.updatedBy }}{% endif %}
+                                        {{ iface.updatedAt|date('Y-m-d H:i') }}
+                                        {% if iface.updatedBy %}<br>{{ iface.updatedBy }}{% endif %}
                                     </td>
                                     <td class="text-end">
                                         <div class="d-flex gap-1 justify-content-end align-items-center">
@@ -454,12 +456,27 @@
                                         {% endif %}
                                     </td>
                                     <td class="text-muted small">
-                                        {{ vip.updatedAt|date('Y-m-d') }}{% if vip.updatedBy %} · {{ vip.updatedBy }}{% endif %}
+                                        {{ vip.updatedAt|date('Y-m-d H:i') }}
+                                        {% if vip.updatedBy %}<br>{{ vip.updatedBy }}{% endif %}
                                     </td>
                                     <td class="text-end">
-                                        <a href="{{ path('virtual_ip_edit', {id: vip.id, from: 'interface', interfaceId: iface.id}) }}" class="btn btn-sm btn-outline-secondary">
+                                        <a href="{{ path('virtual_ip_edit', {id: vip.id, from: 'interface', interfaceId: iface.id}) }}" class="btn btn-sm btn-outline-secondary me-1">
                                             <i class="bi bi-pencil"></i>
                                         </a>
+                                        <form method="post" action="{{ path('virtual_ip_remove_member', {id: vip.id, interfaceId: iface.id}) }}" class="d-inline"
+                                              onsubmit="return confirm('Remove this interface from {{ vip.label|e('js') }}?')">
+                                            <input type="hidden" name="_token" value="{{ csrf_token('remove_member_' ~ vip.id ~ '_' ~ iface.id) }}">
+                                            <button type="submit" class="btn btn-sm btn-outline-warning me-1" title="Unlink from this VIP">
+                                                <i class="bi bi-slash-circle"></i>
+                                            </button>
+                                        </form>
+                                        <form method="post" action="{{ path('virtual_ip_delete', {id: vip.id}) }}" class="d-inline"
+                                              onsubmit="return confirm('Delete {{ vip.label|e('js') }}?')">
+                                            <input type="hidden" name="_token" value="{{ csrf_token('delete_vip_' ~ vip.id) }}">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete this VIP">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
                                     </td>
                                 </tr>
                                 {% endfor %}
