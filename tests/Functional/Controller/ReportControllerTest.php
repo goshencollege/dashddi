@@ -512,4 +512,39 @@ class ReportControllerTest extends AppWebTestCase
         $this->assertSame($parentId, $this->em->find(DomainRecord::class, $nsRecordId)->getDomain()->getId());
         $this->assertSame($parentId, $this->em->find(DomainRecord::class, $glueRecordId)->getDomain()->getId());
     }
+
+    public function testReparentDnsLeavesDelegationDsRecordUntouched(): void
+    {
+        $parent = $this->makeDomain('goshen-ds.edu');
+        $child  = $this->makeDomain('switches.goshen-ds.edu');
+
+        $dsRecord = (new DomainRecord())
+            ->setDomain($parent)
+            ->setHostname('switches')
+            ->setType(RecordType::DS)
+            ->setValue('12345 13 2 ABCDEF0123456789');
+        $this->em->persist($dsRecord);
+        $this->em->flush();
+        $dsRecordId = $dsRecord->getId();
+        $parentId   = $parent->getId();
+        $this->em->clear(); // evict identity map so Domain::records lazy-loads fresh from the DB
+
+        $service = static::getContainer()->get(RecommendationService::class);
+        $rows    = $service->findReparentableDnsRecords();
+        $ids     = array_column($rows, 'record_id');
+        $this->assertNotContains($dsRecordId, $ids, 'Delegation DS record must not be offered for reparenting');
+
+        $crawler = $this->getRecommendationsPage();
+        $token   = $this->extractToken($crawler, 'csrf-reparent-dns');
+
+        // Attempt to move it anyway via a crafted request — must be skipped, not applied.
+        $this->client->request('POST', '/recommendations/apply/reparent-dns', [
+            '_token' => $token,
+            'ids'    => [$dsRecordId],
+        ]);
+        $this->assertResponseRedirects('/recommendations');
+
+        $this->em->clear();
+        $this->assertSame($parentId, $this->em->find(DomainRecord::class, $dsRecordId)->getDomain()->getId());
+    }
 }

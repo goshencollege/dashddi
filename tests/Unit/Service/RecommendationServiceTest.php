@@ -197,6 +197,18 @@ class RecommendationServiceTest extends TestCase
         $this->assertSame(1, $service->countExcludedReparentRecords());
     }
 
+    public function testFindReparentableDnsRecordsExcludesDelegationDsRecord(): void
+    {
+        $parent = $this->buildDomain(1, 'goshen.edu');
+        $child  = $this->buildDomain(2, 'switches.goshen.edu');
+        $this->buildRecord(10, $parent, 'switches', RecordType::DS, '12345 13 2 ABCDEF0123456789');
+
+        $service = $this->serviceWithDomains([$parent, $child]);
+
+        $this->assertCount(0, $service->findReparentableDnsRecords());
+        $this->assertSame(1, $service->countExcludedReparentRecords());
+    }
+
     public function testFindReparentableDnsRecordsExcludesGlueRecordForInBailiwickNameserver(): void
     {
         $parent = $this->buildDomain(1, 'goshen.edu');

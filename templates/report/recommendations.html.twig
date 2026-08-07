@@ -592,8 +592,8 @@
             {% if reparent_excluded_count > 0 %}
                 {{ reparent_excluded_count }} additional record{{ reparent_excluded_count != 1 ? 's' : '' }}
                 matched by name but {{ reparent_excluded_count != 1 ? 'were' : 'was' }} left in place because
-                {{ reparent_excluded_count != 1 ? 'they are' : 'it is' }} an NS delegation record or its glue
-                A/AAAA counterpart — moving those would break the delegation.
+                {{ reparent_excluded_count != 1 ? 'they are' : 'it is' }} an NS or DS delegation record or its
+                glue A/AAAA counterpart — moving those would break the delegation.
             {% endif %}
         </p>
     </div>
