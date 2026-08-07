@@ -6,6 +6,7 @@
 .host-interfaces-table { --vip-row-bg: rgba(0,0,0,.05); }
 [data-bs-theme="dark"] .host-interfaces-table { --vip-row-bg: rgba(255,255,255,.05); }
 .host-interfaces-table .vip-row { --bs-table-bg: var(--vip-row-bg); }
+.host-interfaces-table .vip-row > td:first-child { padding-left: 2rem !important; }
 </style>
 {% endblock %}
 
@@ -284,9 +285,23 @@
                                     {% if vip.updatedBy %}<br>{{ vip.updatedBy }}{% endif %}
                                 </td>
                                 <td class="text-end">
-                                    <a href="{{ path('virtual_ip_edit', {id: vip.id, from: 'interface', interfaceId: iface.id}) }}" class="btn btn-sm btn-outline-secondary">
+                                    <a href="{{ path('virtual_ip_edit', {id: vip.id, from: 'interface', interfaceId: iface.id}) }}" class="btn btn-sm btn-outline-secondary me-1">
                                         <i class="bi bi-pencil"></i>
                                     </a>
+                                    <form method="post" action="{{ path('virtual_ip_remove_member', {id: vip.id, interfaceId: iface.id}) }}" class="d-inline"
+                                          onsubmit="return confirm('Remove this interface from {{ vip.label|e('js') }}?')">
+                                        <input type="hidden" name="_token" value="{{ csrf_token('remove_member_' ~ vip.id ~ '_' ~ iface.id) }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-warning me-1" title="Unlink from this VIP">
+                                            <i class="bi bi-slash-circle"></i>
+                                        </button>
+                                    </form>
+                                    <form method="post" action="{{ path('virtual_ip_delete', {id: vip.id}) }}" class="d-inline"
+                                          onsubmit="return confirm('Delete {{ vip.label|e('js') }}?')">
+                                        <input type="hidden" name="_token" value="{{ csrf_token('delete_vip_' ~ vip.id) }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete this VIP">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
                                 </td>
                             </tr>
                         {% endfor %}
