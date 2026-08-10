@@ -127,6 +127,18 @@
         <div class="alert alert-info py-2 small mb-0">
             <i class="bi bi-lightbulb me-1"></i><strong>Algorithm migration:</strong> assign the new policy to the domain first (possible before any keys exist), then start a KSK rollover and select the new policy as the Algorithm Policy override. Follow the rollover steps to publish the new KSK DS record at your registrar before retiring the old key.
         </div>
+
+        <h6 class="mt-3">Disable DNSSEC</h6>
+        <p>To stop signing a zone entirely, use the guided workflow at <strong>DNS → Disable DNSSEC</strong> (also linked from the locked policy field on the domain/subnet edit form, and from the DNSSEC card on the domain/subnet detail page). Unlike a KSK rollover, this is a one-way decommissioning process, so it follows a strict order to avoid breaking resolution for validating resolvers:</p>
+        <ol>
+            <li><strong>Remove the DS record</strong> at your registrar first, while the zone is still correctly signed. This tells validating resolvers to stop expecting a secure delegation for the zone.</li>
+            <li><strong>Wait for the removal to propagate</strong>, then confirm with <code>dig DS &lt;zone&gt; +short</code> that no DS record remains.</li>
+            <li><strong>Retire the zone's keys</strong> — DashDDI marks every published KSK and ZSK inactive and scheduled for immediate deletion, then reloads and re-signs the zone so BIND drops the DNSKEY/RRSIG records.</li>
+            <li><strong>Clear the policy and complete</strong> — once the zone is confirmed unsigned, DashDDI clears the DNSSEC policy from the domain/subnet. You must then push DNS config from <strong>Servers</strong> to remove the zone's <code>dnssec-policy</code>/<code>key-directory</code> lines from BIND's configuration.</li>
+        </ol>
+        <div class="alert alert-warning py-2 small mb-0">
+            <i class="bi bi-exclamation-triangle me-1"></i>Removing DNSSEC in the wrong order (unsigning before the DS record is removed) causes validating resolvers to see a broken trust chain and return SERVFAIL for the zone until the old DS record expires from caches.
+        </div>
     </div>
 </div>
 

@@ -88,7 +88,7 @@
             <dt class="col-sm-3">DNSSEC Policy</dt>
             <dd class="col-sm-9">Apply a DNSSEC policy for inline zone signing of records in this subnet. Policies are defined under <strong>DNS → DNSSEC Policies</strong>.</dd>
         </dl>
-        <p class="mb-0">Once a policy has been assigned, changing it through the normal edit form is intentionally blocked — the field shows a lock icon and the current policy name. To migrate to a different algorithm, use the <a href="{{ path('user_guide_dns') }}#dnssec">KSK Rollover</a> workflow instead.</p>
+        <p class="mb-0">Once a policy has been assigned, changing it through the normal edit form is intentionally blocked — the field shows a lock icon and the current policy name. To migrate to a different algorithm, use the <a href="{{ path('user_guide_dns') }}#dnssec">KSK Rollover</a> workflow instead; to remove DNSSEC entirely, use the <a href="{{ path('user_guide_dns') }}#dnssec">Disable DNSSEC</a> workflow.</p>
 
         <h6 class="mt-4">Dynamic DNS (DDNS)</h6>
         <dl class="row mb-0">
