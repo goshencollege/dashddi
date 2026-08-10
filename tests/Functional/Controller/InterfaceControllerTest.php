@@ -125,4 +125,37 @@ class InterfaceControllerTest extends AppWebTestCase
         $vip = $this->em->find(VirtualIp::class, $vip->getId());
         $this->assertCount(0, $vip->getMemberInterfaces(), 'VIP should be unlinked by bulk subnet change when its IP is outside the new subnet');
     }
+
+    public function testEditFormPrefillsDuidInNetworkctlFormat(): void
+    {
+        $subnet = $this->makeSubnet('10.56.0.0/24');
+        $iface  = $this->makeInterface($subnet);
+        $iface->getHost()->setDuid('00020000ab11cc5702f3da97b768');
+        $this->em->flush();
+
+        $crawler = $this->client->request('GET', "/interfaces/{$iface->getId()}/edit");
+        $this->assertSame(
+            'DUID-EN/Vendor:0000ab11cc5702f3da97b768',
+            $crawler->filter('form')->form()->get('network_interface[duid]')->getValue()
+        );
+    }
+
+    public function testEditRoundTripsDuidPastedInNetworkctlFormatThroughToHost(): void
+    {
+        $subnet = $this->makeSubnet('10.57.0.0/24');
+        $iface  = $this->makeInterface($subnet);
+        $hostId = $iface->getHost()->getId();
+
+        $crawler = $this->client->request('GET', "/interfaces/{$iface->getId()}/edit");
+        $this->client->submit($crawler->filter('form')->form(), [
+            'network_interface[duid]'           => 'DUID-EN/Vendor:0000ab11cc5702f3da97b768',
+            'network_interface[ipv4Assignment]' => 'keep',
+            'network_interface[ipv6Assignment]' => 'keep',
+        ]);
+        $this->assertResponseRedirects();
+
+        $this->em->clear();
+        $host = $this->em->find(Host::class, $hostId);
+        $this->assertSame('00:02:00:00:ab:11:cc:57:02:f3:da:97:b7:68', $host->getDuid());
+    }
 }

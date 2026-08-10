@@ -45,6 +45,7 @@ class HostType extends AbstractType
             ->add('duid', TextType::class, [
                 'required' => false,
                 'label'    => 'DUID',
+                'data'     => $options['data']?->getDuidDisplay(),
                 'attr'     => [
                     'class'       => 'font-monospace',
                     'placeholder' => 'e.g. 00:01:00:01:2b:3c:4d:5e:aa:bb:cc:dd:ee:ff (DHCPv6 client ID — leave blank if unknown)',

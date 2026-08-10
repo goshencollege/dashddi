@@ -49,6 +49,27 @@ class Host
     )]
     private ?string $duid = null;
 
+    /**
+     * DUID type labels as printed by tools like `networkctl status` (e.g.
+     * "DUID-EN/Vendor:0000ab11..."), mapped to their RFC 8415 2-byte type code.
+     * Checked longest/most-specific first so "DUID-LLT" isn't misread as "DUID-LL".
+     */
+    private const DUID_TYPE_LABELS = [
+        'DUID-LLT'       => '0001',
+        'DUID-EN/Vendor' => '0002',
+        'DUID-EN'        => '0002',
+        'DUID-LL'        => '0003',
+        'DUID-UUID'      => '0004',
+    ];
+
+    /** Canonical `networkctl`-style label per RFC 8415 DUID type code, for reconstructing its display format. */
+    private const DUID_TYPE_NETWORKCTL_LABELS = [
+        '0001' => 'DUID-LLT',
+        '0002' => 'DUID-EN/Vendor',
+        '0003' => 'DUID-LL',
+        '0004' => 'DUID-UUID',
+    ];
+
     #[ORM\OneToMany(targetEntity: NetworkInterface::class, mappedBy: 'host', cascade: ['persist', 'remove'], orphanRemoval: true)]
     #[ORM\OrderBy(['name' => 'ASC'])]
     private Collection $interfaces;
@@ -97,11 +118,39 @@ class Host
             $this->duid = null;
             return $this;
         }
-        $hex = preg_replace('/[^0-9a-fA-F]/', '', $duid);
+
+        $hex = null;
+        foreach (self::DUID_TYPE_LABELS as $label => $typeCode) {
+            $pos = stripos($duid, $label);
+            if ($pos !== false) {
+                $remainder = substr($duid, $pos + strlen($label));
+                $hex = $typeCode . preg_replace('/[^0-9a-fA-F]/', '', $remainder);
+                break;
+            }
+        }
+        $hex ??= preg_replace('/[^0-9a-fA-F]/', '', $duid);
+
         $this->duid = (strlen($hex) >= 4 && strlen($hex) % 2 === 0)
             ? implode(':', str_split(strtolower($hex), 2))
             : strtolower($duid);
         return $this;
+    }
+
+    /**
+     * Reformats the stored DUID the way `networkctl status` displays it (e.g.
+     * "DUID-EN/Vendor:0000ab11cc5702f3da97b768") by swapping the leading 2-byte
+     * type code for its text label — the same format a user would paste in.
+     * Falls back to the raw colon-separated hex if the type code isn't recognized.
+     */
+    public function getDuidDisplay(): ?string
+    {
+        if ($this->duid === null) {
+            return null;
+        }
+        $hex   = str_replace(':', '', $this->duid);
+        $label = self::DUID_TYPE_NETWORKCTL_LABELS[substr($hex, 0, 4)] ?? null;
+
+        return $label !== null ? $label . ':' . substr($hex, 4) : $this->duid;
     }
 
     public function getLocation(): ?string

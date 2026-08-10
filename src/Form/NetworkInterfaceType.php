@@ -49,7 +49,7 @@ class NetworkInterfaceType extends AbstractType
                 'mapped'     => false,
                 'label'      => 'DUID',
                 'required'   => false,
-                'data'       => $options['data']?->getHost()?->getDuid(),
+                'data'       => $options['data']?->getHost()?->getDuidDisplay(),
                 'attr'       => [
                     'class'       => 'font-monospace',
                     'placeholder' => 'Host-level — same value on all of this host\'s interfaces',

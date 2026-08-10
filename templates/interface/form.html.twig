@@ -43,7 +43,7 @@
             {{ form_label(form.duid, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
             {{ form_widget(form.duid, {attr: {class: 'form-control font-monospace' ~ (form.duid.vars.errors|length ? ' is-invalid' : '')}}) }}
             {{ form_errors(form.duid) }}
-            <div class="form-text">DHCPv6 client identifier — this is a host attribute, so changing it here updates it for all of this host's interfaces.</div>
+            <div class="form-text">DHCPv6 client identifier — this is a host attribute, so changing it here updates it for all of this host's interfaces. You can paste directly from <code>networkctl status</code> output (e.g. <code>DUID-EN/Vendor:0000ab11...</code>) — the type label is detected automatically.</div>
         </div>
         {% endif %}
 
