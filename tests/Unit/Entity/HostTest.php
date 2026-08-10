@@ -78,4 +78,51 @@ class HostTest extends TestCase
 
         $this->assertSame('00:02:00:00:ab:11:cc:57:02:f3:da:97:b7:68', $host->getDuid());
     }
+
+    public function testGetDuidTypeLabelReturnsNullWhenDuidIsUnset(): void
+    {
+        $host = new Host();
+
+        $this->assertNull($host->getDuidTypeLabel());
+    }
+
+    public function testGetDuidTypeLabelReturnsNullForUnrecognizedTypeCode(): void
+    {
+        $host = new Host();
+        $host->setDuid('ffffab11cc5702f3da97b768');
+
+        $this->assertNull($host->getDuidTypeLabel());
+    }
+
+    public function testGetDuidTypeLabelDecodesLlt(): void
+    {
+        $host = new Host();
+        $host->setDuid('DUID-LLT:00011234567890abcdef');
+
+        $this->assertSame('DUID-LLT (Link-Layer + Time)', $host->getDuidTypeLabel());
+    }
+
+    public function testGetDuidTypeLabelDecodesEn(): void
+    {
+        $host = new Host();
+        $host->setDuid('DUID-EN/Vendor:0000ab11cc5702f3da97b768');
+
+        $this->assertSame('DUID-EN / Vendor (Enterprise)', $host->getDuidTypeLabel());
+    }
+
+    public function testGetDuidTypeLabelDecodesLl(): void
+    {
+        $host = new Host();
+        $host->setDuid('DUID-LL:aabbccddeeff');
+
+        $this->assertSame('DUID-LL (Link-Layer)', $host->getDuidTypeLabel());
+    }
+
+    public function testGetDuidTypeLabelDecodesUuid(): void
+    {
+        $host = new Host();
+        $host->setDuid('DUID-UUID:0102030405060708090a0b0c0d0e0f10');
+
+        $this->assertSame('DUID-UUID', $host->getDuidTypeLabel());
+    }
 }

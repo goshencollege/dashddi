@@ -62,6 +62,14 @@ class Host
         'DUID-UUID'      => '0004',
     ];
 
+    /** Canonical display label per RFC 8415 DUID type code, for showing the type back alongside the stored hex. */
+    private const DUID_TYPE_DISPLAY_LABELS = [
+        '0001' => 'DUID-LLT (Link-Layer + Time)',
+        '0002' => 'DUID-EN / Vendor (Enterprise)',
+        '0003' => 'DUID-LL (Link-Layer)',
+        '0004' => 'DUID-UUID',
+    ];
+
     #[ORM\OneToMany(targetEntity: NetworkInterface::class, mappedBy: 'host', cascade: ['persist', 'remove'], orphanRemoval: true)]
     #[ORM\OrderBy(['name' => 'ASC'])]
     private Collection $interfaces;
@@ -126,6 +134,16 @@ class Host
             ? implode(':', str_split(strtolower($hex), 2))
             : strtolower($duid);
         return $this;
+    }
+
+    /** Decodes the stored DUID's leading 2-byte RFC 8415 type code back into a human-readable label, for display. */
+    public function getDuidTypeLabel(): ?string
+    {
+        if ($this->duid === null) {
+            return null;
+        }
+        $code = substr(str_replace(':', '', $this->duid), 0, 4);
+        return self::DUID_TYPE_DISPLAY_LABELS[$code] ?? null;
     }
 
     public function getLocation(): ?string
