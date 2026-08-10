@@ -77,6 +77,11 @@ class SubnetBulkEditType extends AbstractType
                 'required' => false,
                 'attr'     => ['placeholder' => '3600'],
             ])
+            ->add('defaultTtl', IntegerType::class, [
+                'label'    => 'Default TTL (seconds)',
+                'required' => false,
+                'attr'     => ['placeholder' => '3600'],
+            ])
             ->add('views', EntityType::class, [
                 'class'        => DnsView::class,
                 'choices'      => $this->viewRepo->findBy([], ['name' => 'ASC']),

@@ -80,6 +80,25 @@ class DomainApiControllerTest extends AppWebTestCase
         $this->assertTrue($data['exclude_from_interfaces']);
     }
 
+    public function testDefaultTtlDefaultsTo3600(): void
+    {
+        $domain = $this->makeDomain('noteldefault.example.com');
+        $data = $this->apiRequest('GET', "/api/domains/{$domain->getId()}");
+        $this->assertSame(3600, $data['default_ttl']);
+    }
+
+    public function testDefaultTtlCanBeSetIndependentlyOfSoaTtl(): void
+    {
+        $domain = $this->makeDomain('ttl.example.com');
+        $data = $this->apiRequest('PATCH', "/api/domains/{$domain->getId()}", [
+            'default_ttl' => 7200,
+            'soa_ttl'     => 3600,
+        ]);
+        $this->assertSame(200, $this->client->getResponse()->getStatusCode());
+        $this->assertSame(7200, $data['default_ttl']);
+        $this->assertSame(3600, $data['soa_ttl']);
+    }
+
     public function testDelete(): void
     {
         $domain = $this->makeDomain('delete.example.com');

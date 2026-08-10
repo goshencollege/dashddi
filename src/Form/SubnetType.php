@@ -107,6 +107,11 @@ class SubnetType extends AbstractType
                 'label'    => 'Minimum TTL (seconds)',
                 'required' => false,
             ])
+            ->add('defaultTtl', IntegerType::class, [
+                'label'    => 'Default TTL (seconds)',
+                'required' => false,
+                'help'     => 'Sets the zone file\'s $TTL directive, used by records that don\'t specify their own TTL. Can be set higher than the Minimum TTL.',
+            ])
             ->add('views', EntityType::class, [
                 'class'        => DnsView::class,
                 'choices'      => $this->viewRepo->findBy([], ['name' => 'ASC']),

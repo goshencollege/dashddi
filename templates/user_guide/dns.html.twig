@@ -78,7 +78,7 @@
                 </tbody>
             </table>
         </div>
-        <p class="mt-3 mb-0 text-muted small">Every record has a <strong>TTL</strong> field (in seconds). Leave it blank to inherit the zone default. Use <strong>Views</strong> to include a record only in specific DNS views.</p>
+        <p class="mt-3 mb-0 text-muted small">Every record has a <strong>TTL</strong> field (in seconds). Leave it blank to inherit the zone's <strong>Default TTL</strong>, set on the domain (or subnet, for reverse zones) and used as the zone file's <code>$TTL</code> directive. This is separate from <strong>Minimum TTL</strong>, which only populates the SOA record's negative-caching field and can be lower than the Default TTL. Use <strong>Views</strong> to include a record only in specific DNS views.</p>
     </div>
 </div>
 
