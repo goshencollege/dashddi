@@ -95,6 +95,12 @@
             <dd class="col-sm-9">Select a DDNS-enabled domain to allow Kea to dynamically update the reverse zone for this subnet. Only domains with a DDNS DNS server and TSIG key configured appear in this list. Leave blank to disable DDNS for this subnet. Can also be set in bulk from the subnet list using <strong>Bulk Edit</strong>.</dd>
         </dl>
 
+        <h6 class="mt-4">DHCPv6 On-Net Interface</h6>
+        <dl class="row mb-0">
+            <dt class="col-sm-3">DHCPv6 On-Net Interface</dt>
+            <dd class="col-sm-9">The OS network interface name (e.g. <code>eth0.20</code>) the Kea DHCP server listens on for non-relayed DHCPv6 requests on this subnet — set this only for subnets that are directly attached (on-link) to a DHCP server, not reached through a relay agent. When set, it's emitted as this subnet's <code>interface</code> key in <code>subnets6.json</code>, which Kea uses to match locally-received, non-relayed traffic to the right subnet. Leave blank for relayed subnets. Hidden when <em>Is Container</em> is checked.</dd>
+        </dl>
+
         <h6 class="mt-4">DHCP Lease Log</h6>
         <dl class="row mb-0">
             <dt class="col-sm-3">Lease Retention</dt>

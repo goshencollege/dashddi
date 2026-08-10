@@ -167,6 +167,14 @@
                     </div>
                     <div id="dhcp-section">
                     <hr class="my-3">
+                    <h6 class="text-muted mb-3"><i class="bi bi-hdd-network me-1"></i>DHCPv6 On-Net Interface</h6>
+                    <div class="mb-4">
+                        {{ form_label(form.dhcpv6Interface, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                        {{ form_widget(form.dhcpv6Interface, {attr: {class: 'form-control font-monospace' ~ (form.dhcpv6Interface.vars.errors|length ? ' is-invalid' : '')}}) }}
+                        <div class="form-text">{{ form.dhcpv6Interface.vars.help }}</div>
+                        {{ form_errors(form.dhcpv6Interface) }}
+                    </div>
+                    <hr class="my-3">
                     <h6 class="text-muted mb-3"><i class="bi bi-journal-text me-1"></i>DHCP Lease Log</h6>
                     <div class="mb-4">
                         {{ form_label(form.leaseRetentionDays, null, {label_attr: {class: 'form-label fw-semibold'}}) }}

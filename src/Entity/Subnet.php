@@ -127,6 +127,9 @@ class Subnet
     #[ORM\Column(options: ['default' => false])]
     private bool $reverseZoneAggregatesV6 = false;
 
+    #[ORM\Column(length: 64, nullable: true)]
+    private ?string $dhcpv6Interface = null;
+
     public function __construct()
     {
         $this->ipAddresses = new ArrayCollection();
@@ -242,6 +245,9 @@ class Subnet
 
     public function isReverseZoneAggregatesV6(): bool { return $this->reverseZoneAggregatesV6; }
     public function setReverseZoneAggregatesV6(bool $v): static { $this->reverseZoneAggregatesV6 = $v; return $this; }
+
+    public function getDhcpv6Interface(): ?string { return $this->dhcpv6Interface; }
+    public function setDhcpv6Interface(?string $v): static { $this->dhcpv6Interface = $v; return $this; }
 
     public function getReverseZoneName(): ?string
     {
