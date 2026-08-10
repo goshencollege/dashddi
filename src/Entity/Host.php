@@ -5,6 +5,7 @@ namespace App\Entity;
 use App\Entity\Trait\AuditableTrait;
 use App\Entity\Trait\SoftDeletableTrait;
 use App\Repository\HostRepository;
+use App\Validator\UniqueDuid;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
@@ -15,6 +16,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\Entity(repositoryClass: HostRepository::class)]
 #[ORM\Table(name: 'host')]
 #[ORM\Index(columns: ['deleted_at'], name: 'idx_host_deleted_at')]
+#[UniqueDuid]
 class Host
 {
     use AuditableTrait;
@@ -39,6 +41,13 @@ class Host
 
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $notes = null;
+
+    #[ORM\Column(length: 255, nullable: true)]
+    #[Assert\Regex(
+        pattern: '/^([0-9a-fA-F]{2}:){1,64}[0-9a-fA-F]{2}$/',
+        message: 'DUID must be a hex string (e.g. 00:01:00:01:2b:3c:4d:5e:aa:bb:cc:dd:ee:ff).'
+    )]
+    private ?string $duid = null;
 
     #[ORM\OneToMany(targetEntity: NetworkInterface::class, mappedBy: 'host', cascade: ['persist', 'remove'], orphanRemoval: true)]
     #[ORM\OrderBy(['name' => 'ASC'])]
@@ -79,6 +88,21 @@ class Host
 
     public function getNotes(): ?string { return $this->notes; }
     public function setNotes(?string $notes): static { $this->notes = $notes; return $this; }
+
+    public function getDuid(): ?string { return $this->duid; }
+    public function setDuid(?string $duid): static
+    {
+        $duid = trim((string) $duid);
+        if ($duid === '') {
+            $this->duid = null;
+            return $this;
+        }
+        $hex = preg_replace('/[^0-9a-fA-F]/', '', $duid);
+        $this->duid = (strlen($hex) >= 4 && strlen($hex) % 2 === 0)
+            ? implode(':', str_split(strtolower($hex), 2))
+            : strtolower($duid);
+        return $this;
+    }
 
     public function getLocation(): ?string
     {

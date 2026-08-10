@@ -154,6 +154,8 @@
             <dd class="col-sm-9">Room number or label within the building.</dd>
             <dt class="col-sm-3">Tags</dt>
             <dd class="col-sm-9">One or more labels for grouping and filtering. Start typing to search existing tags.</dd>
+            <dt class="col-sm-3">DUID</dt>
+            <dd class="col-sm-9">The DHCPv6 client identifier for this device (see <a href="#interfaces">Network Interfaces</a> below). Optional — leave blank if unknown.</dd>
             <dt class="col-sm-3">Notes</dt>
             <dd class="col-sm-9">Free-text notes visible on the host detail page.</dd>
         </dl>
@@ -179,6 +181,8 @@
             <dd class="col-sm-9">Choose <strong>Auto-assign</strong> to use the next available IP in the subnet, or enter a specific address.</dd>
             <dt class="col-sm-3">IPv6 Address</dt>
             <dd class="col-sm-9">Optional. Choose auto-assign (uses EUI-64 generation or next available), IPv4-mapped, or manual entry.</dd>
+            <dt class="col-sm-3">DUID</dt>
+            <dd class="col-sm-9">The DHCPv6 client identifier for this device, used for DHCPv6 host reservations instead of MAC address. DUID is actually a <strong>host</strong> attribute, not a per-interface one — it's shown on every interface form for convenience, but saving it from any interface updates it for the whole host, including all of its other interfaces. It can also be set directly on the host's <strong>Edit</strong> page.</dd>
         </dl>
 
         <h6 class="mt-4">DNS Records</h6>

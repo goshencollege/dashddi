@@ -98,13 +98,14 @@ class DhcpConfigGenerator
 
             $reservations = [];
             foreach ($subnet->getInterfaces() as $iface) {
-                if ($iface->isDeleted() || !$iface->getIpv6Address() || $iface->getMacAddress() === '00:00:00:00:00:00') {
+                $duid = $iface->getHost()?->getDuid();
+                $mac  = $iface->getMacAddress();
+                if ($iface->isDeleted() || !$iface->getIpv6Address() || (!$duid && $mac === '00:00:00:00:00:00')) {
                     continue;
                 }
-                $res = [
-                    'hw-address'   => $iface->getMacAddress(),
-                    'ip-addresses' => [$iface->getIpv6Address()->getAddress()],
-                ];
+                $res = $duid
+                    ? ['duid' => $duid, 'ip-addresses' => [$iface->getIpv6Address()->getAddress()]]
+                    : ['hw-address' => $mac, 'ip-addresses' => [$iface->getIpv6Address()->getAddress()]];
                 if ($hostname = $iface->getPrimaryName()) {
                     $res['hostname'] = rtrim($hostname, '.') . '.';
                 }
@@ -153,14 +154,15 @@ class DhcpConfigGenerator
 
         foreach ($this->subnetRepository->findAll() as $subnet) {
             foreach ($subnet->getInterfaces() as $iface) {
-                if ($iface->isDeleted() || $iface->getIpv6Address() || $iface->getMacAddress() === '00:00:00:00:00:00') {
+                $duid = $iface->getHost()?->getDuid();
+                $mac  = $iface->getMacAddress();
+                if ($iface->isDeleted() || $iface->getIpv6Address() || (!$duid && $mac === '00:00:00:00:00:00')) {
                     continue;
                 }
                 if ($label = $this->findAnyDdnsLabel($iface)) {
-                    $reservations[] = [
-                        'hw-address' => $iface->getMacAddress(),
-                        'hostname'   => $label,
-                    ];
+                    $reservations[] = $duid
+                        ? ['duid' => $duid, 'hostname' => $label]
+                        : ['hw-address' => $mac, 'hostname' => $label];
                 }
             }
         }

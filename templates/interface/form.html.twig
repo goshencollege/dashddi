@@ -37,6 +37,16 @@
             </div>
         </div>
 
+        {% if form.duid is defined %}
+        {# DUID (host-level) #}
+        <div class="mb-4">
+            {{ form_label(form.duid, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+            {{ form_widget(form.duid, {attr: {class: 'form-control font-monospace' ~ (form.duid.vars.errors|length ? ' is-invalid' : '')}}) }}
+            {{ form_errors(form.duid) }}
+            <div class="form-text">DHCPv6 client identifier — this is a host attribute, so changing it here updates it for all of this host's interfaces.</div>
+        </div>
+        {% endif %}
+
         {# Notes #}
         <div class="mb-4">
             {{ form_label(form.notes, null, {label_attr: {class: 'form-label fw-semibold'}}) }}

@@ -44,6 +44,12 @@
                     </div>
                 </div>
                 <div class="mb-3">
+                    {{ form_label(form.duid, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                    {{ form_widget(form.duid, {attr: {class: 'form-control font-monospace' ~ (form.duid.vars.errors|length ? ' is-invalid' : '')}}) }}
+                    {{ form_errors(form.duid) }}
+                    <div class="form-text">DHCPv6 client identifier. Shared across all of this host's interfaces — can also be edited from any interface's page.</div>
+                </div>
+                <div class="mb-3">
                     {{ form_label(form.tags, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
                     {{ form_widget(form.tags, {attr: {class: 'form-select', id: 'host_tags'}}) }}
                     {{ form_errors(form.tags) }}

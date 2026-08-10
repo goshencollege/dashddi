@@ -42,7 +42,22 @@ class NetworkInterfaceType extends AbstractType
                 'required'   => false,
                 'empty_data' => '',
                 'attr'       => ['placeholder' => 'e.g. aabbccddeeff  or  aa:bb:cc:dd:ee:ff  or  AA-BB-CC-DD-EE-FF (leave blank for 00:00:00:00:00:00)'],
-            ])
+            ]);
+
+        if ($options['show_duid']) {
+            $builder->add('duid', TextType::class, [
+                'mapped'     => false,
+                'label'      => 'DUID',
+                'required'   => false,
+                'data'       => $options['data']?->getHost()?->getDuid(),
+                'attr'       => [
+                    'class'       => 'font-monospace',
+                    'placeholder' => 'Host-level — same value on all of this host\'s interfaces',
+                ],
+            ]);
+        }
+
+        $builder
             ->add('subnet', EntityType::class, [
                 'class'        => Subnet::class,
                 'choice_label' => fn($subnet) => (string) $subnet,
@@ -101,8 +116,10 @@ class NetworkInterfaceType extends AbstractType
             'data_class'     => NetworkInterface::class,
             'is_edit'        => false,
             'subnet_choices' => null,
+            'show_duid'      => true,
         ]);
         $resolver->setAllowedTypes('is_edit', 'bool');
         $resolver->setAllowedTypes('subnet_choices', ['null', 'array']);
+        $resolver->setAllowedTypes('show_duid', 'bool');
     }
 }
