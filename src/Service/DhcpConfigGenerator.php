@@ -86,6 +86,10 @@ class DhcpConfigGenerator
                 'subnet' => $subnet->getIpv6Cidr(),
             ];
 
+            if ($subnet->getDhcpv6Interface()) {
+                $block['interface'] = $subnet->getDhcpv6Interface();
+            }
+
             $pools = [];
             foreach ($subnet->getAddressBlocks() as $ab) {
                 if ($ab->getType() === BlockType::Dynamic && str_contains($ab->getStartIp(), ':')) {

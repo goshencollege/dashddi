@@ -53,6 +53,12 @@ class SubnetType extends AbstractType
                 'required' => false,
                 'attr' => ['placeholder' => '192.168.1.1'],
             ])
+            ->add('dhcpv6Interface', TextType::class, [
+                'label'    => 'DHCPv6 On-Net Interface',
+                'required' => false,
+                'attr'     => ['placeholder' => 'e.g. eth0.20'],
+                'help'     => 'OS network interface name the DHCP server listens on for non-relayed (link-local) DHCPv6 requests on this subnet. Emitted as this subnet\'s "interface" key in subnets6.json. Leave blank for subnets reached only via a relay agent.',
+            ])
             ->add('vlan', IntegerType::class, [
                 'required' => false,
                 'label' => 'VLAN ID',

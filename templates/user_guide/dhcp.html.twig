@@ -65,6 +65,7 @@
 
         <h6 class="mt-4">DHCPv6</h6>
         <p>DHCPv6 clients don't send a MAC address, so <code>subnet6</code> reservations are matched on <strong>DUID</strong> instead when the host has one set (see the <a href="{{ path('user_guide_hosts') }}#interfaces">Hosts guide</a> for where to set it). Interfaces on a host without a DUID fall back to MAC-address-based reservations, same as DHCP4.</p>
+        <p class="mb-0">Kea matches an incoming, non-relayed (link-local) DHCPv6 request to a subnet by the interface it arrived on, not by a relay address. Set <strong>DHCPv6 On-Net Interface</strong> on the <a href="{{ path('user_guide_subnets') }}#create-subnet">subnet</a> that's directly attached (on-link) to the DHCP server to emit that subnet's <code>interface</code> key in <code>subnets6.json</code>; leave it blank for subnets only reached through a relay agent. The base <code>kea-dhcp6.conf</code>'s <code>interfaces-config</code> section (which interfaces Kea actually binds/listens on) is maintained directly on the Kea server, outside DashDDI.</p>
     </div>
 </div>
 

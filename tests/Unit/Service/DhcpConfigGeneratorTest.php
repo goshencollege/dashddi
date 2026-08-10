@@ -325,6 +325,30 @@ class DhcpConfigGeneratorTest extends TestCase
         $this->assertSame('00:02:00:00:ab:11:cc:57:02:f3:da:97:b7:68', $reservation['duid']);
     }
 
+    public function testOnNetSubnetEmitsInterfaceKey(): void
+    {
+        $subnet = (new Subnet())->setName('test')->setIpv6Cidr('2001:db8::/32')->setDhcpv6Interface('eth0.20');
+        $this->setId($subnet, 27);
+        $this->setCollection($subnet, 'interfaces', []);
+        $this->setCollection($subnet, 'addressBlocks', []);
+
+        $result = $this->makeGenerator([$subnet])->generateDhcp6Config();
+
+        $this->assertSame('eth0.20', $result[0]['interface']);
+    }
+
+    public function testRelayedSubnetOmitsInterfaceKey(): void
+    {
+        $subnet = (new Subnet())->setName('test')->setIpv6Cidr('2001:db8::/32');
+        $this->setId($subnet, 28);
+        $this->setCollection($subnet, 'interfaces', []);
+        $this->setCollection($subnet, 'addressBlocks', []);
+
+        $result = $this->makeGenerator([$subnet])->generateDhcp6Config();
+
+        $this->assertArrayNotHasKey('interface', $result[0]);
+    }
+
     // ── IPv6 global reservation tests ────────────────────────────────────────
 
     public function testGlobalIpv6ReservationUsesDuidWhenHostDuidIsSet(): void
