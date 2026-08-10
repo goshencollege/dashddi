@@ -88,6 +88,7 @@
                 <div class="mb-4">
                     {{ form_label(form.dnssecPolicy) }}
                     {% if domain.dnssecPolicy %}
+                        <div class="d-none">{{ form_widget(form.dnssecPolicy) }}</div>
                         <div class="form-control-plaintext d-flex align-items-center gap-2">
                             <i class="bi bi-lock text-muted"></i>
                             <strong>{{ domain.dnssecPolicy.name }}</strong>

@@ -144,6 +144,7 @@ class SubnetType extends AbstractType
                 'placeholder'  => '— None —',
                 'required'     => false,
                 'label'        => 'DNSSEC Policy',
+                'disabled'     => $options['locked_policy'],
             ])
             ->add('leaseRetentionDays', IntegerType::class, [
                 'label'    => 'DHCP Lease Retention (days)',
@@ -188,9 +189,11 @@ class SubnetType extends AbstractType
     public function configureOptions(OptionsResolver $resolver): void
     {
         $resolver->setDefaults([
-            'data_class'   => Subnet::class,
-            'embed_blocks' => false,
+            'data_class'    => Subnet::class,
+            'embed_blocks'  => false,
+            'locked_policy' => false,
         ]);
         $resolver->setAllowedTypes('embed_blocks', 'bool');
+        $resolver->setAllowedTypes('locked_policy', 'bool');
     }
 }

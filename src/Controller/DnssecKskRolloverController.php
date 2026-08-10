@@ -40,6 +40,11 @@ class DnssecKskRolloverController extends AbstractController
             if (array_key_exists($candidate, $zonePolicyMap)) {
                 $defaultZone = $candidate;
             }
+        } elseif ($subnetId = $request->query->getInt('subnet')) {
+            $candidate = 'subnet:' . $subnetId;
+            if (array_key_exists($candidate, $zonePolicyMap)) {
+                $defaultZone = $candidate;
+            }
         }
 
         $form = $this->createForm(KskRolloverStartType::class, null, [

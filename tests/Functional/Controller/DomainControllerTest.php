@@ -2,6 +2,7 @@
 
 namespace App\Tests\Functional\Controller;
 
+use App\Entity\DnssecPolicy;
 use App\Entity\DnsView;
 use App\Entity\Domain;
 use App\Entity\DomainRecord;
@@ -104,6 +105,27 @@ class DomainControllerTest extends AppWebTestCase
         $crawler = $this->client->request('GET', "/domains/{$domain->getId()}/edit");
         $this->client->submit($crawler->filter('form')->form(), [
             'domain[name]' => 'functional-updated.example.com',
+        ]);
+        $this->assertResponseRedirects();
+    }
+
+    public function testEditFormWithLockedDnssecPolicyRendersSelectExactlyOnce(): void
+    {
+        $policy = (new DnssecPolicy())->setName('locked-policy-render');
+        $view   = $this->makeView('domain-locked-policy-view');
+        $domain = (new Domain())->setName('functional-locked-policy.example.com')->addView($view)->setDnssecPolicy($policy);
+        $this->em->persist($policy);
+        $this->em->persist($domain);
+        $this->em->flush();
+
+        $crawler = $this->client->request('GET', "/domains/{$domain->getId()}/edit");
+        $this->assertResponseIsSuccessful();
+        $this->assertCount(1, $crawler->filter('select[name="domain[dnssecPolicy]"]'));
+
+        // Submitting must still succeed — a stray un-rendered dnssecPolicy field would
+        // otherwise mean the CSRF token field was also swallowed by form_rest suppression.
+        $this->client->submit($crawler->filter('form')->form(), [
+            'domain[name]' => 'functional-locked-policy-updated.example.com',
         ]);
         $this->assertResponseRedirects();
     }
