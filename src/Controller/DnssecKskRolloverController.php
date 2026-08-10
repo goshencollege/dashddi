@@ -8,6 +8,7 @@ use App\Entity\Domain;
 use App\Entity\Subnet;
 use App\Enum\KskRolloverStatus;
 use App\Form\KskRolloverStartType;
+use App\Repository\DnssecDisableRequestRepository;
 use App\Repository\DnssecKskRolloverRepository;
 use App\Repository\DnsServerRepository;
 use App\Service\KskRolloverService;
@@ -29,7 +30,7 @@ class DnssecKskRolloverController extends AbstractController
     }
 
     #[Route('/start', name: 'ksk_rollover_start', methods: ['GET', 'POST'])]
-    public function start(Request $request, EntityManagerInterface $em, KskRolloverService $svc, DnssecKskRolloverRepository $repo, DnsServerRepository $serverRepo): Response
+    public function start(Request $request, EntityManagerInterface $em, KskRolloverService $svc, DnssecKskRolloverRepository $repo, DnssecDisableRequestRepository $disableRepo, DnsServerRepository $serverRepo): Response
     {
         $firstServer    = $serverRepo->findOneBy([], ['name' => 'ASC']);
         [$zoneChoices, $zonePolicyMap] = $this->buildZoneChoices($em);
@@ -78,11 +79,19 @@ class DnssecKskRolloverController extends AbstractController
                     $this->addFlash('danger', 'An active KSK rollover already exists for "' . $domain->getName() . '".');
                     return $this->redirectToRoute('ksk_rollover_index');
                 }
+                if ($disableRepo->findActiveForDomain($domain)) {
+                    $this->addFlash('danger', 'An active DNSSEC disable request is in progress for "' . $domain->getName() . '". Finish or fail it before starting a rollover.');
+                    return $this->redirectToRoute('dnssec_disable_index');
+                }
                 $rollover->setDomain($domain);
             } else {
                 if ($repo->findActiveForSubnet($subnet)) {
                     $this->addFlash('danger', 'An active KSK rollover already exists for subnet "' . $subnet->getName() . '".');
                     return $this->redirectToRoute('ksk_rollover_index');
+                }
+                if ($disableRepo->findActiveForSubnet($subnet)) {
+                    $this->addFlash('danger', 'An active DNSSEC disable request is in progress for subnet "' . $subnet->getName() . '". Finish or fail it before starting a rollover.');
+                    return $this->redirectToRoute('dnssec_disable_index');
                 }
                 $rollover->setSubnet($subnet);
             }

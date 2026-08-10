@@ -159,6 +159,9 @@
             <a href="{{ path('ksk_rollover_start') }}?subnet={{ subnet.id }}" class="btn btn-sm btn-outline-primary">
                 <i class="bi bi-key me-1"></i>Start KSK Rollover
             </a>
+            <a href="{{ path('dnssec_disable_start') }}?subnet={{ subnet.id }}" class="btn btn-sm btn-outline-danger">
+                <i class="bi bi-shield-x me-1"></i>Disable DNSSEC
+            </a>
             <button type="button" class="btn btn-sm btn-outline-secondary" id="fetch-ds-btn"
                     data-url="{{ path('subnet_ds_record', {id: subnet.id}) }}">
                 <i class="bi bi-search me-1"></i>Fetch DS Record

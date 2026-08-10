@@ -96,6 +96,7 @@
                         <div class="form-text">
                             Policy cannot be changed once DNSSEC is active.
                             To migrate to a different algorithm, use <a href="{{ path('ksk_rollover_start') }}?domain={{ domain.id }}">KSK Rollover</a>.
+                            To remove DNSSEC entirely, use <a href="{{ path('dnssec_disable_start') }}?domain={{ domain.id }}">Disable DNSSEC</a>.
                         </div>
                     {% else %}
                         {{ form_widget(form.dnssecPolicy, {attr: {class: 'form-select'}}) }}

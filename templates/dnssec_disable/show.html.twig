@@ -1,0 +1,199 @@
+{% extends 'base.html.twig' %}
+{% block title %}Disable DNSSEC – {{ disableRequest.zoneName }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-3 gap-2">
+    <a href="{{ path('dnssec_disable_index') }}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i>
+    </a>
+    <h1 class="h3 mb-0">
+        <i class="bi bi-shield-x me-2"></i>Disable DNSSEC — {{ disableRequest.zoneName }}
+        <span class="badge {{ disableRequest.status.badgeClass() }} ms-2 fs-6">{{ disableRequest.status.label() }}</span>
+    </h1>
+</div>
+
+{# ── Overview card ──────────────────────────────────────────────────────── #}
+<div class="row g-3 mb-4">
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header fw-semibold">Details</div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-5">Zone</dt>
+                    <dd class="col-7">{{ disableRequest.zoneName }}</dd>
+                    <dt class="col-5">DNS Server</dt>
+                    <dd class="col-7">{{ disableRequest.dnsServer ? disableRequest.dnsServer.name : '—' }}</dd>
+                    <dt class="col-5">Keys Retired</dt>
+                    <dd class="col-7 font-monospace">{{ disableRequest.retiredKeys|length ?: '—' }}</dd>
+                    <dt class="col-5">Started</dt>
+                    <dd class="col-7">{{ disableRequest.startedAt|date('Y-m-d H:i:s') }}</dd>
+                    {% if disableRequest.completedAt %}
+                    <dt class="col-5">Completed</dt>
+                    <dd class="col-7">{{ disableRequest.completedAt|date('Y-m-d H:i:s') }}</dd>
+                    {% endif %}
+                </dl>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header fw-semibold">DS Record(s) to Remove at Registrar</div>
+            <div class="card-body">
+                {% if disableRequest.dsRecordsAtStart %}
+                    <pre class="mb-0" style="white-space:pre-wrap;word-break:break-all;font-size:.85rem;">{{ disableRequest.dsRecordsAtStart }}</pre>
+                {% else %}
+                    <span class="text-muted">No DS records were found at request start.</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ── Wizard steps ───────────────────────────────────────────────────────── #}
+{% set status = disableRequest.status.value %}
+{% set active = disableRequest.status.isActive() %}
+
+<div class="card mb-4">
+    <div class="card-header fw-semibold">Disable Steps</div>
+    <div class="card-body p-0">
+        <ul class="list-group list-group-flush">
+
+            {# Step 1 — AwaitingDsRemoval #}
+            {% set done1 = status != 'awaiting_ds_removal' and status != 'failed' %}
+            <li class="list-group-item {% if status == 'awaiting_ds_removal' %}list-group-item-warning{% elseif done1 %}list-group-item-success{% endif %}">
+                <div class="d-flex align-items-start gap-3">
+                    <div class="mt-1">
+                        {% if done1 %}<i class="bi bi-check-circle-fill text-success fs-5"></i>
+                        {% elseif status == 'awaiting_ds_removal' %}<i class="bi bi-arrow-right-circle-fill text-warning fs-5"></i>
+                        {% else %}<i class="bi bi-circle text-muted fs-5"></i>{% endif %}
+                    </div>
+                    <div class="flex-grow-1">
+                        <strong>1. Remove DS Record at Registrar</strong>
+                        <p class="mb-1 text-muted small">Log in to your domain registrar and remove the DS record(s) shown above. Do this <em>before</em> touching the zone's keys, so validating resolvers stop expecting a secure delegation while the zone is still correctly signed.</p>
+                        {% if status == 'awaiting_ds_removal' %}
+                        <div class="alert alert-warning mb-2 py-2">
+                            <i class="bi bi-exclamation-triangle me-1"></i>
+                            <strong>Manual action required.</strong> Remove the DS record(s) above at your registrar.
+                        </div>
+                        <form method="post" action="{{ path('dnssec_disable_advance', {id: disableRequest.id}) }}">
+                            <input type="hidden" name="action" value="ds_removed">
+                            <input type="hidden" name="_token" value="{{ csrf_token('dnssec_disable_advance_' ~ disableRequest.id) }}">
+                            <button class="btn btn-sm btn-primary">
+                                <i class="bi bi-check me-1"></i>DS Removed — Wait for Propagation
+                            </button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </div>
+            </li>
+
+            {# Step 2 — DsRemoved #}
+            {% set done2 = status in ['keys_retired', 'complete'] %}
+            <li class="list-group-item {% if status == 'ds_removed' %}list-group-item-warning{% elseif done2 %}list-group-item-success{% endif %}">
+                <div class="d-flex align-items-start gap-3">
+                    <div class="mt-1">
+                        {% if done2 %}<i class="bi bi-check-circle-fill text-success fs-5"></i>
+                        {% elseif status == 'ds_removed' %}<i class="bi bi-arrow-right-circle-fill text-warning fs-5"></i>
+                        {% else %}<i class="bi bi-circle text-muted fs-5"></i>{% endif %}
+                    </div>
+                    <div class="flex-grow-1">
+                        <strong>2. Confirm DS Removal Propagated</strong>
+                        <p class="mb-1 text-muted small">Wait for the DS removal to propagate, then verify no DS record remains:</p>
+                        {% if status == 'ds_removed' %}
+                        <div class="alert alert-warning mb-2 py-2">
+                            <i class="bi bi-clock me-1"></i>
+                            Verify the DS record is gone from the parent zone:<br>
+                            <code>dig DS {{ disableRequest.zoneName }} +short</code><br>
+                            This should return nothing. Once confirmed, click below to retire the zone's keys.
+                        </div>
+                        <form method="post" action="{{ path('dnssec_disable_advance', {id: disableRequest.id}) }}"
+                              onsubmit="return confirm('This will run dnssec-settime on every published key for this zone and force a re-sign. Continue?')">
+                            <input type="hidden" name="action" value="retire_keys">
+                            <input type="hidden" name="_token" value="{{ csrf_token('dnssec_disable_advance_' ~ disableRequest.id) }}">
+                            <button class="btn btn-sm btn-warning text-dark">
+                                <i class="bi bi-key me-1"></i>DS Propagated — Retire Keys
+                            </button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </div>
+            </li>
+
+            {# Step 3 — KeysRetired #}
+            {% set done3 = status == 'complete' %}
+            <li class="list-group-item {% if status == 'keys_retired' %}list-group-item-info{% elseif done3 %}list-group-item-success{% endif %}">
+                <div class="d-flex align-items-start gap-3">
+                    <div class="mt-1">
+                        {% if done3 %}<i class="bi bi-check-circle-fill text-success fs-5"></i>
+                        {% elseif status == 'keys_retired' %}<i class="bi bi-arrow-right-circle-fill text-info fs-5"></i>
+                        {% else %}<i class="bi bi-circle text-muted fs-5"></i>{% endif %}
+                    </div>
+                    <div class="flex-grow-1">
+                        <strong>3. Clear Policy &amp; Complete</strong>
+                        <p class="mb-1 text-muted small">All keys ({{ disableRequest.retiredKeys|length ?: 0 }}) have been marked inactive+delete. Once BIND has dropped the RRSIGs and DNSKEY records, clear the DNSSEC policy from the zone.</p>
+                        {% if status == 'keys_retired' %}
+                        <div class="alert alert-info mb-2 py-2">
+                            <i class="bi bi-clock me-1"></i>
+                            Verify the zone is no longer signed:<br>
+                            <code>dig SOA {{ disableRequest.zoneName }} +dnssec +short</code><br>
+                            Once no RRSIG remains, click below. This clears the DNSSEC policy field; you must then push DNS config from the
+                            <a href="{{ path('dns_server_index') }}">Servers page</a> to remove the zone's signing configuration.
+                        </div>
+                        <form method="post" action="{{ path('dnssec_disable_advance', {id: disableRequest.id}) }}"
+                              onsubmit="return confirm('This clears the DNSSEC policy assigned to this zone. Continue?')">
+                            <input type="hidden" name="action" value="complete">
+                            <input type="hidden" name="_token" value="{{ csrf_token('dnssec_disable_advance_' ~ disableRequest.id) }}">
+                            <button class="btn btn-sm btn-success">
+                                <i class="bi bi-check-circle me-1"></i>Zone Unsigned — Clear Policy &amp; Complete
+                            </button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </div>
+            </li>
+
+            {# Complete #}
+            {% if status == 'complete' %}
+            <li class="list-group-item list-group-item-success">
+                <div class="d-flex align-items-start gap-3">
+                    <div class="mt-1"><i class="bi bi-trophy-fill text-success fs-5"></i></div>
+                    <div><strong>DNSSEC Disabled</strong> — the policy has been cleared. Remember to push DNS config so the zone's <code>dnssec-policy</code>/<code>key-directory</code> lines are removed from the server.</div>
+                </div>
+            </li>
+            {% endif %}
+
+        </ul>
+    </div>
+</div>
+
+{# ── Fail / Log ─────────────────────────────────────────────────────────── #}
+{% if active %}
+<div class="mb-4">
+    <form method="post" action="{{ path('dnssec_disable_advance', {id: disableRequest.id}) }}"
+          onsubmit="return confirm('Mark this disable request as failed? This does not undo any keys already retired.')">
+        <input type="hidden" name="action" value="fail">
+        <input type="hidden" name="_token" value="{{ csrf_token('dnssec_disable_advance_' ~ disableRequest.id) }}">
+        <button class="btn btn-sm btn-outline-danger">
+            <i class="bi bi-x-circle me-1"></i>Mark as Failed
+        </button>
+    </form>
+</div>
+{% endif %}
+
+{% if disableRequest.log %}
+<div class="card">
+    <div class="card-header fw-semibold">Activity Log</div>
+    <div class="card-body p-0">
+        <ul class="list-group list-group-flush">
+        {% for entry in disableRequest.log %}
+            <li class="list-group-item">
+                <span class="text-muted small font-monospace me-2">{{ entry.at }}</span>
+                {{ entry.message }}
+            </li>
+        {% endfor %}
+        </ul>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}
