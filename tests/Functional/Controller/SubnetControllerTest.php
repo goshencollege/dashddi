@@ -2,6 +2,7 @@
 
 namespace App\Tests\Functional\Controller;
 
+use App\Entity\DnssecPolicy;
 use App\Entity\Subnet;
 use App\Tests\Functional\AppWebTestCase;
 
@@ -59,6 +60,27 @@ class SubnetControllerTest extends AppWebTestCase
         $this->client->submit($crawler->filter('form')->form(), [
             'subnet[name]'     => 'Updated Subnet',
             'subnet[ipv4Cidr]' => '10.86.0.0/24',
+        ]);
+        $this->assertResponseRedirects();
+    }
+
+    public function testEditFormWithLockedDnssecPolicyRendersSelectExactlyOnce(): void
+    {
+        $policy = (new DnssecPolicy())->setName('locked-subnet-policy-render');
+        $subnet = (new Subnet())->setName('Locked Policy Subnet')->setIpv4Cidr('10.85.0.0/24')->setDnssecPolicy($policy);
+        $this->em->persist($policy);
+        $this->em->persist($subnet);
+        $this->em->flush();
+
+        $crawler = $this->client->request('GET', "/subnets/{$subnet->getId()}/edit");
+        $this->assertResponseIsSuccessful();
+        $this->assertCount(1, $crawler->filter('select[name="subnet[dnssecPolicy]"]'));
+
+        // Submitting must still succeed — a stray un-rendered dnssecPolicy field would
+        // otherwise mean the CSRF token field was also swallowed by form_rest suppression.
+        $this->client->submit($crawler->filter('form')->form(), [
+            'subnet[name]'     => 'Locked Policy Subnet Updated',
+            'subnet[ipv4Cidr]' => '10.85.0.0/24',
         ]);
         $this->assertResponseRedirects();
     }
