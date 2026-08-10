@@ -253,7 +253,9 @@ class SubnetController extends AbstractController
     #[Route('/{id}/edit', name: 'subnet_edit', methods: ['GET', 'POST'])]
     public function edit(Request $request, Subnet $subnet, EntityManagerInterface $em, SubnetRepository $subnetRepo): Response
     {
-        $form = $this->createForm(SubnetType::class, $subnet);
+        $form = $this->createForm(SubnetType::class, $subnet, [
+            'locked_policy' => $subnet->getDnssecPolicy() !== null,
+        ]);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
