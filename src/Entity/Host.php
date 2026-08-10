@@ -49,6 +49,19 @@ class Host
     )]
     private ?string $duid = null;
 
+    /**
+     * DUID type labels as printed by tools like `networkctl status` (e.g.
+     * "DUID-EN/Vendor:0000ab11..."), mapped to their RFC 8415 2-byte type code.
+     * Checked longest/most-specific first so "DUID-LLT" isn't misread as "DUID-LL".
+     */
+    private const DUID_TYPE_LABELS = [
+        'DUID-LLT'       => '0001',
+        'DUID-EN/Vendor' => '0002',
+        'DUID-EN'        => '0002',
+        'DUID-LL'        => '0003',
+        'DUID-UUID'      => '0004',
+    ];
+
     #[ORM\OneToMany(targetEntity: NetworkInterface::class, mappedBy: 'host', cascade: ['persist', 'remove'], orphanRemoval: true)]
     #[ORM\OrderBy(['name' => 'ASC'])]
     private Collection $interfaces;
@@ -97,7 +110,18 @@ class Host
             $this->duid = null;
             return $this;
         }
-        $hex = preg_replace('/[^0-9a-fA-F]/', '', $duid);
+
+        $hex = null;
+        foreach (self::DUID_TYPE_LABELS as $label => $typeCode) {
+            $pos = stripos($duid, $label);
+            if ($pos !== false) {
+                $remainder = substr($duid, $pos + strlen($label));
+                $hex = $typeCode . preg_replace('/[^0-9a-fA-F]/', '', $remainder);
+                break;
+            }
+        }
+        $hex ??= preg_replace('/[^0-9a-fA-F]/', '', $duid);
+
         $this->duid = (strlen($hex) >= 4 && strlen($hex) % 2 === 0)
             ? implode(':', str_split(strtolower($hex), 2))
             : strtolower($duid);

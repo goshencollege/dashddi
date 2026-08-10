@@ -182,7 +182,7 @@
             <dt class="col-sm-3">IPv6 Address</dt>
             <dd class="col-sm-9">Optional. Choose auto-assign (uses EUI-64 generation or next available), IPv4-mapped, or manual entry.</dd>
             <dt class="col-sm-3">DUID</dt>
-            <dd class="col-sm-9">The DHCPv6 client identifier for this device, used for DHCPv6 host reservations instead of MAC address. DUID is actually a <strong>host</strong> attribute, not a per-interface one — it's shown on every interface form for convenience, but saving it from any interface updates it for the whole host, including all of its other interfaces. It can also be set directly on the host's <strong>Edit</strong> page.</dd>
+            <dd class="col-sm-9">The DHCPv6 client identifier for this device, used for DHCPv6 host reservations instead of MAC address. DUID is actually a <strong>host</strong> attribute, not a per-interface one — it's shown on every interface form for convenience, but saving it from any interface updates it for the whole host, including all of its other interfaces. It can also be set directly on the host's <strong>Edit</strong> page. You can paste the value straight from <code>networkctl status</code> (e.g. <code>DUID-EN/Vendor:0000ab11cc5702f3da97b768</code>) — DashDDI recognizes the type label and adds the correct 2-byte DUID type prefix automatically, so you don't need to work that out by hand.</dd>
         </dl>
 
         <h6 class="mt-4">DNS Records</h6>
