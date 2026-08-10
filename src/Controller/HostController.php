@@ -176,7 +176,7 @@ class HostController extends AbstractController
             return [];
         }
 
-        $known = ['name', 'building', 'room', 'subnet', 'ip', 'mac', 'dns', 'tag',
+        $known = ['name', 'building', 'room', 'subnet', 'ip', 'mac', 'duid', 'dns', 'tag',
                   'dhcp_mismatch', 'last_dhcp', 'last_auth', 'switch_ip', 'switch_port', 'deleted'];
 
         $fieldPattern = implode('|', $known);

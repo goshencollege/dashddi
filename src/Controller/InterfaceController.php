@@ -24,6 +24,7 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 class InterfaceController extends AbstractController
 {
@@ -31,6 +32,7 @@ class InterfaceController extends AbstractController
         private readonly IpAddressManager    $ipManager,
         private readonly DnsViewResolver     $viewResolver,
         private readonly VirtualIpRepository $vipRepo,
+        private readonly ValidatorInterface  $validator,
     ) {}
 
     #[Route('/hosts/{id}/interfaces/new', name: 'interface_new', methods: ['GET', 'POST'])]
@@ -50,6 +52,9 @@ class InterfaceController extends AbstractController
 
         if ($form->isSubmitted() && $form->isValid()) {
             $errors = $this->validateIpInputs($form, $interface->getSubnet(), null);
+            if ($duidError = $this->applyDuidInput($form, $host)) {
+                $errors[] = $duidError;
+            }
             if ($errors) {
                 foreach ($errors as $error) {
                     $this->addFlash('danger', $error);
@@ -123,6 +128,9 @@ class InterfaceController extends AbstractController
         if ($form->isSubmitted() && $form->isValid()) {
             $subnetChanged = $originalSubnet !== $interface->getSubnet();
             $errors = $this->validateIpInputs($form, $interface->getSubnet(), $subnetChanged ? null : $interface);
+            if ($interface->getHost() && ($duidError = $this->applyDuidInput($form, $interface->getHost()))) {
+                $errors[] = $duidError;
+            }
             if ($errors) {
                 foreach ($errors as $error) {
                     $this->addFlash('danger', $error);
@@ -352,6 +360,25 @@ class InterfaceController extends AbstractController
             $em->flush();
         }
         return $this->json(['message' => $count . ' interface(s) updated.']);
+    }
+
+    /** Writes the form's unmapped duid field through to the host and validates it. Returns an error message, or null if valid. */
+    private function applyDuidInput(\Symfony\Component\Form\FormInterface $form, \App\Entity\Host $host): ?string
+    {
+        if (!$form->has('duid')) {
+            return null;
+        }
+
+        $duidRaw = trim((string) $form->get('duid')->getData());
+        $host->setDuid($duidRaw !== '' ? $duidRaw : null);
+
+        foreach ($this->validator->validate($host) as $violation) {
+            if ($violation->getPropertyPath() === 'duid') {
+                return $violation->getMessage();
+            }
+        }
+
+        return null;
     }
 
     private function validateIpInputs(\Symfony\Component\Form\FormInterface $form, ?\App\Entity\Subnet $subnet, ?NetworkInterface $current): array

@@ -418,6 +418,11 @@ class HostRepository extends ServiceEntityRepository
                 $qb->setParameter("sp_$n", $param);
                 return "{$not}(h.room $cmp :sp_{$n})";
 
+            case 'duid':
+                [$cmp, $param] = $this->toStructuredLikeOrEq($value);
+                $qb->setParameter("sp_$n", $param);
+                return "{$not}(h.duid $cmp :sp_{$n})";
+
             case 'building':
                 $qb->setParameter("sp_$n", (int) $value);
                 return "{$not}(h.building = :sp_{$n})";

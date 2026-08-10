@@ -62,6 +62,9 @@
             <li>A <code>reservations</code> section with one entry per host interface that has a static IP</li>
             <li>Global options for lease time, DNS servers, and domain name</li>
         </ul>
+
+        <h6 class="mt-4">DHCPv6</h6>
+        <p>DHCPv6 clients don't send a MAC address, so <code>subnet6</code> reservations are matched on <strong>DUID</strong> instead when the host has one set (see the <a href="{{ path('user_guide_hosts') }}#interfaces">Hosts guide</a> for where to set it). Interfaces on a host without a DUID fall back to MAC-address-based reservations, same as DHCP4.</p>
     </div>
 </div>
 

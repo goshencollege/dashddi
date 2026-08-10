@@ -42,6 +42,14 @@ class HostType extends AbstractType
                 'label'    => 'Notes',
                 'attr'     => ['rows' => 4, 'placeholder' => 'Free-text notes about this host'],
             ])
+            ->add('duid', TextType::class, [
+                'required' => false,
+                'label'    => 'DUID',
+                'attr'     => [
+                    'class'       => 'font-monospace',
+                    'placeholder' => 'e.g. 00:01:00:01:2b:3c:4d:5e:aa:bb:cc:dd:ee:ff (DHCPv6 client ID — leave blank if unknown)',
+                ],
+            ])
             ->add('tags', EntityType::class, [
                 'class'         => Tag::class,
                 'choice_label'  => 'name',
@@ -61,6 +69,7 @@ class HostType extends AbstractType
                 'label'          => false,
                 'data'           => new NetworkInterface(),
                 'subnet_choices' => $options['subnet_choices'],
+                'show_duid'      => false,
             ]);
         }
     }

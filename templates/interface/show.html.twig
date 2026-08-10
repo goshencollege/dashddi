@@ -102,6 +102,12 @@
                         <td colspan="2"></td>
                         {% endif %}
                     </tr>
+                    {% if interface.host and interface.host.duid %}
+                    <tr>
+                        <th class="text-muted fw-normal ps-3">DUID</th>
+                        <td colspan="3"><code>{{ interface.host.duid }}</code> <span class="text-muted small">(host-level)</span></td>
+                    </tr>
+                    {% endif %}
                     {% if interface.notes %}
                     <tr>
                         <th class="text-muted fw-normal ps-3">Notes</th>
