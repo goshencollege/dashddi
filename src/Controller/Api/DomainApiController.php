@@ -97,6 +97,7 @@ class DomainApiController extends AbstractController
         if ($has('soa_retry'))                            { $domain->setSoaRetry(isset($data['soa_retry']) ? (int) $data['soa_retry'] : null); }
         if ($has('soa_expire'))                           { $domain->setSoaExpire(isset($data['soa_expire']) ? (int) $data['soa_expire'] : null); }
         if ($has('soa_ttl'))                              { $domain->setSoaTtl(isset($data['soa_ttl']) ? (int) $data['soa_ttl'] : null); }
+        if ($has('default_ttl'))                          { $domain->setDefaultTtl(isset($data['default_ttl']) ? (int) $data['default_ttl'] : null); }
         if ($has('exclude_from_interfaces'))               { $domain->setExcludeFromInterfaces((bool) ($data['exclude_from_interfaces'] ?? false)); }
 
         if ($has('view_ids')) {
@@ -120,6 +121,7 @@ class DomainApiController extends AbstractController
             'soa_retry'      => $domain->getSoaRetry(),
             'soa_expire'     => $domain->getSoaExpire(),
             'soa_ttl'        => $domain->getSoaTtl(),
+            'default_ttl'    => $domain->getDefaultTtl(),
             'exclude_from_interfaces' => $domain->isExcludeFromInterfaces(),
             'view_ids'       => $domain->getViews()->map(fn($v) => $v->getId())->toArray(),
             'created_at'     => $domain->getCreatedAt()->format(\DateTimeInterface::ATOM),

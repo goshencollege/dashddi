@@ -72,7 +72,8 @@ class DnsConfigGenerator
     public function generateZoneFile(Domain $domain, ?DnsView $view = null, ?string $zoneName = null): string
     {
         $effectiveName = $zoneName ?? $domain->getName();
-        $defaultTtl = $domain->getSoaTtl() ?? 3600;
+        $defaultTtl = $domain->getDefaultTtl() ?? 3600;
+        $soaMinTtl  = $domain->getSoaTtl() ?? 3600;
         $serial     = $this->generateSerial();
         $nameserver = $this->ensureTrailingDot($domain->getSoaNameserver() ?? ('ns1.' . $effectiveName . '.'));
         $email      = $this->emailToRname($domain->getSoaEmail() ?? ('hostmaster.' . $effectiveName . '.'));
@@ -89,7 +90,7 @@ class DnsConfigGenerator
         $lines[] = '';
         $lines[] = sprintf(
             "@ IN SOA %s %s (\n    %-12s ; serial\n    %-12s ; refresh\n    %-12s ; retry\n    %-12s ; expire\n    %-12s ; minimum TTL\n)",
-            $nameserver, $email, $serial, $refresh, $retry, $expire, $defaultTtl
+            $nameserver, $email, $serial, $refresh, $retry, $expire, $soaMinTtl
         );
         $lines[] = '';
 
@@ -188,7 +189,8 @@ class DnsConfigGenerator
 
         $nameserver = $this->ensureTrailingDot($subnet->getSoaNameserver() ?? $this->defaultNs($view));
         $email      = $this->emailToRname($subnet->getSoaEmail() ?? $this->defaultEmail($view, false));
-        $defaultTtl = $subnet->getSoaTtl()    ?? 3600;
+        $defaultTtl = $subnet->getDefaultTtl() ?? 3600;
+        $soaMinTtl  = $subnet->getSoaTtl()     ?? 3600;
         $refresh    = $subnet->getSoaRefresh() ?? 3600;
         $retry      = $subnet->getSoaRetry()   ?? 900;
         $expire     = $subnet->getSoaExpire()  ?? 604800;
@@ -203,7 +205,7 @@ class DnsConfigGenerator
         $lines[] = '';
         $lines[] = sprintf(
             "@ IN SOA %s %s (\n    %-12s ; serial\n    %-12s ; refresh\n    %-12s ; retry\n    %-12s ; expire\n    %-12s ; minimum TTL\n)",
-            $nameserver, $email, $serial, $refresh, $retry, $expire, $defaultTtl
+            $nameserver, $email, $serial, $refresh, $retry, $expire, $soaMinTtl
         );
         $lines[] = '';
 
@@ -494,7 +496,8 @@ class DnsConfigGenerator
      */
     public function generateDomainApexNsUpdate(Domain $domain, ?DnsView $view = null): string
     {
-        $ttl        = $domain->getSoaTtl()      ?? 3600;
+        $ttl        = $domain->getDefaultTtl()  ?? 3600;
+        $soaMinTtl  = $domain->getSoaTtl()      ?? 3600;
         $nameserver = $this->ensureTrailingDot($domain->getSoaNameserver() ?? ('ns1.' . $domain->getName() . '.'));
         $email      = $this->emailToRname($domain->getSoaEmail() ?? ('hostmaster.' . $domain->getName() . '.'));
         $refresh    = $domain->getSoaRefresh()  ?? 3600;
@@ -502,7 +505,7 @@ class DnsConfigGenerator
         $expire     = $domain->getSoaExpire()   ?? 604800;
         $zone       = rtrim($domain->getName(), '.') . '.';
 
-        return $this->buildApexNsUpdate($zone, $nameserver, $email, $ttl, $refresh, $retry, $expire, $view?->getNsUpdateSourceAddress());
+        return $this->buildApexNsUpdate($zone, $nameserver, $email, $ttl, $refresh, $retry, $expire, $soaMinTtl, $view?->getNsUpdateSourceAddress());
     }
 
     /**
@@ -514,7 +517,8 @@ class DnsConfigGenerator
      */
     public function generateSubnetApexNsUpdate(Subnet $subnet, string $cidr, ?DnsView $view = null, array $extraSubnets = []): string
     {
-        $ttl        = $subnet->getSoaTtl()      ?? 3600;
+        $ttl        = $subnet->getDefaultTtl()  ?? 3600;
+        $soaMinTtl  = $subnet->getSoaTtl()      ?? 3600;
         $nameserver = $this->ensureTrailingDot($subnet->getSoaNameserver() ?? $this->defaultNs($view));
         $email      = $this->emailToRname($subnet->getSoaEmail() ?? $this->defaultEmail($view, false));
         $refresh    = $subnet->getSoaRefresh()  ?? 3600;
@@ -522,7 +526,7 @@ class DnsConfigGenerator
         $expire     = $subnet->getSoaExpire()   ?? 604800;
         $zone       = $this->reverseZoneName($cidr) . '.';
         $serial     = $this->generateSerial();
-        $soa        = implode(' ', [$nameserver, $email, $serial, $refresh, $retry, $expire, $ttl]);
+        $soa        = implode(' ', [$nameserver, $email, $serial, $refresh, $retry, $expire, $soaMinTtl]);
 
         [$address, $prefixStr] = explode('/', $cidr);
         $prefix = (int) $prefixStr;
@@ -862,10 +866,11 @@ class DnsConfigGenerator
         int $refresh,
         int $retry,
         int $expire,
+        int $soaMinTtl,
         ?string $localAddress = null,
     ): string {
         $serial = $this->generateSerial();
-        $soa    = implode(' ', [$nameserver, $email, $serial, $refresh, $retry, $expire, $ttl]);
+        $soa    = implode(' ', [$nameserver, $email, $serial, $refresh, $retry, $expire, $soaMinTtl]);
 
         $lines = [];
         if ($localAddress !== null) {

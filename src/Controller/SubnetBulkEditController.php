@@ -56,6 +56,7 @@ class SubnetBulkEditController extends AbstractController
             $applySoaRetry      = !empty($post['apply_soaRetry']);
             $applySoaExpire     = !empty($post['apply_soaExpire']);
             $applySoaTtl        = !empty($post['apply_soaTtl']);
+            $applyDefaultTtl    = !empty($post['apply_defaultTtl']);
             $applyViews         = !empty($post['apply_views']);
             $applyDnssec        = !empty($post['apply_dnssecPolicy']);
             $applyRetention     = !empty($post['apply_leaseRetentionDays']);
@@ -107,6 +108,9 @@ class SubnetBulkEditController extends AbstractController
                 }
                 if ($applySoaTtl) {
                     $subnet->setSoaTtl($data['soaTtl']);
+                }
+                if ($applyDefaultTtl) {
+                    $subnet->setDefaultTtl($data['defaultTtl']);
                 }
                 if ($applyViews) {
                     $newViews = $data['views'] ?? [];

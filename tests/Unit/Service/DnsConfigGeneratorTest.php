@@ -51,6 +51,14 @@ class DnsConfigGeneratorTest extends TestCase
         return $subnet;
     }
 
+    private function makeDomain(string $name = 'example.com'): Domain
+    {
+        return (new Domain())
+            ->setName($name)
+            ->setSoaNameserver('ns1.example.com')
+            ->setSoaEmail('hostmaster@example.com');
+    }
+
     private function makeView(int $id, string $name = 'internal'): DnsView
     {
         $view = (new DnsView())->setName($name);
@@ -785,5 +793,47 @@ class DnsConfigGeneratorTest extends TestCase
         (new \ReflectionProperty(Subnet::class, 'virtualIps'))->setValue($subnet, new ArrayCollection([$vip]));
 
         return $subnet;
+    }
+
+    // ── Default TTL vs Minimum TTL ───────────────────────────────────────────
+
+    public function testForwardZoneFileUsesDefaultTtlForDirectiveAndSoaTtlForMinimum(): void
+    {
+        $domain = $this->makeDomain()->setDefaultTtl(7200)->setSoaTtl(3600);
+        $output = $this->generator->generateZoneFile($domain);
+
+        $this->assertStringContainsString('$TTL 7200', $output);
+        $this->assertMatchesRegularExpression('/3600\s*;\s*minimum TTL/', $output);
+        $this->assertStringNotContainsString('$TTL 3600', $output);
+    }
+
+    public function testReverseZoneFileUsesDefaultTtlForDirectiveAndSoaTtlForMinimum(): void
+    {
+        $subnet = $this->makeSubnet('10.0.0.0/24')->setDefaultTtl(7200)->setSoaTtl(3600);
+        $output = $this->generator->generateReverseZoneFile($subnet, '10.0.0.0/24');
+
+        $this->assertStringContainsString('$TTL 7200', $output);
+        $this->assertMatchesRegularExpression('/3600\s*;\s*minimum TTL/', $output);
+        $this->assertStringNotContainsString('$TTL 3600', $output);
+    }
+
+    public function testDomainApexNsUpdateUsesDefaultTtlForRecordsAndSoaTtlForMinimum(): void
+    {
+        $domain = $this->makeDomain()->setDefaultTtl(7200)->setSoaTtl(3600);
+        $this->generator->forceSerial(2026010101);
+        $output = $this->generator->generateDomainApexNsUpdate($domain);
+
+        $this->assertStringContainsString('update add example.com. 7200 IN NS', $output);
+        $this->assertMatchesRegularExpression('/update add example\.com\. 7200 IN SOA .* 3600$/m', $output);
+    }
+
+    public function testSubnetApexNsUpdateUsesDefaultTtlForRecordsAndSoaTtlForMinimum(): void
+    {
+        $subnet = $this->makeSubnet('10.0.0.0/24')->setDefaultTtl(7200)->setSoaTtl(3600);
+        $this->generator->forceSerial(2026010101);
+        $output = $this->generator->generateSubnetApexNsUpdate($subnet, '10.0.0.0/24');
+
+        $this->assertMatchesRegularExpression('/0\.0\.10\.in-addr\.arpa\. 7200 IN NS/', $output);
+        $this->assertMatchesRegularExpression('/0\.0\.10\.in-addr\.arpa\. 7200 IN SOA .* 3600$/m', $output);
     }
 }

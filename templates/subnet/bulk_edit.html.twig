@@ -184,6 +184,17 @@
             <td></td>
         </tr>
 
+        <tr class="bulk-row inactive" data-field="defaultTtl">
+            <td class="text-center ps-2">
+                <input type="checkbox" class="form-check-input apply-checkbox" name="apply_defaultTtl" id="apply_defaultTtl">
+            </td>
+            <td><label for="apply_defaultTtl" class="form-label fw-semibold mb-0 cursor-pointer">Default TTL (s)</label></td>
+            <td>
+                {{ form_widget(form.defaultTtl, {attr: {class: 'form-control form-control-sm', style: 'max-width:10rem'}}) }}
+            </td>
+            <td></td>
+        </tr>
+
         {# ── DNS Views ─────────────────────────────────────────── #}
         <tr class="table-section-header">
             <td colspan="4" class="small text-uppercase text-muted fw-semibold py-2 ps-3">DNS</td>

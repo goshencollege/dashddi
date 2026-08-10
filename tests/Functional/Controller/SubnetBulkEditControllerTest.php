@@ -165,6 +165,23 @@ class SubnetBulkEditControllerTest extends AppWebTestCase
         $this->assertSame(300, $s1->getSoaTtl());
     }
 
+    public function testPostAppliesDefaultTtl(): void
+    {
+        $s1 = $this->makeSubnet('Bulk Default TTL A', '10.68.1.0/24');
+        $s1Id = $s1->getId();
+
+        $this->postBulkEdit(
+            [$s1Id],
+            ['defaultTtl' => '7200'],
+            ['apply_defaultTtl' => '1'],
+        );
+        $this->assertResponseRedirects('/subnets');
+
+        $this->em->clear();
+        $s1 = $this->em->find(Subnet::class, $s1Id);
+        $this->assertSame(7200, $s1->getDefaultTtl());
+    }
+
     public function testPostTagsReplaceMode(): void
     {
         $existing = (new Tag())->setName('existing-tag');

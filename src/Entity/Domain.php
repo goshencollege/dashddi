@@ -61,6 +61,10 @@ class Domain
     #[Assert\PositiveOrZero]
     private ?int $soaTtl = 3600;
 
+    #[ORM\Column(nullable: true)]
+    #[Assert\PositiveOrZero]
+    private ?int $defaultTtl = 3600;
+
     #[ORM\ManyToOne(targetEntity: DnssecPolicy::class)]
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
     private ?DnssecPolicy $dnssecPolicy = null;
@@ -119,6 +123,9 @@ class Domain
 
     public function getSoaTtl(): ?int { return $this->soaTtl; }
     public function setSoaTtl(?int $soaTtl): static { $this->soaTtl = $soaTtl; return $this; }
+
+    public function getDefaultTtl(): ?int { return $this->defaultTtl; }
+    public function setDefaultTtl(?int $defaultTtl): static { $this->defaultTtl = $defaultTtl; return $this; }
 
     public function getDnssecPolicy(): ?DnssecPolicy { return $this->dnssecPolicy; }
     public function setDnssecPolicy(?DnssecPolicy $v): static { $this->dnssecPolicy = $v; return $this; }

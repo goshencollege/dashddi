@@ -111,6 +111,14 @@
                             {{ form_errors(form.soaTtl) }}
                         </div>
                     </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-6">
+                            {{ form_label(form.defaultTtl, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
+                            {{ form_widget(form.defaultTtl, {attr: {class: 'form-control'}}) }}
+                            {{ form_help(form.defaultTtl) }}
+                            {{ form_errors(form.defaultTtl) }}
+                        </div>
+                    </div>
                     <hr class="my-3">
                     {% if form.views|length > 0 %}
                     <div class="mb-4">

@@ -61,6 +61,14 @@
                         {{ form_errors(form.soaTtl) }}
                     </div>
                 </div>
+                <div class="row g-3 mb-4">
+                    <div class="col-6">
+                        {{ form_label(form.defaultTtl) }}
+                        {{ form_widget(form.defaultTtl, {attr: {class: 'form-control'}}) }}
+                        {{ form_help(form.defaultTtl) }}
+                        {{ form_errors(form.defaultTtl) }}
+                    </div>
+                </div>
                 <hr class="my-3">
                 <div class="mb-4">
                     <label class="form-label fw-semibold">BIND9 Views</label>
