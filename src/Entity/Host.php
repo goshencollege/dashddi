@@ -62,11 +62,11 @@ class Host
         'DUID-UUID'      => '0004',
     ];
 
-    /** Canonical display label per RFC 8415 DUID type code, for showing the type back alongside the stored hex. */
-    private const DUID_TYPE_DISPLAY_LABELS = [
-        '0001' => 'DUID-LLT (Link-Layer + Time)',
-        '0002' => 'DUID-EN / Vendor (Enterprise)',
-        '0003' => 'DUID-LL (Link-Layer)',
+    /** Canonical `networkctl`-style label per RFC 8415 DUID type code, for reconstructing its display format. */
+    private const DUID_TYPE_NETWORKCTL_LABELS = [
+        '0001' => 'DUID-LLT',
+        '0002' => 'DUID-EN/Vendor',
+        '0003' => 'DUID-LL',
         '0004' => 'DUID-UUID',
     ];
 
@@ -136,14 +136,21 @@ class Host
         return $this;
     }
 
-    /** Decodes the stored DUID's leading 2-byte RFC 8415 type code back into a human-readable label, for display. */
-    public function getDuidTypeLabel(): ?string
+    /**
+     * Reformats the stored DUID the way `networkctl status` displays it (e.g.
+     * "DUID-EN/Vendor:0000ab11cc5702f3da97b768") by swapping the leading 2-byte
+     * type code for its text label — the same format a user would paste in.
+     * Falls back to the raw colon-separated hex if the type code isn't recognized.
+     */
+    public function getDuidDisplay(): ?string
     {
         if ($this->duid === null) {
             return null;
         }
-        $code = substr(str_replace(':', '', $this->duid), 0, 4);
-        return self::DUID_TYPE_DISPLAY_LABELS[$code] ?? null;
+        $hex   = str_replace(':', '', $this->duid);
+        $label = self::DUID_TYPE_NETWORKCTL_LABELS[substr($hex, 0, 4)] ?? null;
+
+        return $label !== null ? $label . ':' . substr($hex, 4) : $this->duid;
     }
 
     public function getLocation(): ?string
