@@ -70,6 +70,34 @@ class HostControllerTest extends AppWebTestCase
         $this->assertResponseRedirects();
     }
 
+    public function testEditFormPrefillsDuidInNetworkctlFormat(): void
+    {
+        $host = (new Host())->setName('duid-prefill-host');
+        $host->setDuid('00020000ab11cc5702f3da97b768'); // stored as 00:02:00:00:ab:11:cc:57:02:f3:da:97:b7:68
+        $this->em->persist($host);
+        $this->em->flush();
+
+        $crawler = $this->client->request('GET', "/hosts/{$host->getId()}/edit");
+        $this->assertSame('DUID-EN/Vendor:0000ab11cc5702f3da97b768', $crawler->filter('form')->form()->get('host[duid]')->getValue());
+    }
+
+    public function testUpdateRoundTripsDuidPastedInNetworkctlFormat(): void
+    {
+        $host = (new Host())->setName('duid-roundtrip-host');
+        $this->em->persist($host);
+        $this->em->flush();
+
+        $crawler = $this->client->request('GET', "/hosts/{$host->getId()}/edit");
+        $this->client->submit($crawler->filter('form')->form(), [
+            'host[duid]' => 'DUID-EN/Vendor:0000ab11cc5702f3da97b768',
+        ]);
+        $this->assertResponseRedirects();
+
+        $this->em->clear();
+        $updated = $this->em->getRepository(Host::class)->find($host->getId());
+        $this->assertSame('00:02:00:00:ab:11:cc:57:02:f3:da:97:b7:68', $updated->getDuid());
+    }
+
     public function testDelete(): void
     {
         $host = (new Host())->setName('delete-host');
