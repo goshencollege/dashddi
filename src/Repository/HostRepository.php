@@ -175,6 +175,21 @@ class HostRepository extends ServiceEntityRepository
         $isIpLike  = (bool) preg_match('/^\d[\d.]*\./', $query);  // "192.168", "10.0.0.1"
         $hasNonHex = (bool) preg_match('/[g-zG-Z]/', $query);     // letters outside hex range
 
+        // DUID search accepts either the raw hex form or a networkctl-style type label
+        // (e.g. "DUID-EN/Vendor"). A recognized label makes the intent unambiguous even
+        // though it contains non-hex letters; a bare hex/digit query is only treated as
+        // a DUID candidate in the same "ambiguous" case MAC addresses are (never when the
+        // query looks like an IP address, to avoid matching dotted-decimal digits).
+        $duidCandidate        = Host::normalizeDuidTypeLabel($query);
+        $duidLabelRecognized  = $duidCandidate !== $query;
+        $duidHex              = preg_replace('/[^0-9a-fA-F]/', '', $duidCandidate);
+        $duidPattern          = null;
+        if ($duidHex !== '' && ($duidLabelRecognized || (!$isIpLike && !$hasNonHex))) {
+            $duidPattern = '%' . (strlen($duidHex) % 2 === 0
+                ? implode(':', str_split(strtolower($duidHex), 2))
+                : strtolower($duidHex)) . '%';
+        }
+
         if ($isIpLike) {
             // Query looks like an IP address — only search address fields, skip all text.
             $or = $qb->expr()->orX(
@@ -232,7 +247,6 @@ class HostRepository extends ServiceEntityRepository
                 'h.name LIKE :q',
                 'b.name LIKE :q',
                 'h.room LIKE :q',
-                'h.duid LIKE :q',
                 "CONCAT(COALESCE(b.name, ''), COALESCE(h.room, '')) LIKE :q",
                 <<<'DQL'
                     EXISTS (
@@ -272,7 +286,15 @@ class HostRepository extends ServiceEntityRepository
             );
         }
 
+        if ($duidPattern !== null) {
+            $or->add('h.duid LIKE :duidQ');
+        }
+
         $qb->andWhere($or)->setParameter('q', $q);
+
+        if ($duidPattern !== null) {
+            $qb->setParameter('duidQ', $duidPattern);
+        }
 
         $hex = preg_replace('/[^0-9a-fA-F]/', '', $query);
         if (strlen($hex) === 12) {
@@ -420,7 +442,7 @@ class HostRepository extends ServiceEntityRepository
                 return "{$not}(h.room $cmp :sp_{$n})";
 
             case 'duid':
-                $duidParam = $this->normalizeHexLike($value);
+                $duidParam = $this->normalizeHexLike(Host::normalizeDuidTypeLabel($value));
                 $duidCmp = str_contains($duidParam, '%') ? 'LIKE' : '=';
                 $qb->setParameter("sp_$n", $duidParam);
                 return "{$not}(h.duid $duidCmp :sp_{$n})";
