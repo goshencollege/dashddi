@@ -50,7 +50,7 @@
     <div class="card-header fw-semibold"><i class="bi bi-search me-1"></i>Searching for Hosts</div>
     <div class="card-body">
         <h6>Simple Search</h6>
-        <p>Type in the search bar at the top of the host list. The simple search matches against host name, location (building / room), subnet name, IP address (IPv4 or IPv6), MAC address, and DNS name. Use <code>*</code> as a wildcard (e.g. <code>web*</code>, <code>10.0.*</code>).</p>
+        <p>Type in the search bar at the top of the host list. The simple search matches against host name, location (building / room), subnet name, IP address (IPv4 or IPv6), MAC address, DUID, and DNS name. Use <code>*</code> as a wildcard (e.g. <code>web*</code>, <code>10.0.*</code>).</p>
 
         <h6 class="mt-3">Condition Builder</h6>
         <p>Click <strong>Advanced</strong> to open the condition builder. The builder lets you compose precise filters using multiple fields, operators, and values — with full AND / OR support.</p>
@@ -97,6 +97,11 @@
                         <td>MAC Address</td>
                         <td>contains, starts with, ends with, equals, and negatives</td>
                         <td>Use <code>aa:bb:*</code> to match by OUI prefix</td>
+                    </tr>
+                    <tr>
+                        <td>DUID</td>
+                        <td>contains, starts with, ends with, equals, and negatives</td>
+                        <td>Matches the host's DHCPv6 client identifier; hex digits are matched regardless of colon placement</td>
                     </tr>
                     <tr>
                         <td>DNS Name</td>

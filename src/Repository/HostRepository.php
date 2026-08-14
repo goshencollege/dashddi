@@ -227,11 +227,12 @@ class HostRepository extends ServiceEntityRepository
                 DQL
             );
         } else {
-            // Ambiguous (pure digits, hex chars, partial MAC) — run everything to be safe.
+            // Ambiguous (pure digits, hex chars, partial MAC/DUID) — run everything to be safe.
             $or = $qb->expr()->orX(
                 'h.name LIKE :q',
                 'b.name LIKE :q',
                 'h.room LIKE :q',
+                'h.duid LIKE :q',
                 "CONCAT(COALESCE(b.name, ''), COALESCE(h.room, '')) LIKE :q",
                 <<<'DQL'
                     EXISTS (
@@ -419,9 +420,10 @@ class HostRepository extends ServiceEntityRepository
                 return "{$not}(h.room $cmp :sp_{$n})";
 
             case 'duid':
-                [$cmp, $param] = $this->toStructuredLikeOrEq($value);
-                $qb->setParameter("sp_$n", $param);
-                return "{$not}(h.duid $cmp :sp_{$n})";
+                $duidParam = $this->normalizeHexLike($value);
+                $duidCmp = str_contains($duidParam, '%') ? 'LIKE' : '=';
+                $qb->setParameter("sp_$n", $duidParam);
+                return "{$not}(h.duid $duidCmp :sp_{$n})";
 
             case 'building':
                 $qb->setParameter("sp_$n", (int) $value);
@@ -454,7 +456,7 @@ class HostRepository extends ServiceEntityRepository
                     DQL;
 
             case 'mac':
-                $macParam = $this->normalizeMacLike($value);
+                $macParam = $this->normalizeHexLike($value, 12);
                 $macCmp = str_contains($macParam, '%') ? 'LIKE' : '=';
                 $qb->setParameter("sp_$n", $macParam);
                 return "{$not}EXISTS (SELECT 1 FROM App\Entity\NetworkInterface i{$n} WHERE i{$n}.host = h AND i{$n}.macAddress $macCmp :sp_{$n})";
@@ -714,14 +716,15 @@ class HostRepository extends ServiceEntityRepository
     }
 
     /**
-     * Normalise a user-supplied MAC search value to a LIKE pattern that matches
-     * the stored aa:bb:cc:dd:ee:ff format.  Delimiters (colons, dashes, dots,
-     * spaces) are stripped from each segment; remaining hex digits are re-paired
-     * with colons.  A bare 12-hex-digit string produces an exact pattern; any
-     * shorter input produces a substring pattern (%...%); explicit * wildcards
-     * are preserved and converted to % exactly as toLike() does for other fields.
+     * Normalise a user-supplied hex search value (MAC or DUID) to a LIKE pattern
+     * that matches the stored aa:bb:cc:... format.  Delimiters (colons, dashes,
+     * dots, spaces) are stripped from each segment; remaining hex digits are
+     * re-paired with colons.  When $exactLength is given, a bare hex string of
+     * that length produces an exact pattern; any other input produces a
+     * substring pattern (%...%); explicit * wildcards are preserved and
+     * converted to % exactly as toLike() does for other fields.
      */
-    private function normalizeMacLike(string $value): string
+    private function normalizeHexLike(string $value, ?int $exactLength = null): string
     {
         $hasStar = str_contains($value, '*');
         $parts   = explode('*', $value);
@@ -738,9 +741,9 @@ class HostRepository extends ServiceEntityRepository
             return implode('%', $normalized);
         }
 
-        // No wildcard: full 12-hex-digit MAC → exact match; partial → substring.
+        // No wildcard: a bare hex string of $exactLength → exact match; anything else → substring.
         $totalHex = preg_replace('/[^0-9a-fA-F]/', '', $value);
-        if (strlen($totalHex) === 12) {
+        if ($exactLength !== null && strlen($totalHex) === $exactLength) {
             return $normalized[0];
         }
 

@@ -98,6 +98,40 @@ class HostControllerTest extends AppWebTestCase
         $this->assertSame('00:02:00:00:ab:11:cc:57:02:f3:da:97:b7:68', $updated->getDuid());
     }
 
+    public function testPlainSearchMatchesHostByDuid(): void
+    {
+        $host = (new Host())->setName('duid-search-host');
+        $host->setDuid('00020000ab11cc5702f3da97b768');
+        $this->em->persist($host);
+
+        $other = (new Host())->setName('duid-search-other');
+        $this->em->persist($other);
+        $this->em->flush();
+
+        $this->client->request('GET', '/hosts?' . http_build_query(['q' => 'cc:57:02']));
+        $this->assertResponseIsSuccessful();
+        $content = $this->client->getResponse()->getContent();
+        $this->assertStringContainsString('duid-search-host', $content);
+        $this->assertStringNotContainsString('duid-search-other', $content);
+    }
+
+    public function testStructuredSearchMatchesHostByDuid(): void
+    {
+        $host = (new Host())->setName('duid-structured-host');
+        $host->setDuid('00020000ab11cc5702f3da97b768');
+        $this->em->persist($host);
+
+        $other = (new Host())->setName('duid-structured-other');
+        $this->em->persist($other);
+        $this->em->flush();
+
+        $this->client->request('GET', '/hosts?' . http_build_query(['q' => 'duid:cc5702']));
+        $this->assertResponseIsSuccessful();
+        $content = $this->client->getResponse()->getContent();
+        $this->assertStringContainsString('duid-structured-host', $content);
+        $this->assertStringNotContainsString('duid-structured-other', $content);
+    }
+
     public function testDelete(): void
     {
         $host = (new Host())->setName('delete-host');
