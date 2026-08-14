@@ -118,7 +118,7 @@
         <form method="get" action="{{ path('host_index') }}" class="flex-grow-1 ps-3" id="simple-search-form">
             <div class="input-group">
                 <span class="input-group-text"><i class="bi bi-search"></i></span>
-                <input type="search" name="q" id="q-input" class="form-control" placeholder="Search by name, location, subnet, IP address, MAC, or DNS name…" value="{{ query }}">
+                <input type="search" name="q" id="q-input" class="form-control" placeholder="Search by name, location, subnet, IP address, MAC, DUID, or DNS name…" value="{{ query }}">
                 <button type="submit" class="btn btn-outline-secondary">Search</button>
                 {% if query or isAdvanced %}
                     <a href="{{ path('host_index', {reset: 1}) }}" class="btn btn-outline-secondary">Clear</a>
@@ -634,6 +634,7 @@ const FIELDS = {
     subnet:        { label: 'Subnet',        type: 'select', options: FILTER_SUBNETS },
     ip:            { label: 'IP Address',    type: 'text' },
     mac:           { label: 'MAC Address',   type: 'text' },
+    duid:          { label: 'DUID',          type: 'text' },
     dns:           { label: 'DNS Name',      type: 'text' },
     tag:           { label: 'Tag',           type: 'tag', options: FILTER_TAGS },
     dhcp_mismatch: { label: 'DHCP Mismatch', type: 'bool' },

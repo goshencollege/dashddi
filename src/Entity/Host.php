@@ -119,21 +119,31 @@ class Host
             return $this;
         }
 
-        $hex = null;
-        foreach (self::DUID_TYPE_LABELS as $label => $typeCode) {
-            $pos = stripos($duid, $label);
-            if ($pos !== false) {
-                $remainder = substr($duid, $pos + strlen($label));
-                $hex = $typeCode . preg_replace('/[^0-9a-fA-F]/', '', $remainder);
-                break;
-            }
-        }
-        $hex ??= preg_replace('/[^0-9a-fA-F]/', '', $duid);
+        $hex = preg_replace('/[^0-9a-fA-F]/', '', self::normalizeDuidTypeLabel($duid));
 
         $this->duid = (strlen($hex) >= 4 && strlen($hex) % 2 === 0)
             ? implode(':', str_split(strtolower($hex), 2))
             : strtolower($duid);
         return $this;
+    }
+
+    /**
+     * Recognizes a `networkctl`-style DUID type label (e.g. "DUID-EN/Vendor") in $value
+     * and replaces everything up to and including the label with its RFC 8415 2-byte
+     * type code, so surrounding chatter (e.g. "DHCP6 client DUID: ...") is discarded
+     * along with the label itself. Shared by setDuid() (pasted values) and
+     * HostRepository's DUID search normalization, so both accept the label or the raw
+     * hex form.
+     */
+    public static function normalizeDuidTypeLabel(string $value): string
+    {
+        foreach (self::DUID_TYPE_LABELS as $label => $typeCode) {
+            $pos = stripos($value, $label);
+            if ($pos !== false) {
+                return $typeCode . substr($value, $pos + strlen($label));
+            }
+        }
+        return $value;
     }
 
     /**

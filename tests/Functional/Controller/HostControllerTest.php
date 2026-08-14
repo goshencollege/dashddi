@@ -98,6 +98,88 @@ class HostControllerTest extends AppWebTestCase
         $this->assertSame('00:02:00:00:ab:11:cc:57:02:f3:da:97:b7:68', $updated->getDuid());
     }
 
+    public function testPlainSearchMatchesHostByDuid(): void
+    {
+        $host = (new Host())->setName('duid-search-host');
+        $host->setDuid('00020000ab11cc5702f3da97b768');
+        $this->em->persist($host);
+
+        $other = (new Host())->setName('duid-search-other');
+        $this->em->persist($other);
+        $this->em->flush();
+
+        $this->client->request('GET', '/hosts?' . http_build_query(['q' => 'cc:57:02']));
+        $this->assertResponseIsSuccessful();
+        $content = $this->client->getResponse()->getContent();
+        $this->assertStringContainsString('duid-search-host', $content);
+        $this->assertStringNotContainsString('duid-search-other', $content);
+    }
+
+    public function testStructuredSearchMatchesHostByDuid(): void
+    {
+        $host = (new Host())->setName('duid-structured-host');
+        $host->setDuid('00020000ab11cc5702f3da97b768');
+        $this->em->persist($host);
+
+        $other = (new Host())->setName('duid-structured-other');
+        $this->em->persist($other);
+        $this->em->flush();
+
+        $this->client->request('GET', '/hosts?' . http_build_query(['q' => 'duid:cc5702']));
+        $this->assertResponseIsSuccessful();
+        $content = $this->client->getResponse()->getContent();
+        $this->assertStringContainsString('duid-structured-host', $content);
+        $this->assertStringNotContainsString('duid-structured-other', $content);
+    }
+
+    public function testPlainSearchMatchesHostByDuidTypeLabel(): void
+    {
+        $enVendor = (new Host())->setName('duid-label-en-vendor');
+        $enVendor->setDuid('00020000ab11cc5702f3da97b768'); // DUID-EN/Vendor
+        $this->em->persist($enVendor);
+
+        $llt = (new Host())->setName('duid-label-llt');
+        $llt->setDuid('00010000ab11cc5702f3da97b768'); // DUID-LLT
+        $this->em->persist($llt);
+        $this->em->flush();
+
+        $this->client->request('GET', '/hosts?' . http_build_query(['q' => 'DUID-EN/Vendor']));
+        $this->assertResponseIsSuccessful();
+        $content = $this->client->getResponse()->getContent();
+        $this->assertStringContainsString('duid-label-en-vendor', $content);
+        $this->assertStringNotContainsString('duid-label-llt', $content);
+    }
+
+    public function testStructuredSearchMatchesHostByDuidTypeLabel(): void
+    {
+        $enVendor = (new Host())->setName('duid-structured-label-en-vendor');
+        $enVendor->setDuid('00020000ab11cc5702f3da97b768'); // DUID-EN/Vendor
+        $this->em->persist($enVendor);
+
+        $llt = (new Host())->setName('duid-structured-label-llt');
+        $llt->setDuid('00010000ab11cc5702f3da97b768'); // DUID-LLT
+        $this->em->persist($llt);
+        $this->em->flush();
+
+        $this->client->request('GET', '/hosts?' . http_build_query(['q' => 'duid:DUID-EN/Vendor']));
+        $this->assertResponseIsSuccessful();
+        $content = $this->client->getResponse()->getContent();
+        $this->assertStringContainsString('duid-structured-label-en-vendor', $content);
+        $this->assertStringNotContainsString('duid-structured-label-llt', $content);
+    }
+
+    public function testPlainSearchIpLikeQueryDoesNotFalsePositiveOnDuidHexDigits(): void
+    {
+        $host = (new Host())->setName('duid-ip-guard-host');
+        $host->setDuid('00100200ab11cc5702f3da97b768'); // hex digits happen to contain "10.02.00"-like substrings
+        $this->em->persist($host);
+        $this->em->flush();
+
+        $this->client->request('GET', '/hosts?' . http_build_query(['q' => '10.02.00']));
+        $this->assertResponseIsSuccessful();
+        $this->assertStringNotContainsString('duid-ip-guard-host', $this->client->getResponse()->getContent());
+    }
+
     public function testDelete(): void
     {
         $host = (new Host())->setName('delete-host');
