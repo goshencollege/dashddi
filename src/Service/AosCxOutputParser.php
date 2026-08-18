@@ -12,52 +12,44 @@ class AosCxOutputParser
     /**
      * Parses `show interface brief` into per-port link status/speed.
      *
+     * Deliberately does NOT measure column positions from the header line: AOS-CX
+     * pads header labels ("Enabled", "Status") to the label's own width rather than
+     * the data column's width, so a wide label can butt up against the next one with
+     * only a single space while the data below it (short values like "yes") stays
+     * separated by several — header-derived column offsets silently misalign against
+     * the data. Instead this parses each physical-port row by its fixed field order:
+     * `port  native-vlan  mode  type  enabled  status  [reason...]  speed  [description...]`,
+     * scanning forward from Status for the first purely-numeric-or-"--" token to find
+     * Speed (anything between Status and that token is the free-text Reason column,
+     * e.g. "Waiting for link", which is present only for down ports).
+     *
      * @return array<string, array{status: ?string, speed: ?string}>
      */
     public static function parseInterfaceBrief(string $output): array
     {
         $ports = [];
-        $lines = explode("\n", $output);
 
-        $headerLine = null;
-        foreach ($lines as $i => $line) {
-            if (preg_match('/\bStatus\b/i', $line) && (preg_match('/\bPort\b|\bEthernet\b/i', $line))) {
-                $headerLine = $i;
-                break;
+        foreach (explode("\n", $output) as $line) {
+            $line = trim($line);
+            if ($line === '') continue;
+
+            $tokens = preg_split('/\s+/', $line);
+            if (count($tokens) < 6 || !preg_match('/^\d+\/\d+\/\d+$/', $tokens[0])) continue;
+
+            $port   = $tokens[0];
+            $status = $tokens[5];
+
+            $speed = null;
+            for ($i = 6; $i < count($tokens); $i++) {
+                if (preg_match('/^(\d+|--)$/', $tokens[$i])) {
+                    $speed = $tokens[$i];
+                    break;
+                }
             }
-        }
-
-        if ($headerLine === null) {
-            return $ports;
-        }
-
-        $cols   = preg_split('/\s{2,}/', trim($lines[$headerLine]));
-        $colMap = [];
-        foreach ($cols as $ci => $col) {
-            $col = strtolower(trim($col));
-            if ($col === 'ethernet' || $col === 'port')      $colMap['port']   = $ci;
-            if (str_contains($col, 'status'))                $colMap['status'] = $ci;
-            if (str_contains($col, 'reason'))                $colMap['reason'] = $ci;
-            if (str_contains($col, 'speed'))                 $colMap['speed']  = $ci;
-        }
-
-        for ($i = $headerLine + 1; $i < count($lines); $i++) {
-            $line = trim($lines[$i]);
-            if ($line === '' || preg_match('/^-+$/', $line)) continue;
-
-            $parts = preg_split('/\s{2,}/', $line);
-            if (count($parts) < 2) continue;
-
-            $port = $parts[$colMap['port'] ?? 0] ?? null;
-            if ($port === null || !preg_match('/^\d+\/\d+\/\d+$/', $port)) continue;
-
-            $status = isset($colMap['status']) ? ($parts[$colMap['status']] ?? null) : null;
-            $reason = isset($colMap['reason']) ? ($parts[$colMap['reason']] ?? null) : null;
-            $speed  = isset($colMap['speed'])  ? ($parts[$colMap['speed']]  ?? null) : null;
 
             $ports[$port] = [
-                'status' => $status !== null ? strtolower($status) : ($reason !== null ? strtolower($reason) : null),
-                'speed'  => ($speed !== null && $speed !== '--' && $speed !== '') ? $speed : null,
+                'status' => strtolower($status),
+                'speed'  => ($speed !== null && $speed !== '--') ? $speed : null,
             ];
         }
 
