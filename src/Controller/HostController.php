@@ -421,7 +421,7 @@ class HostController extends AbstractController
     }
 
     #[Route('/{id}', name: 'host_show', methods: ['GET'], requirements: ['id' => '\d+'])]
-    public function show(Host $host, Request $request, VirtualIpRepository $vipRepo, NetworkInterfaceRepository $ifaceRepo, ArubaSwitchRepository $arubaSwitchRepo, AppSettingRepository $settingRepo): Response
+    public function show(Host $host, Request $request, VirtualIpRepository $vipRepo, NetworkInterfaceRepository $ifaceRepo, ArubaSwitchRepository $arubaSwitchRepo, AppSettingRepository $settingRepo, UserPreferenceRepository $prefRepo): Response
     {
         $sessionKey = '_host_token_raw_' . $host->getId();
         $newToken   = $request->getSession()->get($sessionKey);
@@ -447,6 +447,9 @@ class HostController extends AbstractController
         $maxAge = $settingRepo->getInstance()->getSwitchInfoMaxAgeDays();
         $cutoff = $maxAge !== null ? new \DateTimeImmutable("-{$maxAge} days") : null;
 
+        $user = $this->getUser();
+        $pref = $user ? $prefRepo->findByIdentifier($user->getUserIdentifier()) : null;
+
         return $this->render('host/show.html.twig', [
             'host'                  => $host,
             'newToken'              => $newToken,
@@ -455,6 +458,7 @@ class HostController extends AbstractController
             'switchPorts'           => $ifaceRepo->findConnectedToSwitchIps($hostIps, $cutoff),
             'arubaSwitch'           => $arubaSwitchRepo->getInstance(),
             'switchInfoMaxAgeDays'  => $maxAge,
+            'collapsedSections'     => $pref?->getHostCollapsedSections() ?? [],
         ]);
     }
 

@@ -1,6 +1,16 @@
 {% extends 'base.html.twig' %}
 {% block title %}{{ host.name }}{% endblock %}
 
+{% macro sectionToggle(id, collapsedSections) %}
+    {% set isCollapsed = id in collapsedSections %}
+    <button type="button" class="btn btn-sm btn-link text-body p-0 section-toggle-btn" data-bs-toggle="collapse"
+            data-bs-target="#section-{{ id }}" data-section="{{ id }}"
+            aria-expanded="{{ isCollapsed ? 'false' : 'true' }}" aria-controls="section-{{ id }}"
+            title="{{ isCollapsed ? 'Expand' : 'Collapse' }} section">
+        <i class="bi {{ isCollapsed ? 'bi-chevron-right' : 'bi-chevron-down' }} section-chevron"></i>
+    </button>
+{% endmacro %}
+
 {% block stylesheets %}
 <style>
 .host-interfaces-table { --vip-row-bg: rgba(0,0,0,.05); }
@@ -77,13 +87,17 @@
 <div class="card mb-3">
     {% set activeInterfaces  = host.interfaces|filter(i => not i.deleted) %}
     {% set deletedInterfaces = host.interfaces|filter(i => i.deleted) %}
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <span>
-            <i class="bi bi-hdd-network me-1"></i>Interfaces ({{ activeInterfaces|length }}
-            {%- if deletedInterfaces|length > 0 %}, <span class="text-warning-emphasis">{{ deletedInterfaces|length }} deleted</span>{% endif %})
+    {% set ifacesCollapsed = 'interfaces' in collapsedSections %}
+    <div class="card-header d-flex justify-content-between align-items-center section-header-toggle" style="cursor:pointer">
+        <span class="d-flex align-items-center gap-2">
+            {{ _self.sectionToggle('interfaces', collapsedSections) }}
+            <span>
+                <i class="bi bi-hdd-network me-1"></i>Interfaces ({{ activeInterfaces|length }}
+                {%- if deletedInterfaces|length > 0 %}, <span class="text-warning-emphasis">{{ deletedInterfaces|length }} deleted</span>{% endif %})
+            </span>
         </span>
-        {% if not host.deleted %}
-        <span>
+        <div class="d-flex align-items-center gap-2">
+            {% if not host.deleted %}
             <a href="{{ path('interface_new', {id: host.id}) }}" class="btn btn-sm btn-primary">
                 <i class="bi bi-plus-lg me-1"></i>Add Interface
             </a>
@@ -92,9 +106,10 @@
                 <i class="bi bi-hdd-network me-1"></i>Create DNS Records
             </button>
             {% endif %}
-        </span>
-        {% endif %}
+            {% endif %}
+        </div>
     </div>
+    <div class="collapse{{ ifacesCollapsed ? '' : ' show' }}" id="section-interfaces">
     {% if not host.deleted and activeInterfaces|length > 0 %}
     <div class="collapse" id="create-interface-dns-records-panel">
         <div class="card-body border-bottom">
@@ -314,13 +329,17 @@
             </table>
         </div>
     {% endif %}
+    </div>
 </div>
 
 {% if switchPorts is not empty %}
 <div class="card mb-3">
-    <div class="card-header">
+    {% set switchPortsCollapsed = 'switch-ports' in collapsedSections %}
+    <div class="card-header d-flex align-items-center gap-2 section-header-toggle" style="cursor:pointer">
+        {{ _self.sectionToggle('switch-ports', collapsedSections) }}
         <span><i class="bi bi-diagram-3 me-1"></i>Switch Ports ({{ switchPorts|length }})</span>
     </div>
+    <div class="collapse{{ switchPortsCollapsed ? '' : ' show' }}" id="section-switch-ports">
     <div class="card-body py-2 text-muted small border-bottom">
         Reflects each connected device's last known ClearPass authentication, refreshed roughly every 15 minutes.
         {% if switchInfoMaxAgeDays %}
@@ -422,12 +441,18 @@
             </tbody>
         </table>
     </div>
+    </div>
 </div>
 {% endif %}
 
 {% if host.sshHostKeys|length > 0 or not host.deleted %}
 <div class="card mb-3">
-    <div class="card-header"><i class="bi bi-shield-lock me-1"></i>SSH Host Keys</div>
+    {% set sshKeysCollapsed = 'ssh-host-keys' in collapsedSections %}
+    <div class="card-header d-flex align-items-center gap-2 section-header-toggle" style="cursor:pointer">
+        {{ _self.sectionToggle('ssh-host-keys', collapsedSections) }}
+        <span><i class="bi bi-shield-lock me-1"></i>SSH Host Keys</span>
+    </div>
+    <div class="collapse{{ sshKeysCollapsed ? '' : ' show' }}" id="section-ssh-host-keys">
     <div class="card-body py-2">
         {% if host.sshHostKeys|length > 0 %}
         <table class="table table-sm table-borderless mb-2 small">
@@ -512,13 +537,19 @@
         </details>
         {% endif %}
     </div>
+    </div>
 </div>
 {% endif %}
 
 {% set snipeLink = host.snipeItAssetLink %}
 {% if snipeLink %}
 <div class="card mb-3">
-    <div class="card-header"><i class="bi bi-box-seam me-1"></i>Snipe-IT Asset</div>
+    {% set snipeCollapsed = 'snipe-it-asset' in collapsedSections %}
+    <div class="card-header d-flex align-items-center gap-2 section-header-toggle" style="cursor:pointer">
+        {{ _self.sectionToggle('snipe-it-asset', collapsedSections) }}
+        <span><i class="bi bi-box-seam me-1"></i>Snipe-IT Asset</span>
+    </div>
+    <div class="collapse{{ snipeCollapsed ? '' : ' show' }}" id="section-snipe-it-asset">
     <div class="card-body py-2">
         <dl class="row mb-0 small">
             <dt class="col-sm-3">Asset Name</dt>
@@ -542,17 +573,23 @@
             <dd class="col-sm-9">{{ snipeLink.syncedAt|date('Y-m-d H:i') }}</dd>
         </dl>
     </div>
+    </div>
 </div>
 {% endif %}
 
 {% if not host.deleted %}
 <div class="card mb-3">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <span><i class="bi bi-key me-1"></i>Host API Token</span>
+    {% set apiTokenCollapsed = 'api-token' in collapsedSections %}
+    <div class="card-header d-flex justify-content-between align-items-center section-header-toggle" style="cursor:pointer">
+        <span class="d-flex align-items-center gap-2">
+            {{ _self.sectionToggle('api-token', collapsedSections) }}
+            <span><i class="bi bi-key me-1"></i>Host API Token</span>
+        </span>
         <a href="{{ path('user_guide_settings') }}#host-scoped-tokens" class="btn btn-sm btn-outline-secondary" title="User Guide" target="_blank">
             <i class="bi bi-question-circle"></i>
         </a>
     </div>
+    <div class="collapse{{ apiTokenCollapsed ? '' : ' show' }}" id="section-api-token">
     {% if newToken %}
     <div class="card-body pb-2">
         <div class="alert alert-success mb-3">
@@ -612,6 +649,7 @@
         </form>
     </div>
     {% endif %}
+    </div>
 </div>
 {% endif %}
 
@@ -622,6 +660,63 @@
 {% endblock %}
 
 {% block scripts %}
+<script>
+(function () {
+    const collapsedUrl = {{ path('api_preference_host_collapsed_sections')|json_encode|raw }};
+
+    function save(section, collapsed) {
+        fetch(collapsedUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ section: section, collapsed: collapsed }),
+        }).catch(() => {});
+    }
+
+    document.querySelectorAll('.section-toggle-btn[data-section]').forEach(function (btn) {
+        const target  = document.getElementById(btn.getAttribute('data-bs-target').slice(1));
+        const chevron = btn.querySelector('.section-chevron');
+        if (!target) return;
+
+        // Swap the chevron glyph directly on click, the same way the host list's
+        // tree view toggles its chevron — every click on this button always
+        // toggles the section exactly once, so flipping the icon class here in
+        // lockstep with the click needs no dependency on Bootstrap's own
+        // collapse events to keep it in sync.
+        if (chevron) {
+            btn.addEventListener('click', function () {
+                chevron.classList.toggle('bi-chevron-down');
+                chevron.classList.toggle('bi-chevron-right');
+            });
+        }
+
+        target.addEventListener('shown.bs.collapse', function (e) {
+            if (e.target === target) save(btn.dataset.section, false);
+        });
+        target.addEventListener('hidden.bs.collapse', function (e) {
+            if (e.target === target) save(btn.dataset.section, true);
+        });
+    });
+
+    // Clicking anywhere in a section header toggles it, except on other interactive
+    // controls (links/buttons) it contains — those keep their own behavior untouched.
+    // Delegates to the chevron button's own click rather than toggling the collapse
+    // directly, since Bootstrap's collapse data-api listens in the capture phase on
+    // document: putting data-bs-toggle on the header itself would let it intercept
+    // and preventDefault() clicks on nested links (e.g. "Add Interface") before any
+    // bubble-phase handler here could stop it.
+    document.querySelectorAll('.section-header-toggle').forEach(function (header) {
+        const btn = header.querySelector('.section-toggle-btn');
+        if (!btn) return;
+
+        header.addEventListener('click', function (e) {
+            if (btn.contains(e.target)) return;
+            const interactive = e.target.closest('a, button, input, select, textarea, label');
+            if (interactive && interactive !== header) return;
+            btn.click();
+        });
+    });
+})();
+</script>
 {% if switchPorts is not empty and arubaSwitch %}
 <script>
 (function () {

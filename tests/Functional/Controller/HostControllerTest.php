@@ -13,6 +13,7 @@ use App\Entity\IpAddress;
 use App\Entity\Ipv6Address;
 use App\Entity\NetworkInterface;
 use App\Entity\Subnet;
+use App\Entity\UserPreference;
 use App\Enum\RecordType;
 use App\Tests\Functional\AppWebTestCase;
 
@@ -47,6 +48,36 @@ class HostControllerTest extends AppWebTestCase
 
         $this->client->request('GET', "/hosts/{$host->getId()}");
         $this->assertResponseIsSuccessful();
+    }
+
+    public function testShowRendersSectionsExpandedByDefault(): void
+    {
+        $host = (new Host())->setName('sections-expanded-host');
+        $this->em->persist($host);
+        $this->em->flush();
+
+        $this->client->request('GET', "/hosts/{$host->getId()}");
+        $this->assertResponseIsSuccessful();
+        $content = $this->client->getResponse()->getContent();
+        $this->assertStringContainsString('class="collapse show" id="section-interfaces"', $content);
+        $this->assertStringContainsString('aria-expanded="true" aria-controls="section-interfaces"', $content);
+    }
+
+    public function testShowRendersCollapsedSectionFromUserPreference(): void
+    {
+        $pref = new UserPreference('test@example.com');
+        $pref->setHostCollapsedSections(['interfaces']);
+        $this->em->persist($pref);
+
+        $host = (new Host())->setName('sections-collapsed-host');
+        $this->em->persist($host);
+        $this->em->flush();
+
+        $this->client->request('GET', "/hosts/{$host->getId()}");
+        $this->assertResponseIsSuccessful();
+        $content = $this->client->getResponse()->getContent();
+        $this->assertStringContainsString('class="collapse" id="section-interfaces"', $content);
+        $this->assertStringContainsString('aria-expanded="false" aria-controls="section-interfaces"', $content);
     }
 
     public function testEditFormLoads(): void
