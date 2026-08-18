@@ -133,26 +133,34 @@ class NetworkInterfaceRepository extends ServiceEntityRepository
     /**
      * Active interfaces whose cached switch attachment (switchIp) matches one of the
      * given IPs — i.e. devices currently known to be connected to that switch.
+     * $cutoff, if given, excludes interfaces whose switch info is older than that
+     * (switchIp/switchPort are set together with lastAuthAt, so it's the freshness
+     * signal for this cache).
      *
      * @param  string[] $switchIps
      * @return NetworkInterface[]
      */
-    public function findConnectedToSwitchIps(array $switchIps): array
+    public function findConnectedToSwitchIps(array $switchIps, ?\DateTimeImmutable $cutoff = null): array
     {
         $switchIps = array_values(array_filter($switchIps));
         if (empty($switchIps)) {
             return [];
         }
 
-        $interfaces = $this->createQueryBuilder('ni')
+        $qb = $this->createQueryBuilder('ni')
             ->addSelect('h')
             ->leftJoin('ni.host', 'h')
             ->where('ni.switchIp IN (:switchIps)')
             ->andWhere('ni.switchPort IS NOT NULL')
             ->andWhere('ni.deletedAt IS NULL')
-            ->setParameter('switchIps', $switchIps)
-            ->getQuery()
-            ->getResult();
+            ->setParameter('switchIps', $switchIps);
+
+        if ($cutoff !== null) {
+            $qb->andWhere('ni.lastAuthAt >= :cutoff')
+               ->setParameter('cutoff', $cutoff);
+        }
+
+        $interfaces = $qb->getQuery()->getResult();
 
         usort($interfaces, fn ($a, $b) => strnatcasecmp($a->getSwitchPort(), $b->getSwitchPort()));
 

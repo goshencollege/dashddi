@@ -3,6 +3,7 @@
 namespace App\Tests\Functional\Controller;
 
 use App\Entity\ApiToken;
+use App\Entity\AppSetting;
 use App\Entity\ArubaSwitch;
 use App\Entity\DnsView;
 use App\Entity\Domain;
@@ -575,7 +576,7 @@ class HostControllerTest extends AppWebTestCase
         $clientHost = (new Host())->setName('client-host');
         $this->em->persist($clientHost);
         $clientIface = $this->makeInterfaceWithIps($clientHost, $subnet, 'bb:bb:bb:bb:bb:02', 'eth0', '10.20.0.50');
-        $clientIface->setSwitchIp('10.20.0.1')->setSwitchPort('1/1/5');
+        $clientIface->setSwitchIp('10.20.0.1')->setSwitchPort('1/1/5')->setLastAuthAt(new \DateTimeImmutable());
         $this->em->flush();
 
         $switchHostId = $switchHost->getId();
@@ -607,7 +608,7 @@ class HostControllerTest extends AppWebTestCase
         $clientHost = (new Host())->setName('client-host-2');
         $this->em->persist($clientHost);
         $clientIface = $this->makeInterfaceWithIps($clientHost, $subnet, 'bb:bb:bb:bb:bb:04', 'eth0', '10.21.0.50');
-        $clientIface->setSwitchIp('10.21.0.1')->setSwitchPort('1/1/6');
+        $clientIface->setSwitchIp('10.21.0.1')->setSwitchPort('1/1/6')->setLastAuthAt(new \DateTimeImmutable());
         $this->em->flush();
 
         $switchHostId = $switchHost->getId();
@@ -621,6 +622,35 @@ class HostControllerTest extends AppWebTestCase
         $this->assertStringContainsString('port-bounce-btn', $content);
         $this->assertStringContainsString('port-poe-bounce-btn', $content);
         $this->assertStringContainsString('bb:bb:bb:bb:bb:04', $content);
+    }
+
+    public function testShowHidesSwitchPortEntryOlderThanSwitchInfoMaxAge(): void
+    {
+        $setting = $this->em->getRepository(AppSetting::class)->find(1) ?? new AppSetting();
+        $setting->setSwitchInfoMaxAgeDays(1);
+        $this->em->persist($setting);
+
+        $subnet = (new Subnet())->setName('switch-stale-subnet')->setIpv4Cidr('10.22.0.0/24');
+        $this->em->persist($subnet);
+
+        $switchHost = (new Host())->setName('switch-host-3');
+        $this->em->persist($switchHost);
+        $this->makeInterfaceWithIps($switchHost, $subnet, 'aa:aa:aa:aa:aa:05', 'mgmt', '10.22.0.1');
+
+        $clientHost = (new Host())->setName('stale-client-host');
+        $this->em->persist($clientHost);
+        $clientIface = $this->makeInterfaceWithIps($clientHost, $subnet, 'bb:bb:bb:bb:bb:06', 'eth0', '10.22.0.50');
+        $clientIface->setSwitchIp('10.22.0.1')->setSwitchPort('1/1/7')->setLastAuthAt(new \DateTimeImmutable('-5 days'));
+        $this->em->flush();
+
+        $switchHostId = $switchHost->getId();
+        $this->em->clear();
+
+        $this->client->request('GET', "/hosts/{$switchHostId}");
+        $this->assertResponseIsSuccessful();
+        $content = $this->client->getResponse()->getContent();
+        $this->assertStringNotContainsString('Switch Ports', $content);
+        $this->assertStringNotContainsString('stale-client-host', $content);
     }
 
     public function testShowHidesSwitchPortsCardWhenNoInterfacesPointAtHost(): void

@@ -323,7 +323,11 @@
     </div>
     <div class="card-body py-2 text-muted small border-bottom">
         Reflects each connected device's last known ClearPass authentication, refreshed roughly every 15 minutes.
-        Only devices actively authenticating through this switch are shown.
+        {% if switchInfoMaxAgeDays %}
+            Devices not seen in over {{ switchInfoMaxAgeDays }} day{{ switchInfoMaxAgeDays != 1 ? 's' : '' }} are hidden.
+        {% else %}
+            Only devices actively authenticating through this switch are shown.
+        {% endif %}
     </div>
     <div class="table-responsive">
         <table class="table table-hover mb-0">
