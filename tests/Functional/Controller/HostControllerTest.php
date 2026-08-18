@@ -557,4 +557,47 @@ class HostControllerTest extends AppWebTestCase
         $viewNames = $record->getViews()->map(fn($v) => $v->getName())->toArray();
         $this->assertContains('bulk-dns-view', $viewNames);
     }
+
+    // -------------------------------------------------------------------------
+    // Switch Ports card
+    // -------------------------------------------------------------------------
+
+    public function testShowRendersSwitchPortsCardWhenAnotherInterfacePointsAtHostIp(): void
+    {
+        $subnet = (new Subnet())->setName('switch-ports-subnet')->setIpv4Cidr('10.20.0.0/24');
+        $this->em->persist($subnet);
+
+        $switchHost = (new Host())->setName('switch-host');
+        $this->em->persist($switchHost);
+        $this->makeInterfaceWithIps($switchHost, $subnet, 'aa:aa:aa:aa:aa:01', 'mgmt', '10.20.0.1');
+
+        $clientHost = (new Host())->setName('client-host');
+        $this->em->persist($clientHost);
+        $clientIface = $this->makeInterfaceWithIps($clientHost, $subnet, 'bb:bb:bb:bb:bb:02', 'eth0', '10.20.0.50');
+        $clientIface->setSwitchIp('10.20.0.1')->setSwitchPort('1/1/5');
+        $this->em->flush();
+
+        $switchHostId = $switchHost->getId();
+        $clientIfaceId = $clientIface->getId();
+        $this->em->clear();
+
+        $this->client->request('GET', "/hosts/{$switchHostId}");
+        $this->assertResponseIsSuccessful();
+        $content = $this->client->getResponse()->getContent();
+        $this->assertStringContainsString('Switch Ports', $content);
+        $this->assertStringContainsString('1/1/5', $content);
+        $this->assertStringContainsString('client-host', $content);
+        $this->assertStringContainsString("/interfaces/{$clientIfaceId}", $content);
+    }
+
+    public function testShowHidesSwitchPortsCardWhenNoInterfacesPointAtHost(): void
+    {
+        $host = (new Host())->setName('non-switch-host');
+        $this->em->persist($host);
+        $this->em->flush();
+
+        $this->client->request('GET', "/hosts/{$host->getId()}");
+        $this->assertResponseIsSuccessful();
+        $this->assertStringNotContainsString('Switch Ports', $this->client->getResponse()->getContent());
+    }
 }

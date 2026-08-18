@@ -210,6 +210,15 @@
     </div>
 </div>
 
+{# Switch ports #}
+<div class="card mb-4" id="switch-ports">
+    <div class="card-header fw-semibold"><i class="bi bi-diagram-3 me-1"></i>Switch Ports</div>
+    <div class="card-body">
+        <p>If another interface's cached switch attachment points at one of a host's own IP addresses — meaning some device has authenticated through ClearPass reporting this host as its NAS — the host detail page shows a <strong>Switch Ports</strong> card listing every known port and the device currently connected to it.</p>
+        <p class="mb-0">Each row links to the connected device's own interface page, where you can view live port status and use the Reauthenticate, Bounce Port, and PoE Bounce actions (see <a href="{{ path('user_guide_servers') }}#aruba">Aruba CX Switches</a>). This list reflects each device's <strong>last known</strong> ClearPass authentication, refreshed roughly every 15 minutes, so only devices that have actively authenticated through the switch appear — it is not a live poll of every physical port.</p>
+    </div>
+</div>
+
 {# DHCP leases #}
 <div class="card mb-4" id="leases">
     <div class="card-header fw-semibold"><i class="bi bi-journal-text me-1"></i>DHCP Leases on a Host</div>
@@ -379,6 +388,7 @@
             <a href="#search" class="list-group-item list-group-item-action py-1">Searching</a>
             <a href="#add-host" class="list-group-item list-group-item-action py-1">Adding a Host</a>
             <a href="#interfaces" class="list-group-item list-group-item-action py-1">Network Interfaces</a>
+            <a href="#switch-ports" class="list-group-item list-group-item-action py-1">Switch Ports</a>
             <a href="#leases" class="list-group-item list-group-item-action py-1">DHCP Leases</a>
             <a href="#bulk" class="list-group-item list-group-item-action py-1">Bulk Operations</a>
             <a href="#csv-import" class="list-group-item list-group-item-action py-1">Importing from CSV</a>
