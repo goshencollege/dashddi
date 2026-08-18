@@ -32,6 +32,9 @@ class UserPreference
     #[ORM\Column(type: 'json', nullable: true)]
     private ?array $hostSearch = null;
 
+    #[ORM\Column(type: 'json', nullable: true)]
+    private ?array $hostCollapsedSections = null;
+
     public function __construct(string $userIdentifier)
     {
         $this->userIdentifier = $userIdentifier;
@@ -55,4 +58,7 @@ class UserPreference
 
     public function getHostSearch(): ?array { return $this->hostSearch; }
     public function setHostSearch(?array $search): static { $this->hostSearch = $search; return $this; }
+
+    public function getHostCollapsedSections(): ?array { return $this->hostCollapsedSections; }
+    public function setHostCollapsedSections(?array $sections): static { $this->hostCollapsedSections = $sections; return $this; }
 }
