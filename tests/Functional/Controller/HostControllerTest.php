@@ -3,6 +3,7 @@
 namespace App\Tests\Functional\Controller;
 
 use App\Entity\ApiToken;
+use App\Entity\ArubaSwitch;
 use App\Entity\DnsView;
 use App\Entity\Domain;
 use App\Entity\DomainRecord;
@@ -588,6 +589,38 @@ class HostControllerTest extends AppWebTestCase
         $this->assertStringContainsString('1/1/5', $content);
         $this->assertStringContainsString('client-host', $content);
         $this->assertStringContainsString("/interfaces/{$clientIfaceId}", $content);
+        $this->assertStringNotContainsString('port-status-btn', $content);
+    }
+
+    public function testShowRendersSwitchPortActionButtonsWhenArubaSwitchConfigured(): void
+    {
+        $arubaSwitch = (new ArubaSwitch())->setUsername('admin')->setPassword('secret');
+        $this->em->persist($arubaSwitch);
+
+        $subnet = (new Subnet())->setName('switch-actions-subnet')->setIpv4Cidr('10.21.0.0/24');
+        $this->em->persist($subnet);
+
+        $switchHost = (new Host())->setName('switch-host-2');
+        $this->em->persist($switchHost);
+        $this->makeInterfaceWithIps($switchHost, $subnet, 'aa:aa:aa:aa:aa:03', 'mgmt', '10.21.0.1');
+
+        $clientHost = (new Host())->setName('client-host-2');
+        $this->em->persist($clientHost);
+        $clientIface = $this->makeInterfaceWithIps($clientHost, $subnet, 'bb:bb:bb:bb:bb:04', 'eth0', '10.21.0.50');
+        $clientIface->setSwitchIp('10.21.0.1')->setSwitchPort('1/1/6');
+        $this->em->flush();
+
+        $switchHostId = $switchHost->getId();
+        $this->em->clear();
+
+        $this->client->request('GET', "/hosts/{$switchHostId}");
+        $this->assertResponseIsSuccessful();
+        $content = $this->client->getResponse()->getContent();
+        $this->assertStringContainsString('port-status-btn', $content);
+        $this->assertStringContainsString('port-reauth-btn', $content);
+        $this->assertStringContainsString('port-bounce-btn', $content);
+        $this->assertStringContainsString('port-poe-bounce-btn', $content);
+        $this->assertStringContainsString('bb:bb:bb:bb:bb:04', $content);
     }
 
     public function testShowHidesSwitchPortsCardWhenNoInterfacesPointAtHost(): void

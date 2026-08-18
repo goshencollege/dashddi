@@ -332,10 +332,12 @@
                     <th>Port</th>
                     <th>Connected Device</th>
                     <th>Last Seen</th>
+                    {% if arubaSwitch %}<th class="text-end">Actions</th>{% endif %}
                 </tr>
             </thead>
             <tbody>
                 {% for iface in switchPorts %}
+                    {% set detailsId = 'port-details-' ~ iface.id %}
                     <tr>
                         <td class="font-monospace">{{ iface.switchPort }}</td>
                         <td class="small">
@@ -348,7 +350,36 @@
                             </a>
                         </td>
                         <td class="text-muted small">{{ iface.lastAuthAt ? iface.lastAuthAt|date('Y-m-d H:i') : '—' }}</td>
+                        {% if arubaSwitch %}
+                        {% set deviceLabel = iface.host ? iface.host.name : iface.macAddress %}
+                        <td class="text-end text-nowrap">
+                            <button type="button" class="btn btn-sm btn-outline-secondary port-status-btn" data-mac="{{ iface.macAddress }}" data-target="{{ detailsId }}" title="Check Status">
+                                <i class="bi bi-arrow-clockwise"></i>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-info port-reauth-btn" data-mac="{{ iface.macAddress }}" data-target="{{ detailsId }}"
+                                    data-confirm="Reauthenticate port {{ iface.switchPort|e('js') }} ({{ deviceLabel|e('js') }})?" title="Reauthenticate">
+                                <i class="bi bi-shield-check"></i>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-warning port-bounce-btn" data-mac="{{ iface.macAddress }}" data-target="{{ detailsId }}"
+                                    data-confirm="Bounce port {{ iface.switchPort|e('js') }} ({{ deviceLabel|e('js') }})? This will briefly disconnect the client." title="Bounce Port">
+                                <i class="bi bi-power"></i>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-warning port-poe-bounce-btn" data-mac="{{ iface.macAddress }}" data-target="{{ detailsId }}"
+                                    data-confirm="PoE bounce port {{ iface.switchPort|e('js') }} ({{ deviceLabel|e('js') }})? This will cut power and disconnect the client." title="PoE Bounce">
+                                <i class="bi bi-lightning"></i>
+                            </button>
+                        </td>
+                        {% endif %}
                     </tr>
+                    {% if arubaSwitch %}
+                    <tr id="{{ detailsId }}" class="d-none">
+                        <td colspan="4" class="p-0">
+                            <div id="{{ detailsId }}-body" class="p-2 text-muted small">
+                                Click an action button above to load live port-access data from the switch.
+                            </div>
+                        </td>
+                    </tr>
+                    {% endif %}
                 {% endfor %}
             </tbody>
         </table>
@@ -550,4 +581,126 @@
     Created {{ host.createdAt|date('Y-m-d H:i') }}{% if host.createdBy %} by {{ host.createdBy }}{% endif %}
     &middot; Updated {{ host.updatedAt|date('Y-m-d H:i') }}{% if host.updatedBy %} by {{ host.updatedBy }}{% endif %}
 </div>
+{% endblock %}
+
+{% block scripts %}
+{% if switchPorts is not empty and arubaSwitch %}
+<script>
+(function () {
+    const statusUrl    = {{ path('api_switch_port_status')|json_encode|raw }};
+    const reauthUrl    = {{ path('api_switch_port_reauthenticate')|json_encode|raw }};
+    const bounceUrl    = {{ path('api_switch_port_bounce')|json_encode|raw }};
+    const poeBounceUrl = {{ path('api_switch_port_poe_bounce')|json_encode|raw }};
+
+    // Escape HTML entities in any string sourced from API responses.
+    function esc(s) { const d = document.createElement('div'); d.textContent = String(s ?? ''); return d.innerHTML; }
+
+    function renderClients(data) {
+        if (data.error) {
+            return `<div class="alert alert-danger mb-0 py-2">${esc(data.error)}</div>`;
+        }
+        const rawId = 'raw-' + Math.random().toString(36).slice(2);
+        let rawContent = data.raw || '';
+        try { rawContent = JSON.stringify(JSON.parse(rawContent), null, 2); } catch (e) { /* plain text */ }
+        const rawPanel = rawContent ? `
+            <div class="d-flex justify-content-between align-items-center">
+                <span class="text-muted small">Source: ${esc(data.via)}</span>
+                <button class="btn btn-link btn-sm p-0 text-muted small" onclick="document.getElementById('${rawId}').classList.toggle('d-none')">raw</button>
+            </div>
+            <div id="${rawId}" class="d-none mt-1 alert alert-success p-0"><pre class="mb-0 p-2 small" style="max-height:200px;overflow:auto">${esc(rawContent)}</pre></div>` : `<span class="text-muted small">Source: ${esc(data.via)}</span>`;
+        if (!data.clients || data.clients.length === 0) {
+            return `<div><span class="text-muted">No port-access clients found on this port.</span></div>${rawPanel}`;
+        }
+        const rows = data.clients.map(c => `
+            <tr>
+                <td class="font-monospace">${esc(c.mac ?? '—')}</td>
+                <td>${esc(c.vlan ?? '—')}</td>
+                <td>${esc(c.role ?? '—')}</td>
+                <td>${esc(c.status ?? '—')}</td>
+                <td>${esc(c.auth_method ?? '—')}</td>
+            </tr>`).join('');
+        return `<div class="table-responsive mb-1">
+            <table class="table table-sm mb-0">
+                <thead><tr>
+                    <th>MAC</th><th>VLAN</th><th>Role</th><th>Status</th><th>Auth Method</th>
+                </tr></thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>
+        ${rawPanel}`;
+    }
+
+    function showBody(targetId) {
+        const row = document.getElementById(targetId);
+        row.classList.remove('d-none');
+        return document.getElementById(targetId + '-body');
+    }
+
+    document.querySelectorAll('.port-status-btn').forEach(btn => {
+        btn.addEventListener('click', function () {
+            const mac  = btn.dataset.mac;
+            const body = showBody(btn.dataset.target);
+            const orig = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+            body.innerHTML = '<span class="text-muted">Loading…</span>';
+
+            fetch(statusUrl + '?mac=' + encodeURIComponent(mac))
+                .then(r => {
+                    if (!r.ok) {
+                        if (r.status === 401 || r.status === 403) throw new Error('Session expired — please reload the page and try again.');
+                        throw new Error(`Server returned ${r.status} ${r.statusText}. Check the switch connection and server logs.`);
+                    }
+                    return r.json();
+                })
+                .then(data => { body.innerHTML = renderClients(data); })
+                .catch(err => {
+                    const msg = err instanceof SyntaxError ? 'Unexpected response from server — the switch may be unreachable or the session may have expired. Please reload the page.' : err.message;
+                    body.innerHTML = `<div class="alert alert-danger mb-0 py-2">${msg}</div>`;
+                })
+                .finally(() => { btn.disabled = false; btn.innerHTML = orig; });
+        });
+    });
+
+    function bindAction(selector, url, busyLabel, successMsg) {
+        document.querySelectorAll(selector).forEach(btn => {
+            btn.addEventListener('click', function () {
+                if (btn.dataset.confirm && !confirm(btn.dataset.confirm)) return;
+
+                const mac  = btn.dataset.mac;
+                const body = showBody(btn.dataset.target);
+                const orig = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+                body.innerHTML = `<span class="text-muted">${busyLabel}…</span>`;
+
+                fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mac }) })
+                    .then(r => {
+                        if (!r.ok) {
+                            if (r.status === 401 || r.status === 403) throw new Error('Session expired — please reload the page and try again.');
+                            throw new Error(`Server returned ${r.status} ${r.statusText}. Check the switch connection and server logs.`);
+                        }
+                        return r.json();
+                    })
+                    .then(data => {
+                        const out = data.output ? `<pre class="mt-2 mb-0 p-2 border rounded small" style="max-height:120px;overflow:auto">${esc(data.output)}</pre>` : '';
+                        body.innerHTML = data.success
+                            ? `<div class="alert alert-success mb-0 py-2"><i class="bi bi-check-lg me-1"></i>${successMsg}${out}</div>`
+                            : `<div class="alert alert-danger mb-0 py-2">Failed: ${esc(data.error)}${out}</div>`;
+                    })
+                    .catch(err => {
+                        const msg = err instanceof SyntaxError ? 'Unexpected response from server — the switch may be unreachable or the session may have expired. Please reload the page.' : err.message;
+                        body.innerHTML = `<div class="alert alert-danger mb-0 py-2">${msg}</div>`;
+                    })
+                    .finally(() => { btn.disabled = false; btn.innerHTML = orig; });
+            });
+        });
+    }
+
+    bindAction('.port-reauth-btn',     reauthUrl,    'Reauthenticating', 'Reauthentication triggered.');
+    bindAction('.port-bounce-btn',     bounceUrl,    'Bouncing',         'Port bounced successfully.');
+    bindAction('.port-poe-bounce-btn', poeBounceUrl, 'PoE bouncing',     'PoE bounce complete.');
+})();
+</script>
+{% endif %}
 {% endblock %}

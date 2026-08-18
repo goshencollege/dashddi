@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\Host;
 use App\Form\HostType;
+use App\Repository\ArubaSwitchRepository;
 use App\Repository\BuildingRepository;
 use App\Repository\DomainRecordRepository;
 use App\Repository\DomainRepository;
@@ -419,7 +420,7 @@ class HostController extends AbstractController
     }
 
     #[Route('/{id}', name: 'host_show', methods: ['GET'], requirements: ['id' => '\d+'])]
-    public function show(Host $host, Request $request, VirtualIpRepository $vipRepo, NetworkInterfaceRepository $ifaceRepo): Response
+    public function show(Host $host, Request $request, VirtualIpRepository $vipRepo, NetworkInterfaceRepository $ifaceRepo, ArubaSwitchRepository $arubaSwitchRepo): Response
     {
         $sessionKey = '_host_token_raw_' . $host->getId();
         $newToken   = $request->getSession()->get($sessionKey);
@@ -448,6 +449,7 @@ class HostController extends AbstractController
             'domains'     => $this->domainRepo->findBy(['excludeFromInterfaces' => false], ['name' => 'ASC']),
             'vip_map'     => $vipRepo->findMapByInterfaceIds($ifaceIds),
             'switchPorts' => $ifaceRepo->findConnectedToSwitchIps($hostIps),
+            'arubaSwitch' => $arubaSwitchRepo->getInstance(),
         ]);
     }
 
