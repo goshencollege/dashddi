@@ -18,12 +18,13 @@
             <tbody>
                 {% for lease in leases %}
                     {% set iface = interface_map[lease.macAddress] ?? null %}
+                    {% set vendor = mac_vendor(lease.macAddress) %}
                     <tr>
                         <td>
                             {% if iface %}
-                                <a href="{{ path('interface_show', {id: iface.id}) }}"><code>{{ lease.macAddress }}</code></a>
+                                <a href="{{ path('interface_show', {id: iface.id}) }}"><code{% if vendor %} title="{{ vendor }}"{% endif %}>{{ lease.macAddress }}</code></a>
                             {% else %}
-                                <code>{{ lease.macAddress }}</code>
+                                <code{% if vendor %} title="{{ vendor }}"{% endif %}>{{ lease.macAddress }}</code>
                             {% endif %}
                         </td>
                         <td><code>{{ lease.ipAddress }}</code></td>

@@ -42,6 +42,7 @@
         </ul>
         <p>Each host row shows the host name, optional location and Snipe-IT asset label, tags, last-modified date, and action buttons. Interface sub-rows show the interface name (with MAC address in parentheses), subnet, IPv4, IPv6, and DNS names. Interfaces that belong to a virtual IP group show an additional indented sub-row displaying the VIP label, protocol badge, and VIP IP address.</p>
         <p class="mb-0 text-muted small">Interfaces without a name display the MAC address as their identifier.</p>
+        <p class="mb-0 text-muted small">Hover over any MAC address (host list, interface page, DHCP leases, ClearPass auth logs) to see the manufacturer, looked up from the bundled IEEE OUI registry. Locally administered/randomized addresses (e.g. iOS/Android private Wi-Fi MACs) are labeled as such instead of a vendor name. Refresh the bundled database with <code>bin/console app:oui:update</code>.</p>
     </div>
 </div>
 

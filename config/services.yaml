@@ -43,6 +43,14 @@ services:
         arguments:
             $prefixes: '%app.reserved_tag_prefixes%'
 
+    App\Service\OuiLookupService:
+        arguments:
+            $databasePath: '%kernel.project_dir%/resources/oui/oui-database.php'
+
+    App\Command\UpdateOuiDatabaseCommand:
+        arguments:
+            $databasePath: '%kernel.project_dir%/resources/oui/oui-database.php'
+
     Symfony\Component\HttpFoundation\Session\Storage\Handler\PdoSessionHandler:
         arguments:
             - '%env(resolve:DATABASE_URL)%'
