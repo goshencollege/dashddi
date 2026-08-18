@@ -447,6 +447,17 @@ class HostController extends AbstractController
         $maxAge = $settingRepo->getInstance()->getSwitchInfoMaxAgeDays();
         $cutoff = $maxAge !== null ? new \DateTimeImmutable("-{$maxAge} days") : null;
 
+        $switchPorts = $ifaceRepo->findConnectedToSwitchIps($hostIps, $cutoff);
+
+        $switchTargetIp = null;
+        foreach ($switchPorts as $ifaces) {
+            $switchTargetIp = $ifaces[0]->getSwitchIp();
+            break;
+        }
+        if ($switchTargetIp === null) {
+            $switchTargetIp = $hostIps[0] ?? null;
+        }
+
         $user = $this->getUser();
         $pref = $user ? $prefRepo->findByIdentifier($user->getUserIdentifier()) : null;
 
@@ -455,9 +466,10 @@ class HostController extends AbstractController
             'newToken'              => $newToken,
             'domains'               => $this->domainRepo->findBy(['excludeFromInterfaces' => false], ['name' => 'ASC']),
             'vip_map'               => $vipRepo->findMapByInterfaceIds($ifaceIds),
-            'switchPorts'           => $ifaceRepo->findConnectedToSwitchIps($hostIps, $cutoff),
+            'switchPorts'           => $switchPorts,
             'arubaSwitch'           => $arubaSwitchRepo->getInstance(),
             'switchInfoMaxAgeDays'  => $maxAge,
+            'switchTargetIp'        => $switchTargetIp,
             'collapsedSections'     => $pref?->getHostCollapsedSections() ?? [],
         ]);
     }

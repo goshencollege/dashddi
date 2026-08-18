@@ -350,6 +350,12 @@
     </div>
     {% if arubaSwitch %}
     <div class="d-flex align-items-center gap-2 px-3 py-2 border-bottom">
+        <button type="button" class="btn btn-sm btn-outline-primary" id="switch-scan-btn" data-switch-ip="{{ switchTargetIp }}">
+            <i class="bi bi-search me-1"></i>Query Switch
+        </button>
+        <span class="text-muted small" id="switch-scan-status">Last scanned: never</span>
+    </div>
+    <div class="d-flex align-items-center gap-2 px-3 py-2 border-bottom">
         <span class="text-muted small" id="switch-ports-selected-count">0 selected</span>
         <div class="d-flex gap-2 ms-auto">
             <button type="button" class="btn btn-sm btn-outline-secondary" id="bulk-status-btn" disabled>
@@ -367,8 +373,9 @@
         </div>
     </div>
     {% endif %}
+    <div id="switch-scan-alert"></div>
     <div class="table-responsive">
-        <table class="table table-hover mb-0">
+        <table class="table table-hover mb-0" id="switch-ports-table">
             <thead>
                 <tr>
                     {% if arubaSwitch %}
@@ -379,7 +386,14 @@
                     <th>Port</th>
                     <th>Connected Device</th>
                     <th>Last Seen</th>
-                    {% if arubaSwitch %}<th class="text-end">Actions</th>{% endif %}
+                    {% if arubaSwitch %}
+                    <th>Live Status</th>
+                    <th>Live VLAN</th>
+                    <th>Live MAC(s)</th>
+                    <th>LLDP Neighbor</th>
+                    <th>Discrepancies</th>
+                    <th class="text-end">Actions</th>
+                    {% endif %}
                 </tr>
             </thead>
             <tbody>
@@ -409,6 +423,11 @@
                         </td>
                         <td class="text-muted small">{{ primaryIface.lastAuthAt ? primaryIface.lastAuthAt|date('Y-m-d H:i') : '—' }}</td>
                         {% if arubaSwitch %}
+                        <td class="text-muted small">—</td>
+                        <td class="text-muted small">—</td>
+                        <td class="text-muted small">—</td>
+                        <td class="text-muted small">—</td>
+                        <td class="text-muted small">—</td>
                         <td class="text-end text-nowrap">
                             <button type="button" class="btn btn-sm btn-outline-secondary port-status-btn" data-mac="{{ primaryIface.macAddress }}" data-target="{{ detailsId }}" title="Check Status">
                                 <i class="bi bi-arrow-clockwise"></i>
@@ -430,7 +449,7 @@
                     </tr>
                     {% if arubaSwitch %}
                     <tr id="{{ detailsId }}" class="d-none">
-                        <td colspan="5" class="p-0">
+                        <td colspan="10" class="p-0">
                             <div id="{{ detailsId }}-body" class="p-2 text-muted small">
                                 Click an action button above to load live port-access data from the switch.
                             </div>
@@ -724,9 +743,16 @@
     const reauthUrl    = {{ path('api_switch_port_reauthenticate')|json_encode|raw }};
     const bounceUrl    = {{ path('api_switch_port_bounce')|json_encode|raw }};
     const poeBounceUrl = {{ path('api_switch_port_poe_bounce')|json_encode|raw }};
+    const scanUrl      = {{ path('api_switch_scan')|json_encode|raw }};
+    const ifaceUrlTpl  = {{ path('interface_show', {id: 0})|json_encode|raw }};
+
+    const table  = document.getElementById('switch-ports-table');
+    const tbody  = table.querySelector('tbody');
 
     // Escape HTML entities in any string sourced from API responses.
     function esc(s) { const d = document.createElement('div'); d.textContent = String(s ?? ''); return d.innerHTML; }
+    function escAttr(s) { return esc(s).replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
+    function ifaceUrl(id) { return ifaceUrlTpl.replace(/\/0$/, '/' + id); }
 
     function renderClients(data) {
         if (data.error) {
@@ -819,38 +845,42 @@
             });
     }
 
-    document.querySelectorAll('.port-status-btn').forEach(btn => {
-        btn.addEventListener('click', function () {
+    // ── Single-row actions (event delegation — works for rows rendered after a scan too) ──
+    const actionButtons = [
+        { selector: '.port-status-btn',    kind: 'status' },
+        { selector: '.port-reauth-btn',    kind: 'reauth', url: reauthUrl,    busyLabel: 'Reauthenticating', successMsg: 'Reauthentication triggered.' },
+        { selector: '.port-bounce-btn',    kind: 'bounce', url: bounceUrl,    busyLabel: 'Bouncing',          successMsg: 'Port bounced successfully.' },
+        { selector: '.port-poe-bounce-btn',kind: 'poe',    url: poeBounceUrl, busyLabel: 'PoE bouncing',      successMsg: 'PoE bounce complete.' },
+    ];
+
+    tbody.addEventListener('click', function (e) {
+        for (const a of actionButtons) {
+            const btn = e.target.closest(a.selector);
+            if (!btn) continue;
+            if (btn.dataset.confirm && !confirm(btn.dataset.confirm)) return;
+
             const orig = btn.innerHTML;
             btn.disabled = true;
             btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
-            checkStatus(btn.dataset.mac, btn.dataset.target)
-                .catch(() => {})
-                .finally(() => { btn.disabled = false; btn.innerHTML = orig; });
-        });
+            const done = () => { btn.disabled = false; btn.innerHTML = orig; };
+
+            if (a.kind === 'status') {
+                checkStatus(btn.dataset.mac, btn.dataset.target).catch(() => {}).finally(done);
+            } else {
+                runAction(a.url, btn.dataset.mac, btn.dataset.target, a.busyLabel, a.successMsg).finally(done);
+            }
+            return;
+        }
+
+        const toggle = e.target.closest('.live-macs-toggle');
+        if (toggle) {
+            const body = showBody(toggle.dataset.target);
+            body.innerHTML = renderLiveMacsTable(JSON.parse(toggle.dataset.macs));
+        }
     });
-
-    function bindAction(selector, url, busyLabel, successMsg) {
-        document.querySelectorAll(selector).forEach(btn => {
-            btn.addEventListener('click', function () {
-                if (btn.dataset.confirm && !confirm(btn.dataset.confirm)) return;
-
-                const orig = btn.innerHTML;
-                btn.disabled = true;
-                btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
-                runAction(url, btn.dataset.mac, btn.dataset.target, busyLabel, successMsg)
-                    .finally(() => { btn.disabled = false; btn.innerHTML = orig; });
-            });
-        });
-    }
-
-    bindAction('.port-reauth-btn',     reauthUrl,    'Reauthenticating', 'Reauthentication triggered.');
-    bindAction('.port-bounce-btn',     bounceUrl,    'Bouncing',         'Port bounced successfully.');
-    bindAction('.port-poe-bounce-btn', poeBounceUrl, 'PoE bouncing',     'PoE bounce complete.');
 
     // ── Bulk actions ─────────────────────────────────────────────────────────
     const selectAll  = document.getElementById('switch-ports-select-all');
-    const checkboxes = Array.from(document.querySelectorAll('.switch-port-checkbox'));
     const countLabel = document.getElementById('switch-ports-selected-count');
     const bulkButtons = {
         status:    document.getElementById('bulk-status-btn'),
@@ -859,17 +889,21 @@
         poeBounce: document.getElementById('bulk-poe-bounce-btn'),
     };
 
-    function selectedCheckboxes() { return checkboxes.filter(cb => cb.checked); }
+    // Rows are rebuilt after each scan, so checkboxes are always re-queried live
+    // rather than cached in an array.
+    function checkboxes() { return Array.from(tbody.querySelectorAll('.switch-port-checkbox')); }
+    function selectedCheckboxes() { return checkboxes().filter(cb => cb.checked); }
 
     // Re-enables/disables the bulk buttons and the select-all checkbox based on the
     // current selection, without touching the count label (bulk runs overwrite it
     // with a progress/summary message while in flight).
     function refreshBulkButtons() {
-        const n = selectedCheckboxes().length;
+        const all = checkboxes();
+        const n   = all.filter(cb => cb.checked).length;
         Object.values(bulkButtons).forEach(btn => { btn.disabled = n === 0; });
         if (selectAll) {
-            selectAll.checked = n > 0 && n === checkboxes.length;
-            selectAll.indeterminate = n > 0 && n < checkboxes.length;
+            selectAll.checked = n > 0 && n === all.length;
+            selectAll.indeterminate = n > 0 && n < all.length;
         }
         return n;
     }
@@ -879,10 +913,12 @@
         countLabel.textContent = n === 0 ? '0 selected' : (n + ' selected');
     }
 
-    checkboxes.forEach(cb => cb.addEventListener('change', updateSelectionUI));
+    tbody.addEventListener('change', function (e) {
+        if (e.target.matches('.switch-port-checkbox')) updateSelectionUI();
+    });
     if (selectAll) {
         selectAll.addEventListener('click', function () {
-            checkboxes.forEach(cb => { cb.checked = selectAll.checked; });
+            checkboxes().forEach(cb => { cb.checked = selectAll.checked; });
             updateSelectionUI();
         });
     }
@@ -894,11 +930,12 @@
         if (!cb.matches('.switch-port-checkbox')) return;
 
         if (e.shiftKey && lastCheckedCb) {
-            const a = checkboxes.indexOf(lastCheckedCb);
-            const b = checkboxes.indexOf(cb);
+            const all = checkboxes();
+            const a = all.indexOf(lastCheckedCb);
+            const b = all.indexOf(cb);
             if (a !== -1 && b !== -1) {
                 const [lo, hi] = a < b ? [a, b] : [b, a];
-                checkboxes.slice(lo, hi + 1).forEach(box => { box.checked = cb.checked; });
+                all.slice(lo, hi + 1).forEach(box => { box.checked = cb.checked; });
                 updateSelectionUI();
             }
         }
@@ -914,7 +951,7 @@
         if (selected.length === 0) return;
         if (confirmMessage && !confirm(confirmMessage(selected.length))) return;
 
-        checkboxes.forEach(cb => { cb.disabled = true; });
+        checkboxes().forEach(cb => { cb.disabled = true; });
         Object.values(bulkButtons).forEach(btn => { btn.disabled = true; });
         if (selectAll) selectAll.disabled = true;
 
@@ -925,7 +962,7 @@
             (result && result.success === false) ? failed++ : succeeded++;
         }
 
-        checkboxes.forEach(cb => { cb.disabled = false; });
+        checkboxes().forEach(cb => { cb.disabled = false; });
         if (selectAll) selectAll.disabled = false;
         refreshBulkButtons();
         countLabel.textContent = failed > 0
@@ -949,6 +986,182 @@
         n => `PoE bounce ${n} selected port${n !== 1 ? 's' : ''}? This will cut power and disconnect each client.`,
         (mac, target) => runAction(poeBounceUrl, mac, target, 'PoE bouncing', 'PoE bounce complete.'),
     ));
+
+    // ── Query Switch (live scan + correlation) ──────────────────────────────
+    function renderLiveMacsTable(macs) {
+        if (!macs.length) return '<span class="text-muted">No live MAC/client entries on this port.</span>';
+        const rows = macs.map(m => `
+            <tr>
+                <td class="font-monospace">${esc(m.mac)}</td>
+                <td>${esc(m.vlan ?? '—')}</td>
+                <td>${m.known ? `<a href="${ifaceUrl(m.interfaceId)}">${esc(m.hostName ?? m.interfaceName ?? 'known device')}</a>` : '<span class="text-muted">unregistered</span>'}</td>
+                <td>${esc(m.role ?? '—')}</td>
+                <td>${esc(m.status ?? '—')}</td>
+                <td>${esc(m.authMethod ?? '—')}</td>
+            </tr>`).join('');
+        return `<div class="table-responsive mb-0">
+            <table class="table table-sm mb-0">
+                <thead><tr><th>MAC</th><th>VLAN</th><th>Device</th><th>Role</th><th>Status</th><th>Auth Method</th></tr></thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>`;
+    }
+
+    function renderConnectedDevice(port) {
+        if (port.cached.length > 0) {
+            return port.cached.map(c => `
+                <a href="${ifaceUrl(c.interfaceId)}" class="text-decoration-none d-block mb-1">
+                    ${c.hostName ? `<div class="fw-semibold">${esc(c.hostName)}${c.name ? ' &middot; ' + esc(c.name) : ''}</div>` : ''}
+                    <div class="font-monospace text-muted">${esc(c.mac)}</div>
+                </a>`).join('');
+        }
+        const knownLive = port.live.macs.find(m => m.known);
+        if (knownLive) {
+            return `<a href="${ifaceUrl(knownLive.interfaceId)}" class="text-decoration-none d-block">
+                <div class="fw-semibold">${esc(knownLive.hostName ?? knownLive.interfaceName)} <span class="badge bg-info-subtle text-info-emphasis">new</span></div>
+                <div class="font-monospace text-muted">${esc(knownLive.mac)}</div>
+            </a>`;
+        }
+        if (port.live.macs.length > 0) {
+            return '<span class="text-muted">Unregistered device(s)</span>';
+        }
+        return '<span class="text-muted">—</span>';
+    }
+
+    function renderLiveStatus(live) {
+        if (live.status === null && live.speed === null) return '<span class="text-muted">—</span>';
+        const s = (live.status ?? '').toLowerCase();
+        const cls = s.includes('up') ? 'success' : (s.includes('down') ? 'secondary' : 'warning');
+        return `<span class="badge bg-${cls}-subtle text-${cls}-emphasis">${esc(live.status ?? 'unknown')}</span>` +
+            (live.speed ? `<div class="text-muted small">${esc(live.speed)}</div>` : '');
+    }
+
+    function renderLiveVlan(live) {
+        const vlans = Array.from(new Set(live.macs.map(m => m.vlan).filter(v => v !== null && v !== '')));
+        return vlans.length ? esc(vlans.join(', ')) : '<span class="text-muted">—</span>';
+    }
+
+    function renderLiveMacs(port, detailsId) {
+        if (port.live.macs.length === 0) return '<span class="text-muted">—</span>';
+        if (port.live.isUplink) {
+            return `<button type="button" class="btn btn-link btn-sm p-0 live-macs-toggle" data-target="${detailsId}" data-macs='${escAttr(JSON.stringify(port.live.macs))}'>
+                ${port.live.macs.length} devices (uplink)
+            </button>`;
+        }
+        return port.live.macs.map(m => {
+            const cls = m.known ? 'bg-light text-dark' : 'bg-secondary-subtle text-secondary-emphasis';
+            const title = m.known ? esc(m.hostName ?? m.interfaceName ?? '') : 'unregistered';
+            return `<span class="badge ${cls} font-monospace me-1 mb-1" title="${escAttr(title)}">${esc(m.mac)}</span>`;
+        }).join(' ');
+    }
+
+    function renderLldp(live) {
+        if (!live.lldpNeighborName && !live.lldpNeighborPort) return '<span class="text-muted">—</span>';
+        return esc(live.lldpNeighborName ?? '?') + (live.lldpNeighborPort ? ` (${esc(live.lldpNeighborPort)})` : '');
+    }
+
+    function renderDiscrepancies(port) {
+        if (port.discrepancies.length === 0) {
+            return '<span class="badge bg-success-subtle text-success-emphasis"><i class="bi bi-check-lg"></i> OK</span>';
+        }
+        const badgeClass = { unregistered: 'info', moved: 'warning', stale: 'secondary', vlan_mismatch: 'danger' };
+        return port.discrepancies.map(d => {
+            const cls = badgeClass[d.type] ?? 'warning';
+            return `<span class="badge bg-${cls}-subtle text-${cls}-emphasis d-block mb-1" title="${escAttr(d.message)}">${esc(d.type.replace('_', ' '))}</span>`;
+        }).join('');
+    }
+
+    function resolveActionMac(port) {
+        if (port.cached.length > 0) return port.cached[0].mac;
+        const knownLive = port.live.macs.find(m => m.known);
+        return knownLive ? knownLive.mac : null;
+    }
+
+    function renderPortRow(port, index) {
+        const detailsId = 'port-details-scan-' + index;
+        const mac = resolveActionMac(port);
+        const label = port.cached.length > 1 ? `${port.cached.length} devices` : (port.cached[0]?.hostName ?? mac ?? port.port);
+
+        const checkboxCell = mac
+            ? `<td><input type="checkbox" class="form-check-input switch-port-checkbox" data-mac="${escAttr(mac)}" data-target="${detailsId}" data-label="${escAttr(port.port + ' (' + label + ')')}"></td>`
+            : '<td></td>';
+
+        const actionsCell = mac ? `
+            <td class="text-end text-nowrap">
+                <button type="button" class="btn btn-sm btn-outline-secondary port-status-btn" data-mac="${escAttr(mac)}" data-target="${detailsId}" title="Check Status"><i class="bi bi-arrow-clockwise"></i></button>
+                <button type="button" class="btn btn-sm btn-outline-info port-reauth-btn" data-mac="${escAttr(mac)}" data-target="${detailsId}" data-confirm="Reauthenticate port ${escAttr(port.port)}?" title="Reauthenticate"><i class="bi bi-shield-check"></i></button>
+                <button type="button" class="btn btn-sm btn-outline-warning port-bounce-btn" data-mac="${escAttr(mac)}" data-target="${detailsId}" data-confirm="Bounce port ${escAttr(port.port)}? This will briefly disconnect connected clients." title="Bounce Port"><i class="bi bi-power"></i></button>
+                <button type="button" class="btn btn-sm btn-outline-warning port-poe-bounce-btn" data-mac="${escAttr(mac)}" data-target="${detailsId}" data-confirm="PoE bounce port ${escAttr(port.port)}? This will cut power and disconnect connected clients." title="PoE Bounce"><i class="bi bi-lightning"></i></button>
+            </td>` : '<td></td>';
+
+        const lastSeen = port.cached.length > 0 && port.cached[0].lastAuthAt
+            ? new Date(port.cached[0].lastAuthAt).toISOString().slice(0, 16).replace('T', ' ')
+            : '—';
+
+        return `<tr>
+            ${checkboxCell}
+            <td class="font-monospace">${esc(port.port)}</td>
+            <td class="small">${renderConnectedDevice(port)}</td>
+            <td class="text-muted small">${lastSeen}</td>
+            <td class="small">${renderLiveStatus(port.live)}</td>
+            <td class="small">${renderLiveVlan(port.live)}</td>
+            <td class="small">${renderLiveMacs(port, detailsId)}</td>
+            <td class="small">${renderLldp(port.live)}</td>
+            <td class="small">${renderDiscrepancies(port)}</td>
+            ${actionsCell}
+        </tr>
+        <tr id="${detailsId}" class="d-none">
+            <td colspan="10" class="p-0">
+                <div id="${detailsId}-body" class="p-2 text-muted small">Click an action button above to load live port-access data from the switch.</div>
+            </td>
+        </tr>`;
+    }
+
+    function renderPortsTable(ports) {
+        const rows = Object.values(ports).map((port, i) => renderPortRow(port, i));
+        tbody.innerHTML = rows.join('');
+        updateSelectionUI();
+    }
+
+    const scanBtn    = document.getElementById('switch-scan-btn');
+    const scanStatus = document.getElementById('switch-scan-status');
+    const scanAlert  = document.getElementById('switch-scan-alert');
+
+    if (scanBtn) {
+        scanBtn.addEventListener('click', function () {
+            const switchIp = scanBtn.dataset.switchIp;
+            if (!switchIp) {
+                scanAlert.innerHTML = '<div class="alert alert-warning mb-0 m-3 py-2">No switch IP is known for this host yet — it needs at least one recorded ClearPass authentication first.</div>';
+                return;
+            }
+
+            scanAlert.innerHTML = '';
+            const orig = scanBtn.innerHTML;
+            scanBtn.disabled = true;
+            scanBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Scanning…';
+            scanStatus.textContent = 'Scanning switch — this can take a few seconds…';
+
+            fetch(scanUrl + '?switch_ip=' + encodeURIComponent(switchIp))
+                .then(r => {
+                    if (!r.ok) {
+                        if (r.status === 401 || r.status === 403) throw new Error('Session expired — please reload the page and try again.');
+                        throw new Error(`Server returned ${r.status} ${r.statusText}.`);
+                    }
+                    return r.json();
+                })
+                .then(data => {
+                    if (data.error) throw new Error(data.error);
+                    renderPortsTable(data.ports);
+                    scanStatus.textContent = 'Last scanned: ' + new Date().toLocaleTimeString();
+                })
+                .catch(err => {
+                    const msg = err instanceof SyntaxError ? 'Unexpected response from server — the switch may be unreachable.' : err.message;
+                    scanAlert.innerHTML = `<div class="alert alert-danger mb-0 m-3 py-2">Unable to query switch: ${esc(msg)}. Showing last known data only.</div>`;
+                    scanStatus.textContent = 'Last scanned: never';
+                })
+                .finally(() => { scanBtn.disabled = false; scanBtn.innerHTML = orig; });
+        });
+    }
 })();
 </script>
 {% endif %}
