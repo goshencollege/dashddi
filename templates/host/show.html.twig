@@ -789,6 +789,25 @@
         });
     }
 
+    // Shift-click a checkbox to toggle every port between it and the last one clicked.
+    let lastCheckedCb = null;
+    document.addEventListener('click', function (e) {
+        const cb = e.target;
+        if (!cb.matches('.switch-port-checkbox')) return;
+
+        if (e.shiftKey && lastCheckedCb) {
+            const a = checkboxes.indexOf(lastCheckedCb);
+            const b = checkboxes.indexOf(cb);
+            if (a !== -1 && b !== -1) {
+                const [lo, hi] = a < b ? [a, b] : [b, a];
+                checkboxes.slice(lo, hi + 1).forEach(box => { box.checked = cb.checked; });
+                updateSelectionUI();
+            }
+        }
+
+        lastCheckedCb = cb;
+    });
+
     // Runs `work` for each selected port, one at a time (a switch only tolerates so many
     // concurrent SSH/REST sessions), updating the count label with progress and a final
     // succeeded/failed summary. `work` must resolve to {success} rather than reject.
