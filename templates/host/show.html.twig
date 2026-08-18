@@ -374,6 +374,7 @@
     </div>
     {% endif %}
     <div id="switch-scan-alert"></div>
+    <div id="switch-scan-raw"></div>
     <div class="table-responsive">
         <table class="table table-hover mb-0" id="switch-ports-table">
             <thead>
@@ -1123,9 +1124,34 @@
         updateSelectionUI();
     }
 
+    function renderRawOutput(raw) {
+        const commands = [
+            { key: 'interfaceBrief', label: 'show interface brief' },
+            { key: 'portAccess',     label: 'show port-access clients' },
+            { key: 'macTable',       label: 'show mac-address-table' },
+            { key: 'lldp',           label: 'show lldp neighbor-info' },
+        ];
+        const panels = commands.map(c => `
+            <div class="mb-2">
+                <div class="text-muted small fw-semibold">${esc(c.label)}</div>
+                <pre class="small p-2 border rounded mb-0" style="max-height:250px;overflow:auto">${esc(raw[c.key] || '(empty)')}</pre>
+            </div>`).join('');
+        return `<div class="m-3">
+            <button type="button" class="btn btn-link btn-sm p-0 text-muted small" id="switch-scan-raw-toggle">Show raw switch output (for debugging parser issues)</button>
+            <div id="switch-scan-raw-panel" class="d-none mt-2">${panels}</div>
+        </div>`;
+    }
+
     const scanBtn    = document.getElementById('switch-scan-btn');
     const scanStatus = document.getElementById('switch-scan-status');
     const scanAlert  = document.getElementById('switch-scan-alert');
+    const scanRaw    = document.getElementById('switch-scan-raw');
+
+    scanRaw.addEventListener('click', function (e) {
+        if (e.target.id === 'switch-scan-raw-toggle') {
+            document.getElementById('switch-scan-raw-panel').classList.toggle('d-none');
+        }
+    });
 
     if (scanBtn) {
         scanBtn.addEventListener('click', function () {
@@ -1152,6 +1178,7 @@
                 .then(data => {
                     if (data.error) throw new Error(data.error);
                     renderPortsTable(data.ports);
+                    scanRaw.innerHTML = renderRawOutput(data.raw || {});
                     scanStatus.textContent = 'Last scanned: ' + new Date().toLocaleTimeString();
                 })
                 .catch(err => {

@@ -328,21 +328,26 @@ class ArubaCxService
      * SSH-only (no REST fallback) — these are plain CLI reads and REST endpoint coverage
      * for the MAC table / LLDP neighbors varies by AOS-CX firmware version.
      *
-     * @return array{ports: array<string, array{status: ?string, speed: ?string, macs: list<array{mac: string, vlan: ?string}>, clients: list<array{mac: ?string, ip: ?string, vlan: ?string, role: ?string, status: ?string, authMethod: ?string}>, lldp: array{neighborName: ?string, neighborPort: ?string}}>, error: ?string}
+     * @return array{ports: array<string, array{status: ?string, speed: ?string, macs: list<array{mac: string, vlan: ?string}>, clients: list<array{mac: ?string, ip: ?string, vlan: ?string, role: ?string, status: ?string, authMethod: ?string}>, lldp: array{neighborName: ?string, neighborPort: ?string}}>, raw: array{interfaceBrief: string, portAccess: string, macTable: string, lldp: string}, error: ?string}
      */
     public function scanSwitch(ArubaSwitch $creds, string $ip): array
     {
         set_time_limit(60);
 
         if ($creds->getSshPrivateKey() === null && $creds->getPassword() === null) {
-            return ['ports' => [], 'error' => 'No credentials configured'];
+            return ['ports' => [], 'raw' => $this->emptyRaw(), 'error' => 'No credentials configured'];
         }
 
         try {
             return $this->scanSwitchSsh($creds, $ip);
         } catch (\Throwable $e) {
-            return ['ports' => [], 'error' => $e->getMessage()];
+            return ['ports' => [], 'raw' => $this->emptyRaw(), 'error' => $e->getMessage()];
         }
+    }
+
+    private function emptyRaw(): array
+    {
+        return ['interfaceBrief' => '', 'portAccess' => '', 'macTable' => '', 'lldp' => ''];
     }
 
     private function scanSwitchSsh(ArubaSwitch $creds, string $ip): array
@@ -353,7 +358,17 @@ class ArubaCxService
 
         $ssh->exec('', false);
         $ssh->read('/[#>]\s*$/');
-        $ssh->setTimeout(5);
+        $ssh->setTimeout(8);
+
+        // Disable output pagination for this session — without it, the CLI stops at a
+        // "--More--" prompt after ~19-24 lines and waits for a keypress, which our
+        // prompt-regex read() can't satisfy, silently truncating anything longer than
+        // one screen (this is exactly what shows up as only the first N ports of
+        // `show interface brief`). Harmless to send even if unsupported on a given
+        // firmware — worst case is a one-line "unknown command" that gets swallowed
+        // by the next prompt read.
+        $ssh->write("no page\n");
+        $ssh->read('/[#>]\s*$/');
 
         $ssh->write("show interface brief\n");
         $interfaceBriefOut = (string) $ssh->read('/[#>]\s*$/');
@@ -390,7 +405,16 @@ class ArubaCxService
             ];
         }
 
-        return ['ports' => $ports, 'error' => null];
+        return [
+            'ports' => $ports,
+            'raw'   => [
+                'interfaceBrief' => trim($interfaceBriefOut),
+                'portAccess'     => trim($portAccessOut),
+                'macTable'       => trim($macTableOut),
+                'lldp'           => trim($lldpOut),
+            ],
+            'error' => null,
+        ];
     }
 
     // ── Port actions ──────────────────────────────────────────────────────────

@@ -86,6 +86,7 @@ class SwitchApiController extends AbstractController
 
         return $this->json([
             'ports' => $this->correlation->correlate($scan['ports'], $cachedGroups, $known, $switchIp),
+            'raw'   => $scan['raw'],
             'error' => null,
         ]);
     }
