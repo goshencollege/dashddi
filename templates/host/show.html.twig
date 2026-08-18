@@ -316,6 +316,46 @@
     {% endif %}
 </div>
 
+{% if switchPorts is not empty %}
+<div class="card mb-3">
+    <div class="card-header">
+        <span><i class="bi bi-diagram-3 me-1"></i>Switch Ports ({{ switchPorts|length }})</span>
+    </div>
+    <div class="card-body py-2 text-muted small border-bottom">
+        Reflects each connected device's last known ClearPass authentication, refreshed roughly every 15 minutes.
+        Only devices actively authenticating through this switch are shown.
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>Port</th>
+                    <th>Connected Device</th>
+                    <th>Last Seen</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for iface in switchPorts %}
+                    <tr>
+                        <td class="font-monospace">{{ iface.switchPort }}</td>
+                        <td class="small">
+                            <a href="{{ path('interface_show', {id: iface.id}) }}" class="text-decoration-none">
+                                {% if iface.host %}
+                                    <div class="fw-semibold">{{ iface.host.name }}{% if iface.name %} &middot; {{ iface.name }}{% endif %}</div>
+                                {% endif %}
+                                {% set vendor = mac_vendor(iface.macAddress) %}
+                                <div class="font-monospace text-muted"{% if vendor %} title="{{ vendor }}"{% endif %}>{{ iface.macAddress }}</div>
+                            </a>
+                        </td>
+                        <td class="text-muted small">{{ iface.lastAuthAt ? iface.lastAuthAt|date('Y-m-d H:i') : '—' }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
 {% if host.sshHostKeys|length > 0 or not host.deleted %}
 <div class="card mb-3">
     <div class="card-header"><i class="bi bi-shield-lock me-1"></i>SSH Host Keys</div>

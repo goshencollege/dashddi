@@ -131,6 +131,35 @@ class NetworkInterfaceRepository extends ServiceEntityRepository
     }
 
     /**
+     * Active interfaces whose cached switch attachment (switchIp) matches one of the
+     * given IPs — i.e. devices currently known to be connected to that switch.
+     *
+     * @param  string[] $switchIps
+     * @return NetworkInterface[]
+     */
+    public function findConnectedToSwitchIps(array $switchIps): array
+    {
+        $switchIps = array_values(array_filter($switchIps));
+        if (empty($switchIps)) {
+            return [];
+        }
+
+        $interfaces = $this->createQueryBuilder('ni')
+            ->addSelect('h')
+            ->leftJoin('ni.host', 'h')
+            ->where('ni.switchIp IN (:switchIps)')
+            ->andWhere('ni.switchPort IS NOT NULL')
+            ->andWhere('ni.deletedAt IS NULL')
+            ->setParameter('switchIps', $switchIps)
+            ->getQuery()
+            ->getResult();
+
+        usort($interfaces, fn ($a, $b) => strnatcasecmp($a->getSwitchPort(), $b->getSwitchPort()));
+
+        return $interfaces;
+    }
+
+    /**
      * Full-text search across host name, interface name, IPv4, and IPv6 address.
      *
      * @return NetworkInterface[]

@@ -8,6 +8,7 @@ use App\Repository\BuildingRepository;
 use App\Repository\DomainRecordRepository;
 use App\Repository\DomainRepository;
 use App\Repository\HostRepository;
+use App\Repository\NetworkInterfaceRepository;
 use App\Repository\SubnetRepository;
 use App\Repository\TagRepository;
 use App\Repository\VirtualIpRepository;
@@ -418,7 +419,7 @@ class HostController extends AbstractController
     }
 
     #[Route('/{id}', name: 'host_show', methods: ['GET'], requirements: ['id' => '\d+'])]
-    public function show(Host $host, Request $request, VirtualIpRepository $vipRepo): Response
+    public function show(Host $host, Request $request, VirtualIpRepository $vipRepo, NetworkInterfaceRepository $ifaceRepo): Response
     {
         $sessionKey = '_host_token_raw_' . $host->getId();
         $newToken   = $request->getSession()->get($sessionKey);
@@ -428,11 +429,25 @@ class HostController extends AbstractController
 
         $ifaceIds = array_map(fn($iface) => $iface->getId(), $host->getInterfaces()->toArray());
 
+        $hostIps = [];
+        foreach ($host->getInterfaces() as $iface) {
+            if ($iface->isDeleted()) {
+                continue;
+            }
+            if ($iface->getIpAddress() !== null) {
+                $hostIps[] = $iface->getIpAddress()->getAddress();
+            }
+            if ($iface->getIpv6Address() !== null) {
+                $hostIps[] = $iface->getIpv6Address()->getAddress();
+            }
+        }
+
         return $this->render('host/show.html.twig', [
-            'host'     => $host,
-            'newToken' => $newToken,
-            'domains'  => $this->domainRepo->findBy(['excludeFromInterfaces' => false], ['name' => 'ASC']),
-            'vip_map'  => $vipRepo->findMapByInterfaceIds($ifaceIds),
+            'host'        => $host,
+            'newToken'    => $newToken,
+            'domains'     => $this->domainRepo->findBy(['excludeFromInterfaces' => false], ['name' => 'ASC']),
+            'vip_map'     => $vipRepo->findMapByInterfaceIds($ifaceIds),
+            'switchPorts' => $ifaceRepo->findConnectedToSwitchIps($hostIps),
         ]);
     }
 
