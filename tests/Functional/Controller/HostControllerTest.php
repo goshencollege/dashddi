@@ -591,6 +591,8 @@ class HostControllerTest extends AppWebTestCase
         $this->assertStringContainsString('client-host', $content);
         $this->assertStringContainsString("/interfaces/{$clientIfaceId}", $content);
         $this->assertStringNotContainsString('port-status-btn', $content);
+        $this->assertStringNotContainsString('switch-port-checkbox', $content);
+        $this->assertStringNotContainsString('bulk-status-btn', $content);
     }
 
     public function testShowRendersSwitchPortActionButtonsWhenArubaSwitchConfigured(): void
@@ -622,6 +624,12 @@ class HostControllerTest extends AppWebTestCase
         $this->assertStringContainsString('port-bounce-btn', $content);
         $this->assertStringContainsString('port-poe-bounce-btn', $content);
         $this->assertStringContainsString('bb:bb:bb:bb:bb:04', $content);
+        $this->assertStringContainsString('switch-ports-select-all', $content);
+        $this->assertStringContainsString('switch-port-checkbox', $content);
+        $this->assertStringContainsString('bulk-status-btn', $content);
+        $this->assertStringContainsString('bulk-reauth-btn', $content);
+        $this->assertStringContainsString('bulk-bounce-btn', $content);
+        $this->assertStringContainsString('bulk-poe-bounce-btn', $content);
     }
 
     public function testShowHidesSwitchPortEntryOlderThanSwitchInfoMaxAge(): void

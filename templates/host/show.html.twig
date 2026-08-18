@@ -329,10 +329,34 @@
             Only devices actively authenticating through this switch are shown.
         {% endif %}
     </div>
+    {% if arubaSwitch %}
+    <div class="d-flex align-items-center gap-2 px-3 py-2 border-bottom">
+        <span class="text-muted small" id="switch-ports-selected-count">0 selected</span>
+        <div class="d-flex gap-2 ms-auto">
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="bulk-status-btn" disabled>
+                <i class="bi bi-arrow-clockwise me-1"></i>Check Status
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-info" id="bulk-reauth-btn" disabled>
+                <i class="bi bi-shield-check me-1"></i>Reauthenticate
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-warning" id="bulk-bounce-btn" disabled>
+                <i class="bi bi-power me-1"></i>Bounce Port
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-warning" id="bulk-poe-bounce-btn" disabled>
+                <i class="bi bi-lightning me-1"></i>PoE Bounce
+            </button>
+        </div>
+    </div>
+    {% endif %}
     <div class="table-responsive">
         <table class="table table-hover mb-0">
             <thead>
                 <tr>
+                    {% if arubaSwitch %}
+                    <th style="width:2rem">
+                        <input type="checkbox" class="form-check-input" id="switch-ports-select-all" title="Select all">
+                    </th>
+                    {% endif %}
                     <th>Port</th>
                     <th>Connected Device</th>
                     <th>Last Seen</th>
@@ -342,7 +366,15 @@
             <tbody>
                 {% for iface in switchPorts %}
                     {% set detailsId = 'port-details-' ~ iface.id %}
+                    {% set deviceLabel = iface.host ? iface.host.name : iface.macAddress %}
                     <tr>
+                        {% if arubaSwitch %}
+                        <td>
+                            <input type="checkbox" class="form-check-input switch-port-checkbox"
+                                   data-mac="{{ iface.macAddress }}" data-target="{{ detailsId }}"
+                                   data-label="{{ (iface.switchPort ~ ' (' ~ deviceLabel ~ ')')|e('html_attr') }}">
+                        </td>
+                        {% endif %}
                         <td class="font-monospace">{{ iface.switchPort }}</td>
                         <td class="small">
                             <a href="{{ path('interface_show', {id: iface.id}) }}" class="text-decoration-none">
@@ -355,7 +387,6 @@
                         </td>
                         <td class="text-muted small">{{ iface.lastAuthAt ? iface.lastAuthAt|date('Y-m-d H:i') : '—' }}</td>
                         {% if arubaSwitch %}
-                        {% set deviceLabel = iface.host ? iface.host.name : iface.macAddress %}
                         <td class="text-end text-nowrap">
                             <button type="button" class="btn btn-sm btn-outline-secondary port-status-btn" data-mac="{{ iface.macAddress }}" data-target="{{ detailsId }}" title="Check Status">
                                 <i class="bi bi-arrow-clockwise"></i>
@@ -377,7 +408,7 @@
                     </tr>
                     {% if arubaSwitch %}
                     <tr id="{{ detailsId }}" class="d-none">
-                        <td colspan="4" class="p-0">
+                        <td colspan="5" class="p-0">
                             <div id="{{ detailsId }}-body" class="p-2 text-muted small">
                                 Click an action button above to load live port-access data from the switch.
                             </div>
@@ -640,28 +671,63 @@
         return document.getElementById(targetId + '-body');
     }
 
+    // Fetches and renders live port-access data for one MAC into its details row.
+    // Returns a promise resolving to the response data (rejects on error, after rendering it).
+    function checkStatus(mac, target) {
+        const body = showBody(target);
+        body.innerHTML = '<span class="text-muted">Loading…</span>';
+
+        return fetch(statusUrl + '?mac=' + encodeURIComponent(mac))
+            .then(r => {
+                if (!r.ok) {
+                    if (r.status === 401 || r.status === 403) throw new Error('Session expired — please reload the page and try again.');
+                    throw new Error(`Server returned ${r.status} ${r.statusText}. Check the switch connection and server logs.`);
+                }
+                return r.json();
+            })
+            .then(data => { body.innerHTML = renderClients(data); return data; })
+            .catch(err => {
+                const msg = err instanceof SyntaxError ? 'Unexpected response from server — the switch may be unreachable or the session may have expired. Please reload the page.' : err.message;
+                body.innerHTML = `<div class="alert alert-danger mb-0 py-2">${msg}</div>`;
+                throw err;
+            });
+    }
+
+    // Posts a port action (reauth/bounce/poe-bounce) for one MAC and renders the result into its details row.
+    // Returns a promise resolving to {success, error, output} (never rejects — network/HTTP errors resolve as a failure).
+    function runAction(url, mac, target, busyLabel, successMsg) {
+        const body = showBody(target);
+        body.innerHTML = `<span class="text-muted">${busyLabel}…</span>`;
+
+        return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mac }) })
+            .then(r => {
+                if (!r.ok) {
+                    if (r.status === 401 || r.status === 403) throw new Error('Session expired — please reload the page and try again.');
+                    throw new Error(`Server returned ${r.status} ${r.statusText}. Check the switch connection and server logs.`);
+                }
+                return r.json();
+            })
+            .then(data => {
+                const out = data.output ? `<pre class="mt-2 mb-0 p-2 border rounded small" style="max-height:120px;overflow:auto">${esc(data.output)}</pre>` : '';
+                body.innerHTML = data.success
+                    ? `<div class="alert alert-success mb-0 py-2"><i class="bi bi-check-lg me-1"></i>${successMsg}${out}</div>`
+                    : `<div class="alert alert-danger mb-0 py-2">Failed: ${esc(data.error)}${out}</div>`;
+                return data;
+            })
+            .catch(err => {
+                const msg = err instanceof SyntaxError ? 'Unexpected response from server — the switch may be unreachable or the session may have expired. Please reload the page.' : err.message;
+                body.innerHTML = `<div class="alert alert-danger mb-0 py-2">${msg}</div>`;
+                return { success: false, error: msg, output: null };
+            });
+    }
+
     document.querySelectorAll('.port-status-btn').forEach(btn => {
         btn.addEventListener('click', function () {
-            const mac  = btn.dataset.mac;
-            const body = showBody(btn.dataset.target);
             const orig = btn.innerHTML;
             btn.disabled = true;
             btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
-            body.innerHTML = '<span class="text-muted">Loading…</span>';
-
-            fetch(statusUrl + '?mac=' + encodeURIComponent(mac))
-                .then(r => {
-                    if (!r.ok) {
-                        if (r.status === 401 || r.status === 403) throw new Error('Session expired — please reload the page and try again.');
-                        throw new Error(`Server returned ${r.status} ${r.statusText}. Check the switch connection and server logs.`);
-                    }
-                    return r.json();
-                })
-                .then(data => { body.innerHTML = renderClients(data); })
-                .catch(err => {
-                    const msg = err instanceof SyntaxError ? 'Unexpected response from server — the switch may be unreachable or the session may have expired. Please reload the page.' : err.message;
-                    body.innerHTML = `<div class="alert alert-danger mb-0 py-2">${msg}</div>`;
-                })
+            checkStatus(btn.dataset.mac, btn.dataset.target)
+                .catch(() => {})
                 .finally(() => { btn.disabled = false; btn.innerHTML = orig; });
         });
     });
@@ -671,31 +737,10 @@
             btn.addEventListener('click', function () {
                 if (btn.dataset.confirm && !confirm(btn.dataset.confirm)) return;
 
-                const mac  = btn.dataset.mac;
-                const body = showBody(btn.dataset.target);
                 const orig = btn.innerHTML;
                 btn.disabled = true;
                 btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
-                body.innerHTML = `<span class="text-muted">${busyLabel}…</span>`;
-
-                fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mac }) })
-                    .then(r => {
-                        if (!r.ok) {
-                            if (r.status === 401 || r.status === 403) throw new Error('Session expired — please reload the page and try again.');
-                            throw new Error(`Server returned ${r.status} ${r.statusText}. Check the switch connection and server logs.`);
-                        }
-                        return r.json();
-                    })
-                    .then(data => {
-                        const out = data.output ? `<pre class="mt-2 mb-0 p-2 border rounded small" style="max-height:120px;overflow:auto">${esc(data.output)}</pre>` : '';
-                        body.innerHTML = data.success
-                            ? `<div class="alert alert-success mb-0 py-2"><i class="bi bi-check-lg me-1"></i>${successMsg}${out}</div>`
-                            : `<div class="alert alert-danger mb-0 py-2">Failed: ${esc(data.error)}${out}</div>`;
-                    })
-                    .catch(err => {
-                        const msg = err instanceof SyntaxError ? 'Unexpected response from server — the switch may be unreachable or the session may have expired. Please reload the page.' : err.message;
-                        body.innerHTML = `<div class="alert alert-danger mb-0 py-2">${msg}</div>`;
-                    })
+                runAction(url, btn.dataset.mac, btn.dataset.target, busyLabel, successMsg)
                     .finally(() => { btn.disabled = false; btn.innerHTML = orig; });
             });
         });
@@ -704,6 +749,89 @@
     bindAction('.port-reauth-btn',     reauthUrl,    'Reauthenticating', 'Reauthentication triggered.');
     bindAction('.port-bounce-btn',     bounceUrl,    'Bouncing',         'Port bounced successfully.');
     bindAction('.port-poe-bounce-btn', poeBounceUrl, 'PoE bouncing',     'PoE bounce complete.');
+
+    // ── Bulk actions ─────────────────────────────────────────────────────────
+    const selectAll  = document.getElementById('switch-ports-select-all');
+    const checkboxes = Array.from(document.querySelectorAll('.switch-port-checkbox'));
+    const countLabel = document.getElementById('switch-ports-selected-count');
+    const bulkButtons = {
+        status:    document.getElementById('bulk-status-btn'),
+        reauth:    document.getElementById('bulk-reauth-btn'),
+        bounce:    document.getElementById('bulk-bounce-btn'),
+        poeBounce: document.getElementById('bulk-poe-bounce-btn'),
+    };
+
+    function selectedCheckboxes() { return checkboxes.filter(cb => cb.checked); }
+
+    // Re-enables/disables the bulk buttons and the select-all checkbox based on the
+    // current selection, without touching the count label (bulk runs overwrite it
+    // with a progress/summary message while in flight).
+    function refreshBulkButtons() {
+        const n = selectedCheckboxes().length;
+        Object.values(bulkButtons).forEach(btn => { btn.disabled = n === 0; });
+        if (selectAll) {
+            selectAll.checked = n > 0 && n === checkboxes.length;
+            selectAll.indeterminate = n > 0 && n < checkboxes.length;
+        }
+        return n;
+    }
+
+    function updateSelectionUI() {
+        const n = refreshBulkButtons();
+        countLabel.textContent = n === 0 ? '0 selected' : (n + ' selected');
+    }
+
+    checkboxes.forEach(cb => cb.addEventListener('change', updateSelectionUI));
+    if (selectAll) {
+        selectAll.addEventListener('click', function () {
+            checkboxes.forEach(cb => { cb.checked = selectAll.checked; });
+            updateSelectionUI();
+        });
+    }
+
+    // Runs `work` for each selected port, one at a time (a switch only tolerates so many
+    // concurrent SSH/REST sessions), updating the count label with progress and a final
+    // succeeded/failed summary. `work` must resolve to {success} rather than reject.
+    async function runBulk(confirmMessage, work) {
+        const selected = selectedCheckboxes();
+        if (selected.length === 0) return;
+        if (confirmMessage && !confirm(confirmMessage(selected.length))) return;
+
+        checkboxes.forEach(cb => { cb.disabled = true; });
+        Object.values(bulkButtons).forEach(btn => { btn.disabled = true; });
+        if (selectAll) selectAll.disabled = true;
+
+        let succeeded = 0, failed = 0;
+        for (let i = 0; i < selected.length; i++) {
+            countLabel.textContent = `Running on port ${i + 1} of ${selected.length}…`;
+            const result = await work(selected[i].dataset.mac, selected[i].dataset.target);
+            (result && result.success === false) ? failed++ : succeeded++;
+        }
+
+        checkboxes.forEach(cb => { cb.disabled = false; });
+        if (selectAll) selectAll.disabled = false;
+        refreshBulkButtons();
+        countLabel.textContent = failed > 0
+            ? `Done: ${succeeded} succeeded, ${failed} failed.`
+            : `Done: ${succeeded} succeeded.`;
+    }
+
+    bulkButtons.status.addEventListener('click', () => runBulk(
+        null,
+        (mac, target) => checkStatus(mac, target).catch(() => ({ success: false })),
+    ));
+    bulkButtons.reauth.addEventListener('click', () => runBulk(
+        n => `Reauthenticate ${n} selected port${n !== 1 ? 's' : ''}?`,
+        (mac, target) => runAction(reauthUrl, mac, target, 'Reauthenticating', 'Reauthentication triggered.'),
+    ));
+    bulkButtons.bounce.addEventListener('click', () => runBulk(
+        n => `Bounce ${n} selected port${n !== 1 ? 's' : ''}? This will briefly disconnect each client.`,
+        (mac, target) => runAction(bounceUrl, mac, target, 'Bouncing', 'Port bounced successfully.'),
+    ));
+    bulkButtons.poeBounce.addEventListener('click', () => runBulk(
+        n => `PoE bounce ${n} selected port${n !== 1 ? 's' : ''}? This will cut power and disconnect each client.`,
+        (mac, target) => runAction(poeBounceUrl, mac, target, 'PoE bouncing', 'PoE bounce complete.'),
+    ));
 })();
 </script>
 {% endif %}
