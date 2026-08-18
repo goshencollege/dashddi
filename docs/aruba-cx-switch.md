@@ -51,3 +51,38 @@ Port IDs in ClearPass auth logs are typically in `NAS-Port-ID` format, for examp
 ## TLS Certificate Note
 
 TLS verification is enabled by default and recommended. Disable it only if the switch uses a self-signed certificate that cannot be added to the server's trust store.
+
+## Live Port Scan (Query Switch)
+
+The **Switch Ports** card on a host's detail page (shown when that host is itself
+acting as a NAS device) has a **Query Switch** button. Clicking it opens a single
+SSH session to the switch and runs four CLI commands:
+
+- `show interface brief`
+- `show port-access clients`
+- `show mac-address-table`
+- `show lldp neighbor-info`
+
+This is always via SSH (no REST), since these are plain CLI reads and REST
+endpoint coverage for the MAC table and LLDP neighbors varies by AOS-CX firmware
+version. The results are parsed and merged by port (`App\Service\ArubaCxService::scanSwitch()`
+and `App\Service\AosCxOutputParser`), then correlated against DashDDI's cached
+ClearPass-derived switch/port data (`App\Service\SwitchPortCorrelationService`) to
+produce one row per port with:
+
+- Live link status and speed
+- Live VLAN(s) and MAC address(es), classified as an **uplink** (many MACs — a
+  trunk to another switch) to avoid flagging expected noise there
+- LLDP neighbor name/port
+- **Discrepancies**: `unregistered` (live MAC unknown to DashDDI), `moved` (known
+  device live on a different port than cached), `stale` (cached device not seen
+  live anywhere), `vlan_mismatch` (live VLAN differs from the assigned subnet's
+  VLAN)
+
+This is entirely read-only — nothing is written back to DashDDI's database or to
+the switch. It requires Aruba CX credentials with SSH access (key or password) to
+be configured.
+
+**Note:** the CLI output parsers were written from general AOS-CX conventions,
+not from a real device, and may need small regex adjustments once run against a
+specific switch's firmware/output format.

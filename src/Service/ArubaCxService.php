@@ -320,6 +320,79 @@ class ArubaCxService
         return $clients;
     }
 
+    // ── Whole-switch scan ─────────────────────────────────────────────────────
+
+    /**
+     * Runs `show interface brief`, `show port-access clients`, `show mac-address-table`,
+     * and `show lldp neighbor-info` in one SSH session and merges the results by port.
+     * SSH-only (no REST fallback) — these are plain CLI reads and REST endpoint coverage
+     * for the MAC table / LLDP neighbors varies by AOS-CX firmware version.
+     *
+     * @return array{ports: array<string, array{status: ?string, speed: ?string, macs: list<array{mac: string, vlan: ?string}>, clients: list<array{mac: ?string, ip: ?string, vlan: ?string, role: ?string, status: ?string, authMethod: ?string}>, lldp: array{neighborName: ?string, neighborPort: ?string}}>, error: ?string}
+     */
+    public function scanSwitch(ArubaSwitch $creds, string $ip): array
+    {
+        set_time_limit(60);
+
+        if ($creds->getSshPrivateKey() === null && $creds->getPassword() === null) {
+            return ['ports' => [], 'error' => 'No credentials configured'];
+        }
+
+        try {
+            return $this->scanSwitchSsh($creds, $ip);
+        } catch (\Throwable $e) {
+            return ['ports' => [], 'error' => $e->getMessage()];
+        }
+    }
+
+    private function scanSwitchSsh(ArubaSwitch $creds, string $ip): array
+    {
+        $ssh = $this->sshConnect($creds, $ip);
+        $ssh->enablePTY();
+        $ssh->setTimeout(10);
+
+        $ssh->exec('', false);
+        $ssh->read('/[#>]\s*$/');
+        $ssh->setTimeout(5);
+
+        $ssh->write("show interface brief\n");
+        $interfaceBriefOut = (string) $ssh->read('/[#>]\s*$/');
+
+        $ssh->write("show port-access clients\n");
+        $portAccessOut = (string) $ssh->read('/[#>]\s*$/');
+
+        $ssh->write("show mac-address-table\n");
+        $macTableOut = (string) $ssh->read('/[#>]\s*$/');
+
+        $ssh->write("show lldp neighbor-info\n");
+        $lldpOut = (string) $ssh->read('/[#>]\s*$/');
+
+        $interfaceBrief = AosCxOutputParser::parseInterfaceBrief($interfaceBriefOut);
+        $portAccess     = AosCxOutputParser::parsePortAccessClients($portAccessOut);
+        $macTable       = AosCxOutputParser::parseMacAddressTable($macTableOut);
+        $lldp           = AosCxOutputParser::parseLldpNeighborInfo($lldpOut);
+
+        $allPorts = array_unique(array_merge(
+            array_keys($interfaceBrief),
+            array_keys($portAccess),
+            array_keys($macTable),
+            array_keys($lldp),
+        ));
+
+        $ports = [];
+        foreach ($allPorts as $port) {
+            $ports[$port] = [
+                'status'  => $interfaceBrief[$port]['status'] ?? null,
+                'speed'   => $interfaceBrief[$port]['speed']  ?? null,
+                'macs'    => $macTable[$port] ?? [],
+                'clients' => $portAccess[$port] ?? [],
+                'lldp'    => $lldp[$port] ?? ['neighborName' => null, 'neighborPort' => null],
+            ];
+        }
+
+        return ['ports' => $ports, 'error' => null];
+    }
+
     // ── Port actions ──────────────────────────────────────────────────────────
 
     /** @return array{success: bool, error: ?string, output: ?string} */

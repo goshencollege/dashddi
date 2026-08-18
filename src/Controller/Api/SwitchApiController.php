@@ -7,6 +7,7 @@ use App\Repository\ArubaSwitchRepository;
 use App\Repository\ClearpassAuthLogRepository;
 use App\Repository\NetworkInterfaceRepository;
 use App\Service\ArubaCxService;
+use App\Service\SwitchPortCorrelationService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -17,11 +18,12 @@ use Symfony\Component\Routing\Attribute\Route;
 class SwitchApiController extends AbstractController
 {
     public function __construct(
-        private readonly ArubaSwitchRepository     $repo,
-        private readonly ArubaCxService            $cx,
-        private readonly ClearpassAuthLogRepository $authLogRepo,
-        private readonly NetworkInterfaceRepository $ifaceRepo,
-        private readonly AppSettingRepository       $settingRepo,
+        private readonly ArubaSwitchRepository        $repo,
+        private readonly ArubaCxService               $cx,
+        private readonly ClearpassAuthLogRepository    $authLogRepo,
+        private readonly NetworkInterfaceRepository    $ifaceRepo,
+        private readonly AppSettingRepository          $settingRepo,
+        private readonly SwitchPortCorrelationService  $correlation,
     ) {}
 
     #[Route('/port-status', name: 'api_switch_port_status', methods: ['GET'])]
@@ -42,6 +44,50 @@ class SwitchApiController extends AbstractController
         } catch (\Throwable $e) {
             return $this->json(['error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
+    }
+
+    #[Route('/scan', name: 'api_switch_scan', methods: ['GET'])]
+    public function scan(Request $request): JsonResponse
+    {
+        $creds = $this->repo->getInstance();
+        if ($creds === null) {
+            return $this->json(['error' => 'No Aruba CX credentials configured'], Response::HTTP_SERVICE_UNAVAILABLE);
+        }
+
+        $switchIp = trim((string) $request->query->get('switch_ip', ''));
+        if ($switchIp === '') {
+            return $this->json(['error' => 'Provide switch_ip'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        try {
+            $scan = $this->cx->scanSwitch($creds, $switchIp);
+        } catch (\Throwable $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        if ($scan['error'] !== null) {
+            return $this->json(['error' => $scan['error']], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        $allMacs = [];
+        foreach ($scan['ports'] as $port) {
+            foreach ($port['macs'] as $entry) {
+                $allMacs[] = $entry['mac'];
+            }
+            foreach ($port['clients'] as $client) {
+                if ($client['mac'] !== null) {
+                    $allMacs[] = $client['mac'];
+                }
+            }
+        }
+
+        $known        = $this->ifaceRepo->findByMacs(array_unique($allMacs));
+        $cachedGroups = $this->ifaceRepo->findConnectedToSwitchIps([$switchIp]);
+
+        return $this->json([
+            'ports' => $this->correlation->correlate($scan['ports'], $cachedGroups, $known, $switchIp),
+            'error' => null,
+        ]);
     }
 
     #[Route('/port-reauthenticate', name: 'api_switch_port_reauthenticate', methods: ['POST'])]
