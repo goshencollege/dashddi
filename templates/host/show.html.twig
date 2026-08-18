@@ -364,43 +364,46 @@
                 </tr>
             </thead>
             <tbody>
-                {% for iface in switchPorts %}
-                    {% set detailsId = 'port-details-' ~ iface.id %}
-                    {% set deviceLabel = iface.host ? iface.host.name : iface.macAddress %}
+                {% for port, ifaces in switchPorts %}
+                    {% set detailsId = 'port-details-' ~ loop.index0 %}
+                    {% set primaryIface = ifaces[0] %}
+                    {% set deviceLabel = ifaces|length > 1 ? (ifaces|length ~ ' devices') : (primaryIface.host ? primaryIface.host.name : primaryIface.macAddress) %}
                     <tr>
                         {% if arubaSwitch %}
                         <td>
                             <input type="checkbox" class="form-check-input switch-port-checkbox"
-                                   data-mac="{{ iface.macAddress }}" data-target="{{ detailsId }}"
-                                   data-label="{{ (iface.switchPort ~ ' (' ~ deviceLabel ~ ')')|e('html_attr') }}">
+                                   data-mac="{{ primaryIface.macAddress }}" data-target="{{ detailsId }}"
+                                   data-label="{{ (port ~ ' (' ~ deviceLabel ~ ')')|e('html_attr') }}">
                         </td>
                         {% endif %}
-                        <td class="font-monospace">{{ iface.switchPort }}</td>
+                        <td class="font-monospace">{{ port }}</td>
                         <td class="small">
-                            <a href="{{ path('interface_show', {id: iface.id}) }}" class="text-decoration-none">
-                                {% if iface.host %}
-                                    <div class="fw-semibold">{{ iface.host.name }}{% if iface.name %} &middot; {{ iface.name }}{% endif %}</div>
-                                {% endif %}
-                                {% set vendor = mac_vendor(iface.macAddress) %}
-                                <div class="font-monospace text-muted"{% if vendor %} title="{{ vendor }}"{% endif %}>{{ iface.macAddress }}</div>
-                            </a>
+                            {% for iface in ifaces %}
+                                <a href="{{ path('interface_show', {id: iface.id}) }}" class="text-decoration-none d-block{% if not loop.last %} mb-1{% endif %}">
+                                    {% if iface.host %}
+                                        <div class="fw-semibold">{{ iface.host.name }}{% if iface.name %} &middot; {{ iface.name }}{% endif %}</div>
+                                    {% endif %}
+                                    {% set vendor = mac_vendor(iface.macAddress) %}
+                                    <div class="font-monospace text-muted"{% if vendor %} title="{{ vendor }}"{% endif %}>{{ iface.macAddress }}</div>
+                                </a>
+                            {% endfor %}
                         </td>
-                        <td class="text-muted small">{{ iface.lastAuthAt ? iface.lastAuthAt|date('Y-m-d H:i') : '—' }}</td>
+                        <td class="text-muted small">{{ primaryIface.lastAuthAt ? primaryIface.lastAuthAt|date('Y-m-d H:i') : '—' }}</td>
                         {% if arubaSwitch %}
                         <td class="text-end text-nowrap">
-                            <button type="button" class="btn btn-sm btn-outline-secondary port-status-btn" data-mac="{{ iface.macAddress }}" data-target="{{ detailsId }}" title="Check Status">
+                            <button type="button" class="btn btn-sm btn-outline-secondary port-status-btn" data-mac="{{ primaryIface.macAddress }}" data-target="{{ detailsId }}" title="Check Status">
                                 <i class="bi bi-arrow-clockwise"></i>
                             </button>
-                            <button type="button" class="btn btn-sm btn-outline-info port-reauth-btn" data-mac="{{ iface.macAddress }}" data-target="{{ detailsId }}"
-                                    data-confirm="Reauthenticate port {{ iface.switchPort|e('js') }} ({{ deviceLabel|e('js') }})?" title="Reauthenticate">
+                            <button type="button" class="btn btn-sm btn-outline-info port-reauth-btn" data-mac="{{ primaryIface.macAddress }}" data-target="{{ detailsId }}"
+                                    data-confirm="Reauthenticate port {{ port|e('js') }} ({{ deviceLabel|e('js') }})?" title="Reauthenticate">
                                 <i class="bi bi-shield-check"></i>
                             </button>
-                            <button type="button" class="btn btn-sm btn-outline-warning port-bounce-btn" data-mac="{{ iface.macAddress }}" data-target="{{ detailsId }}"
-                                    data-confirm="Bounce port {{ iface.switchPort|e('js') }} ({{ deviceLabel|e('js') }})? This will briefly disconnect the client." title="Bounce Port">
+                            <button type="button" class="btn btn-sm btn-outline-warning port-bounce-btn" data-mac="{{ primaryIface.macAddress }}" data-target="{{ detailsId }}"
+                                    data-confirm="Bounce port {{ port|e('js') }} ({{ deviceLabel|e('js') }})? This will briefly disconnect {{ ifaces|length > 1 ? 'its connected clients' : 'the client' }}." title="Bounce Port">
                                 <i class="bi bi-power"></i>
                             </button>
-                            <button type="button" class="btn btn-sm btn-outline-warning port-poe-bounce-btn" data-mac="{{ iface.macAddress }}" data-target="{{ detailsId }}"
-                                    data-confirm="PoE bounce port {{ iface.switchPort|e('js') }} ({{ deviceLabel|e('js') }})? This will cut power and disconnect the client." title="PoE Bounce">
+                            <button type="button" class="btn btn-sm btn-outline-warning port-poe-bounce-btn" data-mac="{{ primaryIface.macAddress }}" data-target="{{ detailsId }}"
+                                    data-confirm="PoE bounce port {{ port|e('js') }} ({{ deviceLabel|e('js') }})? This will cut power and disconnect {{ ifaces|length > 1 ? 'its connected clients' : 'the client' }}." title="PoE Bounce">
                                 <i class="bi bi-lightning"></i>
                             </button>
                         </td>

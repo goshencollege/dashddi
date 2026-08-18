@@ -132,13 +132,16 @@ class NetworkInterfaceRepository extends ServiceEntityRepository
 
     /**
      * Active interfaces whose cached switch attachment (switchIp) matches one of the
-     * given IPs — i.e. devices currently known to be connected to that switch.
+     * given IPs, grouped by switch port — i.e. everything currently known to be
+     * connected to that switch, grouped by physical port since more than one device
+     * can share a port (e.g. a phone and a PC daisy-chained together).
      * $cutoff, if given, excludes interfaces whose switch info is older than that
      * (switchIp/switchPort are set together with lastAuthAt, so it's the freshness
      * signal for this cache).
      *
      * @param  string[] $switchIps
-     * @return NetworkInterface[]
+     * @return array<string, NetworkInterface[]> keyed by switch port, natural-sorted;
+     *         each group's interfaces are sorted by lastAuthAt descending (most recent first)
      */
     public function findConnectedToSwitchIps(array $switchIps, ?\DateTimeImmutable $cutoff = null): array
     {
@@ -153,18 +156,22 @@ class NetworkInterfaceRepository extends ServiceEntityRepository
             ->where('ni.switchIp IN (:switchIps)')
             ->andWhere('ni.switchPort IS NOT NULL')
             ->andWhere('ni.deletedAt IS NULL')
-            ->setParameter('switchIps', $switchIps);
+            ->setParameter('switchIps', $switchIps)
+            ->orderBy('ni.lastAuthAt', 'DESC');
 
         if ($cutoff !== null) {
             $qb->andWhere('ni.lastAuthAt >= :cutoff')
                ->setParameter('cutoff', $cutoff);
         }
 
-        $interfaces = $qb->getQuery()->getResult();
+        $groups = [];
+        foreach ($qb->getQuery()->getResult() as $iface) {
+            $groups[$iface->getSwitchPort()][] = $iface;
+        }
 
-        usort($interfaces, fn ($a, $b) => strnatcasecmp($a->getSwitchPort(), $b->getSwitchPort()));
+        uksort($groups, 'strnatcasecmp');
 
-        return $interfaces;
+        return $groups;
     }
 
     /**

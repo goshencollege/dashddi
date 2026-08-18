@@ -595,6 +595,43 @@ class HostControllerTest extends AppWebTestCase
         $this->assertStringNotContainsString('bulk-status-btn', $content);
     }
 
+    public function testShowGroupsMultipleDevicesOnTheSameSwitchPortIntoOneRow(): void
+    {
+        $subnet = (new Subnet())->setName('switch-shared-port-subnet')->setIpv4Cidr('10.23.0.0/24');
+        $this->em->persist($subnet);
+
+        $switchHost = (new Host())->setName('switch-host-shared');
+        $this->em->persist($switchHost);
+        $this->makeInterfaceWithIps($switchHost, $subnet, 'aa:aa:aa:aa:aa:07', 'mgmt', '10.23.0.1');
+
+        $phoneHost = (new Host())->setName('phone-host');
+        $this->em->persist($phoneHost);
+        $phoneIface = $this->makeInterfaceWithIps($phoneHost, $subnet, 'bb:bb:bb:bb:bb:08', 'phone', '10.23.0.60');
+        $phoneIface->setSwitchIp('10.23.0.1')->setSwitchPort('1/1/8')->setLastAuthAt(new \DateTimeImmutable('-1 hour'));
+
+        $pcHost = (new Host())->setName('pc-host');
+        $this->em->persist($pcHost);
+        $pcIface = $this->makeInterfaceWithIps($pcHost, $subnet, 'bb:bb:bb:bb:bb:09', 'pc', '10.23.0.61');
+        $pcIface->setSwitchIp('10.23.0.1')->setSwitchPort('1/1/8')->setLastAuthAt(new \DateTimeImmutable());
+        $this->em->flush();
+
+        $switchHostId = $switchHost->getId();
+        $pcIfaceId    = $pcIface->getId();
+        $phoneIfaceId = $phoneIface->getId();
+        $this->em->clear();
+
+        $this->client->request('GET', "/hosts/{$switchHostId}");
+        $this->assertResponseIsSuccessful();
+        $content = $this->client->getResponse()->getContent();
+
+        $this->assertStringContainsString('Switch Ports (1)', $content);
+        $this->assertSame(1, substr_count($content, '1/1/8'));
+        $this->assertStringContainsString('phone-host', $content);
+        $this->assertStringContainsString('pc-host', $content);
+        $this->assertStringContainsString("/interfaces/{$pcIfaceId}", $content);
+        $this->assertStringContainsString("/interfaces/{$phoneIfaceId}", $content);
+    }
+
     public function testShowRendersSwitchPortActionButtonsWhenArubaSwitchConfigured(): void
     {
         $arubaSwitch = (new ArubaSwitch())->setUsername('admin')->setPassword('secret');
