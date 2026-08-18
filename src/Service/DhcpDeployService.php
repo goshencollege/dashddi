@@ -46,11 +46,10 @@ class DhcpDeployService
         return $files;
     }
 
-    public function deployToServer(DhcpServer $server, bool $reload = true): array
+    public function deployToServer(DhcpServer $server, array $allFiles, bool $reload = true): array
     {
         $sftp     = $this->getSftp($server);
         $scope    = $server->getVersionScope();
-        $allFiles = $this->generateFiles(sys_get_temp_dir() . '/dhcp');
         $results  = [];
 
         // Upload global reservation files first — no reload needed, the subnet reload below covers them
