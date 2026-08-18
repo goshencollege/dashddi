@@ -65,6 +65,9 @@ Failed messages go to `failed_priority` or `failed_bulk`. Message classes are in
 ### DNS / DHCP deployment
 `DnsConfigGenerator` produces BIND zone files; `DnsDeployService` deploys them to servers via SSH (using phpseclib). Same pattern for Kea DHCP via `DhcpConfigGenerator`. Deployment results are logged in `PushLog`.
 
+### MAC vendor (OUI) lookup
+`OuiLookupService` resolves a MAC address's manufacturer from `resources/oui/oui-database.php`, a generated PHP array (`OUI prefix => vendor name`) built from the public IEEE MA-L registry. It's exposed to templates via the `mac_vendor()` Twig function (`src/Twig/AppExtension.php`) and shown as a `title` hover attribute wherever MAC addresses are rendered. Locally administered addresses (U/L bit set) are reported as "Locally administered (randomized)" rather than looked up. Regenerate the dataset with `app:oui:update`, which re-downloads the registry — no network access happens at request time.
+
 ## Console commands
 
 All commands run inside the `app` container:
@@ -84,6 +87,7 @@ app:purge-clearpass-auth-logs     # purge old ClearPass auth logs
 app:purge-push-logs               # purge old push logs
 app:purge-dhcp-leases             # purge expired DHCP leases
 app:purge-deleted-hosts           # hard-delete soft-deleted records past retention
+app:oui:update                    # refresh the bundled MAC vendor (IEEE OUI) database
 ```
 
 ## Database migrations

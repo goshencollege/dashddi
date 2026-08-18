@@ -318,10 +318,11 @@
                                         <input type="checkbox" class="form-check-input bulk-iface-cb" value="{{ iface.id }}">
                                     </td>
                                     <td class="iface-name-cell">
+                                        {% set vendor = mac_vendor(iface.macAddress) %}
                                         {% if iface.name %}
-                                            <a href="{{ path('interface_show', {id: iface.id}) }}" class="text-decoration-none fw-semibold">{{ iface.name }} <span class="font-monospace text-muted">({{ iface.macAddress }})</span></a>
+                                            <a href="{{ path('interface_show', {id: iface.id}) }}" class="text-decoration-none fw-semibold">{{ iface.name }} <span class="font-monospace text-muted"{% if vendor %} title="{{ vendor }}"{% endif %}>({{ iface.macAddress }})</span></a>
                                         {% else %}
-                                            <a href="{{ path('interface_show', {id: iface.id}) }}" class="text-decoration-none font-monospace text-muted">{{ iface.macAddress }}</a>
+                                            <a href="{{ path('interface_show', {id: iface.id}) }}" class="text-decoration-none font-monospace text-muted"{% if vendor %} title="{{ vendor }}"{% endif %}>{{ iface.macAddress }}</a>
                                         {% endif %}
                                         {% if iface.deleted %}
                                             <span class="badge text-bg-warning mt-1">Deleted {{ iface.deletedAt|date('Y-m-d') }}</span>

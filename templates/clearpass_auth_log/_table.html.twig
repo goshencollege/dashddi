@@ -20,12 +20,13 @@
             <tbody>
                 {% for log in logs %}
                     {% set iface = interface_map[log.macAddress] ?? null %}
+                    {% set vendor = mac_vendor(log.macAddress) %}
                     <tr>
                         <td>
                             {% if iface %}
-                                <a href="{{ path('interface_show', {id: iface.id}) }}"><code>{{ log.macAddress }}</code></a>
+                                <a href="{{ path('interface_show', {id: iface.id}) }}"><code{% if vendor %} title="{{ vendor }}"{% endif %}>{{ log.macAddress }}</code></a>
                             {% else %}
-                                <code>{{ log.macAddress }}</code>
+                                <code{% if vendor %} title="{{ vendor }}"{% endif %}>{{ log.macAddress }}</code>
                             {% endif %}
                         </td>
                         <td>{{ log.username ?: '—' }}</td>
