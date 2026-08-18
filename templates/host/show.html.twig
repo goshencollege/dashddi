@@ -3,7 +3,7 @@
 
 {% macro sectionToggle(id, collapsedSections) %}
     {% set isCollapsed = id in collapsedSections %}
-    <button type="button" class="btn btn-sm btn-outline-secondary section-toggle-btn" data-bs-toggle="collapse"
+    <button type="button" class="btn btn-sm btn-link text-body p-0 section-toggle-btn" data-bs-toggle="collapse"
             data-bs-target="#section-{{ id }}" data-section="{{ id }}"
             aria-expanded="{{ isCollapsed ? 'false' : 'true' }}" aria-controls="section-{{ id }}"
             title="{{ isCollapsed ? 'Expand' : 'Collapse' }} section">
@@ -90,14 +90,17 @@
     {% set activeInterfaces  = host.interfaces|filter(i => not i.deleted) %}
     {% set deletedInterfaces = host.interfaces|filter(i => i.deleted) %}
     {% set ifacesCollapsed = 'interfaces' in collapsedSections %}
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <span>
-            <i class="bi bi-hdd-network me-1"></i>Interfaces ({{ activeInterfaces|length }}
-            {%- if deletedInterfaces|length > 0 %}, <span class="text-warning-emphasis">{{ deletedInterfaces|length }} deleted</span>{% endif %})
+    <div class="card-header d-flex justify-content-between align-items-center" data-bs-toggle="collapse" data-bs-target="#section-interfaces" style="cursor:pointer">
+        <span class="d-flex align-items-center gap-2">
+            {{ _self.sectionToggle('interfaces', collapsedSections) }}
+            <span>
+                <i class="bi bi-hdd-network me-1"></i>Interfaces ({{ activeInterfaces|length }}
+                {%- if deletedInterfaces|length > 0 %}, <span class="text-warning-emphasis">{{ deletedInterfaces|length }} deleted</span>{% endif %})
+            </span>
         </span>
         <div class="d-flex align-items-center gap-2">
             {% if not host.deleted %}
-            <a href="{{ path('interface_new', {id: host.id}) }}" class="btn btn-sm btn-primary">
+            <a href="{{ path('interface_new', {id: host.id}) }}" class="btn btn-sm btn-primary" onclick="event.stopPropagation()">
                 <i class="bi bi-plus-lg me-1"></i>Add Interface
             </a>
             {% if activeInterfaces|length > 0 %}
@@ -106,7 +109,6 @@
             </button>
             {% endif %}
             {% endif %}
-            {{ _self.sectionToggle('interfaces', collapsedSections) }}
         </div>
     </div>
     <div class="collapse{{ ifacesCollapsed ? '' : ' show' }}" id="section-interfaces">
@@ -335,9 +337,9 @@
 {% if switchPorts is not empty %}
 <div class="card mb-3">
     {% set switchPortsCollapsed = 'switch-ports' in collapsedSections %}
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <span><i class="bi bi-diagram-3 me-1"></i>Switch Ports ({{ switchPorts|length }})</span>
+    <div class="card-header d-flex align-items-center gap-2" data-bs-toggle="collapse" data-bs-target="#section-switch-ports" style="cursor:pointer">
         {{ _self.sectionToggle('switch-ports', collapsedSections) }}
+        <span><i class="bi bi-diagram-3 me-1"></i>Switch Ports ({{ switchPorts|length }})</span>
     </div>
     <div class="collapse{{ switchPortsCollapsed ? '' : ' show' }}" id="section-switch-ports">
     <div class="card-body py-2 text-muted small border-bottom">
@@ -448,9 +450,9 @@
 {% if host.sshHostKeys|length > 0 or not host.deleted %}
 <div class="card mb-3">
     {% set sshKeysCollapsed = 'ssh-host-keys' in collapsedSections %}
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <span><i class="bi bi-shield-lock me-1"></i>SSH Host Keys</span>
+    <div class="card-header d-flex align-items-center gap-2" data-bs-toggle="collapse" data-bs-target="#section-ssh-host-keys" style="cursor:pointer">
         {{ _self.sectionToggle('ssh-host-keys', collapsedSections) }}
+        <span><i class="bi bi-shield-lock me-1"></i>SSH Host Keys</span>
     </div>
     <div class="collapse{{ sshKeysCollapsed ? '' : ' show' }}" id="section-ssh-host-keys">
     <div class="card-body py-2">
@@ -545,9 +547,9 @@
 {% if snipeLink %}
 <div class="card mb-3">
     {% set snipeCollapsed = 'snipe-it-asset' in collapsedSections %}
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <span><i class="bi bi-box-seam me-1"></i>Snipe-IT Asset</span>
+    <div class="card-header d-flex align-items-center gap-2" data-bs-toggle="collapse" data-bs-target="#section-snipe-it-asset" style="cursor:pointer">
         {{ _self.sectionToggle('snipe-it-asset', collapsedSections) }}
+        <span><i class="bi bi-box-seam me-1"></i>Snipe-IT Asset</span>
     </div>
     <div class="collapse{{ snipeCollapsed ? '' : ' show' }}" id="section-snipe-it-asset">
     <div class="card-body py-2">
@@ -580,14 +582,14 @@
 {% if not host.deleted %}
 <div class="card mb-3">
     {% set apiTokenCollapsed = 'api-token' in collapsedSections %}
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <span><i class="bi bi-key me-1"></i>Host API Token</span>
-        <div class="d-flex align-items-center gap-2">
-            <a href="{{ path('user_guide_settings') }}#host-scoped-tokens" class="btn btn-sm btn-outline-secondary" title="User Guide" target="_blank">
-                <i class="bi bi-question-circle"></i>
-            </a>
+    <div class="card-header d-flex justify-content-between align-items-center" data-bs-toggle="collapse" data-bs-target="#section-api-token" style="cursor:pointer">
+        <span class="d-flex align-items-center gap-2">
             {{ _self.sectionToggle('api-token', collapsedSections) }}
-        </div>
+            <span><i class="bi bi-key me-1"></i>Host API Token</span>
+        </span>
+        <a href="{{ path('user_guide_settings') }}#host-scoped-tokens" class="btn btn-sm btn-outline-secondary" title="User Guide" target="_blank" onclick="event.stopPropagation()">
+            <i class="bi bi-question-circle"></i>
+        </a>
     </div>
     <div class="collapse{{ apiTokenCollapsed ? '' : ' show' }}" id="section-api-token">
     {% if newToken %}
