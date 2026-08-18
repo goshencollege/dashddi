@@ -323,10 +323,15 @@ class ArubaCxService
     // ── Whole-switch scan ─────────────────────────────────────────────────────
 
     /**
-     * Runs `show interface brief`, `show port-access clients`, `show mac-address-table`,
-     * and `show lldp neighbor-info` in one SSH session and merges the results by port.
-     * SSH-only (no REST fallback) — these are plain CLI reads and REST endpoint coverage
-     * for the MAC table / LLDP neighbors varies by AOS-CX firmware version.
+     * Fetches interface link status/speed for every port, preferring REST over CLI:
+     * one typed JSON call instead of scraping a text table that turned out to have
+     * header/data column misalignment on real hardware. Falls back to the SSH-parsed
+     * `show interface brief` (below) when REST credentials aren't configured, the
+     * request fails, or it parses to zero ports (e.g. a firmware reporting these
+     * attributes under different JSON keys than assumed here) — parsing this table
+     * with `show port-access clients`, `show mac-address-table`, and
+     * `show lldp neighbor-info` (SSH-only; REST coverage for those varies by AOS-CX
+     * firmware version) all happen in one SSH session and are merged by port.
      *
      * @return array{ports: array<string, array{status: ?string, speed: ?string, macs: list<array{mac: string, vlan: ?string}>, clients: list<array{mac: ?string, ip: ?string, vlan: ?string, role: ?string, status: ?string, authMethod: ?string}>, lldp: array{neighborName: ?string, neighborPort: ?string}}>, raw: array{interfaceBrief: string, portAccess: string, macTable: string, lldp: string}, error: ?string}
      */
@@ -338,8 +343,22 @@ class ArubaCxService
             return ['ports' => [], 'raw' => $this->emptyRaw(), 'error' => 'No credentials configured'];
         }
 
+        $interfaceBrief    = null;
+        $interfaceBriefRaw = '';
+        if ($creds->getPassword() !== null) {
+            try {
+                $rest = $this->getInterfaceBriefRest($creds, $ip);
+                if (!empty($rest['ports'])) {
+                    $interfaceBrief    = $rest['ports'];
+                    $interfaceBriefRaw = $rest['raw'];
+                }
+            } catch (\Throwable $e) {
+                // Fall through to the SSH-parsed `show interface brief` below.
+            }
+        }
+
         try {
-            return $this->scanSwitchSsh($creds, $ip);
+            return $this->scanSwitchSsh($creds, $ip, $interfaceBrief, $interfaceBriefRaw);
         } catch (\Throwable $e) {
             return ['ports' => [], 'raw' => $this->emptyRaw(), 'error' => $e->getMessage()];
         }
@@ -350,7 +369,60 @@ class ArubaCxService
         return ['interfaceBrief' => '', 'portAccess' => '', 'macTable' => '', 'lldp' => ''];
     }
 
-    private function scanSwitchSsh(ArubaSwitch $creds, string $ip): array
+    /**
+     * @return array{ports: array<string, array{status: ?string, speed: ?string}>, raw: string}
+     */
+    private function getInterfaceBriefRest(ArubaSwitch $creds, string $ip): array
+    {
+        $cookie = $this->loginRest($creds, $ip);
+        try {
+            $result = $this->request($creds, $ip, 'GET', '/system/interfaces?depth=2', ['Accept: application/json'], '', $cookie);
+            if (!$result['success']) {
+                throw new \RuntimeException($result['error']);
+            }
+
+            $data  = json_decode($result['body'], true) ?? [];
+            $ports = [];
+
+            foreach ($data as $key => $iface) {
+                if (!is_array($iface)) continue;
+
+                $name = (string) ($iface['name'] ?? rawurldecode((string) $key));
+                if (!preg_match('/^\d+\/\d+\/\d+$/', $name)) continue;
+
+                // Field names per AOS-CX's documented System::Interface attributes.
+                // Checked both flat and nested under a "status" object in case a
+                // firmware version structures the response differently.
+                $statusBlock = is_array($iface['status'] ?? null) ? $iface['status'] : [];
+                $linkState   = $iface['link_state']  ?? $statusBlock['link_state']  ?? null;
+                $adminState  = $iface['admin_state'] ?? $statusBlock['admin_state'] ?? null;
+                $linkSpeed   = $iface['link_speed']  ?? $statusBlock['link_speed']  ?? null;
+
+                $status = $linkState ?? $adminState;
+                $speed  = null;
+                if (is_numeric($linkSpeed) && (float) $linkSpeed > 0) {
+                    // AOS-CX has reported link_speed in both bps and Mb/s across
+                    // versions in the wild — normalise to Mb/s either way.
+                    $speed = (float) $linkSpeed >= 1_000_000
+                        ? (string) ((int) round((float) $linkSpeed / 1_000_000))
+                        : (string) ((int) $linkSpeed);
+                }
+
+                $ports[$name] = [
+                    'status' => $status !== null ? strtolower((string) $status) : null,
+                    'speed'  => $speed,
+                ];
+            }
+
+            $pretty = json_encode(json_decode($result['body'], true), JSON_PRETTY_PRINT);
+
+            return ['ports' => $ports, 'raw' => $pretty !== false ? $pretty : $result['body']];
+        } finally {
+            $this->logoutRest($creds, $ip, $cookie);
+        }
+    }
+
+    private function scanSwitchSsh(ArubaSwitch $creds, string $ip, ?array $interfaceBrief, string $interfaceBriefRaw): array
     {
         $ssh = $this->sshConnect($creds, $ip);
         $ssh->enablePTY();
@@ -370,8 +442,12 @@ class ArubaCxService
         $ssh->write("no page\n");
         $ssh->read('/[#>]\s*$/');
 
-        $ssh->write("show interface brief\n");
-        $interfaceBriefOut = (string) $ssh->read('/[#>]\s*$/');
+        if ($interfaceBrief === null) {
+            $ssh->write("show interface brief\n");
+            $interfaceBriefOut = (string) $ssh->read('/[#>]\s*$/');
+            $interfaceBrief    = AosCxOutputParser::parseInterfaceBrief($interfaceBriefOut);
+            $interfaceBriefRaw = trim($interfaceBriefOut);
+        }
 
         $ssh->write("show port-access clients\n");
         $portAccessOut = (string) $ssh->read('/[#>]\s*$/');
@@ -382,10 +458,9 @@ class ArubaCxService
         $ssh->write("show lldp neighbor-info\n");
         $lldpOut = (string) $ssh->read('/[#>]\s*$/');
 
-        $interfaceBrief = AosCxOutputParser::parseInterfaceBrief($interfaceBriefOut);
-        $portAccess     = AosCxOutputParser::parsePortAccessClients($portAccessOut);
-        $macTable       = AosCxOutputParser::parseMacAddressTable($macTableOut);
-        $lldp           = AosCxOutputParser::parseLldpNeighborInfo($lldpOut);
+        $portAccess = AosCxOutputParser::parsePortAccessClients($portAccessOut);
+        $macTable   = AosCxOutputParser::parseMacAddressTable($macTableOut);
+        $lldp       = AosCxOutputParser::parseLldpNeighborInfo($lldpOut);
 
         $allPorts = array_unique(array_merge(
             array_keys($interfaceBrief),
@@ -408,7 +483,7 @@ class ArubaCxService
         return [
             'ports' => $ports,
             'raw'   => [
-                'interfaceBrief' => trim($interfaceBriefOut),
+                'interfaceBrief' => $interfaceBriefRaw,
                 'portAccess'     => trim($portAccessOut),
                 'macTable'       => trim($macTableOut),
                 'lldp'           => trim($lldpOut),
