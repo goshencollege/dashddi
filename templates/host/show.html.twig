@@ -3,11 +3,11 @@
 
 {% macro sectionToggle(id, collapsedSections) %}
     {% set isCollapsed = id in collapsedSections %}
-    <button type="button" class="btn btn-sm btn-link text-body p-0 section-toggle-btn" data-bs-toggle="collapse"
+    <button type="button" class="btn btn-sm btn-link text-body p-0 section-toggle-btn{{ isCollapsed ? ' collapsed' : '' }}" data-bs-toggle="collapse"
             data-bs-target="#section-{{ id }}" data-section="{{ id }}"
             aria-expanded="{{ isCollapsed ? 'false' : 'true' }}" aria-controls="section-{{ id }}"
             title="{{ isCollapsed ? 'Expand' : 'Collapse' }} section">
-        <i class="bi bi-chevron-down section-chevron" style="transition:transform .15s ease-in-out;{% if isCollapsed %} transform:rotate(-90deg);{% endif %}"></i>
+        <i class="bi bi-chevron-down section-chevron"></i>
     </button>
 {% endmacro %}
 
@@ -17,6 +17,8 @@
 [data-bs-theme="dark"] .host-interfaces-table { --vip-row-bg: rgba(255,255,255,.05); }
 .host-interfaces-table .vip-row { --bs-table-bg: var(--vip-row-bg); }
 .host-interfaces-table .vip-row > td:first-child { padding-left: 2rem !important; }
+.section-chevron { transition: transform .15s ease-in-out; }
+.section-toggle-btn.collapsed .section-chevron { transform: rotate(-90deg); }
 </style>
 {% endblock %}
 
@@ -672,21 +674,13 @@
         }).catch(() => {});
     }
 
+    // Chevron rotation is driven purely by CSS off Bootstrap's own ".collapsed"
+    // class (see stylesheets block), which it toggles on this button natively as
+    // part of the same show()/hide() calls that perform the collapse itself — no
+    // separate JS needed to keep it in sync.
     document.querySelectorAll('.section-toggle-btn[data-section]').forEach(function (btn) {
-        const target  = document.getElementById(btn.getAttribute('data-bs-target').slice(1));
-        const chevron = btn.querySelector('.section-chevron');
+        const target = document.getElementById(btn.getAttribute('data-bs-target').slice(1));
         if (!target) return;
-
-        // Rotate the chevron in step with the collapse animation (matches the
-        // show/hide chevron pattern used on push_log and activity_log pages).
-        if (chevron) {
-            target.addEventListener('show.bs.collapse', function (e) {
-                if (e.target === target) chevron.style.transform = '';
-            });
-            target.addEventListener('hide.bs.collapse', function (e) {
-                if (e.target === target) chevron.style.transform = 'rotate(-90deg)';
-            });
-        }
 
         target.addEventListener('shown.bs.collapse', function (e) {
             if (e.target === target) save(btn.dataset.section, false);
