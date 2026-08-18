@@ -28,7 +28,8 @@ final class PushDhcpMessageHandler
         $startedAt = new \DateTimeImmutable();
 
         try {
-            $result  = $this->deployer->deployToServer($server);
+            $files   = $this->deployer->generateFiles(sys_get_temp_dir() . '/dhcp');
+            $result  = $this->deployer->deployToServer($server, $files);
             $success = $this->isSuccess($result);
             $error   = null;
         } catch (\Throwable $e) {

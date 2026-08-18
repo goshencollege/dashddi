@@ -65,7 +65,7 @@ class GenerateDhcpConfigCommand extends Command
         foreach ($servers as $server) {
             $startedAt = new \DateTimeImmutable();
             try {
-                $results = $this->deployer->deployToServer($server, $reload);
+                $results = $this->deployer->deployToServer($server, $files, $reload);
                 $success = $this->isSuccess($results);
                 $error   = null;
             } catch (\Throwable $e) {

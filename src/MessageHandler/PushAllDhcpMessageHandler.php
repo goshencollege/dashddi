@@ -23,6 +23,7 @@ final class PushAllDhcpMessageHandler
     public function __invoke(PushAllDhcpMessage $message): void
     {
         $servers = $this->repo->findBy([], ['name' => 'ASC']);
+        $files   = $this->deployer->generateFiles(sys_get_temp_dir() . '/dhcp');
 
         $first = true;
         foreach ($servers as $server) {
@@ -34,7 +35,7 @@ final class PushAllDhcpMessageHandler
             $startedAt = new \DateTimeImmutable();
 
             try {
-                $result  = $this->deployer->deployToServer($server);
+                $result  = $this->deployer->deployToServer($server, $files);
                 $success = $this->isSuccess($result);
                 $error   = null;
             } catch (\Throwable $e) {
