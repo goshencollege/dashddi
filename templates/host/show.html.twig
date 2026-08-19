@@ -359,13 +359,11 @@
         {% endif %}
     </div>
     {% if arubaSwitch %}
-    <div class="d-flex align-items-center gap-2 px-3 py-2 border-bottom">
+    <div class="d-flex align-items-center gap-2 px-3 py-2 border-bottom flex-wrap">
         <button type="button" class="btn btn-sm btn-outline-primary" id="switch-scan-btn" data-switch-ip="{{ switchTargetIp }}">
             <i class="bi bi-search me-1"></i>Query Switch
         </button>
         <span class="text-muted small" id="switch-scan-status">Last scanned: never</span>
-    </div>
-    <div class="d-flex align-items-center gap-2 px-3 py-2 border-bottom">
         <span class="text-muted small" id="switch-ports-selected-count">0 selected</span>
         <div class="d-flex gap-2 ms-auto">
             <button type="button" class="btn btn-sm btn-outline-secondary" id="bulk-status-btn" disabled>
