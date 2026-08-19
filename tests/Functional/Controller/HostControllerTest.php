@@ -13,8 +13,10 @@ use App\Entity\IpAddress;
 use App\Entity\Ipv6Address;
 use App\Entity\NetworkInterface;
 use App\Entity\Subnet;
+use App\Entity\SwitchPortLog;
 use App\Entity\UserPreference;
 use App\Enum\RecordType;
+use App\Enum\SwitchPortLogSource;
 use App\Tests\Functional\AppWebTestCase;
 
 class HostControllerTest extends AppWebTestCase
@@ -624,6 +626,47 @@ class HostControllerTest extends AppWebTestCase
         $this->assertStringNotContainsString('port-status-btn', $content);
         $this->assertStringNotContainsString('switch-port-checkbox', $content);
         $this->assertStringNotContainsString('bulk-status-btn', $content);
+    }
+
+    public function testInterfaceListLastSeenLabelIsSwitchScanForLiveScanSource(): void
+    {
+        $host = (new Host())->setName('last-seen-scan-host');
+        $this->em->persist($host);
+
+        $iface = (new NetworkInterface())->setMacAddress('cc:cc:cc:cc:cc:01')->setHost($host)
+            ->setSwitchIp('10.30.0.1')->setSwitchPort('1/1/9')->setLastAuthAt(new \DateTimeImmutable());
+        $this->em->persist($iface);
+        $this->em->flush();
+
+        $this->em->persist(new SwitchPortLog($iface, SwitchPortLogSource::LiveScan, '10.30.0.1', '1/1/9', $iface->getLastAuthAt()));
+        $this->em->flush();
+
+        $hostId = $host->getId();
+        $this->em->clear();
+
+        $this->client->request('GET', "/hosts/{$hostId}");
+        $this->assertResponseIsSuccessful();
+        $this->assertStringContainsString('>switch scan<', $this->client->getResponse()->getContent());
+    }
+
+    public function testInterfaceListLastSeenLabelIsAuthWhenNoSwitchPortLogExists(): void
+    {
+        $host = (new Host())->setName('last-seen-legacy-auth-host');
+        $this->em->persist($host);
+
+        $iface = (new NetworkInterface())->setMacAddress('cc:cc:cc:cc:cc:02')->setHost($host)
+            ->setLastAuthAt(new \DateTimeImmutable());
+        $this->em->persist($iface);
+        $this->em->flush();
+
+        $hostId = $host->getId();
+        $this->em->clear();
+
+        $this->client->request('GET', "/hosts/{$hostId}");
+        $this->assertResponseIsSuccessful();
+        $content = $this->client->getResponse()->getContent();
+        $this->assertStringContainsString('>auth<', $content);
+        $this->assertStringNotContainsString('switch scan', $content);
     }
 
     public function testShowGroupsMultipleDevicesOnTheSameSwitchPortIntoOneRow(): void

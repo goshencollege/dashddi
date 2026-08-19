@@ -12,6 +12,7 @@ use App\Repository\DomainRepository;
 use App\Repository\HostRepository;
 use App\Repository\NetworkInterfaceRepository;
 use App\Repository\SubnetRepository;
+use App\Repository\SwitchPortLogRepository;
 use App\Repository\TagRepository;
 use App\Repository\VirtualIpRepository;
 use App\Entity\UserPreference;
@@ -421,7 +422,7 @@ class HostController extends AbstractController
     }
 
     #[Route('/{id}', name: 'host_show', methods: ['GET'], requirements: ['id' => '\d+'])]
-    public function show(Host $host, Request $request, VirtualIpRepository $vipRepo, NetworkInterfaceRepository $ifaceRepo, ArubaSwitchRepository $arubaSwitchRepo, AppSettingRepository $settingRepo, UserPreferenceRepository $prefRepo): Response
+    public function show(Host $host, Request $request, VirtualIpRepository $vipRepo, NetworkInterfaceRepository $ifaceRepo, ArubaSwitchRepository $arubaSwitchRepo, AppSettingRepository $settingRepo, UserPreferenceRepository $prefRepo, SwitchPortLogRepository $switchPortLogRepo): Response
     {
         $sessionKey = '_host_token_raw_' . $host->getId();
         $newToken   = $request->getSession()->get($sessionKey);
@@ -471,6 +472,7 @@ class HostController extends AbstractController
             'switchInfoMaxAgeDays'  => $maxAge,
             'switchTargetIp'        => $switchTargetIp,
             'collapsedSections'     => $pref?->getHostCollapsedSections() ?? [],
+            'lastSeenSources'       => $switchPortLogRepo->findLatestSourcesByInterfaceIds($ifaceIds),
         ]);
     }
 
