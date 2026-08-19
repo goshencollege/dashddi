@@ -358,15 +358,19 @@ class ArubaCxService
             }
 
             try {
-                $detail = $this->getInterfacesDeepRest($creds, $ip);
+                $combo = $this->getPortAccessAndLldpRest($creds, $ip);
 
-                $pa = $this->extractPortAccessClientsRest($detail['data']);
-                if (!empty($pa)) {
-                    $portAccess        = $pa;
-                    $raw['portAccess'] = $detail['raw'];
+                if (!empty($combo['portAccess'])) {
+                    $portAccess        = $combo['portAccess'];
+                    $raw['portAccess'] = $combo['portAccessRaw'];
+                }
+                if (!empty($combo['lldp'])) {
+                    $lldp        = $combo['lldp'];
+                    $raw['lldp'] = $combo['lldpRaw'];
                 }
             } catch (\Throwable $e) {
-                // Fall through to the SSH-parsed `show port-access clients` below.
+                // Fall through to the SSH-parsed `show port-access clients` and
+                // `show lldp neighbor-info` below.
             }
 
             try {
@@ -377,16 +381,6 @@ class ArubaCxService
                 }
             } catch (\Throwable $e) {
                 // Fall through to the SSH-parsed `show mac-address-table` below.
-            }
-
-            try {
-                $lldpRest = $this->getLldpNeighborsRest($creds, $ip);
-                if (!empty($lldpRest['ports'])) {
-                    $lldp        = $lldpRest['ports'];
-                    $raw['lldp'] = $lldpRest['raw'];
-                }
-            } catch (\Throwable $e) {
-                // Fall through to the SSH-parsed `show lldp neighbor-info` below.
             }
         }
 
@@ -456,128 +450,108 @@ class ArubaCxService
     }
 
     /**
-     * Fetches the full interface collection at a depth deep enough to expand each
-     * interface's `port_access_clients` reference collection into full objects
-     * rather than bare URIs.
+     * Fetches port-access clients and LLDP neighbors via REST, one interface at a
+     * time. AOS-CX doesn't expand either interface's `port_access_clients` or
+     * `lldp_neighbors` reference collection when it's nested inside a
+     * `/system/interfaces?depth=N` collection response — depth=2 leaves both as
+     * bare URIs, and depth>=3 on the full collection times out on real hardware
+     * (confirmed: a ~48-port switch took >10s and never completed) — so both need
+     * their own per-interface endpoint. Listing interface names first via
+     * `/system/interfaces?depth=1` is cheap; both are fetched together, sharing
+     * one login session and one interface-name listing, since the per-port loop is
+     * otherwise identical.
      *
-     * @return array{data: array, raw: string}
+     * @return array{
+     *     portAccess: array<string, list<array{mac: ?string, ip: ?string, vlan: ?string, role: ?string, status: ?string, authMethod: ?string}>>,
+     *     portAccessRaw: string,
+     *     lldp: array<string, array{neighborName: ?string, neighborPort: ?string}>,
+     *     lldpRaw: string,
+     * }
      */
-    private function getInterfacesDeepRest(ArubaSwitch $creds, string $ip): array
+    private function getPortAccessAndLldpRest(ArubaSwitch $creds, string $ip): array
     {
         $cookie = $this->loginRest($creds, $ip);
         try {
-            $result = $this->request($creds, $ip, 'GET', '/system/interfaces?depth=4', ['Accept: application/json'], '', $cookie);
-            if (!$result['success']) {
-                throw new \RuntimeException($result['error']);
-            }
-
-            $data   = json_decode($result['body'], true) ?? [];
-            $pretty = json_encode($data, JSON_PRETTY_PRINT);
-
-            return ['data' => $data, 'raw' => $pretty !== false ? $pretty : $result['body']];
-        } finally {
-            $this->logoutRest($creds, $ip, $cookie);
-        }
-    }
-
-    /**
-     * @param array $interfaces decoded `/system/interfaces?depth=4` body
-     * @return array<string, list<array{mac: ?string, ip: ?string, vlan: ?string, role: ?string, status: ?string, authMethod: ?string}>>
-     */
-    private function extractPortAccessClientsRest(array $interfaces): array
-    {
-        $ports = [];
-
-        foreach ($interfaces as $key => $iface) {
-            if (!is_array($iface)) continue;
-
-            $name = (string) ($iface['name'] ?? rawurldecode((string) $key));
-            if (!preg_match('/^\d+\/\d+\/\d+$/', $name)) continue;
-
-            $clients = $iface['port_access_clients'] ?? [];
-            if (!is_array($clients)) continue;
-
-            foreach ($clients as $clientKey => $entry) {
-                // Still a bare URI reference — the requested depth wasn't enough to
-                // expand it on this firmware version.
-                if (!is_array($entry)) continue;
-
-                $vlanId = array_key_first($entry['access_vlan'] ?? []);
-
-                $ports[$name][] = [
-                    'mac'        => $entry['mac'] ?? (is_string($clientKey) ? rawurldecode($clientKey) : null),
-                    'ip'         => $entry['ip'] ?? null,
-                    'vlan'       => $vlanId !== null ? (string) $vlanId : null,
-                    'role'       => array_key_first($entry['applied_role'] ?? []) ?? null,
-                    'status'     => $entry['client_state'] ?? null,
-                    'authMethod' => $entry['onboarded_method'] ?? null,
-                ];
-            }
-        }
-
-        return $ports;
-    }
-
-    /**
-     * Fetches LLDP neighbor info via REST. AOS-CX doesn't expand `lldp_neighbors`
-     * when it's nested inside a `/system/interfaces?depth=N` collection response —
-     * it stays an empty/unexpanded reference there regardless of depth — so this
-     * queries each interface's own `/system/interfaces/{port}/lldp_neighbors`
-     * endpoint directly, one request per port, reusing a single login session.
-     *
-     * @return array{ports: array<string, array{neighborName: ?string, neighborPort: ?string}>, raw: string}
-     */
-    private function getLldpNeighborsRest(ArubaSwitch $creds, string $ip): array
-    {
-        $cookie = $this->loginRest($creds, $ip);
-        try {
-            $listResult = $this->request($creds, $ip, 'GET', '/system/interfaces?depth=0', ['Accept: application/json'], '', $cookie);
+            $listResult = $this->request($creds, $ip, 'GET', '/system/interfaces?depth=1', ['Accept: application/json'], '', $cookie);
             if (!$listResult['success']) {
                 throw new \RuntimeException($listResult['error']);
             }
 
-            $refs     = json_decode($listResult['body'], true) ?? [];
-            $ports    = [];
-            $rawParts = [];
+            $refs = json_decode($listResult['body'], true) ?? [];
+
+            $portAccess   = [];
+            $lldp         = [];
+            $paRawParts   = [];
+            $lldpRawParts = [];
 
             foreach (array_keys($refs) as $key) {
                 $name = rawurldecode((string) $key);
                 if (!preg_match('/^\d+\/\d+\/\d+$/', $name)) continue;
 
-                $path     = '/system/interfaces/' . rawurlencode($name) . '/lldp_neighbors?depth=2';
-                $response = $this->request($creds, $ip, 'GET', $path, ['Accept: application/json'], '', $cookie);
-                if (!$response['success']) continue; // no LLDP data for this port on this firmware/permission
+                $paResult = $this->request($creds, $ip, 'GET', '/system/interfaces/' . rawurlencode($name) . '/port_access_clients?depth=2', ['Accept: application/json'], '', $cookie);
+                if ($paResult['success']) {
+                    $clients = json_decode($paResult['body'], true) ?? [];
+                    if (!empty($clients)) {
+                        $paRawParts[$name] = $clients;
 
-                $neighbors = json_decode($response['body'], true) ?? [];
-                if (empty($neighbors)) continue;
+                        foreach ($clients as $clientKey => $entry) {
+                            if (!is_array($entry)) continue;
 
-                $rawParts[$name] = $neighbors;
+                            $vlanId = array_key_first($entry['access_vlan'] ?? []);
 
-                $first = null;
-                foreach ($neighbors as $entry) {
-                    if (is_array($entry)) {
-                        $first = $entry;
-                        break;
+                            $portAccess[$name][] = [
+                                'mac'        => $entry['mac'] ?? (is_string($clientKey) ? rawurldecode($clientKey) : null),
+                                'ip'         => $entry['ip'] ?? null,
+                                'vlan'       => $vlanId !== null ? (string) $vlanId : null,
+                                'role'       => array_key_first($entry['applied_role'] ?? []) ?? null,
+                                'status'     => $entry['client_state'] ?? null,
+                                'authMethod' => $entry['onboarded_method'] ?? null,
+                            ];
+                        }
                     }
                 }
-                if ($first === null) continue;
 
-                // The neighbor's descriptive attributes (name, remote port) live
-                // under "neighbor_info"; the top-level chassis_id/port_id fields
-                // are part of the entry's own key, not necessarily human-readable.
-                $info         = is_array($first['neighbor_info'] ?? null) ? $first['neighbor_info'] : [];
-                $neighborName = $info['chassis_name'] ?? $first['chassis_id'] ?? null;
-                $neighborPort = $info['port_id']      ?? $info['port_description'] ?? $first['port_id'] ?? null;
+                $lldpResult = $this->request($creds, $ip, 'GET', '/system/interfaces/' . rawurlencode($name) . '/lldp_neighbors?depth=2', ['Accept: application/json'], '', $cookie);
+                if ($lldpResult['success']) {
+                    $neighbors = json_decode($lldpResult['body'], true) ?? [];
+                    if (!empty($neighbors)) {
+                        $lldpRawParts[$name] = $neighbors;
 
-                $ports[$name] = [
-                    'neighborName' => $neighborName !== null ? (string) $neighborName : null,
-                    'neighborPort' => $neighborPort !== null ? (string) $neighborPort : null,
-                ];
+                        $first = null;
+                        foreach ($neighbors as $entry) {
+                            if (is_array($entry)) {
+                                $first = $entry;
+                                break;
+                            }
+                        }
+
+                        if ($first !== null) {
+                            // The neighbor's descriptive attributes (name, remote port)
+                            // live under "neighbor_info"; the top-level chassis_id/port_id
+                            // fields are part of the entry's own key, not necessarily
+                            // human-readable.
+                            $info         = is_array($first['neighbor_info'] ?? null) ? $first['neighbor_info'] : [];
+                            $neighborName = $info['chassis_name'] ?? $first['chassis_id'] ?? null;
+                            $neighborPort = $info['port_id']      ?? $info['port_description'] ?? $first['port_id'] ?? null;
+
+                            $lldp[$name] = [
+                                'neighborName' => $neighborName !== null ? (string) $neighborName : null,
+                                'neighborPort' => $neighborPort !== null ? (string) $neighborPort : null,
+                            ];
+                        }
+                    }
+                }
             }
 
-            $pretty = json_encode($rawParts, JSON_PRETTY_PRINT);
+            $paPretty   = json_encode($paRawParts, JSON_PRETTY_PRINT);
+            $lldpPretty = json_encode($lldpRawParts, JSON_PRETTY_PRINT);
 
-            return ['ports' => $ports, 'raw' => $pretty !== false ? $pretty : ''];
+            return [
+                'portAccess'    => $portAccess,
+                'portAccessRaw' => $paPretty !== false ? $paPretty : '',
+                'lldp'          => $lldp,
+                'lldpRaw'       => $lldpPretty !== false ? $lldpPretty : '',
+            ];
         } finally {
             $this->logoutRest($creds, $ip, $cookie);
         }
@@ -594,7 +568,10 @@ class ArubaCxService
     {
         $cookie = $this->loginRest($creds, $ip);
         try {
-            $vlanResult = $this->request($creds, $ip, 'GET', '/system/vlans?depth=0', ['Accept: application/json'], '', $cookie);
+            // depth=0 is rejected outright ("invalid value for 'depth' query
+            // parameter") on this firmware — 1 is the minimum, and is all we need
+            // for a name/URI listing here.
+            $vlanResult = $this->request($creds, $ip, 'GET', '/system/vlans?depth=1', ['Accept: application/json'], '', $cookie);
             if (!$vlanResult['success']) {
                 throw new \RuntimeException($vlanResult['error']);
             }

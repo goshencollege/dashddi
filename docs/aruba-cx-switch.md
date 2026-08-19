@@ -63,13 +63,20 @@ every port:
 - The MAC address table
 - LLDP neighbor info
 
-Each of the four is fetched via the REST API first — `GET /system/interfaces?depth=2`
-for link status/speed, `GET /system/interfaces?depth=4` (to expand each interface's
-`port_access_clients` reference collection into full objects) for port-access
-clients, `GET /system/vlans/{vlan}/macs?depth=2` per VLAN for the MAC table, and
-`GET /system/interfaces/{port}/lldp_neighbors?depth=2` per port for LLDP (AOS-CX
-doesn't expand `lldp_neighbors` when it's nested inside the `/system/interfaces`
-collection response, regardless of depth, so it needs its own per-interface call).
+Each of the four is fetched via the REST API first:
+
+- Link status/speed: `GET /system/interfaces?depth=2`
+- Port-access clients and LLDP neighbors: `GET /system/interfaces?depth=1` to list
+  interface names, then `GET /system/interfaces/{port}/port_access_clients?depth=2`
+  and `GET /system/interfaces/{port}/lldp_neighbors?depth=2` per port. AOS-CX
+  doesn't expand either of these reference collections when nested inside a
+  `/system/interfaces?depth=N` collection response — `depth=2` leaves them as bare
+  URIs, and `depth>=3` on the full collection times out on real hardware — so both
+  need their own per-interface call.
+- MAC address table: `GET /system/vlans?depth=1` to list VLANs (`depth=0` is
+  rejected outright by this firmware — 1 is the minimum), then
+  `GET /system/vlans/{vlan}/macs?depth=2` per VLAN.
+
 Any of the four that REST doesn't cover on a given switch/firmware (unconfigured
 credentials, a failed request, or a response that parses to zero entries) falls
 back to its SSH-parsed CLI equivalent (`show interface brief`,
@@ -97,6 +104,8 @@ This is entirely read-only — nothing is written back to DashDDI's database or 
 the switch. It requires Aruba CX credentials with a password (for REST) and/or SSH
 access (key or password, for CLI fallback) to be configured.
 
-**Note:** both the REST JSON parsing and the CLI output parsers were written from
-general AOS-CX conventions, not from a real device, and may need small adjustments
-once run against a specific switch's firmware/output format.
+**Note:** the REST paths for port-access clients, the MAC table, and LLDP
+neighbors above have been confirmed against a real AOS-CX 10.12 switch. The
+CLI-fallback output parsers (`App\Service\AosCxOutputParser`) were written from
+general AOS-CX conventions rather than real device output, and may still need
+adjustments once exercised against a switch/firmware where REST is unavailable.
