@@ -55,18 +55,26 @@ TLS verification is enabled by default and recommended. Disable it only if the s
 ## Live Port Scan (Query Switch)
 
 The **Switch Ports** card on a host's detail page (shown when that host is itself
-acting as a NAS device) has a **Query Switch** button. Clicking it opens a single
-SSH session to the switch and runs four CLI commands:
+acting as a NAS device) has a **Query Switch** button. Clicking it gathers, for
+every port:
 
-- `show interface brief`
-- `show port-access clients`
-- `show mac-address-table`
-- `show lldp neighbor-info`
+- Interface link status/speed
+- Port-access (802.1X/MAC-Auth) clients
+- The MAC address table
+- LLDP neighbor info
 
-This is always via SSH (no REST), since these are plain CLI reads and REST
-endpoint coverage for the MAC table and LLDP neighbors varies by AOS-CX firmware
-version. The results are parsed and merged by port (`App\Service\ArubaCxService::scanSwitch()`
-and `App\Service\AosCxOutputParser`), then correlated against DashDDI's cached
+Each of the four is fetched via the REST API first — `GET /system/interfaces?depth=2`
+for link status/speed, `GET /system/interfaces?depth=4` (to expand each interface's
+`port_access_clients`/`lldp_neighbors` reference collections into full objects) for
+port-access clients and LLDP, and `GET /system/vlans/{vlan}/macs?depth=2` per VLAN
+for the MAC table. Any of the four that REST doesn't cover on a given switch/firmware
+(unconfigured credentials, a failed request, or a response that parses to zero
+entries) falls back to its SSH-parsed CLI equivalent (`show interface brief`,
+`show port-access clients`, `show mac-address-table`, `show lldp neighbor-info`,
+all run in a single SSH session). If REST supplies all four, no SSH connection is
+opened at all. The results are parsed and merged by port
+(`App\Service\ArubaCxService::scanSwitch()` and `App\Service\AosCxOutputParser` for
+the CLI-fallback parsing), then correlated against DashDDI's cached
 ClearPass-derived switch/port data (`App\Service\SwitchPortCorrelationService`) to
 produce one row per port with:
 
@@ -80,9 +88,9 @@ produce one row per port with:
   VLAN)
 
 This is entirely read-only — nothing is written back to DashDDI's database or to
-the switch. It requires Aruba CX credentials with SSH access (key or password) to
-be configured.
+the switch. It requires Aruba CX credentials with a password (for REST) and/or SSH
+access (key or password, for CLI fallback) to be configured.
 
-**Note:** the CLI output parsers were written from general AOS-CX conventions,
-not from a real device, and may need small regex adjustments once run against a
-specific switch's firmware/output format.
+**Note:** both the REST JSON parsing and the CLI output parsers were written from
+general AOS-CX conventions, not from a real device, and may need small adjustments
+once run against a specific switch's firmware/output format.
