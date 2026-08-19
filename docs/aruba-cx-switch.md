@@ -65,11 +65,14 @@ every port:
 
 Each of the four is fetched via the REST API first — `GET /system/interfaces?depth=2`
 for link status/speed, `GET /system/interfaces?depth=4` (to expand each interface's
-`port_access_clients`/`lldp_neighbors` reference collections into full objects) for
-port-access clients and LLDP, and `GET /system/vlans/{vlan}/macs?depth=2` per VLAN
-for the MAC table. Any of the four that REST doesn't cover on a given switch/firmware
-(unconfigured credentials, a failed request, or a response that parses to zero
-entries) falls back to its SSH-parsed CLI equivalent (`show interface brief`,
+`port_access_clients` reference collection into full objects) for port-access
+clients, `GET /system/vlans/{vlan}/macs?depth=2` per VLAN for the MAC table, and
+`GET /system/interfaces/{port}/lldp_neighbors?depth=2` per port for LLDP (AOS-CX
+doesn't expand `lldp_neighbors` when it's nested inside the `/system/interfaces`
+collection response, regardless of depth, so it needs its own per-interface call).
+Any of the four that REST doesn't cover on a given switch/firmware (unconfigured
+credentials, a failed request, or a response that parses to zero entries) falls
+back to its SSH-parsed CLI equivalent (`show interface brief`,
 `show port-access clients`, `show mac-address-table`, `show lldp neighbor-info`,
 all run in a single SSH session). If REST supplies all four, no SSH connection is
 opened at all. The results are parsed and merged by port
