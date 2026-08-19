@@ -2,12 +2,14 @@
 
 namespace App\Controller\Api;
 
+use App\Entity\SwitchPortLog;
+use App\Enum\SwitchPortLogSource;
 use App\Repository\AppSettingRepository;
 use App\Repository\ArubaSwitchRepository;
-use App\Repository\ClearpassAuthLogRepository;
 use App\Repository\NetworkInterfaceRepository;
 use App\Service\ArubaCxService;
 use App\Service\SwitchPortCorrelationService;
+use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -20,10 +22,10 @@ class SwitchApiController extends AbstractController
     public function __construct(
         private readonly ArubaSwitchRepository        $repo,
         private readonly ArubaCxService               $cx,
-        private readonly ClearpassAuthLogRepository    $authLogRepo,
-        private readonly NetworkInterfaceRepository    $ifaceRepo,
-        private readonly AppSettingRepository          $settingRepo,
-        private readonly SwitchPortCorrelationService  $correlation,
+        private readonly NetworkInterfaceRepository   $ifaceRepo,
+        private readonly AppSettingRepository         $settingRepo,
+        private readonly SwitchPortCorrelationService $correlation,
+        private readonly EntityManagerInterface        $em,
     ) {}
 
     #[Route('/port-status', name: 'api_switch_port_status', methods: ['GET'])]
@@ -83,9 +85,34 @@ class SwitchApiController extends AbstractController
 
         $known        = $this->ifaceRepo->findByMacs(array_unique($allMacs));
         $cachedGroups = $this->ifaceRepo->findConnectedToSwitchIps([$switchIp]);
+        $correlated   = $this->correlation->correlate($scan['ports'], $cachedGroups, $known, $switchIp);
+
+        // Confirmed live sightings of already-known devices update DashDDI's cached
+        // switch attachment too — the same fields ClearPass auth log processing
+        // maintains — so action buttons work immediately without waiting on the
+        // next ClearPass pull. This must happen AFTER correlate() above: mutating
+        // these same interface objects first would erase the "moved" discrepancy
+        // it computes by comparing live data against what's currently cached.
+        $now = new \DateTimeImmutable();
+        foreach ($correlated as $port => $data) {
+            if ($data['live']['isUplink']) continue; // trunked-through traffic, not a real attachment
+            foreach ($data['live']['macs'] as $macEntry) {
+                if (!$macEntry['known']) continue;
+                $iface = $known[$macEntry['mac']] ?? null;
+                if ($iface === null) continue;
+
+                if ($iface->getLastAuthAt() === null || $now > $iface->getLastAuthAt()) {
+                    $iface->setLastAuthAt($now);
+                    $iface->setSwitchIp($switchIp);
+                    $iface->setSwitchPort($port);
+                    $this->em->persist(new SwitchPortLog($iface, SwitchPortLogSource::LiveScan, $switchIp, $port, $now));
+                }
+            }
+        }
+        $this->em->flush();
 
         return $this->json([
-            'ports' => $this->correlation->correlate($scan['ports'], $cachedGroups, $known, $switchIp),
+            'ports' => $correlated,
             'raw'   => $scan['raw'],
             'error' => null,
         ]);
@@ -140,8 +167,9 @@ class SwitchApiController extends AbstractController
     }
 
     /**
-     * Resolves switch IP and port ID by looking up the most recent ClearPass auth log
-     * for the given device MAC or IP address.
+     * Resolves switch IP and port ID from the device's cached switch attachment
+     * (NetworkInterface.switchIp/switchPort), kept current by both ClearPass auth
+     * log processing and the live switch scan.
      *
      * @return array{switch_ip: string, port_id: string}|JsonResponse
      */
@@ -168,13 +196,15 @@ class SwitchApiController extends AbstractController
         $mac    = $this->normaliseMac($mac);
         $maxAge = $this->settingRepo->getInstance()->getSwitchInfoMaxAgeDays();
         $cutoff = $maxAge !== null ? new \DateTimeImmutable("-{$maxAge} days") : null;
-        $log    = $this->authLogRepo->findLatestWithSwitchInfoByMac($mac, $cutoff);
 
-        if ($log === null || $log->getNasIp() === null || $log->getNasPortId() === null) {
+        $iface = $this->ifaceRepo->findActiveByMac($mac);
+        if ($iface === null || $iface->getSwitchIp() === null || $iface->getSwitchPort() === null
+            || ($cutoff !== null && ($iface->getLastAuthAt() === null || $iface->getLastAuthAt() < $cutoff))
+        ) {
             return $this->json(['error' => 'No switch info found for this address'], Response::HTTP_NOT_FOUND);
         }
 
-        return ['switch_ip' => $log->getNasIp(), 'port_id' => $log->getNasPortId()];
+        return ['switch_ip' => $iface->getSwitchIp(), 'port_id' => $iface->getSwitchPort()];
     }
 
     /** Normalise MAC to lowercase colon-separated format (handles colons, hyphens, bare hex). */

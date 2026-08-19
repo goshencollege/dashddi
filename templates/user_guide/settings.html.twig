@@ -48,7 +48,8 @@
                     <tr><td>Deleted Host/Interface Retention (days)</td><td>How many days soft-deleted hosts and interfaces are kept before being permanently purged. Individual subnets can override this.</td></tr>
                     <tr><td>Default Retention for New Subnets (days)</td><td>Default lease retention applied when a new subnet is created (can be changed per-subnet)</td></tr>
                     <tr><td>ClearPass Auth Log Retention (days)</td><td>How many days ClearPass auth log entries are kept before being purged</td></tr>
-                    <tr><td>Switch Info Max Age (days)</td><td>How long cached switch port info is considered fresh before being re-fetched from the switch</td></tr>
+                    <tr><td>Switch Port Log Retention (days)</td><td>How many days switch-port attachment history (from ClearPass auth logs and live switch scans) is kept before being purged</td></tr>
+                    <tr><td>Switch Info Max Age (days)</td><td>A device's cached switch IP/port is shown, and can be acted on with Check Status/Reauthenticate/Bounce/PoE Bounce, only if it was last confirmed (via ClearPass or a live switch scan) within this many days</td></tr>
                     <tr><td>Activity Log Retention (days)</td><td>How many days activity log entries are kept. Leave blank to keep entries indefinitely.</td></tr>
                     <tr><th colspan="2" class="table-light small text-muted">SMTP</th></tr>
                     <tr><td>SMTP Host / Port</td><td>Outbound mail server hostname and port for sending notification emails</td></tr>

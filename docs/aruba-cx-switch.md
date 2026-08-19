@@ -1,6 +1,6 @@
 # Aruba CX Switch Integration
 
-DashDDI can query Aruba CX switches to retrieve port access information and perform port management actions (reauthenticate, bounce, POE bounce). This integration is used in conjunction with the ClearPass authentication log view — when a device's auth log entry is selected, DashDDI can look up which port it is connected to and take action on that port.
+DashDDI can query Aruba CX switches to retrieve port access information and perform port management actions (reauthenticate, bounce, POE bounce). This integration is used in conjunction with ClearPass — every known device's cached switch/port location (`switchIp`/`switchPort` on its `NetworkInterface`) is what DashDDI uses to identify the switch port to act on.
 
 ## How It Works
 
@@ -11,7 +11,7 @@ DashDDI contacts Aruba CX switches using the switch's REST API (primary) or SSH 
 - **Bounce a port** — administratively shut down and re-enable a port (forces device reconnection)
 - **POE bounce** — power-cycle the PoE output on a port (useful for IP phones and APs)
 
-Port operations are initiated from within DashDDI's interface when viewing ClearPass authentication logs — the `nasPortId` from the auth log is used to identify the switch port.
+Port operations are initiated from within DashDDI's interface — on a device's interface page, or from the **Switch Ports** card on a host's detail page. Every action resolves its target switch/port from the device's cached switch attachment (`App\Controller\Api\SwitchApiController::resolveSwitch()`), which is kept current by both ClearPass auth log processing and the live **Query Switch** scan (see [Live Port Scan](#live-port-scan-query-switch) below) — never by a live re-query of ClearPass at action time.
 
 ## Configuring an Aruba CX Switch
 
@@ -25,7 +25,7 @@ Add a switch under **Settings → Aruba Switches**. The fields are:
 | Verify TLS | Whether to validate the switch's TLS certificate (default: **on** — recommended; uncheck only if the switch uses a self-signed certificate) |
 | Description | Optional notes about this switch configuration |
 
-**Note:** DashDDI stores one global set of credentials. The actual switch IP is provided at action time (from the NAS IP recorded in the ClearPass auth log) and is not stored in this record.
+**Note:** DashDDI stores one global set of credentials. The actual switch IP is resolved per device at action time from its cached switch attachment (see [How It Works](#how-it-works) above), not stored on this record.
 
 ### Authentication Options
 
@@ -44,8 +44,8 @@ Port IDs in ClearPass auth logs are typically in `NAS-Port-ID` format, for examp
 
 ## Usage Flow
 
-1. A device authenticates through ClearPass. DashDDI pulls the auth log, which includes the NAS IP (switch IP) and NAS Port ID (switch port).
-2. From the auth log entry in DashDDI, you can view port details: connected device, VLAN, auth method, and role.
+1. DashDDI learns a device's switch/port location either from a ClearPass auth log pull (NAS IP/NAS Port ID) or from a live **Query Switch** scan finding it on a port — either way, it's cached on the device's `NetworkInterface`.
+2. On that device's interface page, or the host's **Switch Ports** card, you can view port details: connected device, VLAN, auth method, and role.
 3. From the same interface, you can trigger reauthentication, bounce, or POE bounce on that port.
 
 ## TLS Certificate Note
@@ -84,9 +84,9 @@ back to its SSH-parsed CLI equivalent (`show interface brief`,
 all run in a single SSH session). If REST supplies all four, no SSH connection is
 opened at all. The results are parsed and merged by port
 (`App\Service\ArubaCxService::scanSwitch()` and `App\Service\AosCxOutputParser` for
-the CLI-fallback parsing), then correlated against DashDDI's cached
-ClearPass-derived switch/port data (`App\Service\SwitchPortCorrelationService`) to
-produce one row per port with:
+the CLI-fallback parsing), then correlated against DashDDI's cached switch/port
+data (`App\Service\SwitchPortCorrelationService`) to produce one row per port
+with:
 
 - Live link status and speed
 - Live MAC address(es), classified as an **uplink** (many MACs — a trunk to
@@ -100,9 +100,23 @@ There is deliberately no VLAN-mismatch check — with overlay networking, a port
 live VLAN commonly differs from its assigned subnet's VLAN without that being a
 problem, so the comparison isn't useful here.
 
-This is entirely read-only — nothing is written back to DashDDI's database or to
-the switch. It requires Aruba CX credentials with a password (for REST) and/or SSH
-access (key or password, for CLI fallback) to be configured.
+This never writes anything to the switch itself, but it does update DashDDI's own
+database: for every live MAC that's both **known** (matches an existing
+`NetworkInterface`) and on a **non-uplink** port, the scan updates that
+interface's cached switch attachment (`switchIp`/`switchPort`/`lastAuthAt` — the
+same fields ClearPass auth log processing already maintains) if the scan is newer
+than what's cached, and records the observation in the append-only
+`SwitchPortLog` history table (source `clearpass` or `live_scan`, retained per the
+**Switch Port Log Retention** setting in Application Settings). This is what lets
+the action buttons (Check Status, Reauthenticate, Bounce, PoE Bounce) work
+immediately on a device the scan just discovered, without waiting on the next
+scheduled ClearPass pull — `App\Controller\Api\SwitchApiController::resolveSwitch()`
+resolves every action's target switch/port from that same cached attachment.
+Uplink ports are excluded because the MACs seen there are trunked-through traffic
+from other devices beyond the switch, not genuine attachments to that port.
+
+It requires Aruba CX credentials with a password (for REST) and/or SSH access
+(key or password, for CLI fallback) to be configured.
 
 **Note:** the REST paths for port-access clients, the MAC table, and LLDP
 neighbors above have been confirmed against a real AOS-CX 10.12 switch. The

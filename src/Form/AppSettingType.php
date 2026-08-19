@@ -50,11 +50,17 @@ class AppSettingType extends AbstractType
                 'attr'     => ['placeholder' => '30'],
                 'help'     => 'How long to keep ClearPass authentication log entries. Leave blank to keep forever.',
             ])
+            ->add('switchPortLogRetentionDays', IntegerType::class, [
+                'label'    => 'Switch Port Log Retention (days)',
+                'required' => false,
+                'attr'     => ['placeholder' => '90'],
+                'help'     => 'How long to keep switch-port attachment history (from ClearPass auth logs and live switch scans). Leave blank to keep forever.',
+            ])
             ->add('switchInfoMaxAgeDays', IntegerType::class, [
                 'label'    => 'Switch Info Max Age (days)',
                 'required' => false,
                 'attr'     => ['placeholder' => '7'],
-                'help'     => 'Switch IP and port from ClearPass auth logs are shown on the interface page only if the most recent log entry is within this many days. Leave blank to always show regardless of age.',
+                'help'     => 'A device\'s cached switch IP/port (learned from ClearPass auth logs or a live switch scan) is shown, and can be acted on, only if it was last confirmed within this many days. Leave blank to always show/act on it regardless of age.',
             ])
             ->add('defaultNewSubnetLeaseRetentionDays', IntegerType::class, [
                 'label'    => 'Default Retention for New Subnets (days)',

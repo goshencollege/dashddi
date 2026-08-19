@@ -25,6 +25,9 @@ class AppSetting
     #[ORM\Column(nullable: true, options: ['default' => 30])]
     private ?int $clearpassAuthLogRetentionDays = 30;
 
+    #[ORM\Column(nullable: true, options: ['default' => 90])]
+    private ?int $switchPortLogRetentionDays = 90;
+
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $smtpHost = null;
 
@@ -83,6 +86,9 @@ class AppSetting
 
     public function getClearpassAuthLogRetentionDays(): ?int { return $this->clearpassAuthLogRetentionDays; }
     public function setClearpassAuthLogRetentionDays(?int $days): static { $this->clearpassAuthLogRetentionDays = $days; return $this; }
+
+    public function getSwitchPortLogRetentionDays(): ?int { return $this->switchPortLogRetentionDays; }
+    public function setSwitchPortLogRetentionDays(?int $days): static { $this->switchPortLogRetentionDays = $days; return $this; }
 
     public function getSmtpHost(): ?string { return $this->smtpHost; }
     public function setSmtpHost(?string $smtpHost): static { $this->smtpHost = $smtpHost; return $this; }
