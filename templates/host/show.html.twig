@@ -389,7 +389,6 @@
                     <th>Last Seen</th>
                     {% if arubaSwitch %}
                     <th>Live Status</th>
-                    <th>Live VLAN</th>
                     <th>Live MAC(s)</th>
                     <th>LLDP Neighbor</th>
                     <th>Discrepancies</th>
@@ -428,7 +427,6 @@
                         <td class="text-muted small">—</td>
                         <td class="text-muted small">—</td>
                         <td class="text-muted small">—</td>
-                        <td class="text-muted small">—</td>
                         <td class="text-end text-nowrap">
                             <button type="button" class="btn btn-sm btn-outline-secondary port-status-btn" data-mac="{{ primaryIface.macAddress }}" data-target="{{ detailsId }}" title="Check Status">
                                 <i class="bi bi-arrow-clockwise"></i>
@@ -450,7 +448,7 @@
                     </tr>
                     {% if arubaSwitch %}
                     <tr id="{{ detailsId }}" class="d-none">
-                        <td colspan="10" class="p-0">
+                        <td colspan="9" class="p-0">
                             <div id="{{ detailsId }}-body" class="p-2 text-muted small">
                                 Click an action button above to load live port-access data from the switch.
                             </div>
@@ -994,7 +992,6 @@
         const rows = macs.map(m => `
             <tr>
                 <td class="font-monospace">${esc(m.mac)}</td>
-                <td>${esc(m.vlan ?? '—')}</td>
                 <td>${m.known ? `<a href="${ifaceUrl(m.interfaceId)}">${esc(m.hostName ?? m.interfaceName ?? 'known device')}</a>` : '<span class="text-muted">unregistered</span>'}</td>
                 <td>${esc(m.role ?? '—')}</td>
                 <td>${esc(m.status ?? '—')}</td>
@@ -1002,7 +999,7 @@
             </tr>`).join('');
         return `<div class="table-responsive mb-0">
             <table class="table table-sm mb-0">
-                <thead><tr><th>MAC</th><th>VLAN</th><th>Device</th><th>Role</th><th>Status</th><th>Auth Method</th></tr></thead>
+                <thead><tr><th>MAC</th><th>Device</th><th>Role</th><th>Status</th><th>Auth Method</th></tr></thead>
                 <tbody>${rows}</tbody>
             </table>
         </div>`;
@@ -1037,11 +1034,6 @@
             (live.speed ? `<div class="text-muted small">${esc(live.speed)}</div>` : '');
     }
 
-    function renderLiveVlan(live) {
-        const vlans = Array.from(new Set(live.macs.map(m => m.vlan).filter(v => v !== null && v !== '')));
-        return vlans.length ? esc(vlans.join(', ')) : '<span class="text-muted">—</span>';
-    }
-
     function renderLiveMacs(port, detailsId) {
         if (port.live.macs.length === 0) return '<span class="text-muted">—</span>';
         if (port.live.isUplink) {
@@ -1065,7 +1057,7 @@
         if (port.discrepancies.length === 0) {
             return '<span class="badge bg-success-subtle text-success-emphasis"><i class="bi bi-check-lg"></i> OK</span>';
         }
-        const badgeClass = { unregistered: 'info', moved: 'warning', stale: 'secondary', vlan_mismatch: 'danger' };
+        const badgeClass = { unregistered: 'info', moved: 'warning', stale: 'secondary' };
         return port.discrepancies.map(d => {
             const cls = badgeClass[d.type] ?? 'warning';
             return `<span class="badge bg-${cls}-subtle text-${cls}-emphasis d-block mb-1" title="${escAttr(d.message)}">${esc(d.type.replace('_', ' '))}</span>`;
@@ -1105,14 +1097,13 @@
             <td class="small">${renderConnectedDevice(port)}</td>
             <td class="text-muted small">${lastSeen}</td>
             <td class="small">${renderLiveStatus(port.live)}</td>
-            <td class="small">${renderLiveVlan(port.live)}</td>
             <td class="small">${renderLiveMacs(port, detailsId)}</td>
             <td class="small">${renderLldp(port.live)}</td>
             <td class="small">${renderDiscrepancies(port)}</td>
             ${actionsCell}
         </tr>
         <tr id="${detailsId}" class="d-none">
-            <td colspan="10" class="p-0">
+            <td colspan="9" class="p-0">
                 <div id="${detailsId}-body" class="p-2 text-muted small">Click an action button above to load live port-access data from the switch.</div>
             </td>
         </tr>`;

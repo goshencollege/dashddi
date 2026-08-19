@@ -55,34 +55,57 @@ TLS verification is enabled by default and recommended. Disable it only if the s
 ## Live Port Scan (Query Switch)
 
 The **Switch Ports** card on a host's detail page (shown when that host is itself
-acting as a NAS device) has a **Query Switch** button. Clicking it opens a single
-SSH session to the switch and runs four CLI commands:
+acting as a NAS device) has a **Query Switch** button. Clicking it gathers, for
+every port:
 
-- `show interface brief`
-- `show port-access clients`
-- `show mac-address-table`
-- `show lldp neighbor-info`
+- Interface link status/speed
+- Port-access (802.1X/MAC-Auth) clients
+- The MAC address table
+- LLDP neighbor info
 
-This is always via SSH (no REST), since these are plain CLI reads and REST
-endpoint coverage for the MAC table and LLDP neighbors varies by AOS-CX firmware
-version. The results are parsed and merged by port (`App\Service\ArubaCxService::scanSwitch()`
-and `App\Service\AosCxOutputParser`), then correlated against DashDDI's cached
+Each of the four is fetched via the REST API first:
+
+- Link status/speed: `GET /system/interfaces?depth=2`
+- Port-access clients and LLDP neighbors: `GET /system/interfaces?depth=1` to list
+  interface names, then `GET /system/interfaces/{port}/port_access_clients?depth=2`
+  and `GET /system/interfaces/{port}/lldp_neighbors?depth=2` per port. AOS-CX
+  doesn't expand either of these reference collections when nested inside a
+  `/system/interfaces?depth=N` collection response — `depth=2` leaves them as bare
+  URIs, and `depth>=3` on the full collection times out on real hardware — so both
+  need their own per-interface call.
+- MAC address table: `GET /system/vlans?depth=1` to list VLANs (`depth=0` is
+  rejected outright by this firmware — 1 is the minimum), then
+  `GET /system/vlans/{vlan}/macs?depth=2` per VLAN.
+
+Any of the four that REST doesn't cover on a given switch/firmware (unconfigured
+credentials, a failed request, or a response that parses to zero entries) falls
+back to its SSH-parsed CLI equivalent (`show interface brief`,
+`show port-access clients`, `show mac-address-table`, `show lldp neighbor-info`,
+all run in a single SSH session). If REST supplies all four, no SSH connection is
+opened at all. The results are parsed and merged by port
+(`App\Service\ArubaCxService::scanSwitch()` and `App\Service\AosCxOutputParser` for
+the CLI-fallback parsing), then correlated against DashDDI's cached
 ClearPass-derived switch/port data (`App\Service\SwitchPortCorrelationService`) to
 produce one row per port with:
 
 - Live link status and speed
-- Live VLAN(s) and MAC address(es), classified as an **uplink** (many MACs — a
-  trunk to another switch) to avoid flagging expected noise there
+- Live MAC address(es), classified as an **uplink** (many MACs — a trunk to
+  another switch) to avoid flagging expected noise there
 - LLDP neighbor name/port
 - **Discrepancies**: `unregistered` (live MAC unknown to DashDDI), `moved` (known
   device live on a different port than cached), `stale` (cached device not seen
-  live anywhere), `vlan_mismatch` (live VLAN differs from the assigned subnet's
-  VLAN)
+  live anywhere)
+
+There is deliberately no VLAN-mismatch check — with overlay networking, a port's
+live VLAN commonly differs from its assigned subnet's VLAN without that being a
+problem, so the comparison isn't useful here.
 
 This is entirely read-only — nothing is written back to DashDDI's database or to
-the switch. It requires Aruba CX credentials with SSH access (key or password) to
-be configured.
+the switch. It requires Aruba CX credentials with a password (for REST) and/or SSH
+access (key or password, for CLI fallback) to be configured.
 
-**Note:** the CLI output parsers were written from general AOS-CX conventions,
-not from a real device, and may need small regex adjustments once run against a
-specific switch's firmware/output format.
+**Note:** the REST paths for port-access clients, the MAC table, and LLDP
+neighbors above have been confirmed against a real AOS-CX 10.12 switch. The
+CLI-fallback output parsers (`App\Service\AosCxOutputParser`) were written from
+general AOS-CX conventions rather than real device output, and may still need
+adjustments once exercised against a switch/firmware where REST is unavailable.

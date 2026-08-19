@@ -7,26 +7,65 @@ use PHPUnit\Framework\TestCase;
 
 class AosCxOutputParserTest extends TestCase
 {
-    public function testParseInterfaceBriefExtractsStatusAndSpeed(): void
+    /** Real `show interface brief` output from an Aruba 6300 (AOS-CX). The header
+     *  pads "Enabled" and "Status" with only a single space between them while the
+     *  data columns below stay several spaces apart — this is the case that broke
+     *  the old header-column-position parser (it read "yes"/"no" as the status). */
+    private const REAL_INTERFACE_BRIEF = <<<TXT
+    ----------------------------------------------------------------------------------------------------
+    Port           Native  Mode   Type           Enabled Status  Reason                  Speed   Description
+                   VLAN                                                                  (Mb/s)
+    ----------------------------------------------------------------------------------------------------
+    1/1/1          44      access 1GbT           yes     down    Waiting for link        --      --
+    1/1/3          44      trunk  1GbT           yes     up                              1000    --
+    1/1/7          44      access 1GbT           no      down    Administratively down   --      --
+    1/1/11         44      access 1GbT           yes     up                              100     --
+    1/1/49         1       access --             yes     down    No XCVR installed       --      --
+    1/1/50         --      routed 10G-LR         yes     up                              10000   uplink-to-gl
+    loopback0      --      routed --             yes     up                              --      --
+    vlan44         --      --     --             yes     up                              --      --
+    lag1           1       trunk  --             yes     up      --                      10000   uplink-to-cc1
+
+    cx-cc0#
+    TXT;
+
+    public function testParseInterfaceBriefReadsStatusNotEnabledColumn(): void
     {
-        $output = <<<TXT
-        --------------------------------------------------------------------------------
-        Ethernet  VLAN  Type  Mode    Status  Reason  Speed (Mb/s)  Port Ch#  Name
-        --------------------------------------------------------------------------------
-        1/1/1     10    eth   access  up      ok      1000          --
-        1/1/2     1     eth   trunk   down     --      --            --
-        switch1#
-        TXT;
+        $result = AosCxOutputParser::parseInterfaceBrief(self::REAL_INTERFACE_BRIEF);
 
-        $result = AosCxOutputParser::parseInterfaceBrief($output);
+        $this->assertSame('down', $result['1/1/1']['status']);
+        $this->assertNull($result['1/1/1']['speed']);
 
-        $this->assertSame('up', $result['1/1/1']['status']);
-        $this->assertSame('1000', $result['1/1/1']['speed']);
-        $this->assertSame('down', $result['1/1/2']['status']);
-        $this->assertNull($result['1/1/2']['speed']);
+        $this->assertSame('up', $result['1/1/3']['status']);
+        $this->assertSame('1000', $result['1/1/3']['speed']);
     }
 
-    public function testParseInterfaceBriefReturnsEmptyWithoutRecognisedHeader(): void
+    public function testParseInterfaceBriefHandlesAdministrativelyDownAndNoXcvrReasons(): void
+    {
+        $result = AosCxOutputParser::parseInterfaceBrief(self::REAL_INTERFACE_BRIEF);
+
+        $this->assertSame('down', $result['1/1/7']['status']);
+        $this->assertSame('down', $result['1/1/49']['status']);
+    }
+
+    public function testParseInterfaceBriefExtractsSpeedForUpPorts(): void
+    {
+        $result = AosCxOutputParser::parseInterfaceBrief(self::REAL_INTERFACE_BRIEF);
+
+        $this->assertSame('100', $result['1/1/11']['speed']);
+        $this->assertSame('10000', $result['1/1/50']['speed']);
+    }
+
+    public function testParseInterfaceBriefSkipsNonPhysicalInterfaces(): void
+    {
+        $result = AosCxOutputParser::parseInterfaceBrief(self::REAL_INTERFACE_BRIEF);
+
+        $this->assertArrayNotHasKey('loopback0', $result);
+        $this->assertArrayNotHasKey('vlan44', $result);
+        $this->assertArrayNotHasKey('lag1', $result);
+    }
+
+    public function testParseInterfaceBriefReturnsEmptyForUnrecognisableInput(): void
     {
         $this->assertSame([], AosCxOutputParser::parseInterfaceBrief("nonsense\noutput\n"));
     }

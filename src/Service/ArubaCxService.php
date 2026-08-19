@@ -323,10 +323,15 @@ class ArubaCxService
     // ── Whole-switch scan ─────────────────────────────────────────────────────
 
     /**
-     * Runs `show interface brief`, `show port-access clients`, `show mac-address-table`,
-     * and `show lldp neighbor-info` in one SSH session and merges the results by port.
-     * SSH-only (no REST fallback) — these are plain CLI reads and REST endpoint coverage
-     * for the MAC table / LLDP neighbors varies by AOS-CX firmware version.
+     * Fetches interface link status/speed, port-access clients, the MAC address
+     * table, and LLDP neighbor info for every port, preferring REST over CLI for
+     * each independently: typed JSON calls instead of scraping text tables (which
+     * turned out to have header/data column misalignment on real hardware). Any
+     * of the four falls back to its SSH-parsed `show` command equivalent (all run
+     * in a single SSH session) when REST credentials aren't configured, the
+     * request fails, or it parses to zero entries (e.g. a firmware reporting these
+     * attributes under different JSON keys than assumed here). If REST supplies
+     * all four, no SSH connection is opened at all.
      *
      * @return array{ports: array<string, array{status: ?string, speed: ?string, macs: list<array{mac: string, vlan: ?string}>, clients: list<array{mac: ?string, ip: ?string, vlan: ?string, role: ?string, status: ?string, authMethod: ?string}>, lldp: array{neighborName: ?string, neighborPort: ?string}}>, raw: array{interfaceBrief: string, portAccess: string, macTable: string, lldp: string}, error: ?string}
      */
@@ -338,10 +343,51 @@ class ArubaCxService
             return ['ports' => [], 'raw' => $this->emptyRaw(), 'error' => 'No credentials configured'];
         }
 
+        $interfaceBrief = $portAccess = $macTable = $lldp = null;
+        $raw            = $this->emptyRaw();
+
+        if ($creds->getPassword() !== null) {
+            try {
+                $rest = $this->getInterfaceBriefRest($creds, $ip);
+                if (!empty($rest['ports'])) {
+                    $interfaceBrief        = $rest['ports'];
+                    $raw['interfaceBrief'] = $rest['raw'];
+                }
+            } catch (\Throwable $e) {
+                // Fall through to the SSH-parsed `show interface brief` below.
+            }
+
+            try {
+                $combo = $this->getPortAccessAndLldpRest($creds, $ip);
+
+                if (!empty($combo['portAccess'])) {
+                    $portAccess        = $combo['portAccess'];
+                    $raw['portAccess'] = $combo['portAccessRaw'];
+                }
+                if (!empty($combo['lldp'])) {
+                    $lldp        = $combo['lldp'];
+                    $raw['lldp'] = $combo['lldpRaw'];
+                }
+            } catch (\Throwable $e) {
+                // Fall through to the SSH-parsed `show port-access clients` and
+                // `show lldp neighbor-info` below.
+            }
+
+            try {
+                $mac = $this->getMacTableRest($creds, $ip);
+                if (!empty($mac['ports'])) {
+                    $macTable        = $mac['ports'];
+                    $raw['macTable'] = $mac['raw'];
+                }
+            } catch (\Throwable $e) {
+                // Fall through to the SSH-parsed `show mac-address-table` below.
+            }
+        }
+
         try {
-            return $this->scanSwitchSsh($creds, $ip);
+            return $this->scanSwitchSsh($creds, $ip, $interfaceBrief, $portAccess, $macTable, $lldp, $raw);
         } catch (\Throwable $e) {
-            return ['ports' => [], 'raw' => $this->emptyRaw(), 'error' => $e->getMessage()];
+            return ['ports' => [], 'raw' => $raw, 'error' => $e->getMessage()];
         }
     }
 
@@ -350,42 +396,289 @@ class ArubaCxService
         return ['interfaceBrief' => '', 'portAccess' => '', 'macTable' => '', 'lldp' => ''];
     }
 
-    private function scanSwitchSsh(ArubaSwitch $creds, string $ip): array
+    /**
+     * @return array{ports: array<string, array{status: ?string, speed: ?string}>, raw: string}
+     */
+    private function getInterfaceBriefRest(ArubaSwitch $creds, string $ip): array
     {
-        $ssh = $this->sshConnect($creds, $ip);
-        $ssh->enablePTY();
-        $ssh->setTimeout(10);
+        $cookie = $this->loginRest($creds, $ip);
+        try {
+            $result = $this->request($creds, $ip, 'GET', '/system/interfaces?depth=2', ['Accept: application/json'], '', $cookie);
+            if (!$result['success']) {
+                throw new \RuntimeException($result['error']);
+            }
 
-        $ssh->exec('', false);
-        $ssh->read('/[#>]\s*$/');
-        $ssh->setTimeout(8);
+            $data  = json_decode($result['body'], true) ?? [];
+            $ports = [];
 
-        // Disable output pagination for this session — without it, the CLI stops at a
-        // "--More--" prompt after ~19-24 lines and waits for a keypress, which our
-        // prompt-regex read() can't satisfy, silently truncating anything longer than
-        // one screen (this is exactly what shows up as only the first N ports of
-        // `show interface brief`). Harmless to send even if unsupported on a given
-        // firmware — worst case is a one-line "unknown command" that gets swallowed
-        // by the next prompt read.
-        $ssh->write("no page\n");
-        $ssh->read('/[#>]\s*$/');
+            foreach ($data as $key => $iface) {
+                if (!is_array($iface)) continue;
 
-        $ssh->write("show interface brief\n");
-        $interfaceBriefOut = (string) $ssh->read('/[#>]\s*$/');
+                $name = (string) ($iface['name'] ?? rawurldecode((string) $key));
+                if (!preg_match('/^\d+\/\d+\/\d+$/', $name)) continue;
 
-        $ssh->write("show port-access clients\n");
-        $portAccessOut = (string) $ssh->read('/[#>]\s*$/');
+                // Field names per AOS-CX's documented System::Interface attributes.
+                // Checked both flat and nested under a "status" object in case a
+                // firmware version structures the response differently.
+                $statusBlock = is_array($iface['status'] ?? null) ? $iface['status'] : [];
+                $linkState   = $iface['link_state']  ?? $statusBlock['link_state']  ?? null;
+                $adminState  = $iface['admin_state'] ?? $statusBlock['admin_state'] ?? null;
+                $linkSpeed   = $iface['link_speed']  ?? $statusBlock['link_speed']  ?? null;
 
-        $ssh->write("show mac-address-table\n");
-        $macTableOut = (string) $ssh->read('/[#>]\s*$/');
+                $status = $linkState ?? $adminState;
+                $speed  = null;
+                if (is_numeric($linkSpeed) && (float) $linkSpeed > 0) {
+                    // AOS-CX has reported link_speed in both bps and Mb/s across
+                    // versions in the wild — normalise to Mb/s either way.
+                    $speed = (float) $linkSpeed >= 1_000_000
+                        ? (string) ((int) round((float) $linkSpeed / 1_000_000))
+                        : (string) ((int) $linkSpeed);
+                }
 
-        $ssh->write("show lldp neighbor-info\n");
-        $lldpOut = (string) $ssh->read('/[#>]\s*$/');
+                $ports[$name] = [
+                    'status' => $status !== null ? strtolower((string) $status) : null,
+                    'speed'  => $speed,
+                ];
+            }
 
-        $interfaceBrief = AosCxOutputParser::parseInterfaceBrief($interfaceBriefOut);
-        $portAccess     = AosCxOutputParser::parsePortAccessClients($portAccessOut);
-        $macTable       = AosCxOutputParser::parseMacAddressTable($macTableOut);
-        $lldp           = AosCxOutputParser::parseLldpNeighborInfo($lldpOut);
+            $pretty = json_encode(json_decode($result['body'], true), JSON_PRETTY_PRINT);
+
+            return ['ports' => $ports, 'raw' => $pretty !== false ? $pretty : $result['body']];
+        } finally {
+            $this->logoutRest($creds, $ip, $cookie);
+        }
+    }
+
+    /**
+     * Fetches port-access clients and LLDP neighbors via REST, one interface at a
+     * time. AOS-CX doesn't expand either interface's `port_access_clients` or
+     * `lldp_neighbors` reference collection when it's nested inside a
+     * `/system/interfaces?depth=N` collection response — depth=2 leaves both as
+     * bare URIs, and depth>=3 on the full collection times out on real hardware
+     * (confirmed: a ~48-port switch took >10s and never completed) — so both need
+     * their own per-interface endpoint. Listing interface names first via
+     * `/system/interfaces?depth=1` is cheap; both are fetched together, sharing
+     * one login session and one interface-name listing, since the per-port loop is
+     * otherwise identical.
+     *
+     * @return array{
+     *     portAccess: array<string, list<array{mac: ?string, ip: ?string, vlan: ?string, role: ?string, status: ?string, authMethod: ?string}>>,
+     *     portAccessRaw: string,
+     *     lldp: array<string, array{neighborName: ?string, neighborPort: ?string}>,
+     *     lldpRaw: string,
+     * }
+     */
+    private function getPortAccessAndLldpRest(ArubaSwitch $creds, string $ip): array
+    {
+        $cookie = $this->loginRest($creds, $ip);
+        try {
+            $listResult = $this->request($creds, $ip, 'GET', '/system/interfaces?depth=1', ['Accept: application/json'], '', $cookie);
+            if (!$listResult['success']) {
+                throw new \RuntimeException($listResult['error']);
+            }
+
+            $refs = json_decode($listResult['body'], true) ?? [];
+
+            $portAccess   = [];
+            $lldp         = [];
+            $paRawParts   = [];
+            $lldpRawParts = [];
+
+            foreach (array_keys($refs) as $key) {
+                $name = rawurldecode((string) $key);
+                if (!preg_match('/^\d+\/\d+\/\d+$/', $name)) continue;
+
+                $paResult = $this->request($creds, $ip, 'GET', '/system/interfaces/' . rawurlencode($name) . '/port_access_clients?depth=2', ['Accept: application/json'], '', $cookie);
+                if ($paResult['success']) {
+                    $clients = json_decode($paResult['body'], true) ?? [];
+                    if (!empty($clients)) {
+                        $paRawParts[$name] = $clients;
+
+                        foreach ($clients as $clientKey => $entry) {
+                            if (!is_array($entry)) continue;
+
+                            $vlanId = array_key_first($entry['access_vlan'] ?? []);
+
+                            $portAccess[$name][] = [
+                                'mac'        => $entry['mac'] ?? (is_string($clientKey) ? rawurldecode($clientKey) : null),
+                                'ip'         => $entry['ip'] ?? null,
+                                'vlan'       => $vlanId !== null ? (string) $vlanId : null,
+                                'role'       => array_key_first($entry['applied_role'] ?? []) ?? null,
+                                'status'     => $entry['client_state'] ?? null,
+                                'authMethod' => $entry['onboarded_method'] ?? null,
+                            ];
+                        }
+                    }
+                }
+
+                $lldpResult = $this->request($creds, $ip, 'GET', '/system/interfaces/' . rawurlencode($name) . '/lldp_neighbors?depth=2', ['Accept: application/json'], '', $cookie);
+                if ($lldpResult['success']) {
+                    $neighbors = json_decode($lldpResult['body'], true) ?? [];
+                    if (!empty($neighbors)) {
+                        $lldpRawParts[$name] = $neighbors;
+
+                        $first = null;
+                        foreach ($neighbors as $entry) {
+                            if (is_array($entry)) {
+                                $first = $entry;
+                                break;
+                            }
+                        }
+
+                        if ($first !== null) {
+                            // The neighbor's descriptive attributes (name, remote port)
+                            // live under "neighbor_info"; the top-level chassis_id/port_id
+                            // fields are part of the entry's own key, not necessarily
+                            // human-readable.
+                            $info         = is_array($first['neighbor_info'] ?? null) ? $first['neighbor_info'] : [];
+                            $neighborName = $info['chassis_name'] ?? $first['chassis_id'] ?? null;
+                            $neighborPort = $info['port_id']      ?? $info['port_description'] ?? $first['port_id'] ?? null;
+
+                            $lldp[$name] = [
+                                'neighborName' => $neighborName !== null ? (string) $neighborName : null,
+                                'neighborPort' => $neighborPort !== null ? (string) $neighborPort : null,
+                            ];
+                        }
+                    }
+                }
+            }
+
+            $paPretty   = json_encode($paRawParts, JSON_PRETTY_PRINT);
+            $lldpPretty = json_encode($lldpRawParts, JSON_PRETTY_PRINT);
+
+            return [
+                'portAccess'    => $portAccess,
+                'portAccessRaw' => $paPretty !== false ? $paPretty : '',
+                'lldp'          => $lldp,
+                'lldpRaw'       => $lldpPretty !== false ? $lldpPretty : '',
+            ];
+        } finally {
+            $this->logoutRest($creds, $ip, $cookie);
+        }
+    }
+
+    /**
+     * Builds the switch-wide MAC address table via REST. AOS-CX models learned MACs
+     * per-VLAN (`/system/vlans/{vlan}/macs`) rather than as one flat table, so this
+     * lists VLANs first and then queries each VLAN's MAC collection.
+     *
+     * @return array{ports: array<string, list<array{mac: string, vlan: ?string}>>, raw: string}
+     */
+    private function getMacTableRest(ArubaSwitch $creds, string $ip): array
+    {
+        $cookie = $this->loginRest($creds, $ip);
+        try {
+            // depth=0 is rejected outright ("invalid value for 'depth' query
+            // parameter") on this firmware — 1 is the minimum, and is all we need
+            // for a name/URI listing here.
+            $vlanResult = $this->request($creds, $ip, 'GET', '/system/vlans?depth=1', ['Accept: application/json'], '', $cookie);
+            if (!$vlanResult['success']) {
+                throw new \RuntimeException($vlanResult['error']);
+            }
+
+            $vlanRefs = json_decode($vlanResult['body'], true) ?? [];
+            $ports    = [];
+            $rawParts = [];
+
+            foreach (array_keys($vlanRefs) as $vlanKey) {
+                $vlanId = rawurldecode((string) $vlanKey);
+                $result = $this->request($creds, $ip, 'GET', '/system/vlans/' . rawurlencode($vlanId) . '/macs?depth=2', ['Accept: application/json'], '', $cookie);
+                if (!$result['success']) continue; // MAC table not exposed for this VLAN on this firmware
+
+                $macs               = json_decode($result['body'], true) ?? [];
+                $rawParts[$vlanId] = $macs;
+
+                foreach ($macs as $macKey => $entry) {
+                    if (!is_array($entry)) continue;
+
+                    // "port" is a reference field, represented either as a
+                    // {"<port-name>": "<uri>"} map (the convention used elsewhere for
+                    // reference attributes) or, on some firmware, a bare port name.
+                    $portRef  = $entry['port'] ?? null;
+                    $portName = match (true) {
+                        is_string($portRef) => $portRef,
+                        is_array($portRef)  => (string) (array_key_first($portRef) ?? ''),
+                        default             => null,
+                    };
+                    if ($portName === null || !preg_match('/^\d+\/\d+\/\d+$/', $portName)) continue;
+
+                    $mac             = (string) ($entry['mac_addr'] ?? $macKey);
+                    $ports[$portName][] = [
+                        'mac'  => strtolower($mac),
+                        'vlan' => $vlanId !== '' ? $vlanId : null,
+                    ];
+                }
+            }
+
+            $pretty = json_encode($rawParts, JSON_PRETTY_PRINT);
+
+            return ['ports' => $ports, 'raw' => $pretty !== false ? $pretty : ''];
+        } finally {
+            $this->logoutRest($creds, $ip, $cookie);
+        }
+    }
+
+    private function scanSwitchSsh(
+        ArubaSwitch $creds,
+        string      $ip,
+        ?array      $interfaceBrief,
+        ?array      $portAccess,
+        ?array      $macTable,
+        ?array      $lldp,
+        array       $raw,
+    ): array {
+        if ($interfaceBrief === null || $portAccess === null || $macTable === null || $lldp === null) {
+            $ssh = $this->sshConnect($creds, $ip);
+            $ssh->enablePTY();
+            $ssh->setTimeout(10);
+
+            $ssh->exec('', false);
+            $ssh->read('/[#>]\s*$/');
+            $ssh->setTimeout(8);
+
+            // Disable output pagination for this session — without it, the CLI stops at a
+            // "--More--" prompt after ~19-24 lines and waits for a keypress, which our
+            // prompt-regex read() can't satisfy, silently truncating anything longer than
+            // one screen (this is exactly what shows up as only the first N ports of
+            // `show interface brief`). Harmless to send even if unsupported on a given
+            // firmware — worst case is a one-line "unknown command" that gets swallowed
+            // by the next prompt read.
+            $ssh->write("no page\n");
+            $ssh->read('/[#>]\s*$/');
+
+            if ($interfaceBrief === null) {
+                $ssh->write("show interface brief\n");
+                $interfaceBriefOut     = (string) $ssh->read('/[#>]\s*$/');
+                $interfaceBrief        = AosCxOutputParser::parseInterfaceBrief($interfaceBriefOut);
+                $raw['interfaceBrief'] = trim($interfaceBriefOut);
+            }
+
+            if ($portAccess === null) {
+                $ssh->write("show port-access clients\n");
+                $portAccessOut     = (string) $ssh->read('/[#>]\s*$/');
+                $portAccess        = AosCxOutputParser::parsePortAccessClients($portAccessOut);
+                $raw['portAccess'] = trim($portAccessOut);
+            }
+
+            if ($macTable === null) {
+                $ssh->write("show mac-address-table\n");
+                $macTableOut     = (string) $ssh->read('/[#>]\s*$/');
+                $macTable        = AosCxOutputParser::parseMacAddressTable($macTableOut);
+                $raw['macTable'] = trim($macTableOut);
+            }
+
+            if ($lldp === null) {
+                $ssh->write("show lldp neighbor-info\n");
+                $lldpOut     = (string) $ssh->read('/[#>]\s*$/');
+                $lldp        = AosCxOutputParser::parseLldpNeighborInfo($lldpOut);
+                $raw['lldp'] = trim($lldpOut);
+            }
+        }
+
+        $interfaceBrief ??= [];
+        $portAccess     ??= [];
+        $macTable       ??= [];
+        $lldp           ??= [];
 
         $allPorts = array_unique(array_merge(
             array_keys($interfaceBrief),
@@ -405,16 +698,7 @@ class ArubaCxService
             ];
         }
 
-        return [
-            'ports' => $ports,
-            'raw'   => [
-                'interfaceBrief' => trim($interfaceBriefOut),
-                'portAccess'     => trim($portAccessOut),
-                'macTable'       => trim($macTableOut),
-                'lldp'           => trim($lldpOut),
-            ],
-            'error' => null,
-        ];
+        return ['ports' => $ports, 'raw' => $raw, 'error' => null];
     }
 
     // ── Port actions ──────────────────────────────────────────────────────────
