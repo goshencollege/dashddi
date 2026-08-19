@@ -79,14 +79,14 @@
                     <tr>
                         <th class="text-muted fw-normal ps-3">IPv4 Address</th>
                         <td class="ip-address">{{ interface.ipAddress ? interface.ipAddress.address : '—' }}</td>
-                        {% if switchInfo and switchInfo.nasIp %}
+                        {% if hasSwitchInfo %}
                         <th class="text-muted fw-normal ps-3">Switch IP</th>
                         <td class="ip-address">
                             {% if switchIface and switchIface.host %}
                                 <a href="{{ path('host_show', {id: switchIface.host.id}) }}">{{ switchIface.host.name }}</a>
-                                <span class="text-muted small ms-1">({{ switchInfo.nasIp }})</span>
+                                <span class="text-muted small ms-1">({{ interface.switchIp }})</span>
                             {% else %}
-                                {{ switchInfo.nasIp }}
+                                {{ interface.switchIp }}
                             {% endif %}
                         </td>
                         {% else %}
@@ -96,9 +96,9 @@
                     <tr>
                         <th class="text-muted fw-normal ps-3">IPv6 Address</th>
                         <td class="ip-address small">{{ interface.ipv6Address ? interface.ipv6Address.address : '—' }}</td>
-                        {% if switchInfo and switchInfo.nasIp %}
+                        {% if hasSwitchInfo %}
                         <th class="text-muted fw-normal ps-3">Switch Port</th>
-                        <td>{{ switchInfo.nasPortId ?: '—' }}</td>
+                        <td>{{ interface.switchPort ?: '—' }}</td>
                         {% else %}
                         <td colspan="2"></td>
                         {% endif %}
@@ -252,8 +252,8 @@
 </div>
 {% endif %}
 
-{% if arubaSwitch and switchInfo and switchInfo.nasPortId %}
-{% set portId = switchInfo.nasPortId %}
+{% if arubaSwitch and hasSwitchInfo %}
+{% set portId = interface.switchPort %}
 <div class="card mt-3">
     <div class="card-header d-flex justify-content-between align-items-center">
         <span class="fw-semibold"><i class="bi bi-plug me-1"></i>Switch Port — {{ portId }}</span>
@@ -343,7 +343,7 @@
 {% endblock %}
 
 {% block scripts %}
-{% if arubaSwitch and switchInfo and switchInfo.nasPortId %}
+{% if arubaSwitch and hasSwitchInfo %}
 <script>
 (function () {
     const statusBtn  = document.getElementById('port-status-btn');
