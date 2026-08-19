@@ -49,6 +49,34 @@ class SwitchPortCorrelationServiceTest extends TestCase
         $this->assertFalse($result['1/1/5']['live']['isUplink']);
     }
 
+    public function testCachedEntryIncludesLastDhcpAtAndLastSeenSource(): void
+    {
+        $host  = new Host();
+        $iface = $this->makeIface('aa:bb:cc:dd:ee:09', $host, '10.0.0.1', '1/1/5');
+        $iface->setLastDhcpAt(new \DateTimeImmutable('2026-01-01T00:00:00+00:00'));
+        (new \ReflectionProperty($iface, 'id'))->setValue($iface, 42);
+
+        $cachedGroups = ['1/1/5' => [$iface]];
+
+        $result = $this->service->correlate([], $cachedGroups, [], '10.0.0.1', [42 => 'live_scan']);
+
+        $this->assertSame('2026-01-01T00:00:00+00:00', $result['1/1/5']['cached'][0]['lastDhcpAt']);
+        $this->assertSame('live_scan', $result['1/1/5']['cached'][0]['lastSeenSource']);
+    }
+
+    public function testCachedEntryLastSeenSourceIsNullWhenNoLogExists(): void
+    {
+        $host  = new Host();
+        $iface = $this->makeIface('aa:bb:cc:dd:ee:10', $host, '10.0.0.1', '1/1/5');
+        (new \ReflectionProperty($iface, 'id'))->setValue($iface, 43);
+
+        $cachedGroups = ['1/1/5' => [$iface]];
+
+        $result = $this->service->correlate([], $cachedGroups, [], '10.0.0.1');
+
+        $this->assertNull($result['1/1/5']['cached'][0]['lastSeenSource']);
+    }
+
     public function testMovedDeviceFlaggedOnBothPorts(): void
     {
         $host  = new Host();

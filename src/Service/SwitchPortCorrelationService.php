@@ -20,14 +20,15 @@ class SwitchPortCorrelationService
      * @param  array<string, array{status: ?string, speed: ?string, macs: list<array{mac: string, vlan: ?string}>, clients: list<array{mac: ?string, ip: ?string, vlan: ?string, role: ?string, status: ?string, authMethod: ?string}>, lldp: array{neighborName: ?string, neighborPort: ?string}}> $scanPorts
      * @param  array<string, NetworkInterface[]>                                                                                                                                                                                                                                          $cachedGroups
      * @param  array<string, NetworkInterface>                                                                                                                                                                                                                                            $knownIfacesByMac keyed by lowercase MAC
+     * @param  array<int, string>                                                                                                                                                                                                                                                         $lastSeenSources interface id => 'clearpass'|'live_scan', for whichever most recently advanced lastAuthAt
      * @return array<string, array{
      *     port: string,
-     *     cached: list<array{interfaceId: ?int, hostId: ?int, hostName: ?string, name: ?string, mac: string, lastAuthAt: ?string}>,
+     *     cached: list<array{interfaceId: ?int, hostId: ?int, hostName: ?string, name: ?string, mac: string, lastAuthAt: ?string, lastDhcpAt: ?string, lastSeenSource: ?string}>,
      *     live: array{status: ?string, speed: ?string, lldpNeighborName: ?string, lldpNeighborPort: ?string, isUplink: bool, macs: list<array{mac: string, role: ?string, status: ?string, authMethod: ?string, known: bool, hostId: ?int, hostName: ?string, interfaceId: ?int, interfaceName: ?string}>},
      *     discrepancies: list<array{type: string, message: string, mac: ?string}>
      * }>
      */
-    public function correlate(array $scanPorts, array $cachedGroups, array $knownIfacesByMac, string $switchIp): array
+    public function correlate(array $scanPorts, array $cachedGroups, array $knownIfacesByMac, string $switchIp, array $lastSeenSources = []): array
     {
         $liveMacToPorts = $this->buildLiveMacToPorts($scanPorts);
 
@@ -45,12 +46,14 @@ class SwitchPortCorrelationService
         foreach ($cachedGroups as $port => $ifaces) {
             $ports[$port]['cached'] = array_map(
                 fn (NetworkInterface $iface) => [
-                    'interfaceId' => $iface->getId(),
-                    'hostId'      => $iface->getHost()?->getId(),
-                    'hostName'    => $iface->getHost()?->getName(),
-                    'name'        => $iface->getName(),
-                    'mac'         => $iface->getMacAddress(),
-                    'lastAuthAt'  => $iface->getLastAuthAt()?->format(DATE_ATOM),
+                    'interfaceId'    => $iface->getId(),
+                    'hostId'         => $iface->getHost()?->getId(),
+                    'hostName'       => $iface->getHost()?->getName(),
+                    'name'           => $iface->getName(),
+                    'mac'            => $iface->getMacAddress(),
+                    'lastAuthAt'     => $iface->getLastAuthAt()?->format(DATE_ATOM),
+                    'lastDhcpAt'     => $iface->getLastDhcpAt()?->format(DATE_ATOM),
+                    'lastSeenSource' => $lastSeenSources[$iface->getId()] ?? null,
                 ],
                 $ifaces,
             );

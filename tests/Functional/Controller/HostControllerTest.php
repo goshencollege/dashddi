@@ -628,6 +628,32 @@ class HostControllerTest extends AppWebTestCase
         $this->assertStringNotContainsString('bulk-status-btn', $content);
     }
 
+    public function testShowRendersSwitchScanLabelInSwitchPortsCardWhenSourceIsLiveScan(): void
+    {
+        $subnet = (new Subnet())->setName('switch-ports-scan-subnet')->setIpv4Cidr('10.24.0.0/24');
+        $this->em->persist($subnet);
+
+        $switchHost = (new Host())->setName('switch-scan-host');
+        $this->em->persist($switchHost);
+        $this->makeInterfaceWithIps($switchHost, $subnet, 'aa:aa:aa:aa:aa:03', 'mgmt', '10.24.0.1');
+
+        $clientHost = (new Host())->setName('client-scan-host');
+        $this->em->persist($clientHost);
+        $clientIface = $this->makeInterfaceWithIps($clientHost, $subnet, 'bb:bb:bb:bb:bb:04', 'eth0', '10.24.0.50');
+        $clientIface->setSwitchIp('10.24.0.1')->setSwitchPort('1/1/9')->setLastAuthAt(new \DateTimeImmutable());
+        $this->em->flush();
+
+        $this->em->persist(new SwitchPortLog($clientIface, SwitchPortLogSource::LiveScan, '10.24.0.1', '1/1/9', $clientIface->getLastAuthAt()));
+        $this->em->flush();
+
+        $switchHostId = $switchHost->getId();
+        $this->em->clear();
+
+        $this->client->request('GET', "/hosts/{$switchHostId}");
+        $this->assertResponseIsSuccessful();
+        $this->assertStringContainsString('>switch scan<', $this->client->getResponse()->getContent());
+    }
+
     public function testInterfaceListLastSeenLabelIsSwitchScanForLiveScanSource(): void
     {
         $host = (new Host())->setName('last-seen-scan-host');
