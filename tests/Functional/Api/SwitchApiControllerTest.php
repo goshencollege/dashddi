@@ -69,6 +69,23 @@ class SwitchApiControllerTest extends AppWebTestCase
         ];
     }
 
+    public function testScanResponseIncludesLastSeenSourceForCachedDevice(): void
+    {
+        $this->makeArubaSwitchCreds();
+        $iface = $this->makeIface('aa:bb:cc:dd:ee:07', self::SWITCH_IP, '1/1/10', new \DateTimeImmutable());
+        $this->em->persist(new SwitchPortLog($iface, SwitchPortLogSource::ClearPass, self::SWITCH_IP, '1/1/10', $iface->getLastAuthAt()));
+        $this->em->flush();
+
+        // No live ports at all — this interface only appears via cachedGroups.
+        $this->installStub();
+
+        $data = $this->apiRequest('GET', '/api/switch/scan?switch_ip=' . self::SWITCH_IP);
+        $this->assertSame(200, $this->client->getResponse()->getStatusCode());
+
+        $cached = $data['ports']['1/1/10']['cached'][0];
+        $this->assertSame('clearpass', $cached['lastSeenSource']);
+    }
+
     public function testScanUpdatesCacheForKnownMacOnNonUplinkPort(): void
     {
         $this->makeArubaSwitchCreds();

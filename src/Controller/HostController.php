@@ -459,6 +459,19 @@ class HostController extends AbstractController
             $switchTargetIp = $hostIps[0] ?? null;
         }
 
+        // "Last Seen" source labels (auth/dhcp/switch scan) are needed both for this
+        // host's own interfaces (main Interfaces list) and for the other hosts'
+        // interfaces shown as connected devices in the Switch Ports card.
+        $switchPortIfaceIds = [];
+        foreach ($switchPorts as $ifaces) {
+            foreach ($ifaces as $iface) {
+                $switchPortIfaceIds[] = $iface->getId();
+            }
+        }
+        $lastSeenSources = $switchPortLogRepo->findLatestSourcesByInterfaceIds(
+            array_unique(array_merge($ifaceIds, $switchPortIfaceIds)),
+        );
+
         $user = $this->getUser();
         $pref = $user ? $prefRepo->findByIdentifier($user->getUserIdentifier()) : null;
 
@@ -472,7 +485,7 @@ class HostController extends AbstractController
             'switchInfoMaxAgeDays'  => $maxAge,
             'switchTargetIp'        => $switchTargetIp,
             'collapsedSections'     => $pref?->getHostCollapsedSections() ?? [],
-            'lastSeenSources'       => $switchPortLogRepo->findLatestSourcesByInterfaceIds($ifaceIds),
+            'lastSeenSources'       => $lastSeenSources,
         ]);
     }
 

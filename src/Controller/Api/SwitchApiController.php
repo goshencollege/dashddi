@@ -7,6 +7,7 @@ use App\Enum\SwitchPortLogSource;
 use App\Repository\AppSettingRepository;
 use App\Repository\ArubaSwitchRepository;
 use App\Repository\NetworkInterfaceRepository;
+use App\Repository\SwitchPortLogRepository;
 use App\Service\ArubaCxService;
 use App\Service\SwitchPortCorrelationService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -25,6 +26,7 @@ class SwitchApiController extends AbstractController
         private readonly NetworkInterfaceRepository   $ifaceRepo,
         private readonly AppSettingRepository         $settingRepo,
         private readonly SwitchPortCorrelationService $correlation,
+        private readonly SwitchPortLogRepository      $switchPortLogRepo,
         private readonly EntityManagerInterface        $em,
     ) {}
 
@@ -85,7 +87,16 @@ class SwitchApiController extends AbstractController
 
         $known        = $this->ifaceRepo->findByMacs(array_unique($allMacs));
         $cachedGroups = $this->ifaceRepo->findConnectedToSwitchIps([$switchIp]);
-        $correlated   = $this->correlation->correlate($scan['ports'], $cachedGroups, $known, $switchIp);
+
+        $cachedIfaceIds = [];
+        foreach ($cachedGroups as $ifaces) {
+            foreach ($ifaces as $iface) {
+                $cachedIfaceIds[] = $iface->getId();
+            }
+        }
+        $lastSeenSources = $this->switchPortLogRepo->findLatestSourcesByInterfaceIds($cachedIfaceIds);
+
+        $correlated = $this->correlation->correlate($scan['ports'], $cachedGroups, $known, $switchIp, $lastSeenSources);
 
         // Confirmed live sightings of already-known devices update DashDDI's cached
         // switch attachment too — the same fields ClearPass auth log processing

@@ -11,6 +11,29 @@
     </button>
 {% endmacro %}
 
+{# Combines lastAuthAt/lastDhcpAt into one "last seen" value, labeled with which
+   of auth (ClearPass), switch scan, or dhcp actually produced it. #}
+{% macro lastSeen(lastAuthAt, lastDhcpAt, source, format) %}
+    {% set seen = null %}
+    {% if lastAuthAt and lastDhcpAt %}
+        {% set seen = lastAuthAt > lastDhcpAt ? lastAuthAt : lastDhcpAt %}
+    {% elseif lastAuthAt %}
+        {% set seen = lastAuthAt %}
+    {% elseif lastDhcpAt %}
+        {% set seen = lastDhcpAt %}
+    {% endif %}
+    {% if seen %}
+        {{ seen|date(format) }}
+        {% if lastAuthAt and seen == lastAuthAt %}
+            <br><span class="text-info-emphasis">{{ source == 'live_scan' ? 'switch scan' : 'auth' }}</span>
+        {% else %}
+            <br><span class="text-success-emphasis">dhcp</span>
+        {% endif %}
+    {% else %}
+        —
+    {% endif %}
+{% endmacro %}
+
 {% block stylesheets %}
 <style>
 .host-interfaces-table { --vip-row-bg: rgba(0,0,0,.05); }
@@ -212,24 +235,7 @@
                                 {% endif %}
                             </td>
                             <td class="text-muted small">
-                                {% set lastSeen = null %}
-                                {% if iface.lastAuthAt and iface.lastDhcpAt %}
-                                    {% set lastSeen = iface.lastAuthAt > iface.lastDhcpAt ? iface.lastAuthAt : iface.lastDhcpAt %}
-                                {% elseif iface.lastAuthAt %}
-                                    {% set lastSeen = iface.lastAuthAt %}
-                                {% elseif iface.lastDhcpAt %}
-                                    {% set lastSeen = iface.lastDhcpAt %}
-                                {% endif %}
-                                {% if lastSeen %}
-                                    {{ lastSeen|date('Y-m-d') }}
-                                    {% if iface.lastAuthAt == lastSeen %}
-                                        <br><span class="text-info-emphasis">{{ (lastSeenSources[iface.id]|default(null)) == 'live_scan' ? 'switch scan' : 'auth' }}</span>
-                                    {% else %}
-                                        <br><span class="text-success-emphasis">dhcp</span>
-                                    {% endif %}
-                                {% else %}
-                                    —
-                                {% endif %}
+                                {{ _self.lastSeen(iface.lastAuthAt, iface.lastDhcpAt, lastSeenSources[iface.id]|default(null), 'Y-m-d') }}
                             </td>
                             <td class="text-muted small">
                                 {{ iface.updatedAt|date('Y-m-d H:i') }}
@@ -425,7 +431,7 @@
                                 </a>
                             {% endfor %}
                         </td>
-                        <td class="text-muted small">{{ primaryIface.lastAuthAt ? primaryIface.lastAuthAt|date('Y-m-d H:i') : '—' }}</td>
+                        <td class="text-muted small">{{ _self.lastSeen(primaryIface.lastAuthAt, primaryIface.lastDhcpAt, lastSeenSources[primaryIface.id]|default(null), 'Y-m-d H:i') }}</td>
                         {% if arubaSwitch %}
                         <td class="text-muted small">—</td>
                         <td class="text-muted small">—</td>
@@ -1030,6 +1036,25 @@
         return '<span class="text-muted">—</span>';
     }
 
+    // Mirrors the `lastSeen` Twig macro at the top of this file: combines
+    // lastAuthAt/lastDhcpAt into one "last seen" value, labeled with whichever of
+    // auth (ClearPass), switch scan, or dhcp actually produced it.
+    function renderLastSeen(port) {
+        const c = port.cached[0];
+        if (!c) return '—';
+
+        const authAt = c.lastAuthAt ? new Date(c.lastAuthAt) : null;
+        const dhcpAt = c.lastDhcpAt ? new Date(c.lastDhcpAt) : null;
+        const seen = authAt && dhcpAt ? (authAt > dhcpAt ? authAt : dhcpAt) : (authAt || dhcpAt);
+        if (!seen) return '—';
+
+        const formatted = seen.toISOString().slice(0, 16).replace('T', ' ');
+        const isAuth = authAt !== null && seen.getTime() === authAt.getTime();
+        const label = isAuth ? (c.lastSeenSource === 'live_scan' ? 'switch scan' : 'auth') : 'dhcp';
+        const cls   = isAuth ? 'text-info-emphasis' : 'text-success-emphasis';
+        return `${formatted}<br><span class="${cls}">${label}</span>`;
+    }
+
     function renderLiveStatus(live) {
         if (live.status === null && live.speed === null) return '<span class="text-muted">—</span>';
         const s = (live.status ?? '').toLowerCase();
@@ -1091,9 +1116,7 @@
                 <button type="button" class="btn btn-sm btn-outline-warning port-poe-bounce-btn" data-mac="${escAttr(mac)}" data-target="${detailsId}" data-confirm="PoE bounce port ${escAttr(port.port)}? This will cut power and disconnect connected clients." title="PoE Bounce"><i class="bi bi-lightning"></i></button>
             </td>` : '<td></td>';
 
-        const lastSeen = port.cached.length > 0 && port.cached[0].lastAuthAt
-            ? new Date(port.cached[0].lastAuthAt).toISOString().slice(0, 16).replace('T', ' ')
-            : '—';
+        const lastSeen = renderLastSeen(port);
 
         return `<tr>
             ${checkboxCell}
