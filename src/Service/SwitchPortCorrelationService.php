@@ -23,7 +23,7 @@ class SwitchPortCorrelationService
      * @return array<string, array{
      *     port: string,
      *     cached: list<array{interfaceId: ?int, hostId: ?int, hostName: ?string, name: ?string, mac: string, lastAuthAt: ?string}>,
-     *     live: array{status: ?string, speed: ?string, lldpNeighborName: ?string, lldpNeighborPort: ?string, isUplink: bool, macs: list<array{mac: string, vlan: ?string, role: ?string, status: ?string, authMethod: ?string, known: bool, hostId: ?int, hostName: ?string, interfaceId: ?int, interfaceName: ?string}>},
+     *     live: array{status: ?string, speed: ?string, lldpNeighborName: ?string, lldpNeighborPort: ?string, isUplink: bool, macs: list<array{mac: string, role: ?string, status: ?string, authMethod: ?string, known: bool, hostId: ?int, hostName: ?string, interfaceId: ?int, interfaceName: ?string}>},
      *     discrepancies: list<array{type: string, message: string, mac: ?string}>
      * }>
      */
@@ -115,7 +115,6 @@ class SwitchPortCorrelationService
 
             $macs[] = [
                 'mac'           => $mac,
-                'vlan'          => $entry['vlan'],
                 'role'          => $entry['role'],
                 'status'        => $entry['status'],
                 'authMethod'    => $entry['authMethod'],
@@ -147,16 +146,6 @@ class SwitchPortCorrelationService
                     'mac'     => $mac,
                 ];
             }
-
-            $vlan = $entry['vlan'];
-            $subnetVlan = $iface->getSubnet()?->getVlan();
-            if ($vlan !== null && $subnetVlan !== null && (string) $vlan !== (string) $subnetVlan) {
-                $discrepancies[] = [
-                    'type'    => 'vlan_mismatch',
-                    'message' => "{$mac} is live on VLAN {$vlan}, but its assigned subnet expects VLAN {$subnetVlan}.",
-                    'mac'     => $mac,
-                ];
-            }
         }
 
         return [
@@ -176,10 +165,10 @@ class SwitchPortCorrelationService
 
     /**
      * Merges the MAC-address-table entries and port-access clients for one port into
-     * a single per-MAC record (mac-table VLAN wins as the authoritative live VLAN;
-     * role/status/authMethod come from port-access clients when available).
+     * a single per-MAC record (role/status/authMethod come from port-access clients
+     * when available).
      *
-     * @return array<string, array{vlan: ?string, role: ?string, status: ?string, authMethod: ?string}>
+     * @return array<string, array{role: ?string, status: ?string, authMethod: ?string}>
      */
     private function mergeLiveMacs(array $scan): array
     {
@@ -187,14 +176,13 @@ class SwitchPortCorrelationService
 
         foreach ($scan['macs'] ?? [] as $entry) {
             $mac = strtolower($entry['mac']);
-            $merged[$mac] = ['vlan' => $entry['vlan'], 'role' => null, 'status' => null, 'authMethod' => null];
+            $merged[$mac] = ['role' => null, 'status' => null, 'authMethod' => null];
         }
 
         foreach ($scan['clients'] ?? [] as $client) {
             if ($client['mac'] === null) continue;
             $mac = strtolower($client['mac']);
             $merged[$mac] = [
-                'vlan'       => $merged[$mac]['vlan'] ?? $client['vlan'],
                 'role'       => $client['role'],
                 'status'     => $client['status'],
                 'authMethod' => $client['authMethod'],

@@ -79,13 +79,16 @@ ClearPass-derived switch/port data (`App\Service\SwitchPortCorrelationService`) 
 produce one row per port with:
 
 - Live link status and speed
-- Live VLAN(s) and MAC address(es), classified as an **uplink** (many MACs — a
-  trunk to another switch) to avoid flagging expected noise there
+- Live MAC address(es), classified as an **uplink** (many MACs — a trunk to
+  another switch) to avoid flagging expected noise there
 - LLDP neighbor name/port
 - **Discrepancies**: `unregistered` (live MAC unknown to DashDDI), `moved` (known
   device live on a different port than cached), `stale` (cached device not seen
-  live anywhere), `vlan_mismatch` (live VLAN differs from the assigned subnet's
-  VLAN)
+  live anywhere)
+
+There is deliberately no VLAN-mismatch check — with overlay networking, a port's
+live VLAN commonly differs from its assigned subnet's VLAN without that being a
+problem, so the comparison isn't useful here.
 
 This is entirely read-only — nothing is written back to DashDDI's database or to
 the switch. It requires Aruba CX credentials with a password (for REST) and/or SSH

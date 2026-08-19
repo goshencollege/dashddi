@@ -4,7 +4,6 @@ namespace App\Tests\Unit\Service;
 
 use App\Entity\Host;
 use App\Entity\NetworkInterface;
-use App\Entity\Subnet;
 use App\Service\SwitchPortCorrelationService;
 use PHPUnit\Framework\TestCase;
 
@@ -17,14 +16,13 @@ class SwitchPortCorrelationServiceTest extends TestCase
         $this->service = new SwitchPortCorrelationService();
     }
 
-    private function makeIface(string $mac, ?Host $host = null, ?string $switchIp = null, ?string $switchPort = null, ?Subnet $subnet = null): NetworkInterface
+    private function makeIface(string $mac, ?Host $host = null, ?string $switchIp = null, ?string $switchPort = null): NetworkInterface
     {
         $iface = new NetworkInterface();
         $iface->setMacAddress($mac);
         if ($host !== null) $iface->setHost($host);
         if ($switchIp !== null) $iface->setSwitchIp($switchIp);
         if ($switchPort !== null) $iface->setSwitchPort($switchPort);
-        if ($subnet !== null) $iface->setSubnet($subnet);
         return $iface;
     }
 
@@ -103,30 +101,6 @@ class SwitchPortCorrelationServiceTest extends TestCase
 
         $this->assertSame('unregistered', $result['1/1/5']['discrepancies'][0]['type']);
         $this->assertFalse($result['1/1/5']['live']['macs'][0]['known']);
-    }
-
-    public function testVlanMismatchFlagged(): void
-    {
-        $subnet = new Subnet();
-        $subnet->setVlan(20);
-        $host  = new Host();
-        $iface = $this->makeIface('aa:bb:cc:dd:ee:04', $host, '10.0.0.1', '1/1/5', $subnet);
-
-        $scanPorts = [
-            '1/1/5' => [
-                'status' => 'up', 'speed' => null,
-                'macs' => [['mac' => 'aa:bb:cc:dd:ee:04', 'vlan' => '30']],
-                'clients' => [],
-                'lldp' => ['neighborName' => null, 'neighborPort' => null],
-            ],
-        ];
-        $cachedGroups     = ['1/1/5' => [$iface]];
-        $knownIfacesByMac = ['aa:bb:cc:dd:ee:04' => $iface];
-
-        $result = $this->service->correlate($scanPorts, $cachedGroups, $knownIfacesByMac, '10.0.0.1');
-
-        $types = array_column($result['1/1/5']['discrepancies'], 'type');
-        $this->assertContains('vlan_mismatch', $types);
     }
 
     public function testUplinkPortSuppressesUnregisteredAndStaleNoise(): void
