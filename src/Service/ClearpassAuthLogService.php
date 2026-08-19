@@ -4,6 +4,8 @@ namespace App\Service;
 
 use App\Entity\ClearpassAuthLog;
 use App\Entity\ClearpassServer;
+use App\Entity\SwitchPortLog;
+use App\Enum\SwitchPortLogSource;
 use App\Repository\ClearpassAuthLogRepository;
 use App\Repository\NetworkInterfaceRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -133,6 +135,10 @@ class ClearpassAuthLogService
                         $iface->setLastAuthAt($authTs);
                         $iface->setSwitchIp($log->getNasIp());
                         $iface->setSwitchPort($log->getNasPortId());
+
+                        if ($log->getNasIp() !== null && $log->getNasPortId() !== null) {
+                            $this->em->persist(new SwitchPortLog($iface, SwitchPortLogSource::ClearPass, $log->getNasIp(), $log->getNasPortId(), $authTs));
+                        }
                     }
 
                     $this->em->persist($log);

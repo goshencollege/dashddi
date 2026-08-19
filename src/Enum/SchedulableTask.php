@@ -7,6 +7,7 @@ enum SchedulableTask: string
     case PushClearpass           = 'push_clearpass';
     case PullClearpassLogs       = 'pull_clearpass_logs';
     case PurgeClearpassAuthLogs  = 'purge_clearpass_auth_logs';
+    case PurgeSwitchPortLogs     = 'purge_switch_port_logs';
     case PushDns                 = 'push_dns';
     case PushDhcp                = 'push_dhcp';
     case PurgeLeases             = 'purge_leases';
@@ -22,6 +23,7 @@ enum SchedulableTask: string
             self::PushClearpass          => 'Push ClearPass Endpoints',
             self::PullClearpassLogs      => 'Pull ClearPass Auth Logs',
             self::PurgeClearpassAuthLogs => 'Purge ClearPass Auth Logs',
+            self::PurgeSwitchPortLogs    => 'Purge Switch Port Logs',
             self::PushDns                => 'Push DNS Configs',
             self::PushDhcp               => 'Push DHCP Configs',
             self::PurgeLeases            => 'Purge DHCP Lease Logs',
@@ -39,6 +41,7 @@ enum SchedulableTask: string
             self::PushClearpass          => 'Syncs interface data to the endpoint repository on all configured ClearPass servers. Creates, updates, and removes only endpoints managed by DashDDI.',
             self::PullClearpassLogs      => 'Pulls authentication session logs from all configured ClearPass servers using the REST API. On first run, imports the last 24 hours. Subsequent runs pick up where the previous left off.',
             self::PurgeClearpassAuthLogs => 'Deletes ClearPass authentication log entries older than the retention period configured in Application Settings (default 90 days).',
+            self::PurgeSwitchPortLogs    => 'Deletes switch-port attachment log entries (from ClearPass auth logs and live switch scans) older than the retention period configured in Application Settings (default 90 days).',
             self::PushDns                => 'Generates BIND zone files and dashddi.conf, then deploys them to all configured DNS servers.',
             self::PushDhcp               => 'Generates DHCP subnet configuration and deploys it to all configured DHCP servers.',
             self::PurgeLeases            => 'Deletes DHCP lease log entries that exceed each subnet\'s configured retention period. A default retention period (for subnets with no per-subnet setting and unmatched leases) can be configured in Application Settings.',
@@ -57,6 +60,7 @@ enum SchedulableTask: string
             self::PushClearpass          => 'app:push-clearpass',
             self::PullClearpassLogs      => 'app:pull-clearpass-logs',
             self::PurgeClearpassAuthLogs => 'app:purge-clearpass-auth-logs',
+            self::PurgeSwitchPortLogs    => 'app:purge-switch-port-logs',
             self::PushDns                => 'app:generate-dns-config --deploy',
             self::PushDhcp               => 'app:generate-dhcp-config --reload',
             self::PurgeLeases            => 'app:purge-dhcp-leases',
@@ -74,6 +78,7 @@ enum SchedulableTask: string
             self::PushClearpass          => '0 2 * * *',
             self::PullClearpassLogs      => '*/15 * * * *',
             self::PurgeClearpassAuthLogs => '0 3 * * 0',
+            self::PurgeSwitchPortLogs    => '0 3 * * 0',
             self::PushDns                => '0 2 * * *',
             self::PushDhcp               => '0 2 * * *',
             self::PurgeLeases            => '0 3 * * 0',

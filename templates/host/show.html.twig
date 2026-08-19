@@ -222,7 +222,11 @@
                                 {% endif %}
                                 {% if lastSeen %}
                                     {{ lastSeen|date('Y-m-d') }}
-                                    {% if iface.lastAuthAt == lastSeen %}<br><span class="text-info-emphasis">auth</span>{% else %}<br><span class="text-success-emphasis">dhcp</span>{% endif %}
+                                    {% if iface.lastAuthAt == lastSeen %}
+                                        <br><span class="text-info-emphasis">{{ (lastSeenSources[iface.id]|default(null)) == 'live_scan' ? 'switch scan' : 'auth' }}</span>
+                                    {% else %}
+                                        <br><span class="text-success-emphasis">dhcp</span>
+                                    {% endif %}
                                 {% else %}
                                     —
                                 {% endif %}

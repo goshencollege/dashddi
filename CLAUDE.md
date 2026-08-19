@@ -84,6 +84,7 @@ app:pull-clearpass-logs           # pull auth logs from ClearPass
 app:pull-snipe-it                 # sync assets from Snipe-IT
 app:run-scheduled-tasks           # execute all due scheduled tasks
 app:purge-clearpass-auth-logs     # purge old ClearPass auth logs
+app:purge-switch-port-logs        # purge old switch-port attachment logs
 app:purge-push-logs               # purge old push logs
 app:purge-dhcp-leases             # purge expired DHCP leases
 app:purge-deleted-hosts           # hard-delete soft-deleted records past retention

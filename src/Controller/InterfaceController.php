@@ -93,19 +93,21 @@ class InterfaceController extends AbstractController
 
         usort($events, fn(NetworkEvent $a, NetworkEvent $b) => $b->timestamp <=> $a->timestamp);
 
-        $maxAge     = $settingRepo->getInstance()->getSwitchInfoMaxAgeDays();
-        $cutoff     = $maxAge !== null ? new \DateTimeImmutable("-{$maxAge} days") : null;
-        $switchInfo = $authLogRepo->findLatestWithSwitchInfoByMac($interface->getMacAddress(), $cutoff);
+        $maxAge = $settingRepo->getInstance()->getSwitchInfoMaxAgeDays();
+        $cutoff = $maxAge !== null ? new \DateTimeImmutable("-{$maxAge} days") : null;
 
-        $switchIface  = $switchInfo?->getNasIp() ? $ifaceRepo->findByIpString($switchInfo->getNasIp()) : null;
-        $arubaSwitch  = $switchInfo?->getNasPortId() ? $arubaSwitchRepo->getInstance() : null;
+        $hasSwitchInfo = $interface->getSwitchIp() !== null && $interface->getSwitchPort() !== null
+            && ($cutoff === null || ($interface->getLastAuthAt() !== null && $interface->getLastAuthAt() >= $cutoff));
+
+        $switchIface = $hasSwitchInfo ? $ifaceRepo->findByIpString($interface->getSwitchIp()) : null;
+        $arubaSwitch = $hasSwitchInfo ? $arubaSwitchRepo->getInstance() : null;
 
         return $this->render('interface/show.html.twig', [
-            'interface'   => $interface,
-            'events'      => $events,
-            'switchInfo'  => $switchInfo,
-            'switchIface' => $switchIface,
-            'arubaSwitch' => $arubaSwitch,
+            'interface'     => $interface,
+            'events'        => $events,
+            'hasSwitchInfo' => $hasSwitchInfo,
+            'switchIface'   => $switchIface,
+            'arubaSwitch'   => $arubaSwitch,
             'virtualIps'     => $vipRepo->findByMemberInterface($interface),
             'linkableVips'   => $vipRepo->findLinkableForInterface($interface),
         ]);
