@@ -450,6 +450,10 @@ class HostController extends AbstractController
 
         $switchPorts = $ifaceRepo->findConnectedToSwitchIps($hostIps, $cutoff);
 
+        $isTaggedSwitch = $host->getTags()->exists(
+            fn($key, $tag) => strcasecmp($tag->getName(), 'switch') === 0
+        );
+
         $switchTargetIp = null;
         foreach ($switchPorts as $ifaces) {
             $switchTargetIp = $ifaces[0]->getSwitchIp();
@@ -481,6 +485,7 @@ class HostController extends AbstractController
             'domains'               => $this->domainRepo->findBy(['excludeFromInterfaces' => false], ['name' => 'ASC']),
             'vip_map'               => $vipRepo->findMapByInterfaceIds($ifaceIds),
             'switchPorts'           => $switchPorts,
+            'isTaggedSwitch'        => $isTaggedSwitch,
             'arubaSwitch'           => $arubaSwitchRepo->getInstance(),
             'switchInfoMaxAgeDays'  => $maxAge,
             'switchTargetIp'        => $switchTargetIp,
