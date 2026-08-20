@@ -40,6 +40,14 @@
 [data-bs-theme="dark"] .host-interfaces-table { --vip-row-bg: rgba(255,255,255,.05); }
 .host-interfaces-table .vip-row { --bs-table-bg: var(--vip-row-bg); }
 .host-interfaces-table .vip-row > td:first-child { padding-left: 2rem !important; }
+
+/* Group hover for multi-device switch ports (JS-managed; !important overrides
+   Bootstrap's --bs-table-bg mechanism) — same pattern as the host list's
+   host/interface tree table. */
+#switch-ports-table { --switch-group-hover: rgba(0,0,0,.1); --switch-row-hover: rgba(0,0,0,.18); }
+[data-bs-theme="dark"] #switch-ports-table { --switch-group-hover: rgba(255,255,255,.12); --switch-row-hover: rgba(255,255,255,.22); }
+#switch-ports-table .group-hovered > td { background-color: var(--switch-group-hover) !important; }
+#switch-ports-table .row-hovered > td   { background-color: var(--switch-row-hover)   !important; }
 </style>
 {% endblock %}
 
@@ -767,6 +775,37 @@
     const table  = document.getElementById('switch-ports-table');
     const tbody  = table.querySelector('tbody');
 
+    // Group hover — a port's sub-rows (one per live device, plus the spacer row
+    // that carries the port-level cells) all highlight together, the same
+    // pattern used for host/interface rows on the host list page. Delegated on
+    // the table itself so it keeps working after tbody is replaced wholesale on
+    // every scan re-render.
+    let hoveredPortGroup = null;
+    table.addEventListener('mouseover', function (e) {
+        const row = e.target.closest('tr.switch-port-row');
+        if (!row) return;
+        const id = row.dataset.portGroup;
+        if (!id) return;
+
+        if (id !== hoveredPortGroup) {
+            table.querySelectorAll('.group-hovered, .row-hovered')
+                .forEach(r => r.classList.remove('group-hovered', 'row-hovered'));
+            table.querySelectorAll(`.switch-port-row[data-port-group="${id}"]`)
+                .forEach(r => r.classList.add('group-hovered'));
+            hoveredPortGroup = id;
+        }
+
+        table.querySelectorAll('.row-hovered')
+            .forEach(r => { r.classList.remove('row-hovered'); r.classList.add('group-hovered'); });
+        row.classList.replace('group-hovered', 'row-hovered');
+    });
+
+    table.addEventListener('mouseleave', function () {
+        table.querySelectorAll('.group-hovered, .row-hovered')
+            .forEach(r => r.classList.remove('group-hovered', 'row-hovered'));
+        hoveredPortGroup = null;
+    });
+
     // Escape HTML entities in any string sourced from API responses.
     function esc(s) { const d = document.createElement('div'); d.textContent = String(s ?? ''); return d.innerHTML; }
     function escAttr(s) { return esc(s).replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
@@ -1206,7 +1245,7 @@
         // dozens of MACs into visible sub-rows would be exactly the noise that
         // collapse was built to avoid.
         if (port.live.isUplink) {
-            return `<tr>
+            return `<tr class="switch-port-row" data-port-group="${escAttr(port.port)}">
                 ${checkboxCell(1)}
                 <td class="font-monospace">${esc(port.port)}</td>
                 <td class="small">${renderLiveStatus(port.live)}</td>
@@ -1240,21 +1279,26 @@
         // sharing a row with the first device — otherwise hovering that first
         // device's row would highlight those tall rowspan'd cells too, making it
         // look like the whole port highlighted instead of just that one device.
+        // The spacer row is an EXTRA row on top of the `rowspan` device rows, so
+        // the port-level cells must span rowspan + 1 rows (the spacer itself plus
+        // every device row) — spanning only `rowspan` leaves the last device row
+        // uncovered, and its cells land in the wrong columns as a result.
+        const portRowSpan = rowspan + 1;
         const spacerRow = rowspan > 1 ? `
-        <tr class="switch-port-spacer-row">
-            ${checkboxCell(rowspan)}
-            <td class="font-monospace" rowspan="${rowspan}">${esc(port.port)}</td>
-            <td class="small" rowspan="${rowspan}">${renderLiveStatus(port.live)}</td>
+        <tr class="switch-port-spacer-row switch-port-row" data-port-group="${escAttr(port.port)}">
+            ${checkboxCell(portRowSpan)}
+            <td class="font-monospace" rowspan="${portRowSpan}">${esc(port.port)}</td>
+            <td class="small" rowspan="${portRowSpan}">${renderLiveStatus(port.live)}</td>
             <td colspan="5" class="p-0" style="line-height:0"></td>
-            <td class="text-muted small" rowspan="${rowspan}">${lastSeen}</td>
-            ${actionsCell(rowspan)}
+            <td class="text-muted small" rowspan="${portRowSpan}">${lastSeen}</td>
+            ${actionsCell(portRowSpan)}
         </tr>` : '';
 
         const trs = rows.map((row, i) => {
             const lldpCell = i === lldpRowIndex ? renderLldp(port.live) : '<span class="text-muted">—</span>';
 
             if (rowspan === 1) {
-                return `<tr>
+                return `<tr class="switch-port-row" data-port-group="${escAttr(port.port)}">
                     ${checkboxCell(1)}
                     <td class="font-monospace">${esc(port.port)}</td>
                     <td class="small">${renderLiveStatus(port.live)}</td>
@@ -1267,7 +1311,7 @@
                     ${actionsCell(1)}
                 </tr>`;
             }
-            return `<tr>
+            return `<tr class="switch-port-row" data-port-group="${escAttr(port.port)}">
                 <td class="small">${renderDeviceCell(row)}</td>
                 <td class="small">${renderDeviceMacCell(row)}</td>
                 <td class="small">${renderDevicePolicyCell(row)}</td>
