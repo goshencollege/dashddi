@@ -14,6 +14,7 @@ use App\Entity\Ipv6Address;
 use App\Entity\NetworkInterface;
 use App\Entity\Subnet;
 use App\Entity\SwitchPortLog;
+use App\Entity\Tag;
 use App\Entity\UserPreference;
 use App\Enum\RecordType;
 use App\Enum\SwitchPortLogSource;
@@ -801,6 +802,73 @@ class HostControllerTest extends AppWebTestCase
     public function testShowHidesSwitchPortsCardWhenNoInterfacesPointAtHost(): void
     {
         $host = (new Host())->setName('non-switch-host');
+        $this->em->persist($host);
+        $this->em->flush();
+
+        $this->client->request('GET', "/hosts/{$host->getId()}");
+        $this->assertResponseIsSuccessful();
+        $this->assertStringNotContainsString('Switch Ports', $this->client->getResponse()->getContent());
+    }
+
+    public function testShowRendersSwitchPortsCardWhenHostHasSwitchTagAndNoInterfacesPointAtIt(): void
+    {
+        $tag = (new Tag())->setName('switch');
+        $this->em->persist($tag);
+
+        $subnet = (new Subnet())->setName('switch-tag-subnet')->setIpv4Cidr('10.25.0.0/24');
+        $this->em->persist($subnet);
+
+        $host = (new Host())->setName('tagged-switch-host');
+        $host->addTag($tag);
+        $this->em->persist($host);
+        $this->makeInterfaceWithIps($host, $subnet, 'aa:aa:aa:aa:aa:09', 'mgmt', '10.25.0.1');
+        $this->em->flush();
+
+        $hostId = $host->getId();
+        $this->em->clear();
+
+        $this->client->request('GET', "/hosts/{$hostId}");
+        $this->assertResponseIsSuccessful();
+        $content = $this->client->getResponse()->getContent();
+        $this->assertStringContainsString('Switch Ports', $content);
+        $this->assertStringContainsString('No connected devices found yet.', $content);
+    }
+
+    public function testShowWiresUpQuerySwitchButtonWhenHostHasSwitchTagAndArubaSwitchConfigured(): void
+    {
+        $arubaSwitch = (new ArubaSwitch())->setUsername('admin')->setPassword('secret');
+        $this->em->persist($arubaSwitch);
+
+        $tag = (new Tag())->setName('switch');
+        $this->em->persist($tag);
+
+        $subnet = (new Subnet())->setName('switch-tag-scan-subnet')->setIpv4Cidr('10.26.0.0/24');
+        $this->em->persist($subnet);
+
+        $host = (new Host())->setName('tagged-switch-host-2');
+        $host->addTag($tag);
+        $this->em->persist($host);
+        $this->makeInterfaceWithIps($host, $subnet, 'aa:aa:aa:aa:aa:10', 'mgmt', '10.26.0.1');
+        $this->em->flush();
+
+        $hostId = $host->getId();
+        $this->em->clear();
+
+        $this->client->request('GET', "/hosts/{$hostId}");
+        $this->assertResponseIsSuccessful();
+        $content = $this->client->getResponse()->getContent();
+        $this->assertStringContainsString('id="switch-scan-btn"', $content);
+        $this->assertStringContainsString('data-switch-ip="10.26.0.1"', $content);
+        $this->assertStringContainsString('const scanUrl', $content);
+    }
+
+    public function testShowHidesSwitchPortsCardWhenHostHasUnrelatedTagAndNoInterfacesPointAtIt(): void
+    {
+        $tag = (new Tag())->setName('printer');
+        $this->em->persist($tag);
+
+        $host = (new Host())->setName('tagged-non-switch-host');
+        $host->addTag($tag);
         $this->em->persist($host);
         $this->em->flush();
 

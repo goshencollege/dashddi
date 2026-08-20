@@ -350,7 +350,7 @@
     </div>
 </div>
 
-{% if switchPorts is not empty %}
+{% if switchPorts is not empty or isTaggedSwitch %}
 <div class="card mb-3">
     {% set switchPortsCollapsed = 'switch-ports' in collapsedSections %}
     <div class="card-header d-flex align-items-center gap-2 section-header-toggle" style="cursor:pointer">
@@ -418,6 +418,11 @@
                 </tr>
             </thead>
             <tbody>
+                {% if switchPorts is empty %}
+                <tr>
+                    <td colspan="10" class="text-muted small">No connected devices found yet.</td>
+                </tr>
+                {% endif %}
                 {% for port, ifaces in switchPorts %}
                     {% set detailsId = 'port-details-' ~ loop.index0 %}
                     {% set primaryIface = ifaces[0] %}
@@ -762,7 +767,7 @@
     });
 })();
 </script>
-{% if switchPorts is not empty and arubaSwitch %}
+{% if (switchPorts is not empty or isTaggedSwitch) and arubaSwitch %}
 <script>
 (function () {
     const statusUrl    = {{ path('api_switch_port_status')|json_encode|raw }};
