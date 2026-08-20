@@ -1240,14 +1240,19 @@
         // sharing a row with the first device — otherwise hovering that first
         // device's row would highlight those tall rowspan'd cells too, making it
         // look like the whole port highlighted instead of just that one device.
+        // The spacer row is an EXTRA row on top of the `rowspan` device rows, so
+        // the port-level cells must span rowspan + 1 rows (the spacer itself plus
+        // every device row) — spanning only `rowspan` leaves the last device row
+        // uncovered, and its cells land in the wrong columns as a result.
+        const portRowSpan = rowspan + 1;
         const spacerRow = rowspan > 1 ? `
         <tr class="switch-port-spacer-row">
-            ${checkboxCell(rowspan)}
-            <td class="font-monospace" rowspan="${rowspan}">${esc(port.port)}</td>
-            <td class="small" rowspan="${rowspan}">${renderLiveStatus(port.live)}</td>
+            ${checkboxCell(portRowSpan)}
+            <td class="font-monospace" rowspan="${portRowSpan}">${esc(port.port)}</td>
+            <td class="small" rowspan="${portRowSpan}">${renderLiveStatus(port.live)}</td>
             <td colspan="5" class="p-0" style="line-height:0"></td>
-            <td class="text-muted small" rowspan="${rowspan}">${lastSeen}</td>
-            ${actionsCell(rowspan)}
+            <td class="text-muted small" rowspan="${portRowSpan}">${lastSeen}</td>
+            ${actionsCell(portRowSpan)}
         </tr>` : '';
 
         const trs = rows.map((row, i) => {
