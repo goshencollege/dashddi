@@ -65,7 +65,7 @@ class SamlAuthenticator extends AbstractAuthenticator implements AuthenticationE
         $session->set('_session_expires_at', time() + $lifetime);
 
         $targetPath = $this->getTargetPath($session, $firewallName);
-        return new RedirectResponse($targetPath ?? $this->urlGenerator->generate('dashboard'));
+        return new RedirectResponse($targetPath ?? $this->urlGenerator->generate('host_index'));
     }
 
     public function onAuthenticationFailure(Request $request, AuthenticationException $exception): ?Response

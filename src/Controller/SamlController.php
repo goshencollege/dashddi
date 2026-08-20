@@ -17,7 +17,7 @@ class SamlController extends AbstractController
     public function login(): Response
     {
         if ($this->getUser()) {
-            return $this->redirectToRoute('dashboard');
+            return $this->redirectToRoute('host_index');
         }
 
         return $this->render('saml/login.html.twig');
