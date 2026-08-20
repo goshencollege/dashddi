@@ -17,14 +17,14 @@ class SwitchPortCorrelationService
     private const UPLINK_MAC_THRESHOLD = 8;
 
     /**
-     * @param  array<string, array{status: ?string, speed: ?string, macs: list<array{mac: string, vlan: ?string}>, clients: list<array{mac: ?string, ip: ?string, vlan: ?string, role: ?string, status: ?string, authMethod: ?string}>, lldp: array{neighborName: ?string, neighborPort: ?string}}> $scanPorts
+     * @param  array<string, array{status: ?string, speed: ?string, macs: list<array{mac: string, vlan: ?string}>, clients: list<array{mac: ?string, ip: ?string, vlan: ?string, role: ?string, status: ?string, authMethod: ?string}>, lldp: array{neighborName: ?string, neighborPort: ?string, neighborMac: ?string}}> $scanPorts
      * @param  array<string, NetworkInterface[]>                                                                                                                                                                                                                                          $cachedGroups
      * @param  array<string, NetworkInterface>                                                                                                                                                                                                                                            $knownIfacesByMac keyed by lowercase MAC
      * @param  array<int, string>                                                                                                                                                                                                                                                         $lastSeenSources interface id => 'clearpass'|'live_scan', for whichever most recently advanced lastAuthAt
      * @return array<string, array{
      *     port: string,
      *     cached: list<array{interfaceId: ?int, hostId: ?int, hostName: ?string, name: ?string, mac: string, lastAuthAt: ?string, lastDhcpAt: ?string, lastSeenSource: ?string}>,
-     *     live: array{status: ?string, speed: ?string, lldpNeighborName: ?string, lldpNeighborPort: ?string, isUplink: bool, macs: list<array{mac: string, role: ?string, status: ?string, authMethod: ?string, known: bool, hostId: ?int, hostName: ?string, interfaceId: ?int, interfaceName: ?string}>},
+     *     live: array{status: ?string, speed: ?string, lldpNeighborName: ?string, lldpNeighborPort: ?string, lldpNeighborMac: ?string, isUplink: bool, macs: list<array{mac: string, role: ?string, status: ?string, authMethod: ?string, known: bool, hostId: ?int, hostName: ?string, interfaceId: ?int, interfaceName: ?string}>},
      *     discrepancies: list<array{type: string, message: string, mac: ?string}>
      * }>
      */
@@ -98,6 +98,7 @@ class SwitchPortCorrelationService
                 'speed'            => null,
                 'lldpNeighborName' => null,
                 'lldpNeighborPort' => null,
+                'lldpNeighborMac'  => null,
                 'isUplink'         => false,
                 'macs'             => [],
             ],
@@ -159,6 +160,7 @@ class SwitchPortCorrelationService
                 'speed'            => $scan['speed'] ?? null,
                 'lldpNeighborName' => $scan['lldp']['neighborName'] ?? null,
                 'lldpNeighborPort' => $scan['lldp']['neighborPort'] ?? null,
+                'lldpNeighborMac'  => $scan['lldp']['neighborMac']  ?? null,
                 'isUplink'         => $isUplink,
                 'macs'             => $macs,
             ],

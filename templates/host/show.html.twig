@@ -393,14 +393,19 @@
                     </th>
                     {% endif %}
                     <th>Port</th>
-                    <th>Connected Device</th>
-                    <th>Last Seen</th>
                     {% if arubaSwitch %}
                     <th>Live Status</th>
+                    {% endif %}
+                    <th>Connected Device</th>
+                    {% if arubaSwitch %}
                     <th>Live MAC(s)</th>
+                    <th>Applied Policy</th>
                     <th>LLDP Neighbor</th>
                     <th>Discrepancies</th>
+                    <th>Last Seen</th>
                     <th class="text-end">Actions</th>
+                    {% else %}
+                    <th>Last Seen</th>
                     {% endif %}
                 </tr>
             </thead>
@@ -418,6 +423,9 @@
                         </td>
                         {% endif %}
                         <td class="font-monospace">{{ port }}</td>
+                        {% if arubaSwitch %}
+                        <td class="text-muted small">—</td>
+                        {% endif %}
                         <td class="small">
                             {% for iface in ifaces %}
                                 <a href="{{ path('interface_show', {id: iface.id}) }}" class="text-decoration-none d-block{% if not loop.last %} mb-1{% endif %}">
@@ -429,12 +437,13 @@
                                 </a>
                             {% endfor %}
                         </td>
-                        <td class="text-muted small">{{ _self.lastSeen(primaryIface.lastAuthAt, primaryIface.lastDhcpAt, lastSeenSources[primaryIface.id]|default(null), 'Y-m-d H:i') }}</td>
+                        {% set lastSeenCell %}{{ _self.lastSeen(primaryIface.lastAuthAt, primaryIface.lastDhcpAt, lastSeenSources[primaryIface.id]|default(null), 'Y-m-d H:i') }}{% endset %}
                         {% if arubaSwitch %}
                         <td class="text-muted small">—</td>
                         <td class="text-muted small">—</td>
                         <td class="text-muted small">—</td>
                         <td class="text-muted small">—</td>
+                        <td class="text-muted small">{{ lastSeenCell }}</td>
                         <td class="text-end text-nowrap">
                             <button type="button" class="btn btn-sm btn-outline-secondary port-status-btn" data-mac="{{ primaryIface.macAddress }}" data-target="{{ detailsId }}" title="Check Status">
                                 <i class="bi bi-arrow-clockwise"></i>
@@ -452,11 +461,13 @@
                                 <i class="bi bi-lightning"></i>
                             </button>
                         </td>
+                        {% else %}
+                        <td class="text-muted small">{{ lastSeenCell }}</td>
                         {% endif %}
                     </tr>
                     {% if arubaSwitch %}
                     <tr id="{{ detailsId }}" class="d-none">
-                        <td colspan="9" class="p-0">
+                        <td colspan="10" class="p-0">
                             <div id="{{ detailsId }}-body" class="p-2 text-muted small">
                                 Click an action button above to load live port-access data from the switch.
                             </div>
@@ -1075,20 +1086,88 @@
         }).join(' ');
     }
 
+    function renderAppliedPolicy(live) {
+        const roles = Array.from(new Set(live.macs.map(m => m.role).filter(r => r !== null && r !== '')));
+        return roles.length ? roles.map(r => esc(r)).join(', ') : '<span class="text-muted">—</span>';
+    }
+
+    // Builds one row per live MAC on a (non-uplink) port, aligning connected
+    // device / MAC / applied policy for each — a port with several clients (e.g.
+    // a phone and PC daisy-chained together) gets one sub-row per device instead
+    // of cramming them all into single cells. Also adds a row for any cached
+    // device not confirmed live at all here (the "stale" discrepancy case), so
+    // it isn't silently dropped from the table.
+    function buildDeviceRows(port) {
+        const cachedIfaceIds = new Set(port.cached.map(c => c.interfaceId));
+        const liveIfaceIds   = new Set(port.live.macs.filter(m => m.known).map(m => m.interfaceId));
+
+        const rows = port.live.macs.map(m => ({
+            mac: m.mac,
+            known: m.known,
+            interfaceId: m.interfaceId,
+            hostName: m.hostName,
+            interfaceName: m.interfaceName,
+            role: m.role,
+            isNew: m.known && !cachedIfaceIds.has(m.interfaceId),
+        }));
+
+        port.cached.forEach(c => {
+            if (!liveIfaceIds.has(c.interfaceId)) {
+                rows.push({
+                    mac: c.mac, known: true, interfaceId: c.interfaceId,
+                    hostName: c.hostName, interfaceName: c.name, role: null, isNew: false,
+                });
+            }
+        });
+
+        return rows;
+    }
+
+    function renderDeviceCell(row) {
+        if (!row) return '<span class="text-muted">—</span>';
+        if (!row.known) return '<span class="text-muted">Unregistered</span>';
+        const badge = row.isNew ? ' <span class="badge bg-info-subtle text-info-emphasis">new</span>' : '';
+        return `<a href="${ifaceUrl(row.interfaceId)}" class="text-decoration-none d-block">${esc(row.hostName ?? row.interfaceName ?? '—')}${badge}</a>`;
+    }
+
+    function renderDeviceMacCell(row) {
+        if (!row) return '<span class="text-muted">—</span>';
+        const cls = row.known ? 'bg-light text-dark' : 'bg-secondary-subtle text-secondary-emphasis';
+        return `<span class="badge ${cls} font-monospace">${esc(row.mac)}</span>`;
+    }
+
+    function renderDevicePolicyCell(row) {
+        if (!row || !row.role) return '<span class="text-muted">—</span>';
+        return esc(row.role);
+    }
+
     function renderLldp(live) {
         if (!live.lldpNeighborName && !live.lldpNeighborPort) return '<span class="text-muted">—</span>';
         return esc(live.lldpNeighborName ?? '?') + (live.lldpNeighborPort ? ` (${esc(live.lldpNeighborPort)})` : '');
     }
 
-    function renderDiscrepancies(port) {
-        if (port.discrepancies.length === 0) {
+    function renderDiscrepancyBadges(discrepancies) {
+        if (discrepancies.length === 0) {
             return '<span class="badge bg-success-subtle text-success-emphasis"><i class="bi bi-check-lg"></i> OK</span>';
         }
         const badgeClass = { unregistered: 'info', moved: 'warning', stale: 'secondary' };
-        return port.discrepancies.map(d => {
+        return discrepancies.map(d => {
             const cls = badgeClass[d.type] ?? 'warning';
             return `<span class="badge bg-${cls}-subtle text-${cls}-emphasis d-block mb-1" title="${escAttr(d.message)}">${esc(d.type.replace('_', ' '))}</span>`;
         }).join('');
+    }
+
+    function renderDiscrepancies(port) {
+        return renderDiscrepancyBadges(port.discrepancies);
+    }
+
+    // Discrepancies each carry their own `mac`, so a sub-row can show only the
+    // ones about that specific device instead of dumping every discrepancy for
+    // the port onto one row.
+    function renderDeviceDiscrepancies(port, row) {
+        if (!row) return renderDiscrepancyBadges(port.discrepancies);
+        const mac = row.mac.toLowerCase();
+        return renderDiscrepancyBadges(port.discrepancies.filter(d => d.mac && d.mac.toLowerCase() === mac));
     }
 
     function resolveActionMac(port) {
@@ -1102,36 +1181,86 @@
         const mac = resolveActionMac(port);
         const label = port.cached.length > 1 ? `${port.cached.length} devices` : (port.cached[0]?.hostName ?? mac ?? port.port);
 
-        const checkboxCell = mac
-            ? `<td><input type="checkbox" class="form-check-input switch-port-checkbox" data-mac="${escAttr(mac)}" data-target="${detailsId}" data-label="${escAttr(port.port + ' (' + label + ')')}"></td>`
-            : '<td></td>';
+        const checkboxCell = (rowspan) => mac
+            ? `<td rowspan="${rowspan}"><input type="checkbox" class="form-check-input switch-port-checkbox" data-mac="${escAttr(mac)}" data-target="${detailsId}" data-label="${escAttr(port.port + ' (' + label + ')')}"></td>`
+            : `<td rowspan="${rowspan}"></td>`;
 
-        const actionsCell = mac ? `
-            <td class="text-end text-nowrap">
+        const actionsCell = (rowspan) => mac ? `
+            <td class="text-end text-nowrap" rowspan="${rowspan}">
                 <button type="button" class="btn btn-sm btn-outline-secondary port-status-btn" data-mac="${escAttr(mac)}" data-target="${detailsId}" title="Check Status"><i class="bi bi-arrow-clockwise"></i></button>
                 <button type="button" class="btn btn-sm btn-outline-info port-reauth-btn" data-mac="${escAttr(mac)}" data-target="${detailsId}" data-confirm="Reauthenticate port ${escAttr(port.port)}?" title="Reauthenticate"><i class="bi bi-shield-check"></i></button>
                 <button type="button" class="btn btn-sm btn-outline-warning port-bounce-btn" data-mac="${escAttr(mac)}" data-target="${detailsId}" data-confirm="Bounce port ${escAttr(port.port)}? This will briefly disconnect connected clients." title="Bounce Port"><i class="bi bi-power"></i></button>
                 <button type="button" class="btn btn-sm btn-outline-warning port-poe-bounce-btn" data-mac="${escAttr(mac)}" data-target="${detailsId}" data-confirm="PoE bounce port ${escAttr(port.port)}? This will cut power and disconnect connected clients." title="PoE Bounce"><i class="bi bi-lightning"></i></button>
-            </td>` : '<td></td>';
+            </td>` : `<td rowspan="${rowspan}"></td>`;
 
         const lastSeen = renderLastSeen(port);
 
-        return `<tr>
-            ${checkboxCell}
-            <td class="font-monospace">${esc(port.port)}</td>
-            <td class="small">${renderConnectedDevice(port)}</td>
-            <td class="text-muted small">${lastSeen}</td>
-            <td class="small">${renderLiveStatus(port.live)}</td>
-            <td class="small">${renderLiveMacs(port, detailsId)}</td>
-            <td class="small">${renderLldp(port.live)}</td>
-            <td class="small">${renderDiscrepancies(port)}</td>
-            ${actionsCell}
-        </tr>
+        const detailsRow = `
         <tr id="${detailsId}" class="d-none">
-            <td colspan="9" class="p-0">
+            <td colspan="10" class="p-0">
                 <div id="${detailsId}-body" class="p-2 text-muted small">Click an action button above to load live port-access data from the switch.</div>
             </td>
         </tr>`;
+
+        // Uplink ports keep the existing single collapsed row — exploding a trunk's
+        // dozens of MACs into visible sub-rows would be exactly the noise that
+        // collapse was built to avoid.
+        if (port.live.isUplink) {
+            return `<tr>
+                ${checkboxCell(1)}
+                <td class="font-monospace">${esc(port.port)}</td>
+                <td class="small">${renderLiveStatus(port.live)}</td>
+                <td class="small">${renderConnectedDevice(port)}</td>
+                <td class="small">${renderLiveMacs(port, detailsId)}</td>
+                <td class="small">${renderAppliedPolicy(port.live)}</td>
+                <td class="small">${renderLldp(port.live)}</td>
+                <td class="small">${renderDiscrepancies(port)}</td>
+                <td class="text-muted small">${lastSeen}</td>
+                ${actionsCell(1)}
+            </tr>${detailsRow}`;
+        }
+
+        const rows = buildDeviceRows(port);
+        if (rows.length === 0) rows.push(null);
+        const rowspan = rows.length;
+
+        // LLDP has no per-mac list of its own — just the one neighbor's own MAC
+        // (when the switch reports one) — so match it to whichever row is that
+        // device. If it doesn't match any row (unreported MAC, or none at all
+        // reported), fall back to showing it on the first row rather than
+        // dropping it silently.
+        const lldpMac = port.live.lldpNeighborMac ? port.live.lldpNeighborMac.toLowerCase() : null;
+        let lldpRowIndex = lldpMac ? rows.findIndex(r => r && r.mac.toLowerCase() === lldpMac) : -1;
+        if (lldpRowIndex === -1 && (port.live.lldpNeighborName || port.live.lldpNeighborPort)) {
+            lldpRowIndex = 0;
+        }
+
+        const trs = rows.map((row, i) => {
+            const lldpCell = i === lldpRowIndex ? renderLldp(port.live) : '<span class="text-muted">—</span>';
+            if (i === 0) {
+                return `<tr>
+                    ${checkboxCell(rowspan)}
+                    <td class="font-monospace" rowspan="${rowspan}">${esc(port.port)}</td>
+                    <td class="small" rowspan="${rowspan}">${renderLiveStatus(port.live)}</td>
+                    <td class="small">${renderDeviceCell(row)}</td>
+                    <td class="small">${renderDeviceMacCell(row)}</td>
+                    <td class="small">${renderDevicePolicyCell(row)}</td>
+                    <td class="small">${lldpCell}</td>
+                    <td class="small">${renderDeviceDiscrepancies(port, row)}</td>
+                    <td class="text-muted small" rowspan="${rowspan}">${lastSeen}</td>
+                    ${actionsCell(rowspan)}
+                </tr>`;
+            }
+            return `<tr>
+                <td class="small">${renderDeviceCell(row)}</td>
+                <td class="small">${renderDeviceMacCell(row)}</td>
+                <td class="small">${renderDevicePolicyCell(row)}</td>
+                <td class="small">${lldpCell}</td>
+                <td class="small">${renderDeviceDiscrepancies(port, row)}</td>
+            </tr>`;
+        }).join('');
+
+        return trs + detailsRow;
     }
 
     function renderPortsTable(ports) {
