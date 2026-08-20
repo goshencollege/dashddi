@@ -117,6 +117,7 @@ class AosCxOutputParserTest extends TestCase
 
         $this->assertSame('core-switch.example.com', $result['1/1/1']['neighborName']);
         $this->assertSame('1/1/48', $result['1/1/1']['neighborPort']);
+        $this->assertSame('70:3a:0e:11:22:33', $result['1/1/1']['neighborMac']);
     }
 
     public function testParseLldpNeighborInfoKeyValueFormat(): void
@@ -134,6 +135,23 @@ class AosCxOutputParserTest extends TestCase
 
         $this->assertSame('core-switch.example.com', $result['1/1/1']['neighborName']);
         $this->assertSame('1/1/48', $result['1/1/1']['neighborPort']);
+        $this->assertSame('70:3a:0e:11:22:33', $result['1/1/1']['neighborMac']);
+    }
+
+    public function testParseLldpNeighborInfoIgnoresNonMacChassisId(): void
+    {
+        $output = <<<TXT
+        Local Port : 1/1/1
+        Chassis ID : core-switch.example.com
+        Port ID    : 1/1/48
+        System Name: core-switch.example.com
+        --------------------------------------------------------------
+        switch1#
+        TXT;
+
+        $result = AosCxOutputParser::parseLldpNeighborInfo($output);
+
+        $this->assertNull($result['1/1/1']['neighborMac']);
     }
 
     public function testParseLldpNeighborInfoReturnsEmptyWithoutNeighbors(): void

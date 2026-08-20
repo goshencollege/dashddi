@@ -91,7 +91,12 @@ with:
 - Live link status and speed
 - Live MAC address(es), classified as an **uplink** (many MACs — a trunk to
   another switch) to avoid flagging expected noise there
-- LLDP neighbor name/port
+- Applied policy — the 802.1X/MAC-Auth role(s) RADIUS assigned to the port's
+  live client(s), from the port-access client data
+- LLDP neighbor name/port, plus the neighbor's own MAC when the switch reports
+  one — used by the UI to show the neighbor against whichever of the port's
+  live devices it actually belongs to (e.g. a daisy-chained phone) rather than
+  the whole port
 - **Discrepancies**: `unregistered` (live MAC unknown to DashDDI), `moved` (known
   device live on a different port than cached), `stale` (cached device not seen
   live anywhere)

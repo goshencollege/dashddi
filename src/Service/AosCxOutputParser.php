@@ -203,7 +203,7 @@ class AosCxOutputParser
     /**
      * Parses `show lldp neighbor-info` into per-local-port neighbor summary.
      *
-     * @return array<string, array{neighborName: ?string, neighborPort: ?string}>
+     * @return array<string, array{neighborName: ?string, neighborPort: ?string, neighborMac: ?string}>
      */
     public static function parseLldpNeighborInfo(string $output): array
     {
@@ -227,6 +227,7 @@ class AosCxOutputParser
                 if (str_contains($col, 'local port'))                      $colMap['port'] = $ci;
                 if (str_contains($col, 'name'))                            $colMap['name'] = $ci;
                 if (str_contains($col, 'port id') || str_contains($col, 'port desc')) $colMap['neighborPort'] = $ci;
+                if (str_contains($col, 'chassis id'))                      $colMap['chassisId'] = $ci;
             }
 
             for ($i = $headerLine + 1; $i < count($lines); $i++) {
@@ -239,12 +240,14 @@ class AosCxOutputParser
                 $port = $parts[$colMap['port'] ?? 0] ?? null;
                 if ($port === null || !preg_match('/^\d+\/\d+\/\d+$/', $port)) continue;
 
-                $name = isset($colMap['name']) ? ($parts[$colMap['name']] ?? null) : null;
-                $np   = isset($colMap['neighborPort']) ? ($parts[$colMap['neighborPort']] ?? null) : null;
+                $name      = isset($colMap['name'])       ? ($parts[$colMap['name']]       ?? null) : null;
+                $np        = isset($colMap['neighborPort']) ? ($parts[$colMap['neighborPort']] ?? null) : null;
+                $chassisId = isset($colMap['chassisId'])  ? ($parts[$colMap['chassisId']]  ?? null) : null;
 
                 $ports[$port] = [
                     'neighborName' => $name !== null && $name !== '' ? $name : null,
                     'neighborPort' => $np   !== null && $np   !== '' ? $np   : null,
+                    'neighborMac'  => self::asMacAddress($chassisId),
                 ];
             }
 
@@ -253,7 +256,7 @@ class AosCxOutputParser
             }
         }
 
-        // Key-value block format ("Local Port : 1/1/1" / "System Name : ..." / "Port ID : ...")
+        // Key-value block format ("Local Port : 1/1/1" / "System Name : ..." / "Port ID : ..." / "Chassis Id : ...")
         $current     = null;
         $currentPort = null;
         foreach ($lines as $line) {
@@ -263,13 +266,16 @@ class AosCxOutputParser
                     $ports[$currentPort] = $current;
                 }
                 $currentPort = $m[1];
-                $current     = ['neighborName' => null, 'neighborPort' => null];
+                $current     = ['neighborName' => null, 'neighborPort' => null, 'neighborMac' => null];
             } elseif ($current !== null) {
                 if (preg_match('/^(System\s+Name|Neighbor\s+Name)\s*:\s*(.+)/i', $line, $m)) {
                     $current['neighborName'] = trim($m[2]);
                 }
                 if (preg_match('/^Port\s+ID\s*:\s*(.+)/i', $line, $m)) {
                     $current['neighborPort'] = trim($m[1]);
+                }
+                if (preg_match('/^Chassis\s+Id\s*:\s*(.+)/i', $line, $m)) {
+                    $current['neighborMac'] = self::asMacAddress(trim($m[1]));
                 }
             }
         }
@@ -278,5 +284,14 @@ class AosCxOutputParser
         }
 
         return $ports;
+    }
+
+    /** Returns the value lowercased if it looks like a MAC address, else null. */
+    private static function asMacAddress(?string $value): ?string
+    {
+        if ($value === null || !preg_match('/^([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$/', $value)) {
+            return null;
+        }
+        return strtolower($value);
     }
 }

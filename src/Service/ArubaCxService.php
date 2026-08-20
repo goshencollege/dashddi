@@ -333,7 +333,7 @@ class ArubaCxService
      * attributes under different JSON keys than assumed here). If REST supplies
      * all four, no SSH connection is opened at all.
      *
-     * @return array{ports: array<string, array{status: ?string, speed: ?string, macs: list<array{mac: string, vlan: ?string}>, clients: list<array{mac: ?string, ip: ?string, vlan: ?string, role: ?string, status: ?string, authMethod: ?string}>, lldp: array{neighborName: ?string, neighborPort: ?string}}>, raw: array{interfaceBrief: string, portAccess: string, macTable: string, lldp: string}, error: ?string}
+     * @return array{ports: array<string, array{status: ?string, speed: ?string, macs: list<array{mac: string, vlan: ?string}>, clients: list<array{mac: ?string, ip: ?string, vlan: ?string, role: ?string, status: ?string, authMethod: ?string}>, lldp: array{neighborName: ?string, neighborPort: ?string, neighborMac: ?string}}>, raw: array{interfaceBrief: string, portAccess: string, macTable: string, lldp: string}, error: ?string}
      */
     public function scanSwitch(ArubaSwitch $creds, string $ip): array
     {
@@ -464,7 +464,7 @@ class ArubaCxService
      * @return array{
      *     portAccess: array<string, list<array{mac: ?string, ip: ?string, vlan: ?string, role: ?string, status: ?string, authMethod: ?string}>>,
      *     portAccessRaw: string,
-     *     lldp: array<string, array{neighborName: ?string, neighborPort: ?string}>,
+     *     lldp: array<string, array{neighborName: ?string, neighborPort: ?string, neighborMac: ?string}>,
      *     lldpRaw: string,
      * }
      */
@@ -534,9 +534,19 @@ class ArubaCxService
                             $neighborName = $info['chassis_name'] ?? $first['chassis_id'] ?? null;
                             $neighborPort = $info['port_id']      ?? $info['port_description'] ?? $first['port_id'] ?? null;
 
+                            // The neighbor's own MAC — usually the "mac_addr" field, but
+                            // chassis_id is a MAC too when chassis_id_subtype indicates a
+                            // MAC-based ID (as opposed to a network address or interface
+                            // name), which some firmware uses instead of a distinct field.
+                            $macCandidate = $first['mac_addr'] ?? $first['chassis_id'] ?? null;
+                            $neighborMac  = is_string($macCandidate) && preg_match('/^([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$/', $macCandidate)
+                                ? strtolower($macCandidate)
+                                : null;
+
                             $lldp[$name] = [
                                 'neighborName' => $neighborName !== null ? (string) $neighborName : null,
                                 'neighborPort' => $neighborPort !== null ? (string) $neighborPort : null,
+                                'neighborMac'  => $neighborMac,
                             ];
                         }
                     }
@@ -694,7 +704,7 @@ class ArubaCxService
                 'speed'   => $interfaceBrief[$port]['speed']  ?? null,
                 'macs'    => $macTable[$port] ?? [],
                 'clients' => $portAccess[$port] ?? [],
-                'lldp'    => $lldp[$port] ?? ['neighborName' => null, 'neighborPort' => null],
+                'lldp'    => $lldp[$port] ?? ['neighborName' => null, 'neighborPort' => null, 'neighborMac' => null],
             ];
         }
 

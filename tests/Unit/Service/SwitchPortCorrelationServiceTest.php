@@ -77,6 +77,21 @@ class SwitchPortCorrelationServiceTest extends TestCase
         $this->assertNull($result['1/1/5']['cached'][0]['lastSeenSource']);
     }
 
+    public function testLldpNeighborMacPassesThroughToLiveOutput(): void
+    {
+        $scanPorts = [
+            '1/1/5' => [
+                'status' => 'up', 'speed' => '1000',
+                'macs' => [], 'clients' => [],
+                'lldp' => ['neighborName' => 'phone-1', 'neighborPort' => 'eth0', 'neighborMac' => 'aa:bb:cc:dd:ee:07'],
+            ],
+        ];
+
+        $result = $this->service->correlate($scanPorts, [], [], '10.0.0.1');
+
+        $this->assertSame('aa:bb:cc:dd:ee:07', $result['1/1/5']['live']['lldpNeighborMac']);
+    }
+
     public function testMovedDeviceFlaggedOnBothPorts(): void
     {
         $host  = new Host();
