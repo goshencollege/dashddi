@@ -1235,20 +1235,36 @@
             lldpRowIndex = 0;
         }
 
+        // With more than one sub-row, the port-level cells (Port/Live Status/Last
+        // Seen/Actions) live in their own minimal-height spacer row instead of
+        // sharing a row with the first device — otherwise hovering that first
+        // device's row would highlight those tall rowspan'd cells too, making it
+        // look like the whole port highlighted instead of just that one device.
+        const spacerRow = rowspan > 1 ? `
+        <tr class="switch-port-spacer-row">
+            ${checkboxCell(rowspan)}
+            <td class="font-monospace" rowspan="${rowspan}">${esc(port.port)}</td>
+            <td class="small" rowspan="${rowspan}">${renderLiveStatus(port.live)}</td>
+            <td colspan="5" class="p-0" style="line-height:0"></td>
+            <td class="text-muted small" rowspan="${rowspan}">${lastSeen}</td>
+            ${actionsCell(rowspan)}
+        </tr>` : '';
+
         const trs = rows.map((row, i) => {
             const lldpCell = i === lldpRowIndex ? renderLldp(port.live) : '<span class="text-muted">—</span>';
-            if (i === 0) {
+
+            if (rowspan === 1) {
                 return `<tr>
-                    ${checkboxCell(rowspan)}
-                    <td class="font-monospace" rowspan="${rowspan}">${esc(port.port)}</td>
-                    <td class="small" rowspan="${rowspan}">${renderLiveStatus(port.live)}</td>
+                    ${checkboxCell(1)}
+                    <td class="font-monospace">${esc(port.port)}</td>
+                    <td class="small">${renderLiveStatus(port.live)}</td>
                     <td class="small">${renderDeviceCell(row)}</td>
                     <td class="small">${renderDeviceMacCell(row)}</td>
                     <td class="small">${renderDevicePolicyCell(row)}</td>
                     <td class="small">${lldpCell}</td>
                     <td class="small">${renderDeviceDiscrepancies(port, row)}</td>
-                    <td class="text-muted small" rowspan="${rowspan}">${lastSeen}</td>
-                    ${actionsCell(rowspan)}
+                    <td class="text-muted small">${lastSeen}</td>
+                    ${actionsCell(1)}
                 </tr>`;
             }
             return `<tr>
@@ -1260,7 +1276,7 @@
             </tr>`;
         }).join('');
 
-        return trs + detailsRow;
+        return spacerRow + trs + detailsRow;
     }
 
     function renderPortsTable(ports) {
