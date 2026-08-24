@@ -2,8 +2,11 @@
 
 namespace App\Controller;
 
+use App\Entity\UserPreference;
 use App\Repository\ClearpassAuthLogRepository;
 use App\Repository\NetworkInterfaceRepository;
+use App\Repository\UserPreferenceRepository;
+use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -11,12 +14,52 @@ use Symfony\Component\Routing\Attribute\Route;
 
 class ClearpassAuthLogController extends AbstractController
 {
+    private const FILTER_KEYS = ['mac', 'username', 'role', 'vlan', 'protocol', 'service', 'nas_ip', 'nas_port_id'];
+
     #[Route('/clearpass/auth-logs', name: 'clearpass_auth_log_index', methods: ['GET'])]
     public function index(
         Request $request,
         ClearpassAuthLogRepository $logRepo,
         NetworkInterfaceRepository $ifaceRepo,
+        UserPreferenceRepository $prefRepo,
+        EntityManagerInterface $em,
     ): Response {
+        $user  = $this->getUser();
+        $pref  = $user ? $prefRepo->findByIdentifier($user->getUserIdentifier()) : null;
+        $reset = $request->query->getBoolean('reset');
+
+        if ($reset) {
+            if ($user && $pref && $pref->getClearpassAuthLogSearch() !== null) {
+                $pref->setClearpassAuthLogSearch(null);
+                $em->flush();
+            }
+            return $this->redirectToRoute('clearpass_auth_log_index');
+        }
+
+        $hasExplicitState = $request->query->has('page') || (bool) array_filter(self::FILTER_KEYS, fn($k) => $request->query->has($k));
+
+        if ($hasExplicitState) {
+            if ($user) {
+                $saved = [];
+                foreach (self::FILTER_KEYS as $k) {
+                    $v = trim((string) $request->query->get($k, ''));
+                    if ($v !== '') {
+                        $saved[$k] = $v;
+                    }
+                }
+                if (!$pref) {
+                    $pref = new UserPreference($user->getUserIdentifier());
+                    $em->persist($pref);
+                }
+                $pref->setClearpassAuthLogSearch($saved !== [] ? $saved : null);
+                $em->flush();
+            }
+        } elseif ($pref?->getClearpassAuthLogSearch()) {
+            // Redirect so the restored filters land in the URL — the auto-refresh
+            // AJAX call re-fetches using window.location.search, so it must be there.
+            return $this->redirectToRoute('clearpass_auth_log_index', $pref->getClearpassAuthLogSearch());
+        }
+
         return $this->render('clearpass_auth_log/index.html.twig',
             $this->buildViewData($request, $logRepo, $ifaceRepo));
     }

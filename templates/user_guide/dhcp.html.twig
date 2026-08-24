@@ -109,6 +109,7 @@
             <li>Whether the lease is currently active</li>
         </ul>
         <p class="mb-2">The host list and host detail pages show the <strong>current active lease</strong> for each interface's MAC address alongside any static IP — making it easy to see if a device is getting the expected address.</p>
+        <p class="mb-2 text-muted small">Your filters (MAC, IP, subnet, server) are remembered and restored the next time you open this page, per user.</p>
         <p class="mb-0 text-muted small">To enable lease tracking, configure Kea to post lease events to DashDDI using the <code>run_script</code> hook — see <a href="{{ path('user_guide_servers') }}#kea-lease-notifications">Kea lease notifications</a> in the Servers &amp; Integrations guide.</p>
     </div>
 </div>
@@ -117,6 +118,7 @@
     <div class="card-header fw-semibold"><i class="bi bi-shield-lock me-1"></i>ClearPass Authentication Logs</div>
     <div class="card-body">
         <p>If ClearPass is configured, authentication events are available at <strong>DHCP → ClearPass Auth Logs</strong>. Each entry shows the MAC address, username, IP address, and authentication outcome for network access requests.</p>
+        <p class="mb-2 text-muted small">Your filters are remembered and restored the next time you open this page, per user.</p>
         <p class="mb-0 text-muted small">See the <a href="{{ path('user_guide_servers') }}#clearpass">Servers &amp; Integrations guide → ClearPass</a> for setup details.</p>
     </div>
 </div>

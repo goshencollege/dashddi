@@ -38,6 +38,15 @@ class UserPreference
     #[ORM\Column(type: 'json', nullable: true)]
     private ?array $hostSearchHistory = null;
 
+    #[ORM\Column(type: 'json', nullable: true)]
+    private ?array $dhcpLeaseSearch = null;
+
+    #[ORM\Column(type: 'json', nullable: true)]
+    private ?array $clearpassAuthLogSearch = null;
+
+    #[ORM\Column(type: 'json', nullable: true)]
+    private ?array $domainRecordSearch = null;
+
     public function __construct(string $userIdentifier)
     {
         $this->userIdentifier = $userIdentifier;
@@ -67,4 +76,13 @@ class UserPreference
 
     public function getHostSearchHistory(): ?array { return $this->hostSearchHistory; }
     public function setHostSearchHistory(?array $history): static { $this->hostSearchHistory = $history; return $this; }
+
+    public function getDhcpLeaseSearch(): ?array { return $this->dhcpLeaseSearch; }
+    public function setDhcpLeaseSearch(?array $search): static { $this->dhcpLeaseSearch = $search; return $this; }
+
+    public function getClearpassAuthLogSearch(): ?array { return $this->clearpassAuthLogSearch; }
+    public function setClearpassAuthLogSearch(?array $search): static { $this->clearpassAuthLogSearch = $search; return $this; }
+
+    public function getDomainRecordSearch(): ?array { return $this->domainRecordSearch; }
+    public function setDomainRecordSearch(?array $search): static { $this->domainRecordSearch = $search; return $this; }
 }
