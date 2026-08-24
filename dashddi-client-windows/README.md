@@ -240,15 +240,25 @@ before, so an existing installation keeps renewing without any action.
 
 To move an existing install to the new naming:
 
-1. Re-run the installer with the new script, pointing at your existing install path
+1. Re-run the installer with `-SkipCertRequest`, pointing at your existing install path
    (or move `C:\win-acme` to `C:\dashddi` first and use the default):
    ```powershell
-   .\Install-Dashddi.ps1 -Url https://dashddi.example.com -Token your-existing-token -InstallPath C:\win-acme
+   .\Install-Dashddi.ps1 -Url https://dashddi.example.com -Token your-existing-token `
+       -Email you@example.com -InstallPath C:\win-acme -SkipCertRequest
    ```
-   This overwrites the hook scripts in place with the renamed versions and re-registers
-   the Scheduled Task under the new name (`Dashddi renewal (SYSTEM)`), removing the old
-   `win-acme renewal (SYSTEM)` task.
-2. Or, to move to the new default path entirely: copy `dashddi.ini` and the certificate
-   store entries are unaffected (they live in the Windows Certificate Store, not the
-   install directory) — just re-run the installer with a fresh `C:\dashddi` and your
-   existing token.
+   `-SkipCertRequest` deploys the renamed scripts and re-registers the Scheduled Task
+   under the new name (`Dashddi renewal (SYSTEM)`, removing the old `win-acme renewal
+   (SYSTEM)` task) without also exercising win-acme's certificate request/renewal path
+   during the upgrade itself — the existing certificate keeps renewing on its normal
+   schedule, now via the renamed script. `dashddi.ini` is reused as-is (the token isn't
+   regenerated); `-Email` is still required since the installer prompts for it
+   unconditionally, but it's only written if `dashddi.ini` doesn't already exist.
+2. Or, to move to the new default path entirely: the certificate store entries are
+   unaffected by the install path (they live in the Windows Certificate Store, not the
+   install directory) — just re-run the installer the same way with a fresh
+   `-InstallPath C:\dashddi` and your existing token.
+3. Optional cleanup: the old-named scripts (`Create-AcmeChallenge.ps1`,
+   `Delete-AcmeChallenge.ps1`, `Get-Hosts.ps1`, `Renew-DashddiWinAcme.ps1`,
+   `Install-DashddiWinAcme.ps1`) are left behind in the install directory as unused
+   clutter — safe to delete once the new Scheduled Task has run successfully at least
+   once.

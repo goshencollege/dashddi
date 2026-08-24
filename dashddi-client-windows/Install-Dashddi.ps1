@@ -228,30 +228,34 @@ Check that:
     }
 
     & (Join-Path $InstallPath 'Publish-DashddiRecords.ps1') -Fqdns $fqdns
-
-    # ── 8. Replace win-acme's renewal task with our FQDN-aware wrapper ────────
-    # win-acme registers a task that calls 'wacs.exe --renew' with the static
-    # host list from the initial install. Replace it with Update-DashddiCertificate.ps1
-    # which re-queries DashDDI on every run so the SAN list stays current.
-
-    $taskName   = 'Dashddi renewal (SYSTEM)'
-    $renewScript = Join-Path $InstallPath 'Update-DashddiCertificate.ps1'
-    $taskAction  = New-ScheduledTaskAction `
-        -Execute 'powershell.exe' `
-        -Argument "-NonInteractive -ExecutionPolicy Bypass -File `"$renewScript`""
-    $taskTrigger  = New-ScheduledTaskTrigger -Daily -At '09:00AM'
-    $taskSettings = New-ScheduledTaskSettingsSet `
-        -ExecutionTimeLimit (New-TimeSpan -Hours 2) `
-        -MultipleInstances IgnoreNew
-    $taskPrincipal = New-ScheduledTaskPrincipal `
-        -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
-
-    Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
-    Register-ScheduledTask -TaskName $taskName `
-        -Action $taskAction -Trigger $taskTrigger `
-        -Settings $taskSettings -Principal $taskPrincipal -Force | Out-Null
-    Write-Host "Scheduled Task '$taskName' configured for DashDDI FQDN-aware renewal."
 }
+
+# ── 8. Replace win-acme's renewal task with our FQDN-aware wrapper ────────────
+# win-acme registers a task that calls 'wacs.exe --renew' with the static
+# host list from the initial install. Replace it with Update-DashddiCertificate.ps1
+# which re-queries DashDDI on every run so the SAN list stays current.
+#
+# This runs even with -SkipCertRequest ("deploy everything but skip the initial
+# certificate request") so re-running the installer to pick up renamed scripts
+# on an existing install re-registers the task without forcing a cert request.
+
+$taskName   = 'Dashddi renewal (SYSTEM)'
+$renewScript = Join-Path $InstallPath 'Update-DashddiCertificate.ps1'
+$taskAction  = New-ScheduledTaskAction `
+    -Execute 'powershell.exe' `
+    -Argument "-NonInteractive -ExecutionPolicy Bypass -File `"$renewScript`""
+$taskTrigger  = New-ScheduledTaskTrigger -Daily -At '09:00AM'
+$taskSettings = New-ScheduledTaskSettingsSet `
+    -ExecutionTimeLimit (New-TimeSpan -Hours 2) `
+    -MultipleInstances IgnoreNew
+$taskPrincipal = New-ScheduledTaskPrincipal `
+    -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
+
+Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
+Register-ScheduledTask -TaskName $taskName `
+    -Action $taskAction -Trigger $taskTrigger `
+    -Settings $taskSettings -Principal $taskPrincipal -Force | Out-Null
+Write-Host "Scheduled Task '$taskName' configured for DashDDI FQDN-aware renewal."
 
 Write-Host ''
 Write-Host 'Installation complete.'
