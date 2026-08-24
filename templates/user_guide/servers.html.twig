@@ -517,6 +517,7 @@ curl -s -X POST https://dashddi.example.com/api/dhcp/lease \
                     <tr><td><code>GET</code></td><td><code>/api/self/host</code></td><td>Return the host's name, its interfaces (id, MAC, IPv4, IPv6), and all DNS records attached to each interface. Records are included if their domain has a <a href="{{ path('user_guide_dns') }}#views">public view</a>, has no view restriction (treated as globally accessible), or is a subdomain of a public parent domain managed in DashDDI.</td></tr>
                     <tr><td><code>POST</code></td><td><code>/api/self/dns-challenge</code></td><td>Create a <code>_acme-challenge.*</code> TXT record for ACME DNS-01 validation.</td></tr>
                     <tr><td><code>DELETE</code></td><td><code>/api/self/dns-challenge</code></td><td>Delete the matching <code>_acme-challenge.*</code> TXT record after validation is complete.</td></tr>
+                    <tr><td><code>PUT</code></td><td><code>/api/self/records</code></td><td>Create or update a CAA or HTTPS record at one of the host's FQDNs (idempotent upsert).</td></tr>
                 </tbody>
             </table>
         </div>
@@ -526,20 +527,28 @@ curl -s -X POST https://dashddi.example.com/api/dhcp/lease \
   "fqdn": "web01.example.com",
   "validation": "&lt;acme-token-value&gt;"
 }</code></pre>
-        <p class="text-muted small"><code>fqdn</code> must match one of the DNS records already assigned to the host's interfaces. For an apex record (<code>@</code>), pass the bare domain name (e.g. <code>example.com</code>). The challenge record is created as <code>_acme-challenge.web01.example.com</code> (or <code>_acme-challenge.example.com</code> for the apex) and linked to the same interface as the source record. The <strong>DELETE</strong> request uses the same body to identify and remove the record.</p>
+        <p class="text-muted small"><code>fqdn</code> must match one of the DNS records already assigned to the host's interfaces, either exactly or via a wildcard record covering it (e.g. a <code>*.example.com</code> record covers <code>foo.example.com</code>). For an apex record (<code>@</code>), pass the bare domain name (e.g. <code>example.com</code>). The challenge record is created as <code>_acme-challenge.web01.example.com</code> (or <code>_acme-challenge.example.com</code> for the apex) and linked to the same interface as the matched record. The <strong>DELETE</strong> request uses the same body to identify and remove the record.</p>
         <p class="text-muted small">If the record's domain is internal-only (no public view), DashDDI automatically looks for a public ancestor zone managed in DashDDI. When one is found — for example, <code>example.com</code> is public and <code>internal.example.com</code> is private — the challenge TXT is published in the public parent zone as a multipart label: <code>_acme-challenge.host.internal</code> in <code>example.com</code>. Let's Encrypt resolves the full name <code>_acme-challenge.host.internal.example.com</code> from the public zone, so the validation succeeds even though the host's A record lives in a private zone. No plugin-side configuration is needed.</p>
 
-        <h6 id="api-certbot-plugin" class="mt-3">Certbot plugin (<code>certbot-dns-dashddi</code>)</h6>
-        <p>The recommended approach for certificate automation is the <strong>certbot-dns-dashddi</strong> plugin, which handles challenge creation and cleanup automatically and supports a <code>dashddi-certbot</code> wrapper that discovers the host's FQDNs from DashDDI so you don't have to list them manually.</p>
+        <p><strong><code>PUT /api/self/records</code></strong> request body:</p>
+        <pre class="bg-body-secondary rounded p-3 small mb-2"><code>{
+  "fqdn": "web01.example.com",
+  "type": "CAA",
+  "value": "0 issue \"letsencrypt.org\""
+}</code></pre>
+        <p class="text-muted small"><code>type</code> must be <code>CAA</code> or <code>HTTPS</code> — this endpoint cannot create or modify any other record type. <code>fqdn</code> is resolved the same way as for the DNS challenge endpoints (exact match, or wildcard coverage). The record is created (or updated in place if one already exists at that hostname+domain+type) in the FQDN's own domain, inheriting the same DNS views as the matched source record. Both the <code>dashddi</code> CLI (Linux) and the Windows client call this automatically after a successful certificate issuance when configured to do so — see below.</p>
+
+        <h6 id="api-dashddi-client-linux" class="mt-3">Linux client (<code>dashddi-client</code>)</h6>
+        <p>The recommended approach for certificate automation on Linux is the <strong>dashddi-client</strong> package, which provides a Certbot DNS-01 plugin plus a <code>dashddi</code> CLI that discovers the host's FQDNs from DashDDI so you don't have to list them manually, and can publish CAA/HTTPS records after issuance.</p>
 
         <p class="fw-semibold mb-1">Installation</p>
         <p class="text-muted small mb-1">Certbot and the plugin must share the same Python environment. On Debian/Ubuntu:</p>
         <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-3"><code>apt install -y python3-venv
 python3 -m venv /opt/certbot
 /opt/certbot/bin/pip install certbot
-/opt/certbot/bin/pip install git+https://github.com/goshencollege/dashddi/#subdirectory=certbot-dns-dashddi
+/opt/certbot/bin/pip install git+https://github.com/goshencollege/dashddi/#subdirectory=dashddi-client
 ln -s /opt/certbot/bin/certbot /usr/local/bin/certbot
-ln -s /opt/certbot/bin/dashddi-certbot /usr/local/bin/dashddi-certbot</code></pre>
+ln -s /opt/certbot/bin/dashddi /usr/local/bin/dashddi</code></pre>
 
         <p class="fw-semibold mb-1">Credentials file</p>
         <p class="text-muted small mb-1">Create <code>/etc/letsencrypt/dashddi.ini</code> (chmod 600):</p>
@@ -552,8 +561,8 @@ dns_dashddi_token = &lt;host-scoped-token&gt;
         <p class="text-muted small">Generate the token from the host detail page in DashDDI: <strong>Hosts → &lt;hostname&gt; → Host API Token → Generate Token</strong>. The token is accepted only from this host's IP addresses.</p>
 
         <p class="fw-semibold mb-1">Automatic FQDN discovery</p>
-        <p class="text-muted small mb-1">The <code>dashddi-certbot</code> wrapper queries <code>/api/self/host</code> to find all A/AAAA FQDNs for this host and requests a single SAN certificate covering them all:</p>
-        <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-3"><code>dashddi-certbot --credentials /etc/letsencrypt/dashddi.ini</code></pre>
+        <p class="text-muted small mb-1">The <code>dashddi cert</code> subcommand queries <code>/api/self/host</code> to find all A/AAAA FQDNs for this host and requests a single SAN certificate covering them all:</p>
+        <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-3"><code>dashddi cert --credentials /etc/letsencrypt/dashddi.ini</code></pre>
 
         <p class="fw-semibold mb-1">Manual domain list</p>
         <p class="text-muted small mb-1">To specify domains explicitly, use certbot directly:</p>
@@ -563,15 +572,15 @@ dns_dashddi_token = &lt;host-scoped-token&gt;
   -d web01.example.com -d app.example.com</code></pre>
 
         <p class="fw-semibold mb-1">Automatic renewal (systemd timer)</p>
-        <p class="text-muted small mb-1">Create <code>/etc/systemd/system/dashddi-certbot.service</code> and <code>dashddi-certbot.timer</code>:</p>
+        <p class="text-muted small mb-1">Create <code>/etc/systemd/system/dashddi.service</code> and <code>dashddi.timer</code>:</p>
         <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-3"><code>[Unit]
 Description=Renew certificates via DashDDI
 
 [Service]
 Type=oneshot
-ExecStart=/usr/local/bin/dashddi-certbot --credentials /etc/letsencrypt/dashddi.ini</code></pre>
+ExecStart=/usr/local/bin/dashddi cert --credentials /etc/letsencrypt/dashddi.ini</code></pre>
         <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-3"><code>[Unit]
-Description=Run dashddi-certbot twice daily
+Description=Run dashddi cert twice daily
 
 [Timer]
 OnCalendar=*-*-* 03,15:00:00
@@ -581,10 +590,24 @@ Persistent=true
 [Install]
 WantedBy=timers.target</code></pre>
         <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-3"><code>systemctl daemon-reload
-systemctl enable --now dashddi-certbot.timer</code></pre>
+systemctl enable --now dashddi.timer</code></pre>
 
-        <h6 id="api-ansible" class="mt-4">Ansible role (<code>dashddi_certbot</code>)</h6>
-        <p>An Ansible role is included in the repository at <code>certbot-dns-dashddi/ansible/roles/dashddi_certbot/</code>. It automates the entire setup: generates a host-scoped token via the DashDDI API, installs certbot and the plugin into a virtualenv, writes the credentials file, and deploys a systemd renewal timer.</p>
+        <h6 id="api-name-selection" class="mt-4">Selecting specific names, or names covered by a wildcard</h6>
+        <p>By default both the Linux and Windows clients certify every publicly-reachable FQDN the host owns. To certify an explicit list instead — a subset of those names, or concrete names not present as their own record but covered by a wildcard record (e.g. the host owns <code>*.example.com</code> and you also want <code>foo.example.com</code> and <code>bar.example.com</code> as explicit SAN entries) — set <code>dns_dashddi_names</code> in the credentials file:</p>
+        <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-2"><code>dns_dashddi_names = foo.example.com,bar.example.com</code></pre>
+        <p class="text-muted small">On Linux this can also be passed per-run as <code>dashddi cert --names foo.example.com,bar.example.com</code>, which takes precedence over the credentials file. When set, auto-discovery is skipped entirely and exactly this list is requested; DashDDI still enforces ownership per name at DNS-01 validation time (see the wildcard-matching note under <code>/api/self/dns-challenge</code> above) — a name matched only by a wildcard record is accepted, an unrelated name is rejected with a <code>403</code>.</p>
+
+        <h6 id="api-caa-https" class="mt-4">Publishing CAA/HTTPS records after issuance</h6>
+        <p><strong>CAA</strong> — set <code>dns_dashddi_caa = true</code> in the credentials file, or pass <code>--caa</code> to <code>dashddi cert</code> (Linux) / <code>-Caa</code> to the installer (Windows), to have every successful (re)issuance create or update a CAA record authorizing the issuing CA at each certified FQDN. There's no CA to specify — on Linux it's auto-detected from the ACME server certbot was told to use (Let's Encrypt by default, or derived from <code>--server &lt;url&gt;</code> if passed); the Windows client always authorizes Let's Encrypt, the only ACME server it supports.</p>
+        <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-2"><code>dns_dashddi_caa = true</code></pre>
+        <p class="text-muted small"><strong>HTTPS</strong> — content can't be inferred from the issuance the way the CA is, but <code>dns_dashddi_https = true</code> (or <code>--https</code> / <code>-Https</code>) turns it on using a generally-safe default (<code>1 . alpn=h2</code>, advertising HTTP/2 only — <code>h3</code>/HTTP/3 is deliberately omitted since it needs explicit QUIC support most servers don't have out of the box; add it below if yours does):</p>
+        <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-2"><code>dns_dashddi_https = true</code></pre>
+        <p class="text-muted small">Or provide an explicit value instead (implies enabling it) via <code>dns_dashddi_https_value</code> / <code>--https-value</code> / <code>-HttpsValue</code>:</p>
+        <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-2"><code>dns_dashddi_https_value = 1 . alpn=h2,h3</code></pre>
+        <p class="text-muted small">Either one calls <code>PUT /api/self/records</code> once per FQDN. Each call is an idempotent upsert matched by hostname+domain+type, so re-running it on every renewal is safe. A failure publishing one of these records is logged as a warning and does not fail the overall run — certificate issuance succeeding is the primary outcome. <strong>Limitation:</strong> at most one CAA record and one HTTPS record per FQDN is managed this way. If you need more than one CAA policy line at a name (e.g. both <code>issue</code> and <code>issuewild</code>), manage the extra ones directly in the DNS UI — mixing a manually-created record with a client-managed one at the same name+type is not supported.</p>
+
+        <h6 id="api-ansible" class="mt-4">Ansible role (<code>dashddi_client</code>)</h6>
+        <p>An Ansible role is included in the repository at <code>dashddi-client/ansible/roles/dashddi_client/</code>. It automates the entire setup: generates a host-scoped token via the DashDDI API, installs certbot and the plugin into a virtualenv, writes the credentials file, and deploys a systemd renewal timer.</p>
 
         <p class="fw-semibold mb-1">Required variables</p>
         <div class="table-responsive mb-3">
@@ -607,54 +630,61 @@ systemctl enable --now dashddi-certbot.timer</code></pre>
                 <tr><td><code>dashddi_venv_path</code></td><td><code>/opt/certbot</code></td><td>Virtualenv for certbot and the plugin</td></tr>
                 <tr><td><code>dashddi_propagation_seconds</code></td><td><code>30</code></td><td>DNS propagation wait passed to certbot</td></tr>
                 <tr><td><code>dashddi_force_token_regenerate</code></td><td><code>false</code></td><td>Set to <code>true</code> to revoke and replace the existing token</td></tr>
+                <tr><td><code>dashddi_names</code></td><td><code>""</code></td><td>Optional comma-separated explicit FQDN list — see "Selecting specific names" above</td></tr>
+                <tr><td><code>dashddi_caa</code></td><td><code>false</code></td><td>Set to <code>true</code> to publish a CAA record (CA auto-detected) at each issued FQDN</td></tr>
+                <tr><td><code>dashddi_https</code></td><td><code>false</code></td><td>Set to <code>true</code> to publish an HTTPS record (default value) at each issued FQDN</td></tr>
+                <tr><td><code>dashddi_https_value</code></td><td><code>""</code></td><td>Optional explicit HTTPS record value, e.g. <code>1 . alpn=h2,h3</code> (implies <code>dashddi_https</code>)</td></tr>
             </tbody>
         </table>
         </div>
 
         <p class="fw-semibold mb-1">Usage</p>
         <p class="text-muted small mb-1">Run the included example playbook against your managed hosts. Set credentials in <code>group_vars</code> or pass via vault:</p>
-        <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-2"><code>ansible-playbook -i inventory certbot-dns-dashddi/ansible/certbot.yml \
+        <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-2"><code>ansible-playbook -i inventory dashddi-client/ansible/dashddi.yml \
   -e dashddi_url=https://dashddi.example.com \
   -e @vault.yml</code></pre>
         <p class="text-muted small mb-1">To force token regeneration on a specific host:</p>
-        <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-3"><code>ansible-playbook -i inventory certbot-dns-dashddi/ansible/certbot.yml \
+        <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-3"><code>ansible-playbook -i inventory dashddi-client/ansible/dashddi.yml \
   -e dashddi_force_token_regenerate=true \
   --limit web01.example.com</code></pre>
         <p class="text-muted small">The role is idempotent: if the credentials file already exists and <code>dashddi_force_token_regenerate</code> is false, token generation is skipped. Installation and systemd unit deployment always run.</p>
 
-        <h6 id="api-windows" class="mt-4">Windows</h6>
-        <p>On Windows, use <strong>win-acme-dashddi</strong> — a PowerShell installer at <code>win-acme-dashddi/Install-DashddiWinAcme.ps1</code>. It downloads <a href="https://www.win-acme.com/" target="_blank" rel="noopener">win-acme</a>, deploys the DashDDI challenge hook scripts, writes a credentials file, queries DashDDI for this host's FQDNs, and requests an initial certificate. win-acme stores the certificate in the <strong>Windows Certificate Store</strong> (<code>LocalMachine\My</code>), making it natively available to IIS and other Windows services, and registers its own daily Scheduled Task for automatic renewal.</p>
+        <h6 id="api-windows" class="mt-4">Windows (<code>dashddi-client-windows</code>)</h6>
+        <p>On Windows, use <strong>dashddi-client-windows</strong> — a PowerShell installer at <code>dashddi-client-windows/Install-Dashddi.ps1</code>. It downloads <a href="https://www.win-acme.com/" target="_blank" rel="noopener">win-acme</a>, deploys the DashDDI challenge hook scripts, writes a credentials file, queries DashDDI for this host's FQDNs, and requests an initial certificate. win-acme stores the certificate in the <strong>Windows Certificate Store</strong> (<code>LocalMachine\My</code>), making it natively available to IIS and other Windows services, and a daily Scheduled Task handles automatic renewal (including re-publishing CAA/HTTPS records if configured).</p>
 
         <p class="fw-semibold mb-1">Prerequisites</p>
         <p class="text-muted small mb-1">Windows Server 2016 / Windows 10 or later with PowerShell 5.1+ (built in to all supported versions). No Python required.</p>
 
         <p class="fw-semibold mb-1">Run the installer</p>
         <p class="text-muted small mb-1">From an elevated PowerShell prompt:</p>
-        <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-3"><code>Invoke-WebRequest -Uri https://raw.githubusercontent.com/goshencollege/dashddi/main/win-acme-dashddi/Install-DashddiWinAcme.ps1 -OutFile Install-DashddiWinAcme.ps1
-.\Install-DashddiWinAcme.ps1</code></pre>
-        <p class="text-muted small mb-1">Credentials can be passed directly for unattended use:</p>
-        <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-3"><code>.\Install-DashddiWinAcme.ps1 -Url https://dashddi.example.com -Token &lt;host-scoped-token&gt; -Email admin@example.com</code></pre>
+        <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-3"><code>Invoke-WebRequest -Uri https://raw.githubusercontent.com/goshencollege/dashddi/main/dashddi-client-windows/Install-Dashddi.ps1 -OutFile Install-Dashddi.ps1
+.\Install-Dashddi.ps1</code></pre>
+        <p class="text-muted small mb-1">Credentials, an explicit name list, and CAA/HTTPS options can be passed directly for unattended use:</p>
+        <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-3"><code>.\Install-Dashddi.ps1 -Url https://dashddi.example.com -Token &lt;host-scoped-token&gt; -Email admin@example.com `
+  -Names foo.example.com,bar.example.com `
+  -Caa -HttpsValue '1 . alpn=h2,h3'</code></pre>
 
         <p class="fw-semibold mb-1">What gets installed</p>
         <div class="table-responsive mb-3">
         <table class="table table-sm table-bordered small mb-0">
             <thead><tr><th>Path / Item</th><th>Purpose</th></tr></thead>
             <tbody>
-                <tr><td><code>C:\win-acme\wacs.exe</code></td><td>win-acme ACME client</td></tr>
-                <tr><td><code>C:\win-acme\settings.json</code></td><td>Configures win-acme to use public DNS (8.8.8.8, 1.1.1.1) for pre-validation</td></tr>
-                <tr><td><code>C:\win-acme\Renew-DashddiWinAcme.ps1</code></td><td>Daily renewal wrapper: re-queries DashDDI then calls wacs.exe</td></tr>
-                <tr><td><code>C:\win-acme\Get-Hosts.ps1</code></td><td>Called by the renewal wrapper to discover current FQDNs from DashDDI</td></tr>
-                <tr><td><code>C:\win-acme\Create-AcmeChallenge.ps1</code></td><td>Hook script that creates TXT records via DashDDI</td></tr>
-                <tr><td><code>C:\win-acme\Delete-AcmeChallenge.ps1</code></td><td>Hook script that removes TXT records after validation</td></tr>
-                <tr><td><code>C:\win-acme\dashddi.ini</code></td><td>Credentials file (ACL restricted to SYSTEM + Administrators)</td></tr>
+                <tr><td><code>C:\dashddi\wacs.exe</code></td><td>win-acme ACME client</td></tr>
+                <tr><td><code>C:\dashddi\settings.json</code></td><td>Configures win-acme to use public DNS (8.8.8.8, 1.1.1.1) for pre-validation</td></tr>
+                <tr><td><code>C:\dashddi\Update-DashddiCertificate.ps1</code></td><td>Daily renewal wrapper: re-queries DashDDI, calls wacs.exe, then publishes CAA/HTTPS records</td></tr>
+                <tr><td><code>C:\dashddi\Get-DashddiHosts.ps1</code></td><td>Called by the renewal wrapper to discover current FQDNs from DashDDI</td></tr>
+                <tr><td><code>C:\dashddi\New-DashddiChallenge.ps1</code></td><td>Hook script that creates TXT records via DashDDI</td></tr>
+                <tr><td><code>C:\dashddi\Remove-DashddiChallenge.ps1</code></td><td>Hook script that removes TXT records after validation</td></tr>
+                <tr><td><code>C:\dashddi\Publish-DashddiRecords.ps1</code></td><td>Creates/updates CAA/HTTPS records at each issued FQDN, if configured</td></tr>
+                <tr><td><code>C:\dashddi\dashddi.ini</code></td><td>Credentials file (ACL restricted to SYSTEM + Administrators)</td></tr>
                 <tr><td>Windows Certificate Store &rarr; <code>LocalMachine\My</code></td><td>Issued certificate</td></tr>
-                <tr><td>Task Scheduler &rarr; <code>win-acme renewal (SYSTEM)</code></td><td>Daily task running <code>Renew-DashddiWinAcme.ps1</code> as SYSTEM</td></tr>
+                <tr><td>Task Scheduler &rarr; <code>Dashddi renewal (SYSTEM)</code></td><td>Daily task running <code>Update-DashddiCertificate.ps1</code> as SYSTEM</td></tr>
             </tbody>
         </table>
         </div>
         <p class="text-muted small mb-1">To trigger a manual renewal:</p>
-        <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-3"><code>& "C:\win-acme\Renew-DashddiWinAcme.ps1"</code></pre>
-        <p class="text-muted small mb-1">The SAN list updates automatically — <code>Get-Hosts.ps1</code> re-queries DashDDI on every renewal, so adding or removing a DNS record in DashDDI is reflected on the next daily run with no reinstallation required.</p>
+        <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-3"><code>& "C:\dashddi\wacs.exe" --renew --force</code></pre>
+        <p class="text-muted small mb-1">The SAN list updates automatically — <code>Get-DashddiHosts.ps1</code> re-queries DashDDI on every renewal (or returns the explicit <code>dns_dashddi_names</code> list if set), so adding or removing a DNS record in DashDDI is reflected on the next daily run with no reinstallation required.</p>
 
         <h6 id="api-acme" class="mt-4">Manual hook approach (curl)</h6>
         <p class="text-muted small">If installing Python packages is not practical, you can drive the same endpoints manually using Certbot's <code>--manual</code> authenticator:</p>
@@ -748,16 +778,16 @@ systemctl restart pveproxy pvedaemon</code></pre>
         </ul>
 
         <h6 class="mt-3">Ansible setup (recommended)</h6>
-        <p>The <code>certbot-dns-dashddi</code> Ansible role (included at <code>certbot-dns-dashddi/ansible/</code>) automates the entire setup. Run it against the DashDDI host with <code>dashddi_deploy_hook</code> pointing at the deploy script bundled in the repo:</p>
-        <pre class="bg-body-secondary p-2 rounded small mb-2">ansible-playbook -i inventory certbot-dns-dashddi/ansible/certbot.yml \
+        <p>The <code>dashddi_client</code> Ansible role (included at <code>dashddi-client/ansible/</code>) automates the entire setup. Run it against the DashDDI host with <code>dashddi_deploy_hook</code> pointing at the deploy script bundled in the repo:</p>
+        <pre class="bg-body-secondary p-2 rounded small mb-2">ansible-playbook -i inventory dashddi-client/ansible/dashddi.yml \
   -e dashddi_url=https://dashddi.example.com \
   -e dashddi_admin_token=&lt;token&gt; \
   -e dashddi_deploy_hook=/opt/dashddi/docker/certbot-deploy.sh</pre>
-        <p class="mb-0">The role generates a host-scoped token, installs certbot and the <code>certbot-dns-dashddi</code> plugin, and configures a systemd timer that renews the certificate twice daily. After each renewal the deploy hook copies the new cert into Docker's <code>ssl_certs</code> volume and restarts nginx automatically.</p>
+        <p class="mb-0">The role generates a host-scoped token, installs certbot and the <code>dashddi-client</code> plugin, and configures a systemd timer that renews the certificate twice daily. After each renewal the deploy hook copies the new cert into Docker's <code>ssl_certs</code> volume and restarts nginx automatically.</p>
 
         <h6 class="mt-3">Manual setup</h6>
-        <p>Without Ansible, install certbot and the plugin manually (see <code>certbot-dns-dashddi/README.md</code>), generate a host-scoped token from the DashDDI host's page, then request the certificate once:</p>
-        <pre class="bg-body-secondary p-2 rounded small mb-2">dashddi-certbot --credentials /etc/letsencrypt/dashddi.ini \
+        <p>Without Ansible, install certbot and the plugin manually (see <code>dashddi-client/README.md</code>), generate a host-scoped token from the DashDDI host's page, then request the certificate once:</p>
+        <pre class="bg-body-secondary p-2 rounded small mb-2">dashddi cert --credentials /etc/letsencrypt/dashddi.ini \
   -- --deploy-hook /opt/dashddi/docker/certbot-deploy.sh</pre>
         <p>For automatic renewal, copy the deploy hook into certbot's drop-in directory so it runs on every renewal without any extra arguments:</p>
         <pre class="bg-body-secondary p-2 rounded small mb-0">cp /opt/dashddi/docker/certbot-deploy.sh /etc/letsencrypt/renewal-hooks/deploy/</pre>
@@ -862,7 +892,9 @@ systemctl restart pveproxy pvedaemon</code></pre>
             <a href="#api" class="list-group-item list-group-item-action py-1">REST API</a>
             <a href="#api-host-token-management" class="list-group-item list-group-item-action py-1 ps-4">↳ Host token management</a>
             <a href="#api-self" class="list-group-item list-group-item-action py-1 ps-4">↳ Host self-service (/api/self)</a>
-            <a href="#api-certbot-plugin" class="list-group-item list-group-item-action py-1 ps-4">↳ Certbot plugin</a>
+            <a href="#api-dashddi-client-linux" class="list-group-item list-group-item-action py-1 ps-4">↳ Linux client (dashddi-client)</a>
+            <a href="#api-name-selection" class="list-group-item list-group-item-action py-1 ps-4">↳ Selecting specific names</a>
+            <a href="#api-caa-https" class="list-group-item list-group-item-action py-1 ps-4">↳ CAA/HTTPS auto-publish</a>
             <a href="#api-ansible" class="list-group-item list-group-item-action py-1 ps-4">↳ Ansible role</a>
             <a href="#api-windows" class="list-group-item list-group-item-action py-1 ps-4">↳ Windows</a>
             <a href="#api-acme" class="list-group-item list-group-item-action py-1 ps-4">↳ Manual hook (curl)</a>

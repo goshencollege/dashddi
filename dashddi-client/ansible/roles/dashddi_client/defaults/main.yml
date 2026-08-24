@@ -1,0 +1,54 @@
+---
+# Required — no defaults
+# dashddi_url: "https://dashddi.example.com"
+# dashddi_admin_token: "your-general-purpose-admin-token"
+
+# Host name to look up in DashDDI. Defaults to the Ansible inventory hostname.
+dashddi_host_name: "{{ inventory_hostname }}"
+
+# Path where the credentials file will be written on the target host.
+dashddi_credentials_path: "/etc/letsencrypt/dashddi.ini"
+
+# Certbot virtualenv location.
+dashddi_venv_path: "/opt/certbot"
+
+# Plugin source — pin to a tag or commit for reproducible deploys.
+dashddi_plugin_source: "git+https://github.com/goshencollege/dashddi/#subdirectory=dashddi-client"
+
+# DNS propagation wait time passed to certbot.
+dashddi_propagation_seconds: 30
+
+# Set to true to force token regeneration even when a credentials file
+# already exists. The existing token is immediately revoked.
+dashddi_force_token_regenerate: false
+
+# Optional deploy hook command passed to certbot after successful renewal.
+# Set this to any executable path (or inline command) to run post-renewal.
+# For the DashDDI server itself, point it at docker/certbot-deploy.sh in
+# the project directory, e.g. "/opt/dashddi/docker/certbot-deploy.sh".
+# Leave empty to skip (the default for non-DashDDI hosts).
+dashddi_deploy_hook: ""
+
+# Optional comma-separated list of explicit FQDNs to certify, replacing
+# auto-discovery. Use this for a subset of the host's names, or to add
+# concrete names covered by a wildcard record. Leave empty for the default
+# behaviour (certify every publicly-reachable A/AAAA/CNAME FQDN).
+dashddi_names: ""
+
+# Set to true to publish a CAA record at each issued FQDN after every successful
+# (re)issuance, authorizing the CA that issued the certificate. The CA is
+# auto-detected from the ACME server certbot was told to use (Let's Encrypt by
+# default) — there is nothing else to configure.
+dashddi_caa: false
+
+# Set to true to publish an HTTPS (RFC 9460) record at each issued FQDN using a
+# default value ("1 . alpn=h2"). h3 is deliberately omitted from the default
+# since it requires explicit QUIC support most servers don't have out of the
+# box; add it via dashddi_https_value if yours does. Set dashddi_https_value
+# instead for an explicit value (implies dashddi_https).
+dashddi_https: false
+
+# Optional explicit HTTPS record value, e.g. '1 . alpn=h2,h3' if this host
+# actually supports HTTP/3. Leave empty to use the default value when
+# dashddi_https is true.
+dashddi_https_value: ""

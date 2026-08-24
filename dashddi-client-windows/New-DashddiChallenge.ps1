@@ -1,8 +1,8 @@
 # Called by win-acme's DNS script validation plugin to create the ACME
 # challenge TXT record via the DashDDI host self-service API.
 #
-# win-acme invocation (configured by Install-DashddiWinAcme.ps1):
-#   powershell.exe -ExecutionPolicy ByPass -File Create-AcmeChallenge.ps1 {Identifier} {Token}
+# win-acme invocation (configured by Install-Dashddi.ps1):
+#   powershell.exe -ExecutionPolicy ByPass -File New-DashddiChallenge.ps1 {Identifier} {Token}
 #
 # {Identifier} = FQDN being validated (e.g. srv.example.com)
 # {Token}      = TXT record value assigned by the CA

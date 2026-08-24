@@ -4,14 +4,14 @@
     Install win-acme with DashDDI DNS validation on Windows.
 
 .DESCRIPTION
-    Downloads win-acme, installs it to C:\win-acme (configurable), writes a
+    Downloads win-acme, installs it to C:\dashddi (configurable), writes a
     DashDDI credentials file, deploys the challenge hook scripts, and requests
     an initial certificate.
 
-    A renewal wrapper (Renew-DashddiWinAcme.ps1) is registered as the daily
+    A renewal wrapper (Update-DashddiCertificate.ps1) is registered as the daily
     Scheduled Task. It re-queries DashDDI for the current FQDN list on every
     run so the certificate's SAN list automatically stays in sync as records
-    are added or removed - matching the Linux dashddi-certbot behaviour.
+    are added or removed - matching the Linux dashddi CLI's behaviour.
 
     Certificates are stored in the Windows Certificate Store (LocalMachine\My).
 
@@ -28,23 +28,51 @@
     Prompted interactively if not provided.
 
 .PARAMETER InstallPath
-    Directory to install win-acme and the hook scripts. Default: C:\win-acme.
+    Directory to install win-acme and the hook scripts. Default: C:\dashddi.
+
+.PARAMETER Names
+    Optional comma-separated explicit list of FQDNs to certify, replacing
+    auto-discovery. Use this for a subset of the host's names, or to add
+    concrete names covered by a wildcard record. Written to dashddi.ini as
+    dns_dashddi_names.
+
+.PARAMETER Caa
+    Publish a CAA record authorizing Let's Encrypt at each issued FQDN after
+    every successful (re)issuance. There's nothing to configure — the CA is
+    fixed to Let's Encrypt, the only ACME server this installer supports.
+    Written to dashddi.ini as dns_dashddi_caa = true.
+
+.PARAMETER Https
+    Publish an HTTPS (RFC 9460) record at each issued FQDN after every
+    successful (re)issuance, using a default value ('1 . alpn=h2') unless
+    -HttpsValue is also given. Written to dashddi.ini as dns_dashddi_https = true.
+
+.PARAMETER HttpsValue
+    Explicit HTTPS (RFC 9460) record value to create/update at each issued
+    FQDN (implies -Https), e.g. '1 . alpn=h2,h3' if this server actually
+    supports HTTP/3 (most don't without explicit QUIC configuration - the
+    default omits h3 for that reason). Written to dashddi.ini as
+    dns_dashddi_https_value.
 
 .PARAMETER SkipCertRequest
     Deploy everything but skip the initial certificate request.
 
 .EXAMPLE
-    .\Install-DashddiWinAcme.ps1
+    .\Install-Dashddi.ps1
 
 .EXAMPLE
-    .\Install-DashddiWinAcme.ps1 -Url https://dashddi.example.com -Token abc123 -Email admin@example.com
+    .\Install-Dashddi.ps1 -Url https://dashddi.example.com -Token abc123 -Email admin@example.com
 #>
 [CmdletBinding()]
 param(
     [string]$Url,
     [string]$Token,
     [string]$Email,
-    [string]$InstallPath = 'C:\win-acme',
+    [string]$InstallPath = 'C:\dashddi',
+    [string]$Names,
+    [switch]$Caa,
+    [switch]$Https,
+    [string]$HttpsValue,
     [switch]$SkipCertRequest
 )
 
@@ -109,10 +137,10 @@ if (-not (Test-Path $settingsPath)) {
 
 # ── 4. Deploy hook scripts ────────────────────────────────────────────────────
 
-$baseRaw = 'https://raw.githubusercontent.com/goshencollege/dashddi/main/win-acme-dashddi'
+$baseRaw = 'https://raw.githubusercontent.com/goshencollege/dashddi/main/dashddi-client-windows'
 $scriptDir = if ($PSScriptRoot) { $PSScriptRoot } else { $PWD.Path }
 
-foreach ($script in 'Create-AcmeChallenge.ps1', 'Delete-AcmeChallenge.ps1', 'Get-Hosts.ps1', 'Renew-DashddiWinAcme.ps1') {
+foreach ($script in 'New-DashddiChallenge.ps1', 'Remove-DashddiChallenge.ps1', 'Get-DashddiHosts.ps1', 'Publish-DashddiRecords.ps1', 'Update-DashddiCertificate.ps1') {
     $src = Join-Path $scriptDir $script
     if (-not (Test-Path $src)) {
         Write-Host "Downloading $script..."
@@ -126,11 +154,20 @@ foreach ($script in 'Create-AcmeChallenge.ps1', 'Delete-AcmeChallenge.ps1', 'Get
 
 $credPath = Join-Path $InstallPath 'dashddi.ini'
 if (-not (Test-Path $credPath)) {
-    [System.IO.File]::WriteAllText(
-        $credPath,
-        "dns_dashddi_url = $Url`ndns_dashddi_token = $Token`nacme_email = $Email`n",
-        [System.Text.Encoding]::ASCII
+    $lines = @(
+        "dns_dashddi_url = $Url"
+        "dns_dashddi_token = $Token"
+        "acme_email = $Email"
     )
+    if ($Names)      { $lines += "dns_dashddi_names = $Names" }
+    if ($Caa)        { $lines += "dns_dashddi_caa = true" }
+    if ($HttpsValue) {
+        $lines += "dns_dashddi_https_value = $HttpsValue"
+    } elseif ($Https) {
+        $lines += "dns_dashddi_https = true"
+    }
+
+    [System.IO.File]::WriteAllText($credPath, ($lines -join "`n") + "`n", [System.Text.Encoding]::ASCII)
 
     # Restrict ACL: SYSTEM + Administrators only, no inheritance
     $acl = Get-Acl $credPath
@@ -150,30 +187,15 @@ if (-not (Test-Path $credPath)) {
 
 if (-not $SkipCertRequest) {
     Write-Host 'Querying DashDDI for registered FQDNs...'
-    try {
-        $hostData = Invoke-RestMethod `
-            -Uri "$Url/api/self/host" `
-            -Headers @{ Authorization = "Bearer $Token" }
-    } catch {
-        Write-Error "Failed to contact DashDDI at ${Url}: $_"
-        exit 1
-    }
-
-    $fqdns = @()
-    foreach ($iface in $hostData.interfaces) {
-        foreach ($record in $iface.records) {
-            if ($record.type -in 'A', 'AAAA', 'CNAME' -and $record.fqdn -and $record.fqdn -notin $fqdns) {
-                $fqdns += $record.fqdn
-            }
-        }
-    }
+    $fqdns = @(& (Join-Path $InstallPath 'Get-DashddiHosts.ps1'))
 
     if ($fqdns.Count -eq 0) {
         Write-Error @"
-No publicly-reachable A/AAAA/CNAME FQDNs found for this host in DashDDI.
+No FQDNs to certify.
 Check that:
   - The host has A, AAAA, or CNAME records linked to its interfaces.
   - Each domain has at least one view marked Public in DashDDI.
+  - Or that dns_dashddi_names in dashddi.ini lists them explicitly.
 "@
         exit 1
     }
@@ -183,8 +205,8 @@ Check that:
     # ── 7. Request certificate via win-acme ───────────────────────────────────
 
     $wacs   = Join-Path $InstallPath 'wacs.exe'
-    $create = Join-Path $InstallPath 'Create-AcmeChallenge.ps1'
-    $delete = Join-Path $InstallPath 'Delete-AcmeChallenge.ps1'
+    $create = Join-Path $InstallPath 'New-DashddiChallenge.ps1'
+    $delete = Join-Path $InstallPath 'Remove-DashddiChallenge.ps1'
 
     & $wacs `
         --source manual `
@@ -205,29 +227,35 @@ Check that:
         exit $LASTEXITCODE
     }
 
-    # ── 8. Replace win-acme's renewal task with our FQDN-aware wrapper ────────
-    # win-acme registers a task that calls 'wacs.exe --renew' with the static
-    # host list from the initial install. Replace it with Renew-DashddiWinAcme.ps1
-    # which re-queries DashDDI on every run so the SAN list stays current.
-
-    $taskName   = 'win-acme renewal (SYSTEM)'
-    $renewScript = Join-Path $InstallPath 'Renew-DashddiWinAcme.ps1'
-    $taskAction  = New-ScheduledTaskAction `
-        -Execute 'powershell.exe' `
-        -Argument "-NonInteractive -ExecutionPolicy Bypass -File `"$renewScript`""
-    $taskTrigger  = New-ScheduledTaskTrigger -Daily -At '09:00AM'
-    $taskSettings = New-ScheduledTaskSettingsSet `
-        -ExecutionTimeLimit (New-TimeSpan -Hours 2) `
-        -MultipleInstances IgnoreNew
-    $taskPrincipal = New-ScheduledTaskPrincipal `
-        -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
-
-    Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
-    Register-ScheduledTask -TaskName $taskName `
-        -Action $taskAction -Trigger $taskTrigger `
-        -Settings $taskSettings -Principal $taskPrincipal -Force | Out-Null
-    Write-Host "Scheduled Task '$taskName' configured for DashDDI FQDN-aware renewal."
+    & (Join-Path $InstallPath 'Publish-DashddiRecords.ps1') -Fqdns $fqdns
 }
+
+# ── 8. Replace win-acme's renewal task with our FQDN-aware wrapper ────────────
+# win-acme registers a task that calls 'wacs.exe --renew' with the static
+# host list from the initial install. Replace it with Update-DashddiCertificate.ps1
+# which re-queries DashDDI on every run so the SAN list stays current.
+#
+# This runs even with -SkipCertRequest ("deploy everything but skip the initial
+# certificate request") so re-running the installer to pick up renamed scripts
+# on an existing install re-registers the task without forcing a cert request.
+
+$taskName   = 'Dashddi renewal (SYSTEM)'
+$renewScript = Join-Path $InstallPath 'Update-DashddiCertificate.ps1'
+$taskAction  = New-ScheduledTaskAction `
+    -Execute 'powershell.exe' `
+    -Argument "-NonInteractive -ExecutionPolicy Bypass -File `"$renewScript`""
+$taskTrigger  = New-ScheduledTaskTrigger -Daily -At '09:00AM'
+$taskSettings = New-ScheduledTaskSettingsSet `
+    -ExecutionTimeLimit (New-TimeSpan -Hours 2) `
+    -MultipleInstances IgnoreNew
+$taskPrincipal = New-ScheduledTaskPrincipal `
+    -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
+
+Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
+Register-ScheduledTask -TaskName $taskName `
+    -Action $taskAction -Trigger $taskTrigger `
+    -Settings $taskSettings -Principal $taskPrincipal -Force | Out-Null
+Write-Host "Scheduled Task '$taskName' configured for DashDDI FQDN-aware renewal."
 
 Write-Host ''
 Write-Host 'Installation complete.'
@@ -239,7 +267,7 @@ Write-Host ''
 Write-Host 'To trigger a manual renewal:'
 Write-Host "  & `"$InstallPath\wacs.exe`" --renew --force"
 Write-Host ''
-Write-Host "  Renewal task:   'win-acme renewal (SYSTEM)' -> Renew-DashddiWinAcme.ps1"
+Write-Host "  Renewal task:   'Dashddi renewal (SYSTEM)' -> Update-DashddiCertificate.ps1"
 Write-Host ''
 Write-Host 'FQDNs are re-queried from DashDDI on every renewal - the SAN list updates'
 Write-Host 'automatically as records are added or removed. No re-installation needed.'

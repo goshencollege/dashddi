@@ -1,0 +1,44 @@
+# DashDDI credentials for the dashddi client (certbot DNS-01 validation, cert
+# issuance, and optional CAA/HTTPS record publishing).
+# Copy this file to a secure location and restrict permissions:
+#   cp dashddi.ini.example /etc/letsencrypt/dashddi.ini
+#   chmod 600 /etc/letsencrypt/dashddi.ini
+
+# Base URL of your DashDDI instance (no trailing slash)
+dns_dashddi_url = https://dashddi.example.com
+
+# Host-scoped API token — generate one from the host detail page in DashDDI
+# (Hosts → select host → Host API Token → Generate Token).
+# This token is tied to this host and is only accepted from this host's IP addresses.
+dns_dashddi_token = your-host-scoped-token-here
+
+# Optional: SSL verification for the DashDDI API connection.
+# Leave unset to use the system CA bundle (default, recommended for production).
+# Set to the path of a PEM CA bundle to trust a custom/internal CA:
+#   dns_dashddi_ca_cert = /etc/ssl/certs/my-internal-ca.pem
+# Set to false to disable SSL verification entirely (self-signed certs, dev only):
+#   dns_dashddi_ca_cert = false
+
+# Optional: comma-separated explicit list of FQDNs to certify, replacing the
+# default auto-discovery of every A/AAAA/CNAME FQDN this host owns in DashDDI.
+# Use this for a subset of the host's names, or to add concrete names covered
+# by a wildcard record (e.g. host owns "*.example.com" and you also want
+# "foo.example.com" and "bar.example.com" as explicit SAN entries):
+#   dns_dashddi_names = foo.example.com,bar.example.com
+
+# Optional: after every successful (re)issuance, create/update a CAA and/or
+# HTTPS record at each issued FQDN via the DashDDI self-service API. Each
+# manages at most one record per name (matched by hostname+domain+type) — if
+# you need more than one CAA line at a name (e.g. both "issue" and
+# "issuewild"), manage the extras directly in the DashDDI DNS UI.
+#
+# dns_dashddi_caa just turns CAA publishing on — the CA is auto-detected from
+# the ACME server certbot was told to use (Let's Encrypt by default, or
+# whatever --server points at), so there's nothing else to configure:
+#   dns_dashddi_caa = true
+#
+# HTTPS record content isn't derivable from the issuance itself. dns_dashddi_https
+# turns it on using a generally-safe default ("1 . alpn=h2,h3"):
+#   dns_dashddi_https = true
+# Or set dns_dashddi_https_value for an explicit value (implies dns_dashddi_https):
+#   dns_dashddi_https_value = 1 . alpn=h2,h3

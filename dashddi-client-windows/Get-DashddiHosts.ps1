@@ -18,6 +18,13 @@ if (-not $baseUrl -or -not $apiToken) {
     exit 1
 }
 
+# An explicit override list replaces auto-discovery entirely — used to certify a
+# subset of the host's names, or concrete names covered by a wildcard record.
+if ($cfg.dns_dashddi_names) {
+    $cfg.dns_dashddi_names -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ } | Write-Output
+    return
+}
+
 try {
     $hostData = Invoke-RestMethod -Uri "$baseUrl/api/self/host" `
         -Headers @{ Authorization = "Bearer $apiToken" }

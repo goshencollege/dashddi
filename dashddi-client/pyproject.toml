@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dashddi-client"
+version = "3.0.0"
+description = "DashDDI host self-service client: Certbot DNS-01 authenticator, certificate CLI, and CAA/HTTPS record publishing"
+requires-python = ">=3.9"
+dependencies = [
+    "certbot>=2.0",
+    "requests>=2.28",
+]
+
+[project.entry-points."certbot.plugins"]
+# This entry-point id must never change: Certbot persists "authenticator = dns-dashddi"
+# into each host's /etc/letsencrypt/renewal/*.conf at issuance time. Renaming it would
+# break renewal for every already-issued certificate on every already-deployed host.
+dns-dashddi = "dashddi._internal.authenticator:Authenticator"
+
+[tool.setuptools.packages.find]
+include = ["dashddi*"]
+
+[project.scripts]
+dashddi = "dashddi._internal.cli:main"
