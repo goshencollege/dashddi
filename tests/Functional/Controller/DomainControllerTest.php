@@ -6,6 +6,7 @@ use App\Entity\DnssecPolicy;
 use App\Entity\DnsView;
 use App\Entity\Domain;
 use App\Entity\DomainRecord;
+use App\Entity\UserPreference;
 use App\Enum\RecordType;
 use App\Tests\Functional\AppWebTestCase;
 
@@ -82,6 +83,77 @@ class DomainControllerTest extends AppWebTestCase
 
         $this->client->request('GET', "/domains/{$domain->getId()}");
         $this->assertResponseIsSuccessful();
+    }
+
+    public function testShowSearchIsSavedToUserPreference(): void
+    {
+        $domain = (new Domain())->setName('search-save.example.com');
+        $this->em->persist($domain);
+        $this->em->flush();
+
+        $this->client->request('GET', "/domains/{$domain->getId()}?q=web");
+        $this->assertResponseIsSuccessful();
+
+        $pref = $this->em->getRepository(UserPreference::class)->findByIdentifier('test@example.com');
+        $this->assertSame(['domainId' => $domain->getId(), 'q' => 'web', 'criteria' => []], $pref->getDomainRecordSearch());
+    }
+
+    public function testShowRestoresSavedSearchOnPlainVisit(): void
+    {
+        $domain = (new Domain())->setName('search-restore.example.com');
+        $this->em->persist($domain);
+        $this->em->flush();
+        $domainId = $domain->getId();
+
+        $this->client->request('GET', "/domains/{$domainId}?q=web");
+
+        $this->client->request('GET', "/domains/{$domainId}");
+        $this->assertResponseIsSuccessful();
+        $this->assertStringContainsString('value="web"', $this->client->getResponse()->getContent());
+    }
+
+    public function testShowDoesNotRestoreSearchSavedForADifferentDomain(): void
+    {
+        $domainA = (new Domain())->setName('search-scope-a.example.com');
+        $domainB = (new Domain())->setName('search-scope-b.example.com');
+        $this->em->persist($domainA);
+        $this->em->persist($domainB);
+        $this->em->flush();
+
+        $this->client->request('GET', "/domains/{$domainA->getId()}?q=web");
+
+        $this->client->request('GET', "/domains/{$domainB->getId()}");
+        $this->assertResponseIsSuccessful();
+        $this->assertStringNotContainsString('value="web"', $this->client->getResponse()->getContent());
+    }
+
+    public function testShowResetClearsSavedSearch(): void
+    {
+        $domain = (new Domain())->setName('search-reset.example.com');
+        $this->em->persist($domain);
+        $this->em->flush();
+        $domainId = $domain->getId();
+
+        $this->client->request('GET', "/domains/{$domainId}?q=web");
+        $this->client->request('GET', "/domains/{$domainId}?reset=1");
+        $this->assertResponseRedirects("/domains/{$domainId}");
+
+        $pref = $this->em->getRepository(UserPreference::class)->findByIdentifier('test@example.com');
+        $this->assertNull($pref->getDomainRecordSearch());
+    }
+
+    public function testShowRestoresSavedAdvancedCriteriaOnPlainVisit(): void
+    {
+        $domain = (new Domain())->setName('search-advanced-restore.example.com');
+        $this->em->persist($domain);
+        $this->em->flush();
+        $domainId = $domain->getId();
+
+        $this->client->request('GET', "/domains/{$domainId}?hostname=web1");
+
+        $this->client->request('GET', "/domains/{$domainId}");
+        $this->assertResponseIsSuccessful();
+        $this->assertStringContainsString('value="web1"', $this->client->getResponse()->getContent());
     }
 
     public function testEditFormLoads(): void

@@ -45,7 +45,7 @@ class HostController extends AbstractController
     private const PER_PAGE = 50;
 
     #[Route('', name: 'host_index', methods: ['GET'])]
-    public function index(Request $request, HostRepository $repo, SubnetRepository $subnetRepo, BuildingRepository $buildingRepo, TagRepository $tagRepo, UserPreferenceRepository $prefRepo, VirtualIpRepository $vipRepo, EntityManagerInterface $em): Response
+    public function index(Request $request, HostRepository $repo, SubnetRepository $subnetRepo, BuildingRepository $buildingRepo, TagRepository $tagRepo, UserPreferenceRepository $prefRepo, VirtualIpRepository $vipRepo, AppSettingRepository $settingRepo, EntityManagerInterface $em): Response
     {
         $user       = $this->getUser();
         $pref       = $user ? $prefRepo->findByIdentifier($user->getUserIdentifier()) : null;
@@ -74,11 +74,18 @@ class HostController extends AbstractController
         } elseif ($hasExplicitState) {
             $query = trim($request->query->getString('q'));
             if ($user) {
+                $previousQuery = $pref?->getHostSearch()['q'] ?? null;
                 if (!$pref) {
                     $pref = new UserPreference($user->getUserIdentifier());
                     $em->persist($pref);
                 }
                 $pref->setHostSearch($query !== '' ? ['q' => $query] : null);
+                if ($query !== '' && $query !== $previousQuery) {
+                    $historyLimit = max(0, $settingRepo->getInstance()->getSearchHistoryCount() ?? 10);
+                    $history = array_values(array_filter($pref->getHostSearchHistory() ?? [], fn($h) => $h !== $query));
+                    array_unshift($history, $query);
+                    $pref->setHostSearchHistory(array_slice($history, 0, $historyLimit));
+                }
                 $needsFlush = true;
             }
         } else {
@@ -146,6 +153,7 @@ class HostController extends AbstractController
         return $this->render('host/index.html.twig', [
             'hosts'              => $hosts,
             'query'              => $query,
+            'searchHistory'      => $pref?->getHostSearchHistory() ?? [],
             'isAdvanced'         => $isAdvanced,
             'showDeleted'        => $showDeleted,
             'sort'               => $sort,

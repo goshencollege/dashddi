@@ -5,10 +5,12 @@ namespace App\Controller;
 use App\Entity\DhcpLease;
 use App\Entity\DhcpServer;
 use App\Entity\Subnet;
+use App\Entity\UserPreference;
 use App\Repository\DhcpLeaseRepository;
 use App\Repository\DhcpServerRepository;
 use App\Repository\NetworkInterfaceRepository;
 use App\Repository\SubnetRepository;
+use App\Repository\UserPreferenceRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use IPLib\Address\IPv6;
 use IPLib\Factory as IpFactory;
@@ -20,6 +22,8 @@ use Symfony\Component\Routing\Attribute\Route;
 
 class DhcpLeaseController extends AbstractController
 {
+    private const FILTER_KEYS = ['mac', 'ip', 'subnet', 'server'];
+
     #[Route('/dhcp/leases', name: 'dhcp_lease_index', methods: ['GET'])]
     public function index(
         Request $request,
@@ -27,7 +31,45 @@ class DhcpLeaseController extends AbstractController
         SubnetRepository $subnetRepo,
         DhcpServerRepository $dhcpServerRepo,
         NetworkInterfaceRepository $ifaceRepo,
+        UserPreferenceRepository $prefRepo,
+        EntityManagerInterface $em,
     ): Response {
+        $user  = $this->getUser();
+        $pref  = $user ? $prefRepo->findByIdentifier($user->getUserIdentifier()) : null;
+        $reset = $request->query->getBoolean('reset');
+
+        if ($reset) {
+            if ($user && $pref && $pref->getDhcpLeaseSearch() !== null) {
+                $pref->setDhcpLeaseSearch(null);
+                $em->flush();
+            }
+            return $this->redirectToRoute('dhcp_lease_index');
+        }
+
+        $hasExplicitState = $request->query->has('page') || (bool) array_filter(self::FILTER_KEYS, fn($k) => $request->query->has($k));
+
+        if ($hasExplicitState) {
+            if ($user) {
+                $saved = [];
+                foreach (self::FILTER_KEYS as $k) {
+                    $v = trim((string) $request->query->get($k, ''));
+                    if ($v !== '') {
+                        $saved[$k] = $v;
+                    }
+                }
+                if (!$pref) {
+                    $pref = new UserPreference($user->getUserIdentifier());
+                    $em->persist($pref);
+                }
+                $pref->setDhcpLeaseSearch($saved !== [] ? $saved : null);
+                $em->flush();
+            }
+        } elseif ($pref?->getDhcpLeaseSearch()) {
+            // Redirect so the restored filters land in the URL — the auto-refresh
+            // AJAX call re-fetches using window.location.search, so it must be there.
+            return $this->redirectToRoute('dhcp_lease_index', $pref->getDhcpLeaseSearch());
+        }
+
         return $this->render('dhcp_lease/index.html.twig',
             $this->buildViewData($request, $leaseRepo, $subnetRepo, $dhcpServerRepo, $ifaceRepo));
     }

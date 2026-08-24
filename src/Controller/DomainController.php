@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\Domain;
 use App\Entity\DomainAlias;
+use App\Entity\UserPreference;
 use App\Enum\RecordType;
 use App\Form\DomainType;
 use App\Repository\DnsServerRepository;
@@ -11,6 +12,7 @@ use App\Repository\DnsViewRepository;
 use App\Repository\DomainAliasRepository;
 use App\Repository\DomainRecordRepository;
 use App\Repository\DomainRepository;
+use App\Repository\UserPreferenceRepository;
 use App\Service\KskRolloverService;
 use App\Service\RecommendationService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -77,7 +79,12 @@ class DomainController extends AbstractController
         Request $request,
         DomainRecordRepository $recordRepo,
         DnsViewRepository $viewRepo,
+        UserPreferenceRepository $prefRepo,
+        EntityManagerInterface $em,
     ): Response {
+        $user = $this->getUser();
+        $pref = $user ? $prefRepo->findByIdentifier($user->getUserIdentifier()) : null;
+
         $page  = max(1, $request->query->getInt('page', 1));
         $reset = $request->query->getBoolean('reset');
 
@@ -87,6 +94,10 @@ class DomainController extends AbstractController
         $isAdvanced = false;
 
         if ($reset) {
+            if ($user && $pref && $pref->getDomainRecordSearch() !== null) {
+                $pref->setDomainRecordSearch(null);
+                $em->flush();
+            }
             return $this->redirectToRoute('domain_show', ['id' => $domain->getId()]);
         }
 
@@ -101,6 +112,23 @@ class DomainController extends AbstractController
                 if ($val !== '') {
                     $criteria[$field] = $val;
                 }
+            }
+
+            if ($user) {
+                if (!$pref) {
+                    $pref = new UserPreference($user->getUserIdentifier());
+                    $em->persist($pref);
+                }
+                $pref->setDomainRecordSearch(
+                    ($q !== '' || !empty($criteria)) ? ['domainId' => $domain->getId(), 'q' => $q, 'criteria' => $criteria] : null
+                );
+                $em->flush();
+            }
+        } else {
+            $saved = $pref?->getDomainRecordSearch();
+            if ($saved && ($saved['domainId'] ?? null) === $domain->getId()) {
+                $q        = $saved['q'] ?? '';
+                $criteria = $saved['criteria'] ?? [];
             }
         }
 
