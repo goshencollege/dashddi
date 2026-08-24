@@ -65,7 +65,7 @@
     virtualenv: "{{ dashddi_venv_path }}"
     virtualenv_command: python3 -m venv
 
-- name: Install certbot-dns-dashddi plugin
+- name: Install dashddi-client plugin
   ansible.builtin.pip:
     name: "{{ dashddi_plugin_source }}"
     virtualenv: "{{ dashddi_venv_path }}"
@@ -76,10 +76,10 @@
     dest: /usr/local/bin/certbot
     state: link
 
-- name: Symlink dashddi-certbot to /usr/local/bin
+- name: Symlink dashddi to /usr/local/bin
   ansible.builtin.file:
-    src: "{{ dashddi_venv_path }}/bin/dashddi-certbot"
-    dest: /usr/local/bin/dashddi-certbot
+    src: "{{ dashddi_venv_path }}/bin/dashddi"
+    dest: /usr/local/bin/dashddi
     state: link
 
 # ── Credentials file ──────────────────────────────────────────────────────────
@@ -102,21 +102,21 @@
 
 # ── Systemd renewal timer ─────────────────────────────────────────────────────
 
-- name: Deploy dashddi-certbot.service
+- name: Deploy dashddi.service
   ansible.builtin.template:
-    src: dashddi-certbot.service.j2
-    dest: /etc/systemd/system/dashddi-certbot.service
+    src: dashddi.service.j2
+    dest: /etc/systemd/system/dashddi.service
     mode: "0644"
 
-- name: Deploy dashddi-certbot.timer
+- name: Deploy dashddi.timer
   ansible.builtin.template:
-    src: dashddi-certbot.timer.j2
-    dest: /etc/systemd/system/dashddi-certbot.timer
+    src: dashddi.timer.j2
+    dest: /etc/systemd/system/dashddi.timer
     mode: "0644"
 
 - name: Enable and start renewal timer
   ansible.builtin.systemd:
-    name: dashddi-certbot.timer
+    name: dashddi.timer
     enabled: true
     state: started
     daemon_reload: true

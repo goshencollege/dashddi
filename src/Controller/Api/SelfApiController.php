@@ -63,7 +63,7 @@ class SelfApiController extends AbstractController
 
         [$sourceRecord, $interface] = $match;
 
-        $resolved = $this->resolveChallengeDomain($sourceRecord);
+        $resolved = $this->resolveChallengeDomain($sourceRecord->getDomain(), $fqdn);
         if ($resolved === null) {
             return $this->json(
                 ['error' => 'The domain for this hostname has no public views — ACME validation from the internet is not possible.'],
@@ -125,14 +125,17 @@ class SelfApiController extends AbstractController
 
         [$sourceRecord, $interface] = $match;
 
-        // Compute the challenge hostname prefix from the source record so we only match
-        // _acme-challenge records for this specific hostname — not other TXT records on
-        // the same interface. We match both the direct form (_acme-challenge.srv) and the
+        // Compute the challenge hostname prefix from the requested FQDN (not the matched
+        // record's own hostname — the match may have come from a wildcard record, whose
+        // hostname is a different label than the concrete FQDN being certified) so we only
+        // match _acme-challenge records for this specific hostname — not other TXT records
+        // on the same interface. We match both the direct form (_acme-challenge.srv) and the
         // parent-domain form (_acme-challenge.srv.internal.*) without re-deriving which
         // domain was chosen at creation time.
-        $hostnameBase = $sourceRecord->getHostname() === '@'
+        $sourceHostname = $this->relativeHostname($fqdn, $sourceRecord->getDomain());
+        $hostnameBase = $sourceHostname === '@'
             ? '_acme-challenge'
-            : '_acme-challenge.' . $sourceRecord->getHostname();
+            : '_acme-challenge.' . $sourceHostname;
 
         $normalizedValue = TxtRecordValueValidator::normalizeTxtValue($validation);
         $records = $repo->createQueryBuilder('r')
@@ -160,9 +163,90 @@ class SelfApiController extends AbstractController
         return $this->json(null, Response::HTTP_NO_CONTENT);
     }
 
+    #[Route('/records', name: 'api_self_record_upsert', methods: ['PUT'])]
+    public function upsertRecord(
+        Request $request,
+        EntityManagerInterface $em,
+        ValidatorInterface $validator,
+        DomainRecordRepository $repo,
+    ): JsonResponse {
+        $token = $request->attributes->get('_api_token');
+        if (!$token instanceof ApiToken || !$token->isHostScoped()) {
+            return $this->json(['error' => 'This endpoint requires a host-scoped token.'], Response::HTTP_FORBIDDEN);
+        }
+
+        $data  = json_decode($request->getContent(), true) ?? [];
+        $fqdn  = trim($data['fqdn'] ?? '');
+        $type  = trim($data['type'] ?? '');
+        $value = trim($data['value'] ?? '');
+
+        if ($fqdn === '' || $type === '' || $value === '') {
+            return $this->json(['error' => 'fqdn, type, and value are required.'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $recordType = RecordType::tryFrom($type);
+        if (!in_array($recordType, [RecordType::CAA, RecordType::HTTPS], true)) {
+            return $this->json(['error' => 'Only CAA and HTTPS records may be managed through this endpoint.'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $match = $this->resolveOwnership($token->getHost(), $fqdn);
+        if ($match === null) {
+            return $this->json(['error' => 'The requested FQDN does not belong to this host.'], Response::HTTP_FORBIDDEN);
+        }
+        [$sourceRecord, ] = $match;
+
+        $domain   = $sourceRecord->getDomain();
+        $hostname = $this->relativeHostname($fqdn, $domain);
+
+        $existing = $repo->findOneBy(['domain' => $domain, 'hostname' => $hostname, 'type' => $recordType]);
+        if ($existing !== null) {
+            if ($existing->getValue() === $value) {
+                return $this->json(['id' => $existing->getId(), 'action' => 'unchanged'], Response::HTTP_OK);
+            }
+            $existing->setValue($value);
+            $violations = $validator->validate($existing);
+            if (count($violations) > 0) {
+                $errors = [];
+                foreach ($violations as $v) {
+                    $errors[] = $v->getMessage();
+                }
+                return $this->json(['errors' => $errors], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+            $em->flush();
+            return $this->json(['id' => $existing->getId(), 'action' => 'updated'], Response::HTTP_OK);
+        }
+
+        $record = new DomainRecord();
+        $record->setHostname($hostname);
+        $record->setType($recordType);
+        $record->setValue($value);
+        $record->setDomain($domain);
+        $record->setNetworkInterface($sourceRecord->getNetworkInterface());
+        // Inherit the source record's own views — this name's CAA/HTTPS record should be
+        // visible everywhere the underlying A/AAAA/wildcard record already is, nothing more.
+        foreach ($sourceRecord->getViews() as $view) {
+            $record->addView($view);
+        }
+
+        $violations = $validator->validate($record);
+        if (count($violations) > 0) {
+            $errors = [];
+            foreach ($violations as $v) {
+                $errors[] = $v->getMessage();
+            }
+            return $this->json(['errors' => $errors], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $em->persist($record);
+        $em->flush();
+
+        return $this->json(['id' => $record->getId(), 'action' => 'created'], Response::HTTP_CREATED);
+    }
+
     /**
-     * Find a DomainRecord on the host's interfaces whose FQDN matches the given string.
-     * Returns [DomainRecord, NetworkInterface] or null.
+     * Find a DomainRecord on the host's interfaces whose FQDN matches the given string,
+     * either exactly or via wildcard coverage. Returns [DomainRecord, NetworkInterface] or
+     * null.
      *
      * @return array{0: DomainRecord, 1: NetworkInterface}|null
      */
@@ -178,7 +262,64 @@ class SelfApiController extends AbstractController
                 }
             }
         }
+
+        // No exact match — fall back to a wildcard record covering this FQDN, e.g. a
+        // "*.example.com" record covers "foo.example.com" as an explicit SAN entry.
+        foreach ($host->getInterfaces() as $iface) {
+            if ($iface->isDeleted()) {
+                continue;
+            }
+            foreach ($iface->getDomainRecords() as $record) {
+                if ($this->wildcardCovers($record, $fqdn)) {
+                    return [$record, $iface];
+                }
+            }
+        }
+
         return null;
+    }
+
+    /**
+     * True if $record is a wildcard record (hostname "*" or starting with "*.") whose scope
+     * covers $fqdn. A wildcard covers exactly one additional label prepended to its own name:
+     * "*.example.com" covers "foo.example.com" but not "a.b.example.com", and does not cover
+     * itself literally.
+     */
+    private function wildcardCovers(DomainRecord $record, string $fqdn): bool
+    {
+        $hostname = $record->getHostname();
+        if ($hostname !== '*' && !str_starts_with($hostname, '*.')) {
+            return false;
+        }
+
+        $wildcardFqdn = $record->getFullyQualifiedHostname(); // e.g. "*.example.com"
+        $suffix = substr($wildcardFqdn, 1); // ".example.com"
+
+        if ($fqdn === $wildcardFqdn || !str_ends_with($fqdn, $suffix)) {
+            return false;
+        }
+
+        $label = substr($fqdn, 0, -strlen($suffix));
+        return $label !== '' && !str_contains($label, '.');
+    }
+
+    /**
+     * Compute $fqdn's hostname label relative to $domain (the inverse of
+     * DomainRecord::getFullyQualifiedHostname()). Used to derive the concrete hostname being
+     * certified from the request itself rather than from whichever record proved ownership
+     * (which may be a wildcard record with a different literal hostname).
+     */
+    private function relativeHostname(string $fqdn, Domain $domain): string
+    {
+        $domainName = $domain->getName();
+        if ($fqdn === $domainName) {
+            return '@';
+        }
+        $suffix = '.' . $domainName;
+        if (str_ends_with($fqdn, $suffix)) {
+            return substr($fqdn, 0, -strlen($suffix));
+        }
+        return $fqdn;
     }
 
     /**
@@ -205,10 +346,8 @@ class SelfApiController extends AbstractController
      *
      * @return array{0: Domain, 1: string}|null
      */
-    private function resolveChallengeDomain(DomainRecord $sourceRecord): ?array
+    private function resolveChallengeDomain(Domain $sourceDomain, string $fqdn): ?array
     {
-        $sourceDomain = $sourceRecord->getDomain();
-
         if ($this->domainHasExplicitPublicView($sourceDomain)) {
             $targetDomain = $sourceDomain;
         } else {
@@ -228,7 +367,7 @@ class SelfApiController extends AbstractController
         if ($targetDomain === null) {
             return null;
         }
-        return [$targetDomain, $this->challengeHostnameInParentDomain($sourceRecord, $targetDomain)];
+        return [$targetDomain, $this->challengeHostnameInParentDomain($fqdn, $targetDomain)];
     }
 
     /**
@@ -269,15 +408,12 @@ class SelfApiController extends AbstractController
 
     /**
      * Compute the hostname for a challenge TXT record placed in a parent zone.
-     * Example: source = "host" in "internal.example.com", parent = "example.com"
+     * Example: source = "host.internal.example.com", parent = "example.com"
      * → challenge FQDN = "_acme-challenge.host.internal.example.com"
      * → relative hostname = "_acme-challenge.host.internal"
      */
-    private function challengeHostnameInParentDomain(DomainRecord $sourceRecord, Domain $parentDomain): string
+    private function challengeHostnameInParentDomain(string $sourceFqdn, Domain $parentDomain): string
     {
-        $hostname = $sourceRecord->getHostname();
-        $sourceDomainName = $sourceRecord->getDomain()->getName();
-        $sourceFqdn = $hostname === '@' ? $sourceDomainName : $hostname . '.' . $sourceDomainName;
         $challengeFqdn = '_acme-challenge.' . $sourceFqdn;
         return substr($challengeFqdn, 0, -(strlen($parentDomain->getName()) + 1));
     }

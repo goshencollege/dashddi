@@ -5,7 +5,7 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=/usr/local/bin/dashddi-certbot \
+ExecStart=/usr/local/bin/dashddi cert \
     --credentials {{ dashddi_credentials_path }} \
     -- \
     --dns-dashddi-propagation-seconds {{ dashddi_propagation_seconds }}{% if dashddi_deploy_hook %} \

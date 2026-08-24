@@ -1,0 +1,14 @@
+# DashDDI credentials — managed by Ansible, do not edit manually.
+dns_dashddi_url = {{ dashddi_url }}
+dns_dashddi_token = {{ _dashddi_host_token }}
+{% if dashddi_names %}
+dns_dashddi_names = {{ dashddi_names }}
+{% endif %}
+{% if dashddi_caa %}
+dns_dashddi_caa = true
+{% endif %}
+{% if dashddi_https_value %}
+dns_dashddi_https_value = {{ dashddi_https_value }}
+{% elif dashddi_https %}
+dns_dashddi_https = true
+{% endif %}

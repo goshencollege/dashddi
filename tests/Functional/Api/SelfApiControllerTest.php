@@ -508,4 +508,276 @@ class SelfApiControllerTest extends AppWebTestCase
         $this->assertContains('pub.listing-parent.example.com', $fqdns);
         $this->assertContains('priv.internal.listing-parent.example.com', $fqdns);
     }
+
+    // ── Wildcard ownership matching ───────────────────────────────────────────
+
+    public function testCreateChallengeViaWildcardRecord(): void
+    {
+        $domain = (new Domain())->setName('wild-test.example.com');
+        $this->em->persist($domain);
+
+        [$host, $iface] = $this->makeHostWithIp('wild-host'); // 127.0.0.1
+        $raw = bin2hex(random_bytes(32));
+        $this->makeHostToken($host, $raw);
+        $this->makeDomainRecord($iface, $domain, '*', RecordType::A, '127.0.0.1');
+
+        $data = $this->tokenRequest('POST', '/api/self/dns-challenge', $raw, [
+            'fqdn'       => 'foo.wild-test.example.com',
+            'validation' => 'WILDCARD_TOKEN',
+        ]);
+
+        $this->assertSame(201, $this->tokenClient->getResponse()->getStatusCode());
+        // Challenge hostname must be derived from the concrete requested name, not "*"
+        $this->assertSame('_acme-challenge.foo', $data['hostname']);
+    }
+
+    public function testWildcardDoesNotCoverMultiLabelName(): void
+    {
+        $domain = (new Domain())->setName('wild-scope.example.com');
+        $this->em->persist($domain);
+
+        [$host, $iface] = $this->makeHostWithIp('wild-scope-host'); // 127.0.0.1
+        $raw = bin2hex(random_bytes(32));
+        $this->makeHostToken($host, $raw);
+        $this->makeDomainRecord($iface, $domain, '*.sub', RecordType::A, '127.0.0.1');
+
+        $data = $this->tokenRequest('POST', '/api/self/dns-challenge', $raw, [
+            'fqdn'       => 'a.b.sub.wild-scope.example.com',
+            'validation' => 'TOKEN',
+        ]);
+
+        $this->assertSame(403, $this->tokenClient->getResponse()->getStatusCode());
+    }
+
+    public function testExactMatchTakesPrecedenceOverWildcard(): void
+    {
+        $domain = (new Domain())->setName('precedence.example.com');
+        $this->em->persist($domain);
+
+        [$host, $iface] = $this->makeHostWithIp('precedence-host'); // 127.0.0.1
+        $raw = bin2hex(random_bytes(32));
+        $this->makeHostToken($host, $raw);
+
+        // Second interface on the same host, holding the wildcard record.
+        $wildIface = (new NetworkInterface())
+            ->setHost($host)
+            ->setMacAddress('aa:bb:cc:dd:ee:02');
+        $this->em->persist($wildIface);
+        $this->em->flush();
+
+        $this->makeDomainRecord($wildIface, $domain, '*', RecordType::A, '127.0.0.1');
+        $this->makeDomainRecord($iface, $domain, 'foo', RecordType::A, '127.0.0.1');
+
+        $data = $this->tokenRequest('POST', '/api/self/dns-challenge', $raw, [
+            'fqdn'       => 'foo.precedence.example.com',
+            'validation' => 'PRECEDENCE_TOKEN',
+        ]);
+
+        $this->assertSame(201, $this->tokenClient->getResponse()->getStatusCode());
+
+        // The challenge record must be linked to the exact match's interface, not the
+        // wildcard record's interface.
+        $this->em->clear();
+        $record = $this->em->find(DomainRecord::class, $data['id']);
+        $this->assertNotNull($record);
+        $this->assertSame($iface->getId(), $record->getNetworkInterface()->getId());
+    }
+
+    public function testDeleteChallengeCreatedViaWildcardRecord(): void
+    {
+        $domain = (new Domain())->setName('wild-del.example.com');
+        $this->em->persist($domain);
+
+        [$host, $iface] = $this->makeHostWithIp('wild-del-host'); // 127.0.0.1
+        $raw = bin2hex(random_bytes(32));
+        $this->makeHostToken($host, $raw);
+        $this->makeDomainRecord($iface, $domain, '*', RecordType::A, '127.0.0.1');
+
+        $createData = $this->tokenRequest('POST', '/api/self/dns-challenge', $raw, [
+            'fqdn'       => 'bar.wild-del.example.com',
+            'validation' => 'WILD_DEL_TOKEN',
+        ]);
+        $this->assertSame(201, $this->tokenClient->getResponse()->getStatusCode());
+        $recordId = $createData['id'];
+
+        $this->tokenRequest('DELETE', '/api/self/dns-challenge', $raw, [
+            'fqdn'       => 'bar.wild-del.example.com',
+            'validation' => 'WILD_DEL_TOKEN',
+        ]);
+        $this->assertSame(204, $this->tokenClient->getResponse()->getStatusCode());
+
+        $this->em->clear();
+        $this->assertNull($this->em->find(DomainRecord::class, $recordId));
+    }
+
+    // ── PUT /api/self/records (CAA/HTTPS auto-publish) ────────────────────────
+
+    public function testUpsertRecordCreatesCaaRecord(): void
+    {
+        $domain = (new Domain())->setName('caa-create.example.com');
+        $this->em->persist($domain);
+
+        [$host, $iface] = $this->makeHostWithIp('caa-create-host'); // 127.0.0.1
+        $raw = bin2hex(random_bytes(32));
+        $this->makeHostToken($host, $raw);
+        $this->makeDomainRecord($iface, $domain, 'srv', RecordType::A, '127.0.0.1');
+
+        $data = $this->tokenRequest('PUT', '/api/self/records', $raw, [
+            'fqdn'  => 'srv.caa-create.example.com',
+            'type'  => 'CAA',
+            'value' => '0 issue "letsencrypt.org"',
+        ]);
+
+        $this->assertSame(201, $this->tokenClient->getResponse()->getStatusCode());
+        $this->assertSame('created', $data['action']);
+
+        $this->em->clear();
+        $record = $this->em->find(DomainRecord::class, $data['id']);
+        $this->assertNotNull($record);
+        $this->assertSame(RecordType::CAA, $record->getType());
+        $this->assertSame('srv', $record->getHostname());
+        $this->assertSame('0 issue "letsencrypt.org"', $record->getValue());
+    }
+
+    public function testUpsertRecordUpdatesExistingValue(): void
+    {
+        $domain = (new Domain())->setName('caa-update.example.com');
+        $this->em->persist($domain);
+
+        [$host, $iface] = $this->makeHostWithIp('caa-update-host'); // 127.0.0.1
+        $raw = bin2hex(random_bytes(32));
+        $this->makeHostToken($host, $raw);
+        $this->makeDomainRecord($iface, $domain, 'srv', RecordType::A, '127.0.0.1');
+        $this->makeDomainRecord($iface, $domain, 'srv', RecordType::CAA, '0 issue "oldca.example"');
+
+        $data = $this->tokenRequest('PUT', '/api/self/records', $raw, [
+            'fqdn'  => 'srv.caa-update.example.com',
+            'type'  => 'CAA',
+            'value' => '0 issue "letsencrypt.org"',
+        ]);
+
+        $this->assertSame(200, $this->tokenClient->getResponse()->getStatusCode());
+        $this->assertSame('updated', $data['action']);
+
+        $this->em->clear();
+        $record = $this->em->find(DomainRecord::class, $data['id']);
+        $this->assertSame('0 issue "letsencrypt.org"', $record->getValue());
+    }
+
+    public function testUpsertRecordNoOpWhenValueUnchanged(): void
+    {
+        $domain = (new Domain())->setName('caa-noop.example.com');
+        $this->em->persist($domain);
+
+        [$host, $iface] = $this->makeHostWithIp('caa-noop-host'); // 127.0.0.1
+        $raw = bin2hex(random_bytes(32));
+        $this->makeHostToken($host, $raw);
+        $this->makeDomainRecord($iface, $domain, 'srv', RecordType::A, '127.0.0.1');
+        $this->makeDomainRecord($iface, $domain, 'srv', RecordType::CAA, '0 issue "letsencrypt.org"');
+
+        $data = $this->tokenRequest('PUT', '/api/self/records', $raw, [
+            'fqdn'  => 'srv.caa-noop.example.com',
+            'type'  => 'CAA',
+            'value' => '0 issue "letsencrypt.org"',
+        ]);
+
+        $this->assertSame(200, $this->tokenClient->getResponse()->getStatusCode());
+        $this->assertSame('unchanged', $data['action']);
+    }
+
+    public function testUpsertRecordRejectsNonCaaHttpsType(): void
+    {
+        $domain = (new Domain())->setName('type-reject.example.com');
+        $this->em->persist($domain);
+
+        [$host, $iface] = $this->makeHostWithIp('type-reject-host'); // 127.0.0.1
+        $raw = bin2hex(random_bytes(32));
+        $this->makeHostToken($host, $raw);
+        $this->makeDomainRecord($iface, $domain, 'srv', RecordType::A, '127.0.0.1');
+
+        $this->tokenRequest('PUT', '/api/self/records', $raw, [
+            'fqdn'  => 'srv.type-reject.example.com',
+            'type'  => 'TXT',
+            'value' => 'anything',
+        ]);
+
+        $this->assertSame(422, $this->tokenClient->getResponse()->getStatusCode());
+    }
+
+    public function testUpsertRecordRejectsUnownedFqdn(): void
+    {
+        [$host] = $this->makeHostWithIp('unowned-host'); // 127.0.0.1
+        $raw = bin2hex(random_bytes(32));
+        $this->makeHostToken($host, $raw);
+
+        $this->tokenRequest('PUT', '/api/self/records', $raw, [
+            'fqdn'  => 'other.example.com',
+            'type'  => 'CAA',
+            'value' => '0 issue "letsencrypt.org"',
+        ]);
+
+        $this->assertSame(403, $this->tokenClient->getResponse()->getStatusCode());
+    }
+
+    public function testUpsertRecordWorksForWildcardCoveredFqdn(): void
+    {
+        $domain = (new Domain())->setName('caa-wild.example.com');
+        $this->em->persist($domain);
+
+        [$host, $iface] = $this->makeHostWithIp('caa-wild-host'); // 127.0.0.1
+        $raw = bin2hex(random_bytes(32));
+        $this->makeHostToken($host, $raw);
+        $this->makeDomainRecord($iface, $domain, '*', RecordType::A, '127.0.0.1');
+
+        $data = $this->tokenRequest('PUT', '/api/self/records', $raw, [
+            'fqdn'  => 'foo.caa-wild.example.com',
+            'type'  => 'HTTPS',
+            'value' => '1 . alpn=h2,h3',
+        ]);
+
+        $this->assertSame(201, $this->tokenClient->getResponse()->getStatusCode());
+
+        $this->em->clear();
+        $record = $this->em->find(DomainRecord::class, $data['id']);
+        $this->assertNotNull($record);
+        $this->assertSame('foo', $record->getHostname());
+        $this->assertSame(RecordType::HTTPS, $record->getType());
+    }
+
+    public function testUpsertRecordInheritsSourceRecordViews(): void
+    {
+        $internalView = (new DnsView())->setName('caa-view-internal')->setIsPublic(false);
+        $externalView = (new DnsView())->setName('caa-view-external')->setIsPublic(true);
+        $this->em->persist($internalView);
+        $this->em->persist($externalView);
+
+        $domain = (new Domain())->setName('caa-views.example.com');
+        $domain->addView($internalView);
+        $domain->addView($externalView);
+        $this->em->persist($domain);
+        $this->em->flush();
+
+        [$host, $iface] = $this->makeHostWithIp('caa-views-host'); // 127.0.0.1
+        $raw = bin2hex(random_bytes(32));
+        $this->makeHostToken($host, $raw);
+
+        // Source A record is only in the internal view.
+        $sourceRecord = $this->makeDomainRecord($iface, $domain, 'srv', RecordType::A, '127.0.0.1');
+        $sourceRecord->addView($internalView);
+        $this->em->flush();
+
+        $data = $this->tokenRequest('PUT', '/api/self/records', $raw, [
+            'fqdn'  => 'srv.caa-views.example.com',
+            'type'  => 'CAA',
+            'value' => '0 issue "letsencrypt.org"',
+        ]);
+
+        $this->assertSame(201, $this->tokenClient->getResponse()->getStatusCode());
+
+        $this->em->clear();
+        $record = $this->em->find(DomainRecord::class, $data['id']);
+        $this->assertNotNull($record);
+        $viewIds = $record->getViews()->map(fn($v) => $v->getId())->toArray();
+        $this->assertSame([$internalView->getId()], $viewIds);
+    }
 }

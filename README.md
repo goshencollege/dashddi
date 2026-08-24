@@ -12,7 +12,7 @@ DashDDI is a web-based DNS, DHCP, and IP Address Management (IPAM) system. It pr
 - **Push Notifications** — Real-time push messages on entity changes with push log history
 - **SAML Authentication** — Configurable SAML 2.0 identity provider integration
 - **API Access** — Token-based API with granular route-level permissions
-- **Certbot Plugin** — `certbot-dns-dashddi` plugin for DNS-01 ACME challenges via Let's Encrypt
+- **Certificate Client** — `dashddi-client` (Linux) and `dashddi-client-windows` provide DNS-01 ACME challenge automation, host FQDN discovery, and optional CAA/HTTPS record publishing
 
 ## Tech Stack
 
@@ -183,9 +183,9 @@ DashDDI connects to several external systems for configuration deployment, asset
 
 DashDDI also exposes a REST API for programmatic access to all resources. Full API documentation — including all endpoints, request/response schemas, and authentication details — is available within the app at `/api-docs`.
 
-## Certbot DNS Plugin
+## Certificate Client
 
-The `certbot-dns-dashddi` directory contains a Python plugin that enables Let's Encrypt DNS-01 challenge automation through DashDDI's API. See [`certbot-dns-dashddi/README.md`](certbot-dns-dashddi/README.md) for installation and usage instructions.
+The `dashddi-client` directory contains a Python Certbot DNS-01 authenticator plugin and a `dashddi` CLI for Linux — see [`dashddi-client/README.md`](dashddi-client/README.md). The `dashddi-client-windows` directory integrates the same self-service API with win-acme for Windows hosts — see [`dashddi-client-windows/README.md`](dashddi-client-windows/README.md). Both discover a host's FQDNs from DashDDI, request certificates, and can publish CAA/HTTPS records after issuance.
 
 ## License
 

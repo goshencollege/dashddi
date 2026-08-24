@@ -1,8 +1,8 @@
 # Called by win-acme's DNS script validation plugin to remove the ACME
 # challenge TXT record via the DashDDI host self-service API.
 #
-# win-acme invocation (configured by Install-DashddiWinAcme.ps1):
-#   powershell.exe -ExecutionPolicy ByPass -File Delete-AcmeChallenge.ps1 {Identifier} {Token}
+# win-acme invocation (configured by Install-Dashddi.ps1):
+#   powershell.exe -ExecutionPolicy ByPass -File Remove-DashddiChallenge.ps1 {Identifier} {Token}
 
 param(
     [Parameter(Position = 0, Mandatory)]
