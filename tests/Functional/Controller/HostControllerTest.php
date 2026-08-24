@@ -876,4 +876,74 @@ class HostControllerTest extends AppWebTestCase
         $this->assertResponseIsSuccessful();
         $this->assertStringNotContainsString('Switch Ports', $this->client->getResponse()->getContent());
     }
+
+    public function testSearchAddsQueryToHistoryMostRecentFirst(): void
+    {
+        $this->client->request('GET', '/hosts?q=alpha');
+        $this->client->request('GET', '/hosts?q=beta');
+
+        $pref = $this->em->getRepository(UserPreference::class)->findByIdentifier('test@example.com');
+        $this->assertSame(['beta', 'alpha'], $pref->getHostSearchHistory());
+    }
+
+    public function testSearchHistoryDedupesAndMovesRepeatedQueryToFront(): void
+    {
+        $this->client->request('GET', '/hosts?q=alpha');
+        $this->client->request('GET', '/hosts?q=beta');
+        $this->client->request('GET', '/hosts?q=alpha');
+
+        $pref = $this->em->getRepository(UserPreference::class)->findByIdentifier('test@example.com');
+        $this->assertSame(['alpha', 'beta'], $pref->getHostSearchHistory());
+    }
+
+    public function testSearchHistoryTruncatesToConfiguredLimit(): void
+    {
+        $setting = $this->em->getRepository(AppSetting::class)->find(1) ?? new AppSetting();
+        $setting->setSearchHistoryCount(2);
+        $this->em->persist($setting);
+        $this->em->flush();
+
+        $this->client->request('GET', '/hosts?q=alpha');
+        $this->client->request('GET', '/hosts?q=beta');
+        $this->client->request('GET', '/hosts?q=gamma');
+
+        $pref = $this->em->getRepository(UserPreference::class)->findByIdentifier('test@example.com');
+        $this->assertSame(['gamma', 'beta'], $pref->getHostSearchHistory());
+    }
+
+    public function testSearchHistoryOfZeroDisablesHistory(): void
+    {
+        $setting = $this->em->getRepository(AppSetting::class)->find(1) ?? new AppSetting();
+        $setting->setSearchHistoryCount(0);
+        $this->em->persist($setting);
+        $this->em->flush();
+
+        $this->client->request('GET', '/hosts?q=alpha');
+
+        $pref = $this->em->getRepository(UserPreference::class)->findByIdentifier('test@example.com');
+        $this->assertSame([], $pref->getHostSearchHistory());
+    }
+
+    public function testHostIndexRendersSearchHistoryDropdown(): void
+    {
+        $pref = new UserPreference('test@example.com');
+        $pref->setHostSearchHistory(['alpha', 'beta']);
+        $this->em->persist($pref);
+        $this->em->flush();
+
+        $this->client->request('GET', '/hosts');
+        $this->assertResponseIsSuccessful();
+        $content = $this->client->getResponse()->getContent();
+        $this->assertStringContainsString('bi-chevron-down', $content);
+        $this->assertStringContainsString('Recent Searches', $content);
+        $this->assertStringContainsString('>alpha<', $content);
+        $this->assertStringContainsString('>beta<', $content);
+    }
+
+    public function testHostIndexHidesSearchHistoryDropdownWhenNoHistory(): void
+    {
+        $this->client->request('GET', '/hosts');
+        $this->assertResponseIsSuccessful();
+        $this->assertStringNotContainsString('Recent Searches', $this->client->getResponse()->getContent());
+    }
 }

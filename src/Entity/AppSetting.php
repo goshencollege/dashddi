@@ -73,6 +73,9 @@ class AppSetting
     #[ORM\Column(length: 3, nullable: true, options: ['default' => 'udp'])]
     private ?string $syslogProtocol = 'udp';
 
+    #[ORM\Column(nullable: true, options: ['default' => 10])]
+    private ?int $searchHistoryCount = 10;
+
     public function getId(): int { return $this->id; }
 
     public function getDefaultLeaseRetentionDays(): ?int { return $this->defaultLeaseRetentionDays; }
@@ -134,4 +137,7 @@ class AppSetting
 
     public function getSyslogProtocol(): ?string { return $this->syslogProtocol; }
     public function setSyslogProtocol(?string $protocol): static { $this->syslogProtocol = $protocol; return $this; }
+
+    public function getSearchHistoryCount(): ?int { return $this->searchHistoryCount; }
+    public function setSearchHistoryCount(?int $count): static { $this->searchHistoryCount = $count; return $this; }
 }

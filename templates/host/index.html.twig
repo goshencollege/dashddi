@@ -118,7 +118,18 @@
         <form method="get" action="{{ path('host_index') }}" class="flex-grow-1 ps-3" id="simple-search-form">
             <div class="input-group">
                 <span class="input-group-text"><i class="bi bi-search"></i></span>
-                <input type="search" name="q" id="q-input" class="form-control" placeholder="Search by name, location, subnet, IP address, MAC, DUID, or DNS name…" value="{{ query }}">
+                <input type="text" name="q" id="q-input" class="form-control" placeholder="Search by name, location, subnet, IP address, MAC, DUID, or DNS name…" value="{{ query }}">
+                {% if searchHistory is not empty %}
+                    <button type="button" class="btn btn-outline-secondary" style="border-left: 0;" data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false" title="Recent searches">
+                        <i class="bi bi-chevron-down"></i>
+                    </button>
+                    <ul class="dropdown-menu w-100">
+                        <li><h6 class="dropdown-header">Recent Searches</h6></li>
+                        {% for h in searchHistory %}
+                            <li><a class="dropdown-item{{ h == query ? ' active' }}" href="{{ path('host_index', {q: h}) }}">{{ h }}</a></li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
                 <button type="submit" class="btn btn-outline-secondary">Search</button>
                 {% if query or isAdvanced %}
                     <a href="{{ path('host_index', {reset: 1}) }}" class="btn btn-outline-secondary">Clear</a>

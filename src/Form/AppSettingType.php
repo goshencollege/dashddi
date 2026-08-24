@@ -138,6 +138,12 @@ class AppSettingType extends AbstractType
                 ],
                 'help' => 'TCP allows persistent connections and larger messages. UDP is simpler but limited to ~1024 bytes per message.',
             ])
+            ->add('searchHistoryCount', IntegerType::class, [
+                'label'    => 'Search History Size',
+                'required' => false,
+                'attr'     => ['placeholder' => '10'],
+                'help'     => 'Number of recent searches to remember per user and offer in the search history dropdown. Set to 0 to disable. Leave blank to use the default (10).',
+            ])
         ;
     }
 
