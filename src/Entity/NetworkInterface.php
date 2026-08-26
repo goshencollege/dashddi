@@ -135,14 +135,19 @@ class NetworkInterface
     public function getSwitchPort(): ?string { return $this->switchPort; }
     public function setSwitchPort(?string $port): static { $this->switchPort = $port; return $this; }
 
-    public function getPrimaryName(): ?string
+    public function getPrimaryDomainRecord(): ?DomainRecord
     {
         foreach ($this->domainRecords as $record) {
             if ($record->getDomain() !== null) {
-                return $record->getFullyQualifiedHostname();
+                return $record;
             }
         }
         return null;
+    }
+
+    public function getPrimaryName(): ?string
+    {
+        return $this->getPrimaryDomainRecord()?->getFullyQualifiedHostname();
     }
 
     public function __toString(): string
