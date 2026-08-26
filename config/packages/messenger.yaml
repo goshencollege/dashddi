@@ -9,8 +9,9 @@ framework:
                     queue_name: priority
                 failure_transport: failed_priority
 
-            # Long-running jobs (Snipe-IT pull, scheduled tasks) — consumed by a
-            # dedicated bulk worker so they cannot starve the priority queue.
+            # Long-running jobs (full ClearPass sync, arbitrary scheduled tasks
+            # run via "Run Now") — consumed by a dedicated bulk worker so they
+            # cannot starve the priority queue.
             async_bulk:
                 dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
                 options:
@@ -29,6 +30,6 @@ framework:
             'App\Message\PushAllDhcpMessage':      async_priority
             'App\Message\PushClearpassAllMessage':  async_bulk
             'App\Message\RunScheduledTaskMessage':  async_bulk
-            'App\Message\PullSnipeItMessage':       async_bulk
-            'App\Message\PullClearpassLogsMessage': async_bulk
+            'App\Message\PullSnipeItMessage':       async_priority
+            'App\Message\PullClearpassLogsMessage': async_priority
             'App\Message\SyslogMessage':           async_priority

@@ -531,6 +531,23 @@
                                 <i class="bi bi-shield-lock me-1"></i>Pull ClearPass Auth Logs
                             </button>
                         </li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                            <button class="dropdown-item quick-action-btn"
+                                    data-endpoint="{{ path('dns_server_push') }}"
+                                    data-csrf-token="{{ csrf_token('dns_push') }}"
+                                    data-success="Push queued — deploying DNS configs in the background.">
+                                <i class="bi bi-hdd-network me-1"></i>Push DNS Configs
+                            </button>
+                        </li>
+                        <li>
+                            <button class="dropdown-item quick-action-btn"
+                                    data-endpoint="{{ path('dhcp_server_push') }}"
+                                    data-csrf-token="{{ csrf_token('dhcp_push') }}"
+                                    data-success="Push queued — deploying DHCP configs in the background.">
+                                <i class="bi bi-router me-1"></i>Push DHCP Configs
+                            </button>
+                        </li>
                     </ul>
                 </li>
                 <li class="nav-item dropdown me-2">

@@ -46,8 +46,8 @@ docker compose -f docker-compose.dev.yml exec app php bin/console <command>
 
 ### Async messaging (two queues)
 Symfony Messenger with a Doctrine transport. Two separate queues:
-- **`async_priority`** — fast push messages (DNS, DHCP, ClearPass single-server). Consumed by the `worker_priority` container.
-- **`async_bulk`** — long-running jobs (full ClearPass sync, scheduled tasks, Snipe-IT pull). Consumed by `worker_bulk`, which also monitors `async_priority` when idle.
+- **`async_priority`** — fast push messages (DNS, DHCP, ClearPass single-server) plus manually-triggered pulls (Snipe-IT pull, ClearPass log pull). Consumed by the `worker_priority` container.
+- **`async_bulk`** — long-running jobs (full ClearPass sync, arbitrary scheduled tasks run via "Run Now"). Consumed by `worker_bulk`, which also monitors `async_priority` when idle.
 
 Failed messages go to `failed_priority` or `failed_bulk`. Message classes are in `src/Message/`, handlers in `src/MessageHandler/`.
 
