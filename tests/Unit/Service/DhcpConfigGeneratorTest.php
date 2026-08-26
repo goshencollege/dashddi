@@ -185,7 +185,7 @@ class DhcpConfigGeneratorTest extends TestCase
         $this->assertSame([['pool' => '10.0.0.100 - 10.0.0.200']], $result[0]['pools']);
     }
 
-    public function testDdnsSubnetWithDdnsHostnameDoesNotSuppressDdnsOnReservation(): void
+    public function testDdnsSubnetWithDdnsHostnameDoesNotSkipDdnsOnReservation(): void
     {
         $ddnsDomain = (new Domain())->setName('dyn.goshen.edu')->setDdnsEnabled(true);
         $iface      = $this->makeIface('aa:bb:cc:00:11:33', '10.0.0.11');
@@ -197,10 +197,10 @@ class DhcpConfigGeneratorTest extends TestCase
 
         $reservation = $this->makeGenerator([$subnet])->generateDhcp4Config()[0]['reservations'][0];
 
-        $this->assertArrayNotHasKey('ddns-send-updates', $reservation);
+        $this->assertArrayNotHasKey('client-classes', $reservation);
     }
 
-    public function testNonDdnsSubnetDoesNotSuppressDdnsOnReservation(): void
+    public function testNonDdnsSubnetDoesNotSkipDdnsOnReservation(): void
     {
         $iface  = $this->makeIfaceWithHostname('aa:bb:cc:00:11:44', '10.0.0.12', 'statichost', 'goshen.edu');
         $subnet = $this->makeSubnet(12);
@@ -209,7 +209,25 @@ class DhcpConfigGeneratorTest extends TestCase
 
         $reservation = $this->makeGenerator([$subnet])->generateDhcp4Config()[0]['reservations'][0];
 
-        $this->assertArrayNotHasKey('ddns-send-updates', $reservation);
+        $this->assertArrayNotHasKey('client-classes', $reservation);
+    }
+
+    public function testDdnsSubnetWithStaticHostnameAssignsSkipDdnsClass(): void
+    {
+        // A host with a static (non-DDNS-enabled domain) FQDN living in a subnet that has
+        // DDNS enabled must not have DHCP DDNS clobber its static PTR. Assigning it to the
+        // "SKIP_DDNS" class (recognized by libdhcp_ddns_tuning.so) stops Kea from sending any
+        // DDNS update for this reservation at all.
+        $ddnsDomain = (new Domain())->setName('dyn.goshen.edu')->setDdnsEnabled(true);
+        $iface      = $this->makeIfaceWithHostname('aa:bb:cc:00:11:55', '10.0.0.13', 'statichost', 'goshen.edu');
+        $subnet     = $this->makeSubnet(13)->setDdnsDomain($ddnsDomain);
+        $this->setCollection($subnet, 'interfaces', [$iface]);
+        $this->setCollection($subnet, 'addressBlocks', []);
+
+        $reservation = $this->makeGenerator([$subnet])->generateDhcp4Config()[0]['reservations'][0];
+
+        $this->assertSame('statichost.goshen.edu.', $reservation['hostname']);
+        $this->assertSame(['SKIP_DDNS'], $reservation['client-classes']);
     }
 
     // ── IPv6 tests ────────────────────────────────────────────────────────────

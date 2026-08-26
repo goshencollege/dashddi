@@ -93,6 +93,7 @@
             <li>Check <strong>DDNS Enabled</strong> on this DHCP server and push config.</li>
         </ol>
         <p>DashDDI generates <code>kea-dhcp-ddns.conf</code> from the configured domains and subnets and deploys it alongside the regular subnet files. The file contains TSIG key definitions and forward/reverse zone entries for the Kea D2 daemon.</p>
+        <p>A host reservation's DHCP hostname is taken from its interface's first DNS record. If that record's domain is <em>not</em> DDNS-enabled but the reservation's subnet is, DashDDI assigns the reservation to the <code>SKIP_DDNS</code> client class so Kea never sends a DDNS update for it — protecting a statically-assigned FQDN from being overwritten by DHCP DDNS when the host's IP falls in a subnet whose reverse zone is otherwise dynamic. This relies on the <code>libdhcp_ddns_tuning.so</code> hook (or an equivalent mechanism) recognizing the <code>SKIP_DDNS</code> class on the Kea server; without it, Kea ignores the class assignment and DDNS proceeds as normal.</p>
         <p class="mb-0 text-muted small">The Kea D2 daemon is a separate package (<code>kea-dhcp-ddns-server</code>) and requires a matching entry in <code>kea-ctrl-agent.conf</code>. See the <a href="{{ path('user_guide_servers') }}#kea-ddns">Servers &amp; Integrations guide → DHCP / Kea → Dynamic DNS</a> for full setup details.</p>
     </div>
 </div>

@@ -51,9 +51,7 @@ class DhcpConfigGenerator
                     'hw-address' => $iface->getMacAddress(),
                     'ip-address' => $iface->getIpAddress()->getAddress(),
                 ];
-                if ($hostname = $iface->getPrimaryName()) {
-                    $res['hostname'] = rtrim($hostname, '.') . '.';
-                }
+                $this->applyHostnameAndDdns($res, $iface, (bool) $subnet->getDdnsQualifyingSuffix());
                 $reservations[] = $res;
             }
             if ($reservations) {
@@ -110,9 +108,7 @@ class DhcpConfigGenerator
                 $res = $duid
                     ? ['duid' => $duid, 'ip-addresses' => [$iface->getIpv6Address()->getAddress()]]
                     : ['hw-address' => $mac, 'ip-addresses' => [$iface->getIpv6Address()->getAddress()]];
-                if ($hostname = $iface->getPrimaryName()) {
-                    $res['hostname'] = rtrim($hostname, '.') . '.';
-                }
+                $this->applyHostnameAndDdns($res, $iface, (bool) $subnet->getDdnsQualifyingSuffix());
                 $reservations[] = $res;
             }
             if ($reservations) {
@@ -172,6 +168,26 @@ class DhcpConfigGenerator
         }
 
         return $reservations;
+    }
+
+    /**
+     * Sets the reservation hostname from the interface's primary DomainRecord. If the subnet
+     * has DDNS enabled but this record's domain doesn't, the reservation is assigned to the
+     * "SKIP_DDNS" client class (recognized by the libdhcp_ddns_tuning.so hook, if loaded) so
+     * Kea never sends a DDNS update for it — a host with a static FQDN outside the dynamic
+     * domain must not have its DNS records overwritten by DHCP DDNS.
+     */
+    private function applyHostnameAndDdns(array &$res, NetworkInterface $iface, bool $subnetDdnsEnabled): void
+    {
+        $record = $iface->getPrimaryDomainRecord();
+        if (!$record) {
+            return;
+        }
+
+        $res['hostname'] = rtrim($record->getFullyQualifiedHostname(), '.') . '.';
+        if ($subnetDdnsEnabled && !$record->getDomain()?->isDdnsEnabled()) {
+            $res['client-classes'] = ['SKIP_DDNS'];
+        }
     }
 
     private function findAnyDdnsLabel(NetworkInterface $iface): ?string
