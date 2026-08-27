@@ -7,6 +7,7 @@ plugin, and optionally publishes CAA/HTTPS records for each issued name.
 """
 import argparse
 import configparser
+import getpass
 import os
 import shlex
 import shutil
@@ -19,6 +20,7 @@ import requests
 
 DEFAULT_CA_DOMAIN = "letsencrypt.org"
 DEFAULT_HTTPS_VALUE = "1 . alpn=h2"
+DEFAULT_CREDENTIALS_PATH = "/etc/dashddi/dashddi.ini"
 
 SYSTEMD_SERVICE_PATH = "/etc/systemd/system/dashddi.service"
 SYSTEMD_TIMER_PATH = "/etc/systemd/system/dashddi.timer"
@@ -56,6 +58,40 @@ class Credentials:
     caa: bool
     https: bool
     https_value: str
+
+
+def _prompt_and_write_credentials(path: str) -> None:
+    """Interactively prompt for and write a new credentials file at `path`.
+
+    Only called when `path` doesn't exist yet. Requires an interactive terminal —
+    a missing file with no TTY (e.g. a systemd timer firing before initial setup
+    has happened) is a hard error rather than hanging on input().
+    """
+    if not sys.stdin.isatty():
+        sys.exit(
+            f"Error: no credentials file at {path} and input is not interactive.\n"
+            "Create it manually (see dashddi.ini.example) or pass --credentials "
+            "pointing at an existing file."
+        )
+
+    print(f"No credentials file found at {path} — let's create one.")
+    url = input("DashDDI URL (e.g. https://dashddi.example.com): ").strip().rstrip("/")
+    token = getpass.getpass("Host-scoped API token (from the host detail page in DashDDI): ").strip()
+    if not url or not token:
+        sys.exit("Error: URL and token are both required.")
+
+    try:
+        directory = os.path.dirname(path)
+        if directory:
+            os.makedirs(directory, mode=0o755, exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(f"dns_dashddi_url = {url}\n")
+            f.write(f"dns_dashddi_token = {token}\n")
+        os.chmod(path, 0o600)
+    except OSError as exc:
+        sys.exit(f"Error: failed to write credentials file at {path}: {exc}")
+
+    print(f"Credentials written to {path}")
 
 
 def _read_credentials(path: str) -> Credentials:
@@ -276,6 +312,9 @@ def _ensure_renewal_schedule(args: argparse.Namespace) -> None:
 
 
 def _cmd_cert(args: argparse.Namespace) -> int:
+    if not os.path.exists(args.credentials):
+        _prompt_and_write_credentials(args.credentials)
+
     creds = _read_credentials(args.credentials)
     if args.caa:
         creds.caa = True
@@ -347,9 +386,12 @@ def main() -> None:
     )
     cert_parser.add_argument(
         "--credentials",
-        required=True,
+        default=DEFAULT_CREDENTIALS_PATH,
         metavar="FILE",
-        help="Path to the DashDDI credentials INI file.",
+        help=(
+            f"Path to the DashDDI credentials INI file. Defaults to {DEFAULT_CREDENTIALS_PATH}. "
+            "If it doesn't exist yet, you're prompted to create it (interactive sessions only)."
+        ),
     )
     cert_parser.add_argument(
         "--names",

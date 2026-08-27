@@ -1,6 +1,10 @@
 # DashDDI credentials for the dashddi client (certbot DNS-01 validation, cert
 # issuance, and optional CAA/HTTPS record publishing).
-# Copy this file to a secure location and restrict permissions:
+#
+# You don't have to create this by hand: running `dashddi cert` with no file at
+# /etc/dashddi/dashddi.ini (or whatever --credentials points at) prompts for the
+# URL and token and writes it for you. To create it manually instead, copy this
+# file to a secure location and restrict permissions:
 #   mkdir -p /etc/dashddi
 #   cp dashddi.ini.example /etc/dashddi/dashddi.ini
 #   chmod 600 /etc/dashddi/dashddi.ini

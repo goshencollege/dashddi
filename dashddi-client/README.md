@@ -56,6 +56,12 @@ addresses. No route permissions need to be configured.
 
 ### 2. Create a credentials file
 
+The easiest way is to just skip this step: `dashddi cert` (see below) prompts for the
+DashDDI URL and token and writes the file for you — at `/etc/dashddi/dashddi.ini` by
+default — the first time it's run against a location with no file yet.
+
+To create it manually instead:
+
 ```bash
 mkdir -p /etc/dashddi
 cp dashddi.ini.example /etc/dashddi/dashddi.ini
@@ -117,14 +123,26 @@ DashDDI, then runs `certbot certonly` for all of them in a single SAN certificat
 request:
 
 ```bash
-dashddi cert --credentials /etc/dashddi/dashddi.ini
+dashddi cert
 ```
+
+`--credentials` is optional and defaults to `/etc/dashddi/dashddi.ini`; pass it to use
+a different location:
+
+```bash
+dashddi cert --credentials /path/to/dashddi.ini
+```
+
+If the credentials file doesn't exist yet at whichever path is in effect, `dashddi cert`
+prompts for the DashDDI URL and host-scoped token and writes it (mode 600) before
+continuing — no separate setup step required. This only happens in an interactive
+terminal; a missing file with no TTY attached (e.g. a scheduled renewal run before
+initial setup) is a hard error instead.
 
 Extra arguments after `--` are passed through to certbot:
 
 ```bash
-dashddi cert --credentials /etc/dashddi/dashddi.ini \
-  -- --dry-run --dns-dashddi-propagation-seconds 60
+dashddi cert -- --dry-run --dns-dashddi-propagation-seconds 60
 ```
 
 This is the recommended way to set up automatic renewal. It will always request certs
