@@ -57,6 +57,12 @@
 .PARAMETER SkipCertRequest
     Deploy everything but skip the initial certificate request.
 
+.PARAMETER NoScheduledTask
+    Don't register the 'Dashddi renewal (SYSTEM)' Scheduled Task. By default it is
+    always (re)registered, even when -SkipCertRequest is used, so that re-running the
+    installer on an existing install picks up any renamed/updated scripts. Pass this
+    switch to manage renewal scheduling yourself instead.
+
 .EXAMPLE
     .\Install-Dashddi.ps1
 
@@ -73,7 +79,8 @@ param(
     [switch]$Caa,
     [switch]$Https,
     [string]$HttpsValue,
-    [switch]$SkipCertRequest
+    [switch]$SkipCertRequest,
+    [switch]$NoScheduledTask
 )
 
 $ErrorActionPreference = 'Stop'
@@ -238,36 +245,47 @@ Check that:
 # This runs even with -SkipCertRequest ("deploy everything but skip the initial
 # certificate request") so re-running the installer to pick up renamed scripts
 # on an existing install re-registers the task without forcing a cert request.
+# Pass -NoScheduledTask to opt out and manage renewal scheduling yourself.
 
-$taskName   = 'Dashddi renewal (SYSTEM)'
-$renewScript = Join-Path $InstallPath 'Update-DashddiCertificate.ps1'
-$taskAction  = New-ScheduledTaskAction `
-    -Execute 'powershell.exe' `
-    -Argument "-NonInteractive -ExecutionPolicy Bypass -File `"$renewScript`""
-$taskTrigger  = New-ScheduledTaskTrigger -Daily -At '09:00AM'
-$taskSettings = New-ScheduledTaskSettingsSet `
-    -ExecutionTimeLimit (New-TimeSpan -Hours 2) `
-    -MultipleInstances IgnoreNew
-$taskPrincipal = New-ScheduledTaskPrincipal `
-    -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
+$taskName = 'Dashddi renewal (SYSTEM)'
 
-Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
-Register-ScheduledTask -TaskName $taskName `
-    -Action $taskAction -Trigger $taskTrigger `
-    -Settings $taskSettings -Principal $taskPrincipal -Force | Out-Null
-Write-Host "Scheduled Task '$taskName' configured for DashDDI FQDN-aware renewal."
+if (-not $NoScheduledTask) {
+    $renewScript = Join-Path $InstallPath 'Update-DashddiCertificate.ps1'
+    $taskAction  = New-ScheduledTaskAction `
+        -Execute 'powershell.exe' `
+        -Argument "-NonInteractive -ExecutionPolicy Bypass -File `"$renewScript`""
+    $taskTrigger  = New-ScheduledTaskTrigger -Daily -At '09:00AM'
+    $taskSettings = New-ScheduledTaskSettingsSet `
+        -ExecutionTimeLimit (New-TimeSpan -Hours 2) `
+        -MultipleInstances IgnoreNew
+    $taskPrincipal = New-ScheduledTaskPrincipal `
+        -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
+
+    Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
+    Register-ScheduledTask -TaskName $taskName `
+        -Action $taskAction -Trigger $taskTrigger `
+        -Settings $taskSettings -Principal $taskPrincipal -Force | Out-Null
+    Write-Host "Scheduled Task '$taskName' configured for DashDDI FQDN-aware renewal."
+} else {
+    Write-Host "Skipping Scheduled Task setup (-NoScheduledTask). Renewal will not run automatically."
+}
 
 Write-Host ''
 Write-Host 'Installation complete.'
 Write-Host "  win-acme:       $InstallPath"
 Write-Host "  Credentials:    $credPath"
 Write-Host "  Certificate:    Windows Certificate Store (LocalMachine\My)"
-Write-Host "  Renewal:        Scheduled Task created automatically by win-acme"
-Write-Host ''
-Write-Host 'To trigger a manual renewal:'
-Write-Host "  & `"$InstallPath\wacs.exe`" --renew --force"
-Write-Host ''
-Write-Host "  Renewal task:   'Dashddi renewal (SYSTEM)' -> Update-DashddiCertificate.ps1"
-Write-Host ''
-Write-Host 'FQDNs are re-queried from DashDDI on every renewal - the SAN list updates'
-Write-Host 'automatically as records are added or removed. No re-installation needed.'
+if (-not $NoScheduledTask) {
+    Write-Host "  Renewal:        Scheduled Task '$taskName' -> Update-DashddiCertificate.ps1"
+    Write-Host ''
+    Write-Host 'To trigger a manual renewal:'
+    Write-Host "  & `"$InstallPath\wacs.exe`" --renew --force"
+    Write-Host ''
+    Write-Host 'FQDNs are re-queried from DashDDI on every renewal - the SAN list updates'
+    Write-Host 'automatically as records are added or removed. No re-installation needed.'
+} else {
+    Write-Host '  Renewal:        not scheduled (-NoScheduledTask)'
+    Write-Host ''
+    Write-Host 'To renew manually:'
+    Write-Host "  & `"$InstallPath\Update-DashddiCertificate.ps1`""
+}

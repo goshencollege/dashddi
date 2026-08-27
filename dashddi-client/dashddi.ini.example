@@ -1,8 +1,9 @@
 # DashDDI credentials for the dashddi client (certbot DNS-01 validation, cert
 # issuance, and optional CAA/HTTPS record publishing).
 # Copy this file to a secure location and restrict permissions:
-#   cp dashddi.ini.example /etc/letsencrypt/dashddi.ini
-#   chmod 600 /etc/letsencrypt/dashddi.ini
+#   mkdir -p /etc/dashddi
+#   cp dashddi.ini.example /etc/dashddi/dashddi.ini
+#   chmod 600 /etc/dashddi/dashddi.ini
 
 # Base URL of your DashDDI instance (no trailing slash)
 dns_dashddi_url = https://dashddi.example.com

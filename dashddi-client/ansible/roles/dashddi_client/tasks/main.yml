@@ -84,9 +84,9 @@
 
 # ── Credentials file ──────────────────────────────────────────────────────────
 
-- name: Ensure /etc/letsencrypt exists
+- name: Ensure /etc/dashddi exists
   ansible.builtin.file:
-    path: /etc/letsencrypt
+    path: /etc/dashddi
     state: directory
     mode: "0755"
 

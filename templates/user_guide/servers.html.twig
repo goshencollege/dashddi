@@ -551,8 +551,10 @@ ln -s /opt/certbot/bin/certbot /usr/local/bin/certbot
 ln -s /opt/certbot/bin/dashddi /usr/local/bin/dashddi</code></pre>
 
         <p class="fw-semibold mb-1">Credentials file</p>
-        <p class="text-muted small mb-1">Create <code>/etc/letsencrypt/dashddi.ini</code> (chmod 600):</p>
-        <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-3"><code>dns_dashddi_url = https://dashddi.example.com
+        <p class="text-muted small mb-1">Create <code>/etc/dashddi/dashddi.ini</code> (chmod 600):</p>
+        <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-3"><code>mkdir -p /etc/dashddi
+
+dns_dashddi_url = https://dashddi.example.com
 dns_dashddi_token = &lt;host-scoped-token&gt;
 
 # Optional — only needed if DashDDI uses a self-signed or internal CA cert:
@@ -562,35 +564,20 @@ dns_dashddi_token = &lt;host-scoped-token&gt;
 
         <p class="fw-semibold mb-1">Automatic FQDN discovery</p>
         <p class="text-muted small mb-1">The <code>dashddi cert</code> subcommand queries <code>/api/self/host</code> to find all A/AAAA FQDNs for this host and requests a single SAN certificate covering them all:</p>
-        <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-3"><code>dashddi cert --credentials /etc/letsencrypt/dashddi.ini</code></pre>
+        <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-3"><code>dashddi cert --credentials /etc/dashddi/dashddi.ini</code></pre>
 
         <p class="fw-semibold mb-1">Manual domain list</p>
         <p class="text-muted small mb-1">To specify domains explicitly, use certbot directly:</p>
         <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-3"><code>certbot certonly \
   --authenticator dns-dashddi \
-  --dns-dashddi-credentials /etc/letsencrypt/dashddi.ini \
+  --dns-dashddi-credentials /etc/dashddi/dashddi.ini \
   -d web01.example.com -d app.example.com</code></pre>
 
         <p class="fw-semibold mb-1">Automatic renewal (systemd timer)</p>
-        <p class="text-muted small mb-1">Create <code>/etc/systemd/system/dashddi.service</code> and <code>dashddi.timer</code>:</p>
-        <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-3"><code>[Unit]
-Description=Renew certificates via DashDDI
-
-[Service]
-Type=oneshot
-ExecStart=/usr/local/bin/dashddi cert --credentials /etc/letsencrypt/dashddi.ini</code></pre>
-        <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-3"><code>[Unit]
-Description=Run dashddi cert twice daily
-
-[Timer]
-OnCalendar=*-*-* 03,15:00:00
-RandomizedDelaySec=1h
-Persistent=true
-
-[Install]
-WantedBy=timers.target</code></pre>
-        <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-3"><code>systemctl daemon-reload
-systemctl enable --now dashddi.timer</code></pre>
+        <p class="text-muted small mb-1">As of <code>dashddi-client</code> v3.1, a successful <code>dashddi cert</code> run automatically installs and enables a twice-daily systemd timer (<code>/etc/systemd/system/dashddi.timer</code>) that reruns the exact same command — same credentials file, <code>--names</code>/<code>--caa</code>/<code>--https</code>/<code>--https-value</code> flags, and any extra certbot arguments after <code>--</code>. Running <code>dashddi cert</code> once by hand is enough to set up ongoing renewal; nothing further needs to be created manually.</p>
+        <p class="text-muted small mb-1">An existing <code>dashddi.timer</code> (e.g. one deployed by the Ansible role below, or from a prior run) is never overwritten — it may have been hand-customized, so it's left alone. Setup requires running as root on a systemd host; otherwise it's silently skipped with a note on stderr.</p>
+        <p class="text-muted small mb-1">Pass <code>--no-schedule</code> to skip this and manage renewal scheduling yourself:</p>
+        <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-3"><code>dashddi cert --credentials /etc/dashddi/dashddi.ini --no-schedule</code></pre>
 
         <h6 id="api-name-selection" class="mt-4">Selecting specific names, or names covered by a wildcard</h6>
         <p>By default both the Linux and Windows clients certify every publicly-reachable FQDN the host owns. To certify an explicit list instead — a subset of those names, or concrete names not present as their own record but covered by a wildcard record (e.g. the host owns <code>*.example.com</code> and you also want <code>foo.example.com</code> and <code>bar.example.com</code> as explicit SAN entries) — set <code>dns_dashddi_names</code> in the credentials file:</p>
@@ -626,7 +613,7 @@ systemctl enable --now dashddi.timer</code></pre>
             <thead><tr><th>Variable</th><th>Default</th><th>Description</th></tr></thead>
             <tbody>
                 <tr><td><code>dashddi_host_name</code></td><td><code>inventory_hostname</code></td><td>Host name in DashDDI (must match exactly)</td></tr>
-                <tr><td><code>dashddi_credentials_path</code></td><td><code>/etc/letsencrypt/dashddi.ini</code></td><td>Where to write the credentials file</td></tr>
+                <tr><td><code>dashddi_credentials_path</code></td><td><code>/etc/dashddi/dashddi.ini</code></td><td>Where to write the credentials file</td></tr>
                 <tr><td><code>dashddi_venv_path</code></td><td><code>/opt/certbot</code></td><td>Virtualenv for certbot and the plugin</td></tr>
                 <tr><td><code>dashddi_propagation_seconds</code></td><td><code>30</code></td><td>DNS propagation wait passed to certbot</td></tr>
                 <tr><td><code>dashddi_force_token_regenerate</code></td><td><code>false</code></td><td>Set to <code>true</code> to revoke and replace the existing token</td></tr>
@@ -650,7 +637,7 @@ systemctl enable --now dashddi.timer</code></pre>
         <p class="text-muted small">The role is idempotent: if the credentials file already exists and <code>dashddi_force_token_regenerate</code> is false, token generation is skipped. Installation and systemd unit deployment always run.</p>
 
         <h6 id="api-windows" class="mt-4">Windows (<code>dashddi-client-windows</code>)</h6>
-        <p>On Windows, use <strong>dashddi-client-windows</strong> — a PowerShell installer at <code>dashddi-client-windows/Install-Dashddi.ps1</code>. It downloads <a href="https://www.win-acme.com/" target="_blank" rel="noopener">win-acme</a>, deploys the DashDDI challenge hook scripts, writes a credentials file, queries DashDDI for this host's FQDNs, and requests an initial certificate. win-acme stores the certificate in the <strong>Windows Certificate Store</strong> (<code>LocalMachine\My</code>), making it natively available to IIS and other Windows services, and a daily Scheduled Task handles automatic renewal (including re-publishing CAA/HTTPS records if configured).</p>
+        <p>On Windows, use <strong>dashddi-client-windows</strong> — a PowerShell installer at <code>dashddi-client-windows/Install-Dashddi.ps1</code>. It downloads <a href="https://www.win-acme.com/" target="_blank" rel="noopener">win-acme</a>, deploys the DashDDI challenge hook scripts, writes a credentials file, queries DashDDI for this host's FQDNs, and requests an initial certificate. win-acme stores the certificate in the <strong>Windows Certificate Store</strong> (<code>LocalMachine\My</code>), making it natively available to IIS and other Windows services, and by default a daily Scheduled Task is registered automatically to handle renewal (including re-publishing CAA/HTTPS records if configured) — pass <code>-NoScheduledTask</code> to skip that and manage scheduling yourself.</p>
 
         <p class="fw-semibold mb-1">Prerequisites</p>
         <p class="text-muted small mb-1">Windows Server 2016 / Windows 10 or later with PowerShell 5.1+ (built in to all supported versions). No Python required.</p>
@@ -678,7 +665,7 @@ systemctl enable --now dashddi.timer</code></pre>
                 <tr><td><code>C:\dashddi\Publish-DashddiRecords.ps1</code></td><td>Creates/updates CAA/HTTPS records at each issued FQDN, if configured</td></tr>
                 <tr><td><code>C:\dashddi\dashddi.ini</code></td><td>Credentials file (ACL restricted to SYSTEM + Administrators)</td></tr>
                 <tr><td>Windows Certificate Store &rarr; <code>LocalMachine\My</code></td><td>Issued certificate</td></tr>
-                <tr><td>Task Scheduler &rarr; <code>Dashddi renewal (SYSTEM)</code></td><td>Daily task running <code>Update-DashddiCertificate.ps1</code> as SYSTEM</td></tr>
+                <tr><td>Task Scheduler &rarr; <code>Dashddi renewal (SYSTEM)</code></td><td>Daily task running <code>Update-DashddiCertificate.ps1</code> as SYSTEM — registered automatically unless <code>-NoScheduledTask</code> is passed</td></tr>
             </tbody>
         </table>
         </div>
@@ -787,10 +774,9 @@ systemctl restart pveproxy pvedaemon</code></pre>
 
         <h6 class="mt-3">Manual setup</h6>
         <p>Without Ansible, install certbot and the plugin manually (see <code>dashddi-client/README.md</code>), generate a host-scoped token from the DashDDI host's page, then request the certificate once:</p>
-        <pre class="bg-body-secondary p-2 rounded small mb-2">dashddi cert --credentials /etc/letsencrypt/dashddi.ini \
+        <pre class="bg-body-secondary p-2 rounded small mb-0">dashddi cert --credentials /etc/dashddi/dashddi.ini \
   -- --deploy-hook /opt/dashddi/docker/certbot-deploy.sh</pre>
-        <p>For automatic renewal, copy the deploy hook into certbot's drop-in directory so it runs on every renewal without any extra arguments:</p>
-        <pre class="bg-body-secondary p-2 rounded small mb-0">cp /opt/dashddi/docker/certbot-deploy.sh /etc/letsencrypt/renewal-hooks/deploy/</pre>
+        <p class="mb-0">As of <code>dashddi-client</code> v3.1, this single run is enough — a successful request automatically installs and enables a twice-daily systemd timer that reruns this exact command (deploy hook included), so no separate step is needed to wire up renewal.</p>
     </div>
 </div>
 

@@ -57,11 +57,12 @@ addresses. No route permissions need to be configured.
 ### 2. Create a credentials file
 
 ```bash
-cp dashddi.ini.example /etc/letsencrypt/dashddi.ini
-chmod 600 /etc/letsencrypt/dashddi.ini
+mkdir -p /etc/dashddi
+cp dashddi.ini.example /etc/dashddi/dashddi.ini
+chmod 600 /etc/dashddi/dashddi.ini
 ```
 
-Edit `/etc/letsencrypt/dashddi.ini`:
+Edit `/etc/dashddi/dashddi.ini`:
 
 ```ini
 dns_dashddi_url = https://dashddi.example.com
@@ -73,7 +74,7 @@ dns_dashddi_token = your-host-scoped-token-here
 ```bash
 certbot certonly \
   --authenticator dns-dashddi \
-  --dns-dashddi-credentials /etc/letsencrypt/dashddi.ini \
+  --dns-dashddi-credentials /etc/dashddi/dashddi.ini \
   -d myhost.example.com
 ```
 
@@ -82,7 +83,7 @@ For wildcard certificates:
 ```bash
 certbot certonly \
   --authenticator dns-dashddi \
-  --dns-dashddi-credentials /etc/letsencrypt/dashddi.ini \
+  --dns-dashddi-credentials /etc/dashddi/dashddi.ini \
   -d '*.example.com'
 ```
 
@@ -116,19 +117,44 @@ DashDDI, then runs `certbot certonly` for all of them in a single SAN certificat
 request:
 
 ```bash
-dashddi cert --credentials /etc/letsencrypt/dashddi.ini
+dashddi cert --credentials /etc/dashddi/dashddi.ini
 ```
 
 Extra arguments after `--` are passed through to certbot:
 
 ```bash
-dashddi cert --credentials /etc/letsencrypt/dashddi.ini \
+dashddi cert --credentials /etc/dashddi/dashddi.ini \
   -- --dry-run --dns-dashddi-propagation-seconds 60
 ```
 
-This is the recommended way to set up automatic renewal — add it to a systemd timer or
-cron job and it will always request certs for exactly the FQDNs DashDDI knows about for
-this host. A, AAAA, and CNAME record FQDNs in domains with a public view are included.
+This is the recommended way to set up automatic renewal. It will always request certs
+for exactly the FQDNs DashDDI knows about for this host — A, AAAA, and CNAME record
+FQDNs in domains with a public view are included.
+
+### Automatic renewal schedule
+
+After a successful certificate request, `dashddi cert` automatically installs and
+enables a systemd timer (`dashddi.timer`, twice daily) that reruns the exact same
+command — same credentials file, `--names`/`--caa`/`--https`/`--https-value` flags, and
+any extra certbot arguments after `--`. This means running `dashddi cert` once by hand
+is enough to set up ongoing renewal; you don't need to configure a timer or cron job
+yourself.
+
+An existing `/etc/systemd/system/dashddi.timer` (e.g. one deployed by the Ansible role,
+or from a previous run) is never overwritten, so hand-customized schedules are left
+alone. Setup requires running as root and a systemd host; on a non-systemd host, or when
+run unprivileged (e.g. `--dry-run` testing), it's silently skipped with a note on
+stderr.
+
+Pass `--no-schedule` to skip this entirely:
+
+```bash
+dashddi cert --credentials /etc/dashddi/dashddi.ini --no-schedule
+```
+
+If you're using the Ansible role, it deploys its own `dashddi.service`/`dashddi.timer`
+(with support for a deploy hook — see below), so no action is needed there; the CLI's
+own schedule setup will find the timer already exists and step aside.
 
 ### Requesting a subset of names, or names covered by a wildcard
 
@@ -144,7 +170,7 @@ dns_dashddi_names = foo.example.com,bar.example.com
 or pass `--names` on the command line (takes precedence over the credentials file):
 
 ```bash
-dashddi cert --credentials /etc/letsencrypt/dashddi.ini \
+dashddi cert --credentials /etc/dashddi/dashddi.ini \
   --names foo.example.com,bar.example.com
 ```
 
@@ -164,7 +190,7 @@ dns_dashddi_caa = true
 ```
 
 ```bash
-dashddi cert --credentials /etc/letsencrypt/dashddi.ini --caa
+dashddi cert --credentials /etc/dashddi/dashddi.ini --caa
 ```
 
 There's no CA to specify — it's auto-detected from the ACME server certbot was told to
@@ -182,7 +208,7 @@ dns_dashddi_https = true
 ```
 
 ```bash
-dashddi cert --credentials /etc/letsencrypt/dashddi.ini --https
+dashddi cert --credentials /etc/dashddi/dashddi.ini --https
 ```
 
 Or provide an explicit value instead (implies enabling it, on either platform):
@@ -192,7 +218,7 @@ dns_dashddi_https_value = 1 . alpn=h2,h3
 ```
 
 ```bash
-dashddi cert --credentials /etc/letsencrypt/dashddi.ini --https-value '1 . alpn=h2,h3'
+dashddi cert --credentials /etc/dashddi/dashddi.ini --https-value '1 . alpn=h2,h3'
 ```
 
 Either one calls `PUT /api/self/records` once per FQDN. Each call is an idempotent
@@ -222,7 +248,7 @@ An example playbook is at `ansible/dashddi.yml`.
 | `dashddi_url` | *(required)* | Base URL of your DashDDI instance |
 | `dashddi_admin_token` | *(required)* | General-purpose token with `api_hosts_index` and `api_hosts_token_generate` route permissions |
 | `dashddi_host_name` | `{{ inventory_hostname }}` | Name of the host in DashDDI (must match exactly) |
-| `dashddi_credentials_path` | `/etc/letsencrypt/dashddi.ini` | Where to write the credentials file |
+| `dashddi_credentials_path` | `/etc/dashddi/dashddi.ini` | Where to write the credentials file |
 | `dashddi_venv_path` | `/opt/certbot` | Virtualenv path for certbot and the plugin |
 | `dashddi_plugin_source` | `git+https://github.com/goshencollege/dashddi/…` | pip-installable source for the plugin |
 | `dashddi_propagation_seconds` | `30` | DNS propagation wait passed to certbot |
@@ -291,7 +317,7 @@ Increase the propagation wait time:
 ```bash
 certbot certonly \
   --authenticator dns-dashddi \
-  --dns-dashddi-credentials /etc/letsencrypt/dashddi.ini \
+  --dns-dashddi-credentials /etc/dashddi/dashddi.ini \
   --dns-dashddi-propagation-seconds 60 \
   -d myhost.example.com
 ```
@@ -329,3 +355,22 @@ Certbot plugin's authenticator id (`dns-dashddi`, the value used with
 `--authenticator`) is unchanged, so every already-issued certificate's
 `/etc/letsencrypt/renewal/*.conf` keeps working and keeps renewing exactly as before —
 even before you complete the steps above.
+
+### Credentials file location
+
+The credentials file now defaults to `/etc/dashddi/dashddi.ini` instead of
+`/etc/letsencrypt/dashddi.ini` — now that the client does more than drive Certbot (name
+discovery, CAA/HTTPS publishing, renewal scheduling), it no longer makes sense to live
+under Certbot's own config directory. This is purely a documentation/default change:
+`--dns-dashddi-credentials` / `--credentials` is just a path, so nothing breaks if an
+existing host keeps its file at the old location. To move one over:
+
+```bash
+mkdir -p /etc/dashddi
+mv /etc/letsencrypt/dashddi.ini /etc/dashddi/dashddi.ini
+```
+
+Then update wherever the path is referenced: any existing `dashddi.timer`/cron entry,
+and `/etc/letsencrypt/renewal/*.conf` for the `dns_dashddi_credentials` value Certbot
+stores from the original issuance. Ansible-managed hosts pick up the new default path
+automatically on the next run.
