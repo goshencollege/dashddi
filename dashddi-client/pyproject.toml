@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dashddi-client"
-version = "3.0.0"
+version = "3.1.0"
 description = "DashDDI host self-service client: Certbot DNS-01 authenticator, certificate CLI, and CAA/HTTPS record publishing"
 requires-python = ">=3.9"
 dependencies = [

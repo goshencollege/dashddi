@@ -7,6 +7,9 @@ plugin, and optionally publishes CAA/HTTPS records for each issued name.
 """
 import argparse
 import configparser
+import os
+import shlex
+import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -16,6 +19,32 @@ import requests
 
 DEFAULT_CA_DOMAIN = "letsencrypt.org"
 DEFAULT_HTTPS_VALUE = "1 . alpn=h2"
+
+SYSTEMD_SERVICE_PATH = "/etc/systemd/system/dashddi.service"
+SYSTEMD_TIMER_PATH = "/etc/systemd/system/dashddi.timer"
+
+SYSTEMD_SERVICE_TEMPLATE = """[Unit]
+Description=Renew certificates via DashDDI
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart={exec_start}
+PrivateTmp=true
+"""
+
+SYSTEMD_TIMER_TEMPLATE = """[Unit]
+Description=Run dashddi cert twice daily
+
+[Timer]
+OnCalendar=*-*-* 03,15:00:00
+RandomizedDelaySec=1h
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+"""
 
 
 @dataclass
@@ -178,6 +207,74 @@ def _publish_records(creds: Credentials, fqdns: list[str], certbot_args: list[st
                 )
 
 
+def _renewal_command(args: argparse.Namespace) -> list[str]:
+    """Rebuild the exact `dashddi cert ...` invocation used for this run.
+
+    Used as the ExecStart for the generated systemd service, so the scheduled
+    renewal reproduces the same credentials file, name selection, and
+    CAA/HTTPS/certbot options as the run that created the schedule.
+    """
+    dashddi_bin = shutil.which("dashddi") or os.path.abspath(sys.argv[0])
+    cmd = [dashddi_bin, "cert", "--credentials", args.credentials]
+    if args.names:
+        cmd += ["--names", args.names]
+    if args.caa:
+        cmd.append("--caa")
+    if args.https_value:
+        cmd += ["--https-value", args.https_value]
+    elif args.https:
+        cmd.append("--https")
+    if args.certbot_args:
+        cmd.append("--")
+        cmd += args.certbot_args
+    return cmd
+
+
+def _ensure_renewal_schedule(args: argparse.Namespace) -> None:
+    """Install a systemd timer that reruns this command twice daily, if one isn't
+    already set up.
+
+    Only runs after a successful issuance. Never overwrites an existing timer
+    (e.g. one deployed by the Ansible role, or a prior run of this command) —
+    it may have been hand-customized, so we leave it alone rather than
+    clobbering it on every renewal.
+    """
+    if os.path.exists(SYSTEMD_TIMER_PATH):
+        return
+
+    if shutil.which("systemctl") is None:
+        print(
+            "Note: systemd not found — skipping automatic renewal schedule setup. "
+            "Set up cron or another scheduler manually, or pass --no-schedule to "
+            "silence this message.",
+            file=sys.stderr,
+        )
+        return
+
+    if os.geteuid() != 0:
+        print(
+            "Note: not running as root — skipping automatic renewal schedule setup. "
+            "Re-run as root to have a systemd timer created automatically, or pass "
+            "--no-schedule to silence this message.",
+            file=sys.stderr,
+        )
+        return
+
+    exec_start = shlex.join(_renewal_command(args))
+    try:
+        with open(SYSTEMD_SERVICE_PATH, "w", encoding="utf-8") as f:
+            f.write(SYSTEMD_SERVICE_TEMPLATE.format(exec_start=exec_start))
+        with open(SYSTEMD_TIMER_PATH, "w", encoding="utf-8") as f:
+            f.write(SYSTEMD_TIMER_TEMPLATE)
+        subprocess.run(["systemctl", "daemon-reload"], check=True)
+        subprocess.run(["systemctl", "enable", "--now", "dashddi.timer"], check=True)
+    except (OSError, subprocess.CalledProcessError) as exc:
+        print(f"Warning: failed to set up automatic renewal schedule: {exc}", file=sys.stderr)
+        return
+
+    print(f"Renewal schedule installed: systemd timer 'dashddi.timer' ({SYSTEMD_TIMER_PATH})")
+
+
 def _cmd_cert(args: argparse.Namespace) -> int:
     creds = _read_credentials(args.credentials)
     if args.caa:
@@ -219,6 +316,8 @@ def _cmd_cert(args: argparse.Namespace) -> int:
     result = subprocess.call(cmd)
     if result == 0:
         _publish_records(creds, fqdns, args.certbot_args)
+        if args.schedule:
+            _ensure_renewal_schedule(args)
     return result
 
 
@@ -241,7 +340,7 @@ def main() -> None:
         ),
         epilog=(
             "Any arguments after -- are passed through to certbot. Example:\n"
-            "  dashddi cert --credentials /etc/letsencrypt/dashddi.ini "
+            "  dashddi cert --credentials /etc/dashddi/dashddi.ini "
             "-- --dns-dashddi-propagation-seconds 60 --dry-run"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -285,6 +384,20 @@ def main() -> None:
         help=(
             "Explicit HTTPS record value to publish after issuance (implies --https). "
             "Takes precedence over dns_dashddi_https_value in the credentials file."
+        ),
+    )
+    cert_parser.add_argument(
+        "--no-schedule",
+        dest="schedule",
+        action="store_false",
+        default=True,
+        help=(
+            "Don't set up an automatic renewal schedule after issuance. By default, "
+            "after a successful certificate request, this command installs and enables "
+            f"a systemd timer ({SYSTEMD_TIMER_PATH}) that reruns this exact "
+            "invocation twice daily — unless one already exists, or the process isn't "
+            "running as root, or systemd isn't available, in which case setup is "
+            "silently skipped (or logged as a warning)."
         ),
     )
     cert_parser.add_argument(

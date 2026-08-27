@@ -7,7 +7,7 @@
 dashddi_host_name: "{{ inventory_hostname }}"
 
 # Path where the credentials file will be written on the target host.
-dashddi_credentials_path: "/etc/letsencrypt/dashddi.ini"
+dashddi_credentials_path: "/etc/dashddi/dashddi.ini"
 
 # Certbot virtualenv location.
 dashddi_venv_path: "/opt/certbot"

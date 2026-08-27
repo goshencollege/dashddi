@@ -63,6 +63,15 @@ ACME account notifications. Pass them directly for unattended use:
 | Windows Certificate Store → `LocalMachine\My` | Issued certificate |
 | Task Scheduler → `Dashddi renewal (SYSTEM)` | Daily task running `Update-DashddiCertificate.ps1` as SYSTEM |
 
+By default, the installer always registers the `Dashddi renewal (SYSTEM)` Scheduled
+Task — running it once is enough to set up ongoing automatic renewal, no separate
+scheduling step required. Pass `-NoScheduledTask` to skip this and manage renewal
+scheduling yourself:
+
+```powershell
+.\Install-Dashddi.ps1 -Url https://dashddi.example.com -Token ... -Email ... -NoScheduledTask
+```
+
 ## How it works
 
 The installer registers `Update-DashddiCertificate.ps1` as the `Dashddi renewal
