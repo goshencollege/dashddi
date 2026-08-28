@@ -345,6 +345,7 @@ def _cmd_cert(args: argparse.Namespace) -> int:
 
     cmd = [
         "certbot", "certonly",
+        "--non-interactive",
         "--authenticator", "dns-dashddi",
         "--dns-dashddi-credentials", args.credentials,
     ]
