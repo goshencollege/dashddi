@@ -9,6 +9,7 @@ use App\Repository\DomainRecordRepository;
 use App\Repository\DomainRepository;
 use App\Repository\NetworkInterfaceRepository;
 use App\Repository\VirtualIpRepository;
+use App\Service\DnsViewResolver;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -58,6 +59,7 @@ class DomainRecordApiController extends AbstractController
         NetworkInterfaceRepository $interfaceRepo,
         VirtualIpRepository $vipRepo,
         DnsViewRepository $viewRepo,
+        DnsViewResolver $viewResolver,
         ValidatorInterface $validator,
     ): JsonResponse {
         $data = json_decode($request->getContent(), true) ?? [];
@@ -133,10 +135,17 @@ class DomainRecordApiController extends AbstractController
             $record->setValue($value);
         }
 
-        foreach ($data['view_ids'] ?? [] as $viewId) {
-            $view = $viewRepo->find($viewId);
-            if ($view) {
+        if (!empty($data['all_views'])) {
+            $subnet = $record->getNetworkInterface()?->getSubnet() ?? $record->getVirtualIp()?->getSubnet();
+            foreach ($viewResolver->availableViewsFor($record->getDomain(), $subnet) as $view) {
                 $record->addView($view);
+            }
+        } else {
+            foreach ($data['view_ids'] ?? [] as $viewId) {
+                $view = $viewRepo->find($viewId);
+                if ($view) {
+                    $record->addView($view);
+                }
             }
         }
 
@@ -160,6 +169,7 @@ class DomainRecordApiController extends AbstractController
         NetworkInterfaceRepository $interfaceRepo,
         VirtualIpRepository $vipRepo,
         DnsViewRepository $viewRepo,
+        DnsViewResolver $viewResolver,
         ValidatorInterface $validator,
     ): JsonResponse {
         $data = json_decode($request->getContent(), true) ?? [];
@@ -243,7 +253,15 @@ class DomainRecordApiController extends AbstractController
             $domainRecord->setIsCanonical($canBeCanonical && (bool) $data['is_canonical']);
         }
 
-        if (array_key_exists('view_ids', $data)) {
+        if (!empty($data['all_views'])) {
+            foreach ($domainRecord->getViews()->toArray() as $view) {
+                $domainRecord->removeView($view);
+            }
+            $subnet = $domainRecord->getNetworkInterface()?->getSubnet() ?? $domainRecord->getVirtualIp()?->getSubnet();
+            foreach ($viewResolver->availableViewsFor($domainRecord->getDomain(), $subnet) as $view) {
+                $domainRecord->addView($view);
+            }
+        } elseif (array_key_exists('view_ids', $data)) {
             foreach ($domainRecord->getViews()->toArray() as $view) {
                 $domainRecord->removeView($view);
             }
@@ -297,7 +315,7 @@ class DomainRecordApiController extends AbstractController
             'value'        => $record->getValue(),
             'ttl'          => $record->getTtl(),
             'is_canonical' => $record->isCanonical(),
-            'view_ids'     => $record->getViews()->map(fn($v) => $v->getId())->toArray(),
+            'view_ids'     => array_values($record->getViews()->map(fn($v) => $v->getId())->toArray()),
             'created_at'   => $record->getCreatedAt()->format(\DateTimeInterface::ATOM),
             'updated_at'   => $record->getUpdatedAt()->format(\DateTimeInterface::ATOM),
             'created_by'   => $record->getCreatedBy(),
