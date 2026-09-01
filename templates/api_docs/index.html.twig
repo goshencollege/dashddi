@@ -1021,7 +1021,8 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
                     {name: 'is_canonical', type: 'boolean', required: false, desc: 'Mark as the canonical (PTR) name. Only valid on interface- or VIP-linked A/AAAA records. Default: false.'},
                     {name: 'value', type: 'string', required: false, desc: 'Record value. Required for standalone records and all non-A/AAAA types.'},
                     {name: 'ttl', type: 'integer', required: false, desc: 'TTL in seconds.'},
-                    {name: 'view_ids', type: 'integer[]', required: false, desc: 'DNS view IDs.'},
+                    {name: 'view_ids', type: 'integer[]', required: false, desc: 'DNS view IDs. Ignored if <code>all_view</code> is true.'},
+                    {name: 'all_view', type: 'boolean', required: false, desc: 'Automatically attach every DNS view that applies to the record\'s domain/subnet combination (same resolution used by the web form), instead of specifying <code>view_ids</code> explicitly. Default: false.'},
                 ],
                 response_status: '201',
             } %}
@@ -1039,7 +1040,8 @@ curl -u "token:&lt;your-token&gt;" https://example.com/api/...</code></pre>
                     {name: 'value', type: 'string', required: false, desc: 'Record value.'},
                     {name: 'is_canonical', type: 'boolean', required: false, desc: 'Canonical name flag. Only valid on interface- or VIP-linked A/AAAA records.'},
                     {name: 'ttl', type: 'integer|null', required: false, desc: 'TTL in seconds, or null to clear.'},
-                    {name: 'view_ids', type: 'integer[]', required: false, desc: 'Replaces all current views.'},
+                    {name: 'view_ids', type: 'integer[]', required: false, desc: 'Replaces all current views. Ignored if <code>all_view</code> is true.'},
+                    {name: 'all_view', type: 'boolean', required: false, desc: 'Replace current views with every DNS view that applies to the record\'s (possibly just-updated) domain/subnet combination, instead of specifying <code>view_ids</code> explicitly.'},
                 ],
             } %}
 
