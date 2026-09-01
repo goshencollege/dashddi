@@ -135,7 +135,7 @@ class DomainRecordApiController extends AbstractController
             $record->setValue($value);
         }
 
-        if (!empty($data['all_view'])) {
+        if (!empty($data['all_views'])) {
             $subnet = $record->getNetworkInterface()?->getSubnet() ?? $record->getVirtualIp()?->getSubnet();
             foreach ($viewResolver->availableViewsFor($record->getDomain(), $subnet) as $view) {
                 $record->addView($view);
@@ -253,7 +253,7 @@ class DomainRecordApiController extends AbstractController
             $domainRecord->setIsCanonical($canBeCanonical && (bool) $data['is_canonical']);
         }
 
-        if (!empty($data['all_view'])) {
+        if (!empty($data['all_views'])) {
             foreach ($domainRecord->getViews()->toArray() as $view) {
                 $domainRecord->removeView($view);
             }

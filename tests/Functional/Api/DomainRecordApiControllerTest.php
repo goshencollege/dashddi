@@ -64,7 +64,7 @@ class DomainRecordApiControllerTest extends AppWebTestCase
             'type'         => 'A',
             'interface_id' => $iface->getId(),
             'domain_id'    => $domain->getId(),
-            'all_view'     => true,
+            'all_views'    => true,
         ]);
 
         $this->assertSame(201, $this->client->getResponse()->getStatusCode());
@@ -82,7 +82,7 @@ class DomainRecordApiControllerTest extends AppWebTestCase
             'type'      => 'TXT',
             'domain_id' => $domain->getId(),
             'value'     => 'hello',
-            'all_view'  => true,
+            'all_views' => true,
             'view_ids'  => [$viewB->getId()],
         ]);
 
@@ -115,21 +115,21 @@ class DomainRecordApiControllerTest extends AppWebTestCase
         $subnet = $this->makeSubnet('10.71.0.0/24', [$viewB]);
         $iface  = $this->makeInterface($subnet, 'aa:bb:cc:dd:ee:04');
 
-        // Domain-only TXT record: no subnet in play, so all_view resolves to every domain view.
+        // Domain-only TXT record: no subnet in play, so all_views resolves to every domain view.
         $data = $this->apiRequest('POST', '/api/domain-records', [
             'hostname'  => 'host4',
             'type'      => 'TXT',
             'domain_id' => $domain->getId(),
             'value'     => 'hello',
-            'all_view'  => true,
+            'all_views' => true,
         ]);
         $this->assertSame(201, $this->client->getResponse()->getStatusCode());
         $this->assertSame([$viewA->getId(), $viewB->getId()], $data['view_ids']);
 
-        // Linking it to an interface on a subnet narrows all_view down to the intersection.
+        // Linking it to an interface on a subnet narrows all_views down to the intersection.
         $updated = $this->apiRequest('PATCH', "/api/domain-records/{$data['id']}", [
             'interface_id' => $iface->getId(),
-            'all_view'     => true,
+            'all_views'    => true,
         ]);
 
         $this->assertSame(200, $this->client->getResponse()->getStatusCode());
