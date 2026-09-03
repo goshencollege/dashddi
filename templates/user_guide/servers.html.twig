@@ -551,25 +551,33 @@ ln -s /opt/certbot/bin/certbot /usr/local/bin/certbot
 ln -s /opt/certbot/bin/dashddi /usr/local/bin/dashddi</code></pre>
 
         <p class="fw-semibold mb-1">Credentials file</p>
-        <p class="text-muted small mb-1">The easiest way is to skip this step: <code>dashddi cert</code> (see below) prompts for the DashDDI URL and host-scoped token and writes the file for you — at <code>/etc/dashddi/dashddi.ini</code> by default (mode 600) — the first time it's run against a location with no file yet. This only happens in an interactive terminal; a missing file with no TTY attached (e.g. a scheduled renewal run before initial setup) is a hard error instead.</p>
+        <p class="text-muted small mb-1">The easiest way is to skip this step: <code>dashddi cert</code> (see below) prompts for the DashDDI URL, host-scoped token, ACME subscriber agreement, and an optional email address, and writes the file for you — at <code>/etc/dashddi/dashddi.ini</code> by default (mode 600) — the first time it's run against a location with no file yet. This only happens in an interactive terminal; a missing file with no TTY attached (e.g. a scheduled renewal run before initial setup) is a hard error instead. The same prompt runs once against an existing file that predates <code>dns_dashddi_agree_tos</code> (hand-written, or from an older <code>dashddi-client</code>), and the answers are appended so later runs — including unattended renewals — never prompt again.</p>
         <p class="text-muted small mb-1">To create it manually instead, write <code>/etc/dashddi/dashddi.ini</code> (chmod 600):</p>
         <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-3"><code>dns_dashddi_url = https://dashddi.example.com
 dns_dashddi_token = &lt;host-scoped-token&gt;
 
+# Required — certbot runs with --non-interactive and refuses to issue without it:
+dns_dashddi_agree_tos = true
+
+# Optional — passed to certbot as --email; omit and dashddi cert passes
+# --register-unsafely-without-email instead:
+#   dns_dashddi_email = admin@example.com
+
 # Optional — only needed if DashDDI uses a self-signed or internal CA cert:
 #   dns_dashddi_ca_cert = false                       # disable SSL verification (dev only)
 #   dns_dashddi_ca_cert = /etc/ssl/certs/internal.pem # custom CA bundle</code></pre>
-        <p class="text-muted small">Generate the token from the host detail page in DashDDI: <strong>Hosts → &lt;hostname&gt; → Host API Token → Generate Token</strong>. The token is accepted only from this host's IP addresses.</p>
+        <p class="text-muted small">Generate the token from the host detail page in DashDDI: <strong>Hosts → &lt;hostname&gt; → Host API Token → Generate Token</strong>. The token is accepted only from this host's IP addresses. <code>dns_dashddi_agree_tos</code> records agreement to your ACME CA's subscriber agreement (Let's Encrypt: <a href="https://letsencrypt.org/repository/" target="_blank" rel="noopener">letsencrypt.org/repository</a>).</p>
 
         <p class="fw-semibold mb-1">Automatic FQDN discovery</p>
         <p class="text-muted small mb-1">The <code>dashddi cert</code> subcommand queries <code>/api/self/host</code> to find all A/AAAA FQDNs for this host and requests a single SAN certificate covering them all. <code>--credentials</code> is optional and defaults to <code>/etc/dashddi/dashddi.ini</code>:</p>
         <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-3"><code>dashddi cert</code></pre>
 
         <p class="fw-semibold mb-1">Manual domain list</p>
-        <p class="text-muted small mb-1">To specify domains explicitly, use certbot directly:</p>
+        <p class="text-muted small mb-1">To specify domains explicitly, use certbot directly — remember <code>--agree-tos</code> and <code>--email</code>/<code>--register-unsafely-without-email</code>, which certbot's own <code>--non-interactive</code> mode requires and which <code>dashddi cert</code> normally supplies for you:</p>
         <pre class="bg-body-secondary rounded p-3 small overflow-auto mb-3"><code>certbot certonly \
   --authenticator dns-dashddi \
   --dns-dashddi-credentials /etc/dashddi/dashddi.ini \
+  --agree-tos --email admin@example.com \
   -d web01.example.com -d app.example.com</code></pre>
 
         <p class="fw-semibold mb-1">Automatic renewal (systemd timer)</p>

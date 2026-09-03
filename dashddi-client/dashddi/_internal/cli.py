@@ -58,6 +58,31 @@ class Credentials:
     caa: bool
     https: bool
     https_value: str
+    agree_tos: bool
+    email: str
+
+
+def _prompt_tos_and_email() -> "tuple[bool, str]":
+    """Interactively prompt for ACME subscriber agreement and an optional email.
+
+    Certbot's --non-interactive mode requires both to be settled up front —
+    ToS agreement via --agree-tos, and email via --email or an explicit opt-out
+    (--register-unsafely-without-email). Asking once here and persisting the
+    answers means every later run (including unattended renewals) can pass
+    them straight through without prompting again.
+    """
+    print(
+        "\nCertificate issuance requires agreeing to your ACME CA's subscriber "
+        "agreement (Let's Encrypt: https://letsencrypt.org/repository/, or your "
+        "custom --server's terms if you're using one)."
+    )
+    agree = input("Do you agree? (y/N): ").strip().lower()
+    if agree not in ("y", "yes"):
+        sys.exit("Error: certificate issuance requires agreeing to the CA's subscriber agreement.")
+    email = input(
+        "Email address for renewal/expiry notices (optional, press Enter to skip): "
+    ).strip()
+    return True, email
 
 
 def _prompt_and_write_credentials(path: str) -> None:
@@ -80,6 +105,8 @@ def _prompt_and_write_credentials(path: str) -> None:
     if not url or not token:
         sys.exit("Error: URL and token are both required.")
 
+    _, email = _prompt_tos_and_email()
+
     try:
         directory = os.path.dirname(path)
         if directory:
@@ -87,11 +114,48 @@ def _prompt_and_write_credentials(path: str) -> None:
         with open(path, "w", encoding="utf-8") as f:
             f.write(f"dns_dashddi_url = {url}\n")
             f.write(f"dns_dashddi_token = {token}\n")
+            f.write("dns_dashddi_agree_tos = true\n")
+            if email:
+                f.write(f"dns_dashddi_email = {email}\n")
         os.chmod(path, 0o600)
     except OSError as exc:
         sys.exit(f"Error: failed to write credentials file at {path}: {exc}")
 
     print(f"Credentials written to {path}")
+
+
+def _ensure_tos_agreement(path: str, creds: Credentials) -> Credentials:
+    """Back-fill ToS agreement + email onto a credentials file that predates them.
+
+    Covers credentials files created by an older dashddi-client version, or
+    copied by hand from dashddi.ini.example, that have no
+    dns_dashddi_agree_tos entry yet. Requires a TTY for the same reason
+    _prompt_and_write_credentials does — a non-interactive run (e.g. a
+    scheduled renewal) can't be blocked on a prompt.
+    """
+    if creds.agree_tos:
+        return creds
+
+    if not sys.stdin.isatty():
+        sys.exit(
+            f"Error: {path} has no dns_dashddi_agree_tos entry and input is not "
+            "interactive.\nRun `dashddi cert` once by hand to agree to the CA's "
+            "subscriber agreement, or add dns_dashddi_agree_tos = true "
+            "(and optionally dns_dashddi_email) to the file yourself."
+        )
+
+    agree_tos, email = _prompt_tos_and_email()
+    try:
+        with open(path, "a", encoding="utf-8") as f:
+            f.write("dns_dashddi_agree_tos = true\n")
+            if email:
+                f.write(f"dns_dashddi_email = {email}\n")
+    except OSError as exc:
+        sys.exit(f"Error: failed to update credentials file at {path}: {exc}")
+
+    creds.agree_tos = agree_tos
+    creds.email = email
+    return creds
 
 
 def _read_credentials(path: str) -> Credentials:
@@ -133,6 +197,8 @@ def _read_credentials(path: str) -> Credentials:
         caa=_parse_bool(section.get("dns_dashddi_caa", "")),
         https=https,
         https_value=https_value,
+        agree_tos=_parse_bool(section.get("dns_dashddi_agree_tos", "")),
+        email=section.get("dns_dashddi_email", "").strip(),
     )
 
 
@@ -316,6 +382,7 @@ def _cmd_cert(args: argparse.Namespace) -> int:
         _prompt_and_write_credentials(args.credentials)
 
     creds = _read_credentials(args.credentials)
+    creds = _ensure_tos_agreement(args.credentials, creds)
     if args.caa:
         creds.caa = True
     if args.https_value:
@@ -346,9 +413,14 @@ def _cmd_cert(args: argparse.Namespace) -> int:
     cmd = [
         "certbot", "certonly",
         "--non-interactive",
+        "--agree-tos",
         "--authenticator", "dns-dashddi",
         "--dns-dashddi-credentials", args.credentials,
     ]
+    if creds.email:
+        cmd += ["--email", creds.email]
+    else:
+        cmd.append("--register-unsafely-without-email")
     for fqdn in fqdns:
         cmd += ["-d", fqdn]
     cmd += args.certbot_args

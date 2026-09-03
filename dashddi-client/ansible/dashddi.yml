@@ -11,6 +11,9 @@
 #   dashddi_url          Base URL of your DashDDI instance
 #   dashddi_admin_token  General-purpose token with api_hosts_index and
 #                        api_hosts_token_generate route permissions
+#   dashddi_agree_tos    Agreement to your ACME CA's subscriber agreement
+#                        (Let's Encrypt: https://letsencrypt.org/repository/);
+#                        certbot refuses non-interactive issuance without it
 
 - name: Deploy DashDDI client and renewal timer
   hosts: all
