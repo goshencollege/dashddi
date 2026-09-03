@@ -8,6 +8,7 @@ use App\Entity\SwitchPortLog;
 use App\Enum\SwitchPortLogSource;
 use App\Repository\ClearpassAuthLogRepository;
 use App\Repository\NetworkInterfaceRepository;
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 
 class ClearpassAuthLogService
@@ -60,7 +61,7 @@ class ClearpassAuthLogService
      * Pulls authentication sessions from ClearPass with acctstarttime greater than
      * the latest record already stored. On first run, fetches the last hour.
      *
-     * @return array{imported: int, errors: string[]}
+     * @return array{imported: int, errors: string[], notices: string[]}
      */
     public function pullFromServer(ClearpassServer $server): array
     {
@@ -68,6 +69,7 @@ class ClearpassAuthLogService
         $token     = $this->getAccessToken($server);
         $imported  = 0;
         $errors    = [];
+        $notices   = [];
         $offset    = 0;
         $latestTs  = $this->logRepo->findLatestAuthTimestamp($server) ?? new \DateTimeImmutable('-1 hour');
 
@@ -100,6 +102,7 @@ class ClearpassAuthLogService
                 )));
                 $ifaceMap = $this->ifaceRepo->findByMacs($pageMacs);
 
+                $pageImported = 0;
                 foreach ($items as $item) {
                     $sessionId = (string) ($item['id'] ?? '');
                     $macRaw    = (string) ($item['mac_address'] ?? $item['callingstationid'] ?? '');
@@ -142,11 +145,24 @@ class ClearpassAuthLogService
                     }
 
                     $this->em->persist($log);
-                    $imported++;
+                    $pageImported++;
                 }
 
                 // Flush and clear the identity map between pages so memory stays flat.
-                $this->em->flush();
+                try {
+                    $this->em->flush();
+                } catch (UniqueConstraintViolationException) {
+                    // Our existence check and this flush aren't atomic, so a concurrent
+                    // pull (cron, "Run Now", or the manual "Pull Logs" button) can insert
+                    // one of these sessions in between. The page's transaction rolls back
+                    // as a whole, and flushing again would throw again (the EM is closed
+                    // after a failed flush), so stop here rather than crash the run —
+                    // the rolled-back rows aren't lost, they'll just look "new" again and
+                    // get imported on the next pull.
+                    $notices[] = 'Stopped after a concurrent pull inserted an overlapping session; remaining rows will be picked up on the next pull.';
+                    break;
+                }
+                $imported += $pageImported;
                 $this->em->clear();
 
                 // Re-fetch the server entity after clear so it is managed again.
@@ -157,7 +173,7 @@ class ClearpassAuthLogService
             $offset += count($items);
         } while (count($items) === self::PAGE_SIZE && $offset < $total);
 
-        return ['imported' => $imported, 'errors' => $errors];
+        return ['imported' => $imported, 'errors' => $errors, 'notices' => $notices];
     }
 
     private function getAccessToken(ClearpassServer $server): string
