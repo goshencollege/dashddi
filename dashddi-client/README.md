@@ -57,8 +57,9 @@ addresses. No route permissions need to be configured.
 ### 2. Create a credentials file
 
 The easiest way is to just skip this step: `dashddi cert` (see below) prompts for the
-DashDDI URL and token and writes the file for you — at `/etc/dashddi/dashddi.ini` by
-default — the first time it's run against a location with no file yet.
+DashDDI URL, token, ACME subscriber agreement, and email, and writes the file for you —
+at `/etc/dashddi/dashddi.ini` by default — the first time it's run against a location
+with no file yet.
 
 To create it manually instead:
 
@@ -73,7 +74,14 @@ Edit `/etc/dashddi/dashddi.ini`:
 ```ini
 dns_dashddi_url = https://dashddi.example.com
 dns_dashddi_token = your-host-scoped-token-here
+dns_dashddi_agree_tos = true
+dns_dashddi_email = admin@example.com
 ```
+
+`dns_dashddi_agree_tos` records agreement to your ACME CA's subscriber agreement
+(Let's Encrypt: https://letsencrypt.org/repository/) and is required — certbot runs
+with `--non-interactive` and refuses to issue without it. `dns_dashddi_email` is
+optional; omit it and `dashddi cert` passes `--register-unsafely-without-email` instead.
 
 ### 3. Request a certificate
 
@@ -81,6 +89,7 @@ dns_dashddi_token = your-host-scoped-token-here
 certbot certonly \
   --authenticator dns-dashddi \
   --dns-dashddi-credentials /etc/dashddi/dashddi.ini \
+  --agree-tos --email admin@example.com \
   -d myhost.example.com
 ```
 
@@ -90,8 +99,13 @@ For wildcard certificates:
 certbot certonly \
   --authenticator dns-dashddi \
   --dns-dashddi-credentials /etc/dashddi/dashddi.ini \
+  --agree-tos --email admin@example.com \
   -d '*.example.com'
 ```
+
+(`--agree-tos` and `--email`/`--register-unsafely-without-email` are certbot's own
+non-interactive requirements, not specific to the dns-dashddi plugin. `dashddi cert`,
+below, handles these for you.)
 
 ## Configuration options
 
@@ -134,10 +148,14 @@ dashddi cert --credentials /path/to/dashddi.ini
 ```
 
 If the credentials file doesn't exist yet at whichever path is in effect, `dashddi cert`
-prompts for the DashDDI URL and host-scoped token and writes it (mode 600) before
-continuing — no separate setup step required. This only happens in an interactive
-terminal; a missing file with no TTY attached (e.g. a scheduled renewal run before
-initial setup) is a hard error instead.
+prompts for the DashDDI URL, host-scoped token, ACME subscriber agreement, and an
+optional email address, and writes it (mode 600) before continuing — no separate setup
+step required. This only happens in an interactive terminal; a missing file with no TTY
+attached (e.g. a scheduled renewal run before initial setup) is a hard error instead.
+The same prompt runs once against an existing credentials file that predates
+`dns_dashddi_agree_tos` (e.g. created by hand from `dashddi.ini.example`, or written by
+an older `dashddi-client`), and the answers are appended to the file so later runs —
+including unattended renewals — never need to prompt again.
 
 Extra arguments after `--` are passed through to certbot:
 

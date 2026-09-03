@@ -2,6 +2,14 @@
 # Required — no defaults
 # dashddi_url: "https://dashddi.example.com"
 # dashddi_admin_token: "your-general-purpose-admin-token"
+# dashddi_agree_tos: true  # agreement to your ACME CA's subscriber agreement
+                           # (Let's Encrypt: https://letsencrypt.org/repository/).
+                           # certbot runs with --non-interactive and refuses to
+                           # issue without it.
+
+# Optional email passed to certbot for renewal/expiry notices. Leave empty and
+# certbot is run with --register-unsafely-without-email instead.
+dashddi_email: ""
 
 # Host name to look up in DashDDI. Defaults to the Ansible inventory hostname.
 dashddi_host_name: "{{ inventory_hostname }}"

@@ -3,8 +3,9 @@
 #
 # You don't have to create this by hand: running `dashddi cert` with no file at
 # /etc/dashddi/dashddi.ini (or whatever --credentials points at) prompts for the
-# URL and token and writes it for you. To create it manually instead, copy this
-# file to a secure location and restrict permissions:
+# URL, token, ACME subscriber agreement, and email, and writes it for you. To
+# create it manually instead, copy this file to a secure location and
+# restrict permissions:
 #   mkdir -p /etc/dashddi
 #   cp dashddi.ini.example /etc/dashddi/dashddi.ini
 #   chmod 600 /etc/dashddi/dashddi.ini
@@ -16,6 +17,15 @@ dns_dashddi_url = https://dashddi.example.com
 # (Hosts → select host → Host API Token → Generate Token).
 # This token is tied to this host and is only accepted from this host's IP addresses.
 dns_dashddi_token = your-host-scoped-token-here
+
+# Required: agreement to your ACME CA's subscriber agreement (Let's Encrypt:
+# https://letsencrypt.org/repository/, or your custom --server's terms).
+# certbot runs with --non-interactive and refuses to issue without this.
+dns_dashddi_agree_tos = true
+
+# Optional: email address passed to certbot for renewal/expiry notices. If
+# omitted, dashddi cert passes --register-unsafely-without-email instead.
+#   dns_dashddi_email = admin@example.com
 
 # Optional: SSL verification for the DashDDI API connection.
 # Leave unset to use the system CA bundle (default, recommended for production).
