@@ -77,6 +77,10 @@ class PullClearpassLogsCommand extends Command
                     $io->writeln('    <comment>!</comment> ' . $err);
                     $failed = true;
                 }
+
+                foreach ($result['notices'] as $notice) {
+                    $io->writeln('    <comment>i</comment> ' . $notice);
+                }
             } catch (\Throwable $e) {
                 $io->error($server->getName() . ': ' . $e->getMessage());
                 $failed = true;
