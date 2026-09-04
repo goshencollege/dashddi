@@ -10,6 +10,7 @@ use App\Entity\Host;
 use App\Entity\IpAddress;
 use App\Entity\NetworkInterface;
 use App\Entity\Subnet;
+use App\Entity\VirtualIp;
 use App\Enum\RecordType;
 use App\Tests\Functional\AppWebTestCase;
 use App\Validator\TxtRecordValueValidator;
@@ -81,6 +82,31 @@ class SelfApiControllerTest extends AppWebTestCase
         $record->setValue($value);
         $record->setDomain($domain);
         $record->setNetworkInterface($iface);
+        $this->em->persist($record);
+        $this->em->flush();
+        return $record;
+    }
+
+    private function makeVip(Subnet $subnet, NetworkInterface $memberIface, string $ip): VirtualIp
+    {
+        $ipAddr = (new IpAddress())->setAddress($ip)->setSubnet($subnet);
+        $this->em->persist($ipAddr);
+
+        $vip = (new VirtualIp())->setLabel('test-vip')->setSubnet($subnet)->setIpAddress($ipAddr);
+        $vip->addMemberInterface($memberIface);
+        $this->em->persist($vip);
+        $this->em->flush();
+        return $vip;
+    }
+
+    private function makeVipDomainRecord(VirtualIp $vip, Domain $domain, string $hostname, RecordType $type, string $value): DomainRecord
+    {
+        $record = new DomainRecord();
+        $record->setHostname($hostname);
+        $record->setType($type);
+        $record->setValue($value);
+        $record->setDomain($domain);
+        $record->setVirtualIp($vip);
         $this->em->persist($record);
         $this->em->flush();
         return $record;
@@ -507,6 +533,116 @@ class SelfApiControllerTest extends AppWebTestCase
         $fqdns = array_column($data['interfaces'][0]['records'], 'fqdn');
         $this->assertContains('pub.listing-parent.example.com', $fqdns);
         $this->assertContains('priv.internal.listing-parent.example.com', $fqdns);
+    }
+
+    // ── VIP DNS records ────────────────────────────────────────────────────────
+
+    public function testHostEndpointIncludesVipRecords(): void
+    {
+        $domain = (new Domain())->setName('vip-test.example.com');
+        $this->em->persist($domain);
+
+        [$host, $iface] = $this->makeHostWithIp('vip-host'); // 127.0.0.1
+        $raw = bin2hex(random_bytes(32));
+        $this->makeHostToken($host, $raw);
+
+        $vip = $this->makeVip($iface->getSubnet(), $iface, '127.0.0.2');
+        $this->makeVipDomainRecord($vip, $domain, 'cluster', RecordType::A, '127.0.0.2');
+
+        $data = $this->tokenRequest('GET', '/api/self/host', $raw);
+
+        $this->assertSame(200, $this->tokenClient->getResponse()->getStatusCode());
+        $this->assertCount(1, $data['vips']);
+        $this->assertSame($vip->getId(), $data['vips'][0]['id']);
+        $this->assertSame('127.0.0.2', $data['vips'][0]['ipv4']);
+        $this->assertCount(1, $data['vips'][0]['records']);
+        $this->assertSame('cluster.vip-test.example.com', $data['vips'][0]['records'][0]['fqdn']);
+    }
+
+    public function testHostEndpointExcludesVipInternalOnlyDomainRecords(): void
+    {
+        $internalView = (new DnsView())->setName('vip-internal-only')->setIsPublic(false);
+        $this->em->persist($internalView);
+
+        $internalDomain = (new Domain())->setName('vip-internal.example.com');
+        $internalDomain->addView($internalView);
+        $this->em->persist($internalDomain);
+
+        [$host, $iface] = $this->makeHostWithIp('vip-filter-host'); // 127.0.0.1
+        $raw = bin2hex(random_bytes(32));
+        $this->makeHostToken($host, $raw);
+
+        $vip = $this->makeVip($iface->getSubnet(), $iface, '127.0.0.3');
+        $this->makeVipDomainRecord($vip, $internalDomain, 'cluster', RecordType::A, '127.0.0.3');
+
+        $data = $this->tokenRequest('GET', '/api/self/host', $raw);
+
+        $this->assertSame(200, $this->tokenClient->getResponse()->getStatusCode());
+        $this->assertCount(1, $data['vips']);
+        $this->assertCount(0, $data['vips'][0]['records']);
+    }
+
+    public function testCreateChallengeForVipOwnedFqdn(): void
+    {
+        $domain = (new Domain())->setName('vip-acme.example.com');
+        $this->em->persist($domain);
+
+        $view = (new DnsView())->setName('vip-acme-external')->setIsPublic(true);
+        $this->em->persist($view);
+        $domain->addView($view);
+        $this->em->flush();
+
+        [$host, $iface] = $this->makeHostWithIp('vip-acme-host'); // 127.0.0.1
+        $raw = bin2hex(random_bytes(32));
+        $this->makeHostToken($host, $raw);
+
+        $vip = $this->makeVip($iface->getSubnet(), $iface, '127.0.0.4');
+        $sourceRecord = $this->makeVipDomainRecord($vip, $domain, 'cluster', RecordType::A, '127.0.0.4');
+        $sourceRecord->addView($view);
+        $this->em->flush();
+
+        $data = $this->tokenRequest('POST', '/api/self/dns-challenge', $raw, [
+            'fqdn'       => 'cluster.vip-acme.example.com',
+            'validation' => 'VIP_ACME_TOKEN',
+        ]);
+
+        $this->assertSame(201, $this->tokenClient->getResponse()->getStatusCode());
+        $this->assertSame('_acme-challenge.cluster', $data['hostname']);
+
+        $this->em->clear();
+        $record = $this->em->find(DomainRecord::class, $data['id']);
+        $this->assertNotNull($record);
+        $this->assertNull($record->getNetworkInterface());
+        $this->assertSame($vip->getId(), $record->getVirtualIp()->getId());
+    }
+
+    public function testDeleteChallengeForVipOwnedFqdn(): void
+    {
+        $domain = (new Domain())->setName('vip-del.example.com');
+        $this->em->persist($domain);
+
+        [$host, $iface] = $this->makeHostWithIp('vip-del-host'); // 127.0.0.1
+        $raw = bin2hex(random_bytes(32));
+        $this->makeHostToken($host, $raw);
+
+        $vip = $this->makeVip($iface->getSubnet(), $iface, '127.0.0.5');
+        $this->makeVipDomainRecord($vip, $domain, 'cluster', RecordType::A, '127.0.0.5');
+
+        $createData = $this->tokenRequest('POST', '/api/self/dns-challenge', $raw, [
+            'fqdn'       => 'cluster.vip-del.example.com',
+            'validation' => 'VIP_DEL_TOKEN',
+        ]);
+        $this->assertSame(201, $this->tokenClient->getResponse()->getStatusCode());
+        $recordId = $createData['id'];
+
+        $this->tokenRequest('DELETE', '/api/self/dns-challenge', $raw, [
+            'fqdn'       => 'cluster.vip-del.example.com',
+            'validation' => 'VIP_DEL_TOKEN',
+        ]);
+        $this->assertSame(204, $this->tokenClient->getResponse()->getStatusCode());
+
+        $this->em->clear();
+        $this->assertNull($this->em->find(DomainRecord::class, $recordId));
     }
 
     // ── Wildcard ownership matching ───────────────────────────────────────────

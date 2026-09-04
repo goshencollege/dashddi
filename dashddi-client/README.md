@@ -133,8 +133,9 @@ below, handles these for you.)
 
 The package installs a `dashddi` command. Its `cert` subcommand queries
 `GET /api/self/host` to discover all A/AAAA/CNAME FQDNs registered to this host in
-DashDDI, then runs `certbot certonly` for all of them in a single SAN certificate
-request:
+DashDDI — including any VIP (VRRP/failover cluster address, etc.) one of the host's
+interfaces is a member of — then runs `certbot certonly` for all of them in a single
+SAN certificate request:
 
 ```bash
 dashddi cert
@@ -336,9 +337,10 @@ and that the host's interfaces include the machine's current IP.
 
 **`403 Forbidden` — "FQDN does not belong to this host"**
 
-The FQDN being certified does not have a DNS record linked to this host's interfaces in
-DashDDI (directly, or via a wildcard record covering it). Add an A or AAAA record for
-the hostname under the correct domain before running Certbot.
+The FQDN being certified does not have a DNS record linked to this host's interfaces or
+to a VIP one of those interfaces is a member of, in DashDDI (directly, or via a wildcard
+record covering it). Add an A or AAAA record for the hostname under the correct domain
+(or under the VIP) before running Certbot.
 
 **`422 Unprocessable Entity` — "no public views"**
 

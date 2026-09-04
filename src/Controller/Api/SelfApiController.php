@@ -7,10 +7,13 @@ use App\Entity\Domain;
 use App\Entity\DomainRecord;
 use App\Entity\Host;
 use App\Entity\NetworkInterface;
+use App\Entity\VirtualIp;
 use App\Enum\RecordType;
 use App\Repository\DomainRecordRepository;
 use App\Repository\DomainRepository;
+use App\Repository\VirtualIpRepository;
 use App\Validator\TxtRecordValueValidator;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -24,6 +27,7 @@ class SelfApiController extends AbstractController
 {
     public function __construct(
         private readonly DomainRepository $domainRepository,
+        private readonly VirtualIpRepository $virtualIpRepository,
     ) {}
 
     #[Route('/host', name: 'api_self_host', methods: ['GET'])]
@@ -61,7 +65,7 @@ class SelfApiController extends AbstractController
             return $this->json(['error' => 'The requested FQDN does not belong to this host.'], Response::HTTP_FORBIDDEN);
         }
 
-        [$sourceRecord, $interface] = $match;
+        [$sourceRecord, ] = $match;
 
         $resolved = $this->resolveChallengeDomain($sourceRecord->getDomain(), $fqdn);
         if ($resolved === null) {
@@ -77,7 +81,8 @@ class SelfApiController extends AbstractController
         $record->setType(RecordType::TXT);
         $record->setValue(TxtRecordValueValidator::normalizeTxtValue($validation));
         $record->setDomain($targetDomain);
-        $record->setNetworkInterface($interface);
+        $record->setNetworkInterface($sourceRecord->getNetworkInterface());
+        $record->setVirtualIp($sourceRecord->getVirtualIp());
         // Assign all target domain views so the record appears in every zone file (including
         // the public/external one that Let's Encrypt queries).
         foreach ($targetDomain->getViews() as $view) {
@@ -123,14 +128,14 @@ class SelfApiController extends AbstractController
             return $this->json(['error' => 'The requested FQDN does not belong to this host.'], Response::HTTP_FORBIDDEN);
         }
 
-        [$sourceRecord, $interface] = $match;
+        [$sourceRecord, $owner] = $match;
 
         // Compute the challenge hostname prefix from the requested FQDN (not the matched
         // record's own hostname — the match may have come from a wildcard record, whose
         // hostname is a different label than the concrete FQDN being certified) so we only
         // match _acme-challenge records for this specific hostname — not other TXT records
-        // on the same interface. We match both the direct form (_acme-challenge.srv) and the
-        // parent-domain form (_acme-challenge.srv.internal.*) without re-deriving which
+        // on the same interface/VIP. We match both the direct form (_acme-challenge.srv) and
+        // the parent-domain form (_acme-challenge.srv.internal.*) without re-deriving which
         // domain was chosen at creation time.
         $sourceHostname = $this->relativeHostname($fqdn, $sourceRecord->getDomain());
         $hostnameBase = $sourceHostname === '@'
@@ -138,12 +143,13 @@ class SelfApiController extends AbstractController
             : '_acme-challenge.' . $sourceHostname;
 
         $normalizedValue = TxtRecordValueValidator::normalizeTxtValue($validation);
+        $ownerField = $owner instanceof VirtualIp ? 'r.virtualIp' : 'r.networkInterface';
         $records = $repo->createQueryBuilder('r')
-            ->where('r.networkInterface = :iface')
+            ->where($ownerField . ' = :owner')
             ->andWhere('r.type = :type')
             ->andWhere('r.value = :value')
             ->andWhere('r.hostname = :exact OR r.hostname LIKE :prefix')
-            ->setParameter('iface', $interface)
+            ->setParameter('owner', $owner)
             ->setParameter('type', RecordType::TXT)
             ->setParameter('value', $normalizedValue)
             ->setParameter('exact', $hostnameBase)
@@ -222,6 +228,7 @@ class SelfApiController extends AbstractController
         $record->setValue($value);
         $record->setDomain($domain);
         $record->setNetworkInterface($sourceRecord->getNetworkInterface());
+        $record->setVirtualIp($sourceRecord->getVirtualIp());
         // Inherit the source record's own views — this name's CAA/HTTPS record should be
         // visible everywhere the underlying A/AAAA/wildcard record already is, nothing more.
         foreach ($sourceRecord->getViews() as $view) {
@@ -244,39 +251,79 @@ class SelfApiController extends AbstractController
     }
 
     /**
-     * Find a DomainRecord on the host's interfaces whose FQDN matches the given string,
-     * either exactly or via wildcard coverage. Returns [DomainRecord, NetworkInterface] or
-     * null.
+     * Find a DomainRecord owned by one of the host's interfaces or by a VIP one of those
+     * interfaces is a member of, whose FQDN matches the given string, either exactly or via
+     * wildcard coverage. Returns [DomainRecord, owner] or null.
      *
-     * @return array{0: DomainRecord, 1: NetworkInterface}|null
+     * @return array{0: DomainRecord, 1: NetworkInterface|VirtualIp}|null
      */
     private function resolveOwnership(Host $host, string $fqdn): ?array
     {
+        $interfaces = [];
         foreach ($host->getInterfaces() as $iface) {
-            if ($iface->isDeleted()) {
-                continue;
+            if (!$iface->isDeleted()) {
+                $interfaces[] = $iface;
             }
+        }
+        $vips = $this->vipsForHost($host);
+
+        foreach ($interfaces as $iface) {
             foreach ($iface->getDomainRecords() as $record) {
                 if ($record->getFullyQualifiedHostname() === $fqdn) {
                     return [$record, $iface];
                 }
             }
         }
+        foreach ($vips as $vip) {
+            foreach ($vip->getDomainRecords() as $record) {
+                if ($record->getFullyQualifiedHostname() === $fqdn) {
+                    return [$record, $vip];
+                }
+            }
+        }
 
         // No exact match — fall back to a wildcard record covering this FQDN, e.g. a
         // "*.example.com" record covers "foo.example.com" as an explicit SAN entry.
-        foreach ($host->getInterfaces() as $iface) {
-            if ($iface->isDeleted()) {
-                continue;
-            }
+        foreach ($interfaces as $iface) {
             foreach ($iface->getDomainRecords() as $record) {
                 if ($this->wildcardCovers($record, $fqdn)) {
                     return [$record, $iface];
                 }
             }
         }
+        foreach ($vips as $vip) {
+            foreach ($vip->getDomainRecords() as $record) {
+                if ($this->wildcardCovers($record, $fqdn)) {
+                    return [$record, $vip];
+                }
+            }
+        }
 
         return null;
+    }
+
+    /**
+     * Returns the deduplicated, non-deleted VIPs that any of the host's (non-deleted)
+     * interfaces are a member of.
+     *
+     * @return VirtualIp[]
+     */
+    private function vipsForHost(Host $host): array
+    {
+        $ifaceIds = [];
+        foreach ($host->getInterfaces() as $iface) {
+            if (!$iface->isDeleted()) {
+                $ifaceIds[] = $iface->getId();
+            }
+        }
+
+        $vips = [];
+        foreach ($this->virtualIpRepository->findMapByInterfaceIds($ifaceIds) as $vipList) {
+            foreach ($vipList as $vip) {
+                $vips[$vip->getId()] = $vip;
+            }
+        }
+        return array_values($vips);
     }
 
     /**
@@ -426,36 +473,24 @@ class SelfApiController extends AbstractController
             if ($iface->isDeleted()) {
                 continue;
             }
-            $records = [];
-            foreach ($iface->getDomainRecords() as $record) {
-                $domain = $record->getDomain();
-                if ($domain === null) {
-                    continue;
-                }
-                $domainName = $domain->getName();
-                if (!isset($reachableCache[$domainName])) {
-                    $reachableCache[$domainName] = $this->domainHasPublicView($domain)
-                        || $this->findPublicParentDomain($domainName) !== null;
-                }
-                if (!$reachableCache[$domainName]) {
-                    continue;
-                }
-                $records[] = [
-                    'id'        => $record->getId(),
-                    'hostname'  => $record->getHostname(),
-                    'fqdn'      => $record->getFullyQualifiedHostname(),
-                    'type'      => $record->getType()->value,
-                    'value'     => $record->getValue(),
-                    'domain_id' => $domain->getId(),
-                ];
-            }
             $interfaces[] = [
                 'id'      => $iface->getId(),
                 'name'    => $iface->getName(),
                 'mac'     => $iface->getMacAddress(),
                 'ipv4'    => $iface->getIpAddress()?->getAddress(),
                 'ipv6'    => $iface->getIpv6Address()?->getAddress(),
-                'records' => $records,
+                'records' => $this->serializeReachableRecords($iface->getDomainRecords(), $reachableCache),
+            ];
+        }
+
+        $vips = [];
+        foreach ($this->vipsForHost($host) as $vip) {
+            $vips[] = [
+                'id'      => $vip->getId(),
+                'label'   => $vip->getLabel(),
+                'ipv4'    => $vip->getIpAddress()?->getAddress(),
+                'ipv6'    => $vip->getIpv6Address()?->getAddress(),
+                'records' => $this->serializeReachableRecords($vip->getDomainRecords(), $reachableCache),
             ];
         }
 
@@ -463,6 +498,44 @@ class SelfApiController extends AbstractController
             'id'         => $host->getId(),
             'name'       => $host->getName(),
             'interfaces' => $interfaces,
+            'vips'       => $vips,
         ];
+    }
+
+    /**
+     * Serializes the DomainRecords of an interface or VIP, dropping any whose domain has no
+     * publicly reachable view (directly or via an ancestor domain) — ACME clients should only
+     * see names they can realistically certify from the internet.
+     *
+     * @param  Collection<int, DomainRecord>  $records
+     * @param  array<string, bool>            $reachableCache  domain name → reachable, shared across callers
+     * @return list<array<string, mixed>>
+     */
+    private function serializeReachableRecords(Collection $records, array &$reachableCache): array
+    {
+        $out = [];
+        foreach ($records as $record) {
+            $domain = $record->getDomain();
+            if ($domain === null) {
+                continue;
+            }
+            $domainName = $domain->getName();
+            if (!isset($reachableCache[$domainName])) {
+                $reachableCache[$domainName] = $this->domainHasPublicView($domain)
+                    || $this->findPublicParentDomain($domainName) !== null;
+            }
+            if (!$reachableCache[$domainName]) {
+                continue;
+            }
+            $out[] = [
+                'id'        => $record->getId(),
+                'hostname'  => $record->getHostname(),
+                'fqdn'      => $record->getFullyQualifiedHostname(),
+                'type'      => $record->getType()->value,
+                'value'     => $record->getValue(),
+                'domain_id' => $domain->getId(),
+            ];
+        }
+        return $out;
     }
 }

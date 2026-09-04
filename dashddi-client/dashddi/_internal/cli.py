@@ -233,8 +233,10 @@ def _fetch_fqdns(creds: Credentials) -> list[str]:
     data = resp.json()
     seen: set[str] = set()
     fqdns: list[str] = []
-    for iface in data.get("interfaces", []):
-        for record in iface.get("records", []):
+    record_groups = [iface.get("records", []) for iface in data.get("interfaces", [])]
+    record_groups += [vip.get("records", []) for vip in data.get("vips", [])]
+    for records in record_groups:
+        for record in records:
             if record.get("type") not in ("A", "AAAA", "CNAME"):
                 continue
             fqdn = record.get("fqdn", "").rstrip(".")
