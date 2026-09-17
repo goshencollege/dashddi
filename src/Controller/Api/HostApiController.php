@@ -7,6 +7,7 @@ use App\Entity\Host;
 use App\Repository\BuildingRepository;
 use App\Repository\HostRepository;
 use App\Repository\TagRepository;
+use App\Service\HostQueryParser;
 use App\Service\ReservedTagPrefixService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -19,27 +20,64 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
 #[Route('/api/hosts')]
 class HostApiController extends AbstractController
 {
-    public function __construct(private readonly ReservedTagPrefixService $reservedPrefixes) {}
+    public function __construct(
+        private readonly ReservedTagPrefixService $reservedPrefixes,
+        private readonly HostQueryParser $queryParser,
+    ) {}
 
     #[Route('', name: 'api_hosts_index', methods: ['GET'])]
     public function index(Request $request, HostRepository $repo): JsonResponse
     {
         $deletedParam = $request->query->get('deleted');
-        $qb = $repo->createQueryBuilder('h');
-        if ($deletedParam !== 'all') {
-            $qb->where($request->query->getBoolean('deleted') ? 'h.deletedAt IS NOT NULL' : 'h.deletedAt IS NULL');
-        }
+        $q = trim($request->query->getString('q', ''));
 
-        if ($name = $request->query->get('name')) {
-            $qb->andWhere('h.name LIKE :name')->setParameter('name', '%' . $name . '%');
-        }
-        if ($buildingId = $request->query->getInt('building_id')) {
-            $qb->andWhere('h.building = :bid')->setParameter('bid', $buildingId);
-        }
+        if ($q !== '') {
+            $orGroups = $this->queryParser->parse($q);
 
-        $hosts = $qb->orderBy('h.name', 'ASC')->getQuery()->getResult();
+            if (!empty($orGroups)) {
+                $hasDeletedToken = false;
+                foreach ($orGroups as $conditions) {
+                    foreach ($conditions as [$field, , ]) {
+                        if ($field === 'deleted') {
+                            $hasDeletedToken = true;
+                            break 2;
+                        }
+                    }
+                }
+                $hosts = $repo->structuredSearch($orGroups);
+                if (!$hasDeletedToken) {
+                    $hosts = $this->filterByDeletedState($hosts, $deletedParam, $request);
+                }
+            } else {
+                $hosts = $this->filterByDeletedState($repo->search($q), $deletedParam, $request);
+            }
+        } else {
+            $qb = $repo->createQueryBuilder('h');
+            if ($deletedParam !== 'all') {
+                $qb->where($request->query->getBoolean('deleted') ? 'h.deletedAt IS NOT NULL' : 'h.deletedAt IS NULL');
+            }
+
+            if ($name = $request->query->get('name')) {
+                $qb->andWhere('h.name LIKE :name')->setParameter('name', '%' . $name . '%');
+            }
+            if ($buildingId = $request->query->getInt('building_id')) {
+                $qb->andWhere('h.building = :bid')->setParameter('bid', $buildingId);
+            }
+
+            $hosts = $qb->orderBy('h.name', 'ASC')->getQuery()->getResult();
+        }
 
         return $this->json(array_map($this->serialize(...), $hosts));
+    }
+
+    /** @param Host[] $hosts */
+    private function filterByDeletedState(array $hosts, ?string $deletedParam, Request $request): array
+    {
+        if ($deletedParam === 'all') {
+            return $hosts;
+        }
+        $wantDeleted = $request->query->getBoolean('deleted');
+        return array_values(array_filter($hosts, fn(Host $h) => $h->isDeleted() === $wantDeleted));
     }
 
     #[Route('/{id}', name: 'api_hosts_show', methods: ['GET'])]

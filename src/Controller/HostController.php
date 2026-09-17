@@ -23,6 +23,7 @@ use App\Entity\NetworkInterface;
 use App\Entity\SshHostKey;
 use App\Enum\RecordType;
 use App\Service\DnsViewResolver;
+use App\Service\HostQueryParser;
 use App\Service\IpAddressManager;
 use App\Service\ReservedTagPrefixService;
 use phpseclib3\Crypt\PublicKeyLoader;
@@ -40,6 +41,7 @@ class HostController extends AbstractController
         private readonly IpAddressManager $ipManager,
         private readonly ReservedTagPrefixService $reservedPrefixes,
         private readonly DomainRepository $domainRepo,
+        private readonly HostQueryParser $queryParser,
     ) {}
 
     private const PER_PAGE = 50;
@@ -105,7 +107,7 @@ class HostController extends AbstractController
             }
         }
 
-        $orGroups   = self::parseStructuredQuery($query);
+        $orGroups   = $this->queryParser->parse($query);
         $isAdvanced = !empty($orGroups);
 
         if ($needsFlush) {
@@ -172,94 +174,6 @@ class HostController extends AbstractController
                 'link_params' => $linkParams,
             ],
         ]);
-    }
-
-    /**
-     * Parse a structured query string into OR-groups of AND-conditions.
-     * Each condition: [field, value, negate].
-     * Returns [] for plain-text queries with no known field:value tokens.
-     *
-     * @return array<array<array{string, string, bool}>>
-     */
-    private static function parseStructuredQuery(string $q): array
-    {
-        $q = trim($q);
-        if ($q === '') {
-            return [];
-        }
-
-        $known = ['name', 'building', 'room', 'subnet', 'ip', 'mac', 'duid', 'dns', 'tag',
-                  'dhcp_mismatch', 'last_dhcp', 'last_auth', 'switch_ip', 'switch_port', 'deleted'];
-
-        $fieldPattern = implode('|', $known);
-        $orParts      = self::splitRespectingParens($q, ' OR ');
-        $orGroups     = [];
-
-        foreach ($orParts as $orPart) {
-            $orPart = trim($orPart);
-            if (str_starts_with($orPart, '(') && str_ends_with($orPart, ')')) {
-                $orPart = trim(substr($orPart, 1, -1));
-            }
-
-            $andConditions = [];
-            foreach (explode(' AND ', $orPart) as $token) {
-                $token = trim($token);
-                if (!preg_match('/^(' . $fieldPattern . '):(\"(?:[^\"\\\\]|\\\\.)*\"|[^\s]+)$/', $token, $m)) {
-                    continue;
-                }
-                $raw = $m[2];
-                if (str_starts_with($raw, '"') && str_ends_with($raw, '"')) {
-                    $raw = stripslashes(substr($raw, 1, -1));
-                }
-                $negate = false;
-                if (str_starts_with($raw, '!')) {
-                    $negate = true;
-                    $raw    = substr($raw, 1);
-                }
-                if ($raw !== '') {
-                    $andConditions[] = [$m[1], $raw, $negate];
-                }
-            }
-
-            if (!empty($andConditions)) {
-                $orGroups[] = $andConditions;
-            }
-        }
-
-        return $orGroups;
-    }
-
-    /** Split $str on $sep, ignoring occurrences inside parentheses. */
-    private static function splitRespectingParens(string $str, string $sep): array
-    {
-        $parts   = [];
-        $depth   = 0;
-        $current = '';
-        $sepLen  = strlen($sep);
-        $len     = strlen($str);
-
-        for ($i = 0; $i < $len; $i++) {
-            $c = $str[$i];
-            if ($c === '(') {
-                $depth++;
-                $current .= $c;
-            } elseif ($c === ')') {
-                $depth--;
-                $current .= $c;
-            } elseif ($depth === 0 && substr($str, $i, $sepLen) === $sep) {
-                $parts[] = $current;
-                $current = '';
-                $i += $sepLen - 1;
-            } else {
-                $current .= $c;
-            }
-        }
-
-        if ($current !== '') {
-            $parts[] = $current;
-        }
-
-        return $parts;
     }
 
     #[Route('/new', name: 'host_new', methods: ['GET', 'POST'])]
