@@ -82,6 +82,20 @@ class HostRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    /**
+     * Same field grammar as structuredSearchPaginated(), without pagination.
+     *
+     * @return Host[]
+     */
+    public function structuredSearch(array $orGroups): array
+    {
+        return $this->buildStructuredQb($orGroups)
+            ->distinct()
+            ->orderBy('h.name', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
     // -------------------------------------------------------------------------
     // Paginated methods
     // -------------------------------------------------------------------------

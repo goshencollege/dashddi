@@ -134,6 +134,73 @@ class HostApiControllerTest extends AppWebTestCase
         $this->assertCount(0, $data);
     }
 
+    public function testIndexFreeTextQuery(): void
+    {
+        $this->makeHost('Unique Freetext Host');
+        $this->makeHost('Other Host');
+        $data = $this->apiRequest('GET', '/api/hosts?q=Unique+Freetext');
+        $this->assertIsArray($data);
+        $this->assertCount(1, $data);
+        $this->assertSame('Unique Freetext Host', $data[0]['name']);
+    }
+
+    public function testIndexStructuredQueryByName(): void
+    {
+        $this->makeHost('Structured Query Host');
+        $this->makeHost('Different Host');
+        $data = $this->apiRequest('GET', '/api/hosts?q=' . urlencode('name:Structured*'));
+        $this->assertIsArray($data);
+        $this->assertCount(1, $data);
+        $this->assertSame('Structured Query Host', $data[0]['name']);
+    }
+
+    public function testIndexStructuredQueryByRoom(): void
+    {
+        $host = $this->makeHost('Room Query Host');
+        $host->setRoom('A101');
+        $this->em->flush();
+
+        $data = $this->apiRequest('GET', '/api/hosts?q=' . urlencode('room:A101'));
+        $this->assertIsArray($data);
+        $this->assertCount(1, $data);
+        $this->assertSame('Room Query Host', $data[0]['name']);
+    }
+
+    public function testIndexStructuredQueryExcludesDeletedByDefault(): void
+    {
+        $host = $this->makeHost('Deleted Structured Host');
+        $host->setRoom('Z999');
+        $host->softDeleteWithInterfaces();
+        $this->em->flush();
+
+        $data = $this->apiRequest('GET', '/api/hosts?q=' . urlencode('room:Z999'));
+        $this->assertIsArray($data);
+        $this->assertCount(0, $data);
+    }
+
+    public function testIndexStructuredQueryDeletedTokenOverridesDeletedParam(): void
+    {
+        $host = $this->makeHost('Deleted Token Host');
+        $host->setRoom('Z998');
+        $host->softDeleteWithInterfaces();
+        $this->em->flush();
+
+        $data = $this->apiRequest('GET', '/api/hosts?q=' . urlencode('room:Z998 AND deleted:1'));
+        $this->assertIsArray($data);
+        $this->assertCount(1, $data);
+        $this->assertSame('Deleted Token Host', $data[0]['name']);
+    }
+
+    public function testIndexQueryTakesPrecedenceOverNameParam(): void
+    {
+        $this->makeHost('Precedence Match Host');
+        $this->makeHost('Precedence Other Host');
+        $data = $this->apiRequest('GET', '/api/hosts?q=Precedence+Match&name=Precedence+Other');
+        $this->assertIsArray($data);
+        $this->assertCount(1, $data);
+        $this->assertSame('Precedence Match Host', $data[0]['name']);
+    }
+
     public function testGenerateTokenCreatesNewToken(): void
     {
         $host = $this->makeHost('Token Host');
