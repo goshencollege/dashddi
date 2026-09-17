@@ -65,6 +65,46 @@
     virtualenv: "{{ dashddi_venv_path }}"
     virtualenv_command: python3 -m venv
 
+# ── Migrate from certbot-dns-dashddi v2 ───────────────────────────────────────
+# A host that had the old, pre-rename certbot-dns-dashddi package installed
+# breaks once the new dashddi-client package is added to the same venv — both
+# register the same dns-dashddi certbot plugin entry point, and certbot
+# refuses to load either ("Duplicate plugin name"). See README.md's
+# "Upgrading from certbot-dns-dashddi v2" section.
+
+- name: Uninstall legacy certbot-dns-dashddi package (pre-v3 rename)
+  ansible.builtin.pip:
+    name: certbot-dns-dashddi
+    state: absent
+    virtualenv: "{{ dashddi_venv_path }}"
+
+- name: Check for legacy dashddi-certbot systemd timer
+  ansible.builtin.stat:
+    path: /etc/systemd/system/dashddi-certbot.timer
+  register: _dashddi_legacy_timer_stat
+
+- name: Disable legacy dashddi-certbot systemd timer
+  ansible.builtin.systemd:
+    name: dashddi-certbot.timer
+    state: stopped
+    enabled: false
+  when: _dashddi_legacy_timer_stat.stat.exists
+
+- name: Remove legacy dashddi-certbot systemd units and symlink
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/systemd/system/dashddi-certbot.service
+    - /etc/systemd/system/dashddi-certbot.timer
+    - /usr/local/bin/dashddi-certbot
+  when: _dashddi_legacy_timer_stat.stat.exists
+
+- name: Reload systemd after removing legacy units
+  ansible.builtin.systemd:
+    daemon_reload: true
+  when: _dashddi_legacy_timer_stat.stat.exists
+
 - name: Install dashddi-client plugin
   ansible.builtin.pip:
     name: "{{ dashddi_plugin_source }}"
