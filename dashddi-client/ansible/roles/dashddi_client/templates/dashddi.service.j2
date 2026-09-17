@@ -5,9 +5,5 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=/usr/local/bin/dashddi cert \
-    --credentials {{ dashddi_credentials_path }} \
-    -- \
-    --dns-dashddi-propagation-seconds {{ dashddi_propagation_seconds }}{% if dashddi_deploy_hook %} \
-    --deploy-hook {{ dashddi_deploy_hook }}{% endif %}
+ExecStart=/usr/local/bin/dashddi cert --credentials {{ dashddi_credentials_path }} -- --dns-dashddi-propagation-seconds {{ dashddi_propagation_seconds }}{{ (' --deploy-hook ' + dashddi_deploy_hook) if dashddi_deploy_hook else '' }}
 PrivateTmp=true
