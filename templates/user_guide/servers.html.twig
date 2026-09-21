@@ -401,6 +401,7 @@ curl -s -X POST https://dashddi.example.com/api/dhcp/lease \
                     <tr><td>API Key</td><td>Snipe-IT API token — generate one under your user profile in Snipe-IT (<strong>Profile → API Keys → Create</strong>). Read-only access is sufficient.</td></tr>
                     <tr><td>MAC Custom Fields</td><td>Comma-separated Snipe-IT custom field names that contain MAC addresses. Append <code>:alias</code> to control the interface name in DashDDI (e.g. <code>MAC Address, WiFi MAC Address:wifi, Management MAC:mgmt</code>). Without an alias, a short name is derived automatically. Multiple MAC values in a single field can be separated by newlines, semicolons, or commas.</td></tr>
                     <tr><td>Verify TLS</td><td>Whether to validate Snipe-IT's TLS certificate. Disable if using a self-signed cert.</td></tr>
+                    <tr><td>Max Deletion Percentage</td><td>Safety guardrail (0–100, default 25). If a sync would delete or unlink more than this percentage of previously-synced hosts in one run, the sync aborts and makes no changes — protecting against a malformed or empty Snipe-IT API response being misread as mass asset deletion. Set to 100 to disable.</td></tr>
                 </tbody>
             </table>
         </div>
@@ -424,6 +425,7 @@ curl -s -X POST https://dashddi.example.com/api/dhcp/lease \
                     <tr><td>Subsequent sync runs</td><td>Updates host name to match asset name (unless manually changed since last sync); soft-deletes interfaces whose MACs no longer appear; restores interfaces whose MACs reappear; backfills interface names that are still unset.</td></tr>
                     <tr><td>Asset archived/deleted — adopted host</td><td>Removes the <code>snipeit</code> tag and unlinks the asset; host is preserved.</td></tr>
                     <tr><td>Asset archived/deleted — sync-created host</td><td>Soft-deletes the host and its interfaces.</td></tr>
+                    <tr><td>Deletions in one run exceed Max Deletion Percentage</td><td>Sync aborts entirely with no changes made; surfaces as a red "Exception" in the push log (or CLI failure) explaining the counts and threshold, so an operator can investigate before assets are actually removed.</td></tr>
                 </tbody>
             </table>
         </div>

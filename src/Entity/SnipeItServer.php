@@ -45,6 +45,11 @@ class SnipeItServer
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $vlanOverrideCustomField = null;
 
+    /** Sync aborts (no deletions performed) if the percentage of existing links it would delete/unlink exceeds this. 100 disables the check. */
+    #[ORM\Column(options: ['default' => 25])]
+    #[Assert\Range(min: 0, max: 100)]
+    private int $maxDeletionPercent = 25;
+
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $description = null;
 
@@ -134,6 +139,9 @@ class SnipeItServer
 
     public function getVlanOverrideCustomField(): ?string { return $this->vlanOverrideCustomField; }
     public function setVlanOverrideCustomField(?string $v): static { $this->vlanOverrideCustomField = $v ?: null; return $this; }
+
+    public function getMaxDeletionPercent(): int { return $this->maxDeletionPercent; }
+    public function setMaxDeletionPercent(int $maxDeletionPercent): static { $this->maxDeletionPercent = $maxDeletionPercent; return $this; }
 
     public function getDefaultSubnet(): ?Subnet { return $this->defaultSubnet; }
     public function setDefaultSubnet(?Subnet $subnet): static { $this->defaultSubnet = $subnet; return $this; }

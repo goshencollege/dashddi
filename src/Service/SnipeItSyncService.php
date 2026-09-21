@@ -46,6 +46,7 @@ class SnipeItSyncService
         $macFieldDefs        = $server->getMacFieldDefinitions();
         $vlanOverrideField   = $server->getVlanOverrideCustomField();
         $defaultSubnetId     = $server->getDefaultSubnet()?->getId();
+        $maxDeletionPercent  = $server->getMaxDeletionPercent();
 
         $snipeTag = $this->ensureTag(self::TAG_NAME);
         $this->em->flush(); // persist new tag before first clear
@@ -250,32 +251,48 @@ class SnipeItSyncService
         // Remove or unlink hosts whose Snipe-IT assets are no longer active
         $snipeTag      = $this->ensureTag(self::TAG_NAME);
         $existingLinks = $this->linkRepo->findByServer($server);
-        foreach ($existingLinks as $link) {
-            if (!in_array($link->getSnipeAssetId(), $activeAssetIds, true)) {
-                if ($link->isAdopted()) {
-                    // Preserve the pre-existing host; just remove the link and all snipeit tags
-                    $host = $link->getHost();
-                    foreach ($host->getTags()->filter(fn(Tag $t) => str_starts_with($t->getName(), 'snipeit'))->toArray() as $t) {
-                        $host->removeTag($t);
-                    }
-                    $host->setSnipeItAssetLink(null);
-                    $this->em->createQuery('DELETE FROM App\Entity\SnipeItAssetLink l WHERE l.id = :id')
-                        ->setParameter('id', $link->getId())
-                        ->execute();
-                    $this->em->detach($link);
-                } else {
-                    // Soft-delete the sync-created host and its interfaces; delete only the link row
-                    $host = $link->getHost();
-                    $host->softDeleteWithInterfaces();
-                    $host->setSnipeItAssetLink(null);
-                    $this->em->getConnection()->executeStatement(
-                        'DELETE FROM snipe_it_asset_link WHERE id = ?',
-                        [$link->getId()]
-                    );
-                    $this->em->detach($link);
+
+        $linksToRemove = array_filter(
+            $existingLinks,
+            fn(SnipeItAssetLink $link) => !in_array($link->getSnipeAssetId(), $activeAssetIds, true)
+        );
+        $existingCount = count($existingLinks);
+        $toDeleteCount = count($linksToRemove);
+
+        if (self::shouldAbortForDeletionThreshold($toDeleteCount, $existingCount, $maxDeletionPercent)) {
+            $percent = round(($toDeleteCount / $existingCount) * 100, 1);
+            throw new \RuntimeException(sprintf(
+                'Sync aborted: this run would delete/unlink %d of %d previously-synced host(s) (%s%%), exceeding the configured Max Deletion Percentage of %d%% for this server. '
+                . 'No changes were made. This usually means Snipe-IT returned an unexpected or empty response (e.g. a permissions issue or a custom-field rename after an upgrade) rather than that assets were actually deleted. '
+                . 'Verify the Snipe-IT API response and custom-field configuration, then re-run. If this deletion is expected, raise the Max Deletion Percentage on the server config or set it to 100 to disable this check.',
+                $toDeleteCount, $existingCount, $percent, $maxDeletionPercent
+            ));
+        }
+
+        foreach ($linksToRemove as $link) {
+            if ($link->isAdopted()) {
+                // Preserve the pre-existing host; just remove the link and all snipeit tags
+                $host = $link->getHost();
+                foreach ($host->getTags()->filter(fn(Tag $t) => str_starts_with($t->getName(), 'snipeit'))->toArray() as $t) {
+                    $host->removeTag($t);
                 }
-                $result['deleted']++;
+                $host->setSnipeItAssetLink(null);
+                $this->em->createQuery('DELETE FROM App\Entity\SnipeItAssetLink l WHERE l.id = :id')
+                    ->setParameter('id', $link->getId())
+                    ->execute();
+                $this->em->detach($link);
+            } else {
+                // Soft-delete the sync-created host and its interfaces; delete only the link row
+                $host = $link->getHost();
+                $host->softDeleteWithInterfaces();
+                $host->setSnipeItAssetLink(null);
+                $this->em->getConnection()->executeStatement(
+                    'DELETE FROM snipe_it_asset_link WHERE id = ?',
+                    [$link->getId()]
+                );
+                $this->em->detach($link);
             }
+            $result['deleted']++;
         }
 
         $server->setLastSyncAt(new \DateTimeImmutable());
@@ -620,6 +637,15 @@ class SnipeItSyncService
             return -1;
         }
         return (int) substr($cidr, strpos($cidr, '/') + 1);
+    }
+
+    /** True if deleting/unlinking $toDeleteCount of $existingCount links exceeds $thresholdPercent. A threshold of 100 never trips. */
+    public static function shouldAbortForDeletionThreshold(int $toDeleteCount, int $existingCount, int $thresholdPercent): bool
+    {
+        if ($existingCount === 0 || $toDeleteCount === 0) {
+            return false;
+        }
+        return (($toDeleteCount / $existingCount) * 100) > $thresholdPercent;
     }
 
     private function ensureTag(string $tagName): Tag
