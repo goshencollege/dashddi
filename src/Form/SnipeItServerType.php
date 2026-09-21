@@ -7,6 +7,7 @@ use App\Entity\Subnet;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
+use Symfony\Component\Form\Extension\Core\Type\IntegerType;
 use Symfony\Component\Form\Extension\Core\Type\PasswordType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
@@ -43,6 +44,11 @@ class SnipeItServerType extends AbstractType
                 'required' => false,
                 'attr'     => ['placeholder' => 'e.g. VLAN Override'],
                 'help'     => 'Optional. Display name of a Snipe-IT custom field containing a numeric VLAN ID. When set, overrides the category-based subnet assignment for individual assets.',
+            ])
+            ->add('maxDeletionPercent', IntegerType::class, [
+                'label' => 'Max Deletion Percentage',
+                'attr'  => ['placeholder' => '25', 'min' => 0, 'max' => 100],
+                'help'  => 'Safety guardrail: if a sync would delete/unlink more than this percentage of previously-synced hosts in one run, the sync aborts and makes no changes instead of proceeding. Guards against a malformed or empty Snipe-IT API response being misread as mass asset deletion. Set to 100 to disable.',
             ])
             ->add('defaultSubnet', EntityType::class, [
                 'class'         => Subnet::class,
