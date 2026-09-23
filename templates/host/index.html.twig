@@ -21,6 +21,9 @@
 .host-tree-table td, .host-tree-table th { padding-top: 0.3rem; padding-bottom: 0.3rem; }
 .host-tree-table thead th { position: sticky; top: 0; z-index: 2; background-color: var(--bs-body-bg); padding-top: 0.46rem; padding-bottom: 0.46rem; }
 .host-tree-table thead th::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; border-bottom: 2px solid var(--bs-border-color); }
+/* Host row sticks below the header while its own interface rows scroll past; the next host row's */
+/* sticky position naturally overlaps and pushes the previous one off as it reaches the same offset. */
+.host-tree-table .host-row > td { position: sticky; top: var(--tree-sticky-top, 0px); z-index: 1; background-color: var(--bs-body-bg); }
 .host-tree-table thead th:first-child { border-left: 1px solid var(--bs-border-color); }
 .host-tree-table thead th:last-child  { border-right: 1px solid var(--bs-border-color); }
 .host-tree-table .toggle-cell { width: 1.75rem; padding-right: 0; text-align: center; }
@@ -47,6 +50,9 @@
 /* Group hover (JS-managed; !important overrides Bootstrap's --bs-table-bg mechanism) */
 .host-tree-table .group-hovered > td { background-color: var(--tree-group-hover) !important; }
 .host-tree-table .row-hovered > td   { background-color: var(--tree-row-hover)   !important; }
+/* Host row is sticky, so its hover tint must stay opaque or rows scrolling underneath show through it */
+.host-tree-table .host-row.group-hovered > td { background-color: var(--bs-body-bg) !important; background-image: linear-gradient(var(--tree-group-hover), var(--tree-group-hover)) !important; }
+.host-tree-table .host-row.row-hovered > td   { background-color: var(--bs-body-bg) !important; background-image: linear-gradient(var(--tree-row-hover), var(--tree-row-hover)) !important; }
 </style>
 {{ include('_tom_select_dark.html.twig') }}
 {% endblock %}
@@ -1122,6 +1128,29 @@ document.getElementById('add-group-btn').addEventListener('click', () => addGrou
 initBuilder();
 </script>
 <script>
+// --- Sticky host row offset (must match the sticky header's rendered height) ---
+const treeTableEl = document.querySelector('.host-tree-table');
+const treeTheadEl = treeTableEl?.querySelector('thead');
+
+function updateTreeStickyOffset() {
+    if (!treeTableEl || !treeTheadEl) return;
+    // Overlap by 1px (rather than butting exactly against the header) to absorb subpixel
+    // rounding differences between the two independently-sticky elements while scrolling,
+    // which otherwise show as a hairline gap that interface rows peek through.
+    const height = treeTheadEl.getBoundingClientRect().height;
+    treeTableEl.style.setProperty('--tree-sticky-top', (height - 1) + 'px');
+}
+
+// A ResizeObserver (rather than a one-shot measurement on load) keeps the offset correct
+// if the header's height changes later, e.g. once icon/web fonts finish swapping in.
+if (window.ResizeObserver && treeTheadEl) {
+    new ResizeObserver(updateTreeStickyOffset).observe(treeTheadEl);
+} else {
+    updateTreeStickyOffset();
+    window.addEventListener('load', updateTreeStickyOffset);
+}
+window.addEventListener('resize', updateTreeStickyOffset);
+
 // --- Tree expand/collapse (persisted in localStorage; default: expanded) ---
 const collapsedHosts = new Set(
     JSON.parse(localStorage.getItem('host-tree-collapsed') || '[]')
