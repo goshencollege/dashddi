@@ -80,6 +80,9 @@ class NetworkInterface
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $switchPort = null;
 
+    #[ORM\Column]
+    private bool $snipeItManaged = false;
+
     public function __construct()
     {
         $this->domainRecords = new ArrayCollection();
@@ -134,6 +137,9 @@ class NetworkInterface
 
     public function getSwitchPort(): ?string { return $this->switchPort; }
     public function setSwitchPort(?string $port): static { $this->switchPort = $port; return $this; }
+
+    public function isSnipeItManaged(): bool { return $this->snipeItManaged; }
+    public function setSnipeItManaged(bool $snipeItManaged): static { $this->snipeItManaged = $snipeItManaged; return $this; }
 
     public function getPrimaryDomainRecord(): ?DomainRecord
     {
