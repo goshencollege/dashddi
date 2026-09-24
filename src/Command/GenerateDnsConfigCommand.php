@@ -74,14 +74,6 @@ class GenerateDnsConfigCommand extends Command
                     foreach (array_filter([$subnet->getIpv4Cidr(), $subnet->getIpv6Cidr()]) as $cidr) {
                         $zoneName = $this->generator->reverseZoneName($cidr);
                         $filename = $viewDir . '/' . $zoneName . '.zone';
-                        // RFC 2317 classless delegation names (sub-/24 subnets) contain a literal "/",
-                        // e.g. "0/29.244.51.198.in-addr.arpa", which nests the zone file one directory
-                        // deeper than $viewDir — ensure that directory exists too.
-                        $zoneFileDir = dirname($filename);
-                        if (!is_dir($zoneFileDir) && !mkdir($zoneFileDir, 0755, true) && !is_dir($zoneFileDir)) {
-                            $io->error("Cannot create output directory: $zoneFileDir");
-                            return Command::FAILURE;
-                        }
                         file_put_contents($filename, $this->generator->generateReverseZoneFile($subnet, $cidr, $view));
                         $io->writeln(' <info>Wrote</info> ' . $filename);
                     }
