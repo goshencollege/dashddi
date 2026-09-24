@@ -70,10 +70,26 @@ class GenerateDnsConfigCommand extends Command
                     $io->writeln(' <info>Wrote</info> ' . $filename);
                 }
 
-                foreach ($this->generator->subnetsForView($view) as $subnet) {
+                $subnets = $this->generator->subnetsForView($view);
+                foreach ($subnets as $subnet) {
                     foreach (array_filter([$subnet->getIpv4Cidr(), $subnet->getIpv6Cidr()]) as $cidr) {
+                        $isIpv6 = str_contains($cidr, ':');
+                        // Subnets whose reverse zone is aggregated into a containing subnet's
+                        // zone (Subnet::reverseZoneAggregatesV4/V6) don't get their own file —
+                        // matches DnsDeployService and generateSecondaryConf.
+                        if ($this->generator->isAbsorbedFor($subnet, $subnets, $isIpv6)) {
+                            continue;
+                        }
                         $zoneName = $this->generator->reverseZoneName($cidr);
                         $filename = $viewDir . '/' . $zoneName . '.zone';
+                        // RFC 2317 classless delegation names (sub-/24 subnets) contain a literal "/",
+                        // e.g. "0/29.244.51.198.in-addr.arpa", which nests the zone file one directory
+                        // deeper than $viewDir — ensure that directory exists too.
+                        $zoneFileDir = dirname($filename);
+                        if (!is_dir($zoneFileDir) && !mkdir($zoneFileDir, 0755, true) && !is_dir($zoneFileDir)) {
+                            $io->error("Cannot create output directory: $zoneFileDir");
+                            return Command::FAILURE;
+                        }
                         file_put_contents($filename, $this->generator->generateReverseZoneFile($subnet, $cidr, $view));
                         $io->writeln(' <info>Wrote</info> ' . $filename);
                     }
