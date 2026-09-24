@@ -153,6 +153,10 @@ class DnsDeployService
                         }
                         $remotePath  = $zonePath . '/' . $viewName . '/' . $zoneName . '.zone';
                         $displayFile = $viewName . '/' . $zoneName . '.zone';
+                        // RFC 2317 classless delegation names (sub-/24 subnets) contain a literal "/",
+                        // e.g. "0/29.244.51.198.in-addr.arpa", which nests the zone file one directory
+                        // deeper than the view dir created above — ensure that directory exists too.
+                        $sftp->exec('mkdir -p ' . escapeshellarg(dirname($remotePath)));
                         $isDynamic   = $subnet->isDdnsEnabled()
                             && $subnet->getDdnsDnsServer()?->getId() === $server->getId()
                             && $server->getDdnsAlgorithm();
