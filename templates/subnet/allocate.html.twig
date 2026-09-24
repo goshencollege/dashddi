@@ -1,0 +1,80 @@
+{% extends 'base.html.twig' %}
+{% block title %}Allocate Subnet — {{ container.name }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ path('subnet_index') }}">Subnets</a></li>
+        <li class="breadcrumb-item"><a href="{{ path('subnet_show', {id: container.id}) }}">{{ container.name }}</a></li>
+        <li class="breadcrumb-item active">Allocate Subnet</li>
+    </ol>
+</nav>
+
+<div class="row justify-content-center">
+    <div class="col-md-7">
+        <div class="card">
+            <div class="card-header"><h5 class="mb-0">Allocate Subnet in {{ container.name }}</h5></div>
+            <div class="card-body">
+                {% if not hasV4 %}
+                    <p class="text-muted mb-0">This container has no IPv4 CIDR defined, so a subnet can't be carved out of it.</p>
+                {% else %}
+                <form method="post">
+                    <input type="hidden" name="_token" value="{{ csrf_token('allocate_subnet_' ~ container.id) }}">
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">IPv4 Prefix Length</label>
+                        <div class="input-group" style="max-width: 160px">
+                            <span class="input-group-text">/</span>
+                            <input type="number" name="ipv4_prefix" class="form-control" value="{{ v4PrefixLen }}"
+                                   min="{{ container.ipv4Cidr|split('/')[1] + 1 }}" max="32">
+                        </div>
+                        <div class="form-text">Finds the first free block of this size within <code>{{ container.ipv4Cidr }}</code>.</div>
+                    </div>
+
+                    {% if hasV6 %}
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="pairV6Check" name="pair_ipv6" value="1" {{ pairV6 ? 'checked' : '' }}>
+                        <label class="form-check-label fw-semibold" for="pairV6Check">Also allocate a corresponding IPv6 subnet</label>
+                        <div class="form-text">
+                            Places the IPv6 subnet at the same relative position within <code>{{ container.ipv6Cidr }}</code>
+                            as the new IPv4 subnet occupies within <code>{{ container.ipv4Cidr }}</code> — the same convention
+                            as hex-encoding a /24's third octet into a v6 group, generalized to any prefix length.
+                        </div>
+                    </div>
+                    <div class="mb-3" id="v6PrefixGroup">
+                        <label class="form-label fw-semibold">IPv6 Prefix Length</label>
+                        <div class="input-group" style="max-width: 160px">
+                            <span class="input-group-text">/</span>
+                            <input type="number" name="ipv6_prefix" class="form-control" value="{{ v6PrefixLen }}"
+                                   min="{{ container.ipv6Cidr|split('/')[1] + 1 }}" max="128">
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-magic me-1"></i>Find Next Available
+                        </button>
+                        <a href="{{ path('subnet_show', {id: container.id}) }}" class="btn btn-outline-secondary">Cancel</a>
+                    </div>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    var checkbox = document.getElementById('pairV6Check');
+    var group    = document.getElementById('v6PrefixGroup');
+    if (!checkbox || !group) return;
+
+    function sync() { group.style.display = checkbox.checked ? '' : 'none'; }
+    checkbox.addEventListener('change', sync);
+    sync();
+}());
+</script>
+{% endblock %}

@@ -126,6 +126,22 @@
     </div>
 </div>
 
+<div class="card mb-4" id="allocate-subnet">
+    <div class="card-header fw-semibold"><i class="bi bi-magic me-1"></i>Allocating a Subnet from a Container</div>
+    <div class="card-body">
+        <p>A container subnet's detail page shows an <strong>Allocate Subnet</strong> button (also available as a magic-wand icon on the subnet list) when the container has an IPv4 CIDR. It finds the first free block of a given size inside the container and pre-fills a new subnet form with it — no more scanning the list by hand to find the next open <code>/24</code>.</p>
+        <dl class="row mb-0">
+            <dt class="col-sm-3">IPv4 Prefix Length</dt>
+            <dd class="col-sm-9">The size of the block to carve out, e.g. <code>/24</code>. DashDDI walks the container's CIDR in blocks of this size and returns the first one that doesn't overlap any existing child subnet, regardless of that child's own prefix length.</dd>
+            <dt class="col-sm-3">Also allocate a corresponding IPv6 subnet</dt>
+            <dd class="col-sm-9">Shown when the container also has an IPv6 CIDR. Places the new IPv6 subnet at the <em>same relative position</em> within the container's IPv6 CIDR that the new IPv4 subnet occupies within the container's IPv4 CIDR.</dd>
+            <dt class="col-sm-3">IPv6 Prefix Length</dt>
+            <dd class="col-sm-9">The size of the IPv6 block to derive, e.g. <code>/64</code>.</dd>
+        </dl>
+        <p class="mt-3 mb-0">The IPv6 placement generalizes the common manual convention of hex-encoding a <code>/24</code>'s third octet into a v6 group (e.g. <code>10.0.5.0/24</code> → <code>...:5::/64</code>) so it also works for prefix lengths that don't fall on octet boundaries, like <code>/23</code> or <code>/25</code>. If the container's IPv6 CIDR isn't large enough to represent every possible index at the requested IPv4 prefix length, or the computed IPv6 block is already occupied by another subnet, allocation fails with an explanation instead of silently picking something else — v6 placement is meant to stay deterministic and predictable, not "next available".</p>
+    </div>
+</div>
+
 <div class="card mb-4" id="address-blocks">
     <div class="card-header fw-semibold"><i class="bi bi-grid me-1"></i>Address Blocks</div>
     <div class="card-body">
@@ -205,6 +221,7 @@
             <a href="#subnet-list" class="list-group-item list-group-item-action py-1">Subnet List Views</a>
             <a href="#create-subnet" class="list-group-item list-group-item-action py-1">Creating a Subnet</a>
             <a href="#subnet-detail" class="list-group-item list-group-item-action py-1">Subnet Detail Page</a>
+            <a href="#allocate-subnet" class="list-group-item list-group-item-action py-1">Allocating a Subnet from a Container</a>
             <a href="#address-blocks" class="list-group-item list-group-item-action py-1">Address Blocks</a>
             <a href="#vrfs" class="list-group-item list-group-item-action py-1">VRFs</a>
             <a href="#bulk-edit" class="list-group-item list-group-item-action py-1">Bulk Edit</a>

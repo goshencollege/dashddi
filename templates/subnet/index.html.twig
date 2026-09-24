@@ -292,6 +292,11 @@
         {% if subnet.updatedBy %}<br>{{ subnet.updatedBy }}{% endif %}
     </td>
     <td class="text-end">
+        {% if subnet.isContainer and subnet.ipv4Cidr %}
+        <a href="{{ path('subnet_allocate', {id: subnet.id}) }}" class="btn btn-sm btn-outline-primary me-1" title="Allocate Subnet">
+            <i class="bi bi-magic"></i>
+        </a>
+        {% endif %}
         <a href="{{ path('subnet_edit', {id: subnet.id}) }}" class="btn btn-sm btn-outline-secondary me-1">
             <i class="bi bi-pencil"></i>
         </a>
