@@ -406,6 +406,7 @@ class SnipeItSyncService
             $iface = new NetworkInterface();
             $iface->setMacAddress($mac);
             $iface->setHost($host);
+            $iface->setSnipeItManaged(true);
             if ($alias !== '' && $iface->getName() === null) {
                 $iface->setName($alias);
             }
@@ -435,6 +436,7 @@ class SnipeItSyncService
             $iface->setMacAddress($mac);
             $iface->setName($alias);
             $iface->setHost($host);
+            $iface->setSnipeItManaged(true);
             $this->assignSubnetIfMissing($iface, $categorySubnetIdMap, $categoryId, $overrideSubnetId, $defaultSubnetId);
             $this->em->persist($iface);
             $added++;
@@ -493,9 +495,11 @@ class SnipeItSyncService
 
         $normalizedMacs = array_keys($macAliasMap);
 
-        // Soft-delete interfaces whose MACs are no longer in the asset
+        // Soft-delete interfaces whose MACs are no longer in the asset. Only ever touches
+        // interfaces DashDDI itself created via Snipe-IT sync — manually-added interfaces are
+        // never reported by Snipe-IT's MAC custom fields, so they must not be swept up here.
         foreach ($host->getInterfaces() as $iface) {
-            if (!$iface->isDeleted() && !in_array($iface->getMacAddress(), $normalizedMacs, true)) {
+            if (!$iface->isDeleted() && self::shouldRemoveStaleInterface($iface->isSnipeItManaged(), $iface->getMacAddress(), $normalizedMacs)) {
                 $iface->softDelete();
             }
         }
@@ -524,6 +528,7 @@ class SnipeItSyncService
             foreach ($host->getInterfaces() as $existing) {
                 if ($existing->isDeleted() && $existing->getMacAddress() === $mac) {
                     $existing->restore();
+                    $existing->setSnipeItManaged(true);
                     if ($existing->getName() === null) {
                         $existing->setName($macAliasMap[$mac]);
                     }
@@ -542,6 +547,7 @@ class SnipeItSyncService
                 // Unlinked host — move this interface via ORM (owning side only, no orphanRemoval
                 // triggered) then refresh the conflict host to get an accurate interface count.
                 $conflict->setHost($host);
+                $conflict->setSnipeItManaged(true);
                 $this->em->flush();
 
                 $this->em->refresh($conflictHost);
@@ -557,6 +563,7 @@ class SnipeItSyncService
             $iface->setMacAddress($mac);
             $iface->setName($macAliasMap[$mac]);
             $iface->setHost($host);
+            $iface->setSnipeItManaged(true);
             $this->assignSubnetIfMissing($iface, $categorySubnetIdMap, $categoryId, $overrideSubnetId, $defaultSubnetId);
             $this->em->persist($iface);
         }
@@ -637,6 +644,12 @@ class SnipeItSyncService
             return -1;
         }
         return (int) substr($cidr, strpos($cidr, '/') + 1);
+    }
+
+    /** True if a stale interface should be soft-deleted during sync — only ever removes interfaces DashDDI itself created via Snipe-IT, never manually-added ones. */
+    public static function shouldRemoveStaleInterface(bool $snipeItManaged, string $mac, array $normalizedMacs): bool
+    {
+        return $snipeItManaged && !in_array($mac, $normalizedMacs, true);
     }
 
     /** True if deleting/unlinking $toDeleteCount of $existingCount links exceeds $thresholdPercent. A threshold of 100 never trips. */
