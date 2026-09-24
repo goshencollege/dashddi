@@ -133,17 +133,18 @@ class DatabaseRestoreCommand extends Command
                 $this->connection->executeStatement("DROP TABLE IF EXISTS `{$tbl}`");
             }
 
-            // Execute backup statements; skip DROP TABLE lines (tables already gone).
+            // Execute backup statements. Each table's dump starts with its own
+            // `DROP TABLE IF EXISTS` — deliberately NOT skipped here, even though we
+            // already dropped everything above: a live Messenger worker or scheduler
+            // container can recreate tables like `messenger_messages` via Doctrine
+            // transport auto-setup in the gap between the pre-drop above and this
+            // loop reaching that table's CREATE TABLE. Re-running the backup's own
+            // idempotent DROP heals that race instead of failing on "already exists".
             $statements = $this->splitSqlStatements($sql);
             $count      = 0;
 
             foreach ($statements as $stmt) {
-                $upper = strtoupper(ltrim($stmt));
                 if ($stmt === '' || str_starts_with($stmt, '--')) {
-                    continue;
-                }
-                // Skip DROP TABLE — we already wiped the schema above.
-                if (str_starts_with($upper, 'DROP TABLE')) {
                     continue;
                 }
                 $this->connection->executeStatement($stmt);

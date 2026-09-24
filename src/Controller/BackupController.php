@@ -64,6 +64,8 @@ class BackupController extends AbstractController
             return $this->redirectToRoute('backup_index');
         }
 
+        set_time_limit(600);
+
         $consolePath = $this->getParameter('kernel.project_dir') . '/bin/console';
         $process     = new Process(['php', $consolePath, 'app:database:backup']);
         $process->setTimeout(600);
@@ -102,6 +104,8 @@ class BackupController extends AbstractController
 
         $extension = str_ends_with($origName, '.sql.enc') ? '.sql.enc' : '.sql';
         $tmpPath = $uploadedFile->move('/tmp', uniqid('dashddi_restore_', true) . $extension)->getPathname();
+
+        set_time_limit(600);
 
         $consolePath = $this->getParameter('kernel.project_dir') . '/bin/console';
         $keyFile     = tempnam('/tmp', 'dashddi_key_');
@@ -156,6 +160,8 @@ class BackupController extends AbstractController
             $this->addFlash('danger', 'This backup is encrypted but no backup password is saved in Backup Settings.');
             return $this->redirectToRoute('backup_index');
         }
+
+        set_time_limit(600);
 
         $consolePath = $this->getParameter('kernel.project_dir') . '/bin/console';
         $keyFile     = tempnam('/tmp', 'dashddi_key_');

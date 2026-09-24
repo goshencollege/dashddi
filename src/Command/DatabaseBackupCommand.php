@@ -226,16 +226,20 @@ class DatabaseBackupCommand extends Command
         );
 
         foreach ($tables as $table) {
-            if (in_array($table, $excludeTables, true)) {
-                continue;
-            }
+            $isExcluded = in_array($table, $excludeTables, true);
 
             fwrite($fh, "\n-- --------------------------------------------------------\n");
-            fwrite($fh, "-- Table: `{$table}`\n\n");
+            fwrite($fh, "-- Table: `{$table}`" . ($isExcluded ? ' (schema only — data excluded)' : '') . "\n\n");
             fwrite($fh, "DROP TABLE IF EXISTS `{$table}`;\n");
 
             $create = $this->connection->fetchAllAssociative("SHOW CREATE TABLE `{$table}`");
             fwrite($fh, $create[0]['Create Table'] . ";\n\n");
+
+            // Schema is always dumped so a restore's migration history stays consistent with
+            // what tables actually exist — only the (potentially huge) row data is skipped.
+            if ($isExcluded) {
+                continue;
+            }
 
             $total = (int) $this->connection->fetchOne("SELECT COUNT(*) FROM `{$table}`");
             if ($total === 0) {
