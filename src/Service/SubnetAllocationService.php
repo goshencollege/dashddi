@@ -94,6 +94,9 @@ class SubnetAllocationService
      * it at the same relative index within the container's IPv6 range. This generalizes the common manual
      * convention of hex-encoding the IPv4 subnet's variable octet into an IPv6 group: when the IPv4 prefix
      * is /24 and the IPv6 slot is 16 bits wide, the index IS that octet, placed in the low byte of the group.
+     * The extraction is rounded up to a whole byte (using the address's own trailing zero bits) so that
+     * prefixes not landing on a byte boundary, like /23, derive from the real octet value rather than a
+     * shrunken ordinal index that could alias with an unrelated sibling's slot.
      *
      * @return array{cidr: ?string, error: ?string}
      */
@@ -140,8 +143,16 @@ class SubnetAllocationService
             )];
         }
 
+        // Round the extraction up to a whole byte using the address's own trailing bits (already
+        // zero for any valid network address), rather than stopping exactly at $indexBits. Otherwise
+        // a subnet whose prefix doesn't land on a byte boundary (e.g. a /23) gets a shrunken ordinal
+        // index instead of its real octet value, and can alias with an unrelated sibling's derived
+        // slot purely because the two use different-width index encodings.
+        $maxV4Bits   = $v4Range->getStartAddress()::getNumberOfBits() - $v4ContainerPrefix;
+        $extractBits = $indexBits > 0 ? min($availableBits, $maxV4Bits, (int) ceil($indexBits / 8) * 8) : 0;
+
         $v4NetworkBits = $v4Range->getStartAddress()->getBits();
-        $indexBinary   = $indexBits > 0 ? substr($v4NetworkBits, $v4ContainerPrefix, $indexBits) : '';
+        $indexBinary   = $extractBits > 0 ? substr($v4NetworkBits, $v4ContainerPrefix, $extractBits) : '';
 
         $v6ContainerBits = $v6ContainerRange->getStartAddress()->getBits();
         $prefixBits      = substr($v6ContainerBits, 0, $v6ContainerPrefix);

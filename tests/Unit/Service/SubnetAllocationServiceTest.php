@@ -118,6 +118,35 @@ class SubnetAllocationServiceTest extends TestCase
         $this->assertNull($result['error']);
     }
 
+    public function testDeriveCorrespondingIpv6CidrReconstructsFullOctetForNonByteAlignedPrefix(): void
+    {
+        $container = $this->makeSubnet('10.0.0.0/16', '2001:db8:0:f800::/56');
+        $this->subnetRepo->method('findV6ContainedBy')->willReturn([]);
+
+        // A /23 only needs 7 index bits, but extraction rounds up to a whole byte using the
+        // address's own (already-zero) trailing bit, reconstructing the real octet value 6 —
+        // not floor(6/2)=3, which would be a shrunken ordinal index among /23-sized siblings.
+        $result = $this->service->deriveCorrespondingIpv6Cidr($container, '10.0.6.0/23', 64);
+
+        $this->assertSame('2001:db8:0:f806::/64', $result['cidr']);
+        $this->assertNull($result['error']);
+    }
+
+    public function testDeriveCorrespondingIpv6CidrDoesNotCollideWithUnrelatedByteAlignedSibling(): void
+    {
+        $container = $this->makeSubnet('10.0.0.0/16', '2001:db8:0:f800::/56');
+        // An unrelated /24 sibling at octet 3.
+        $unrelated = $this->makeSubnet('10.0.3.0/24', '2001:db8:0:f803::/64');
+        $this->subnetRepo->method('findV6ContainedBy')->willReturn([$unrelated]);
+
+        // Regression test: truncating the index at 7 raw bits previously made a /23 at octet 6
+        // derive the same v6 CIDR (f803, = floor(6/2)) as this unrelated /24 at octet 3.
+        $result = $this->service->deriveCorrespondingIpv6Cidr($container, '10.0.6.0/23', 64);
+
+        $this->assertSame('2001:db8:0:f806::/64', $result['cidr']);
+        $this->assertNull($result['error']);
+    }
+
     public function testDeriveCorrespondingIpv6CidrErrorsWhenV6SlotTooSmall(): void
     {
         $container = $this->makeSubnet('10.0.0.0/8', '2001:db8::/32');
