@@ -42,6 +42,15 @@ until $COMPOSE exec -T app php -r 'echo "ok";' 2>/dev/null | grep -q ok; do
     sleep 2
 done
 
+# A compose change that recreates the network (or any change that recreates db
+# alongside app) can leave app responsive before db has actually started, since
+# the check above only confirms PHP-FPM is up, not that the database is
+# reachable — migrations would then fail with a DNS/connection error.
+echo "==> Waiting for database connectivity..."
+until $COMPOSE exec -T app php bin/console dbal:run-sql "SELECT 1" >/dev/null 2>&1; do
+    sleep 2
+done
+
 echo "==> Running migrations..."
 $COMPOSE exec -T app php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
 
