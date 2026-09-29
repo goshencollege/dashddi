@@ -318,7 +318,7 @@ if ($AppEnv -eq 'dev') {
 
     $dbServiceBlock = ''
     $dependsOnBlock = ''
-    $volumesBlock   = "volumes:`n  ssl_certs:`n  symfony_var:"
+    $volumesBlock   = "volumes:`n  ssl_certs:`n  symfony_var:`n`nnetworks:`n  default:`n    enable_ipv6: true`n    ipam:`n      config:`n        - subnet: fd00:dead:beef::/64"
 
     if ($UseContainerDb) {
         $dbServiceBlock = @"
@@ -357,6 +357,13 @@ volumes:
   ssl_certs:
   mysql_data:
   symfony_var:
+
+networks:
+  default:
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: fd00:dead:beef::/64
 "@
     }
 

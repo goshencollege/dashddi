@@ -348,6 +348,13 @@ volumes:
   ssl_certs:
   mysql_data:
   symfony_var:
+
+networks:
+  default:
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: fd00:dead:beef::/64
 YAML
 
     else
@@ -357,6 +364,13 @@ YAML
 volumes:
   ssl_certs:
   symfony_var:
+
+networks:
+  default:
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: fd00:dead:beef::/64
 YAML
     fi
 
