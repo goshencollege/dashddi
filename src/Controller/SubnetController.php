@@ -15,6 +15,7 @@ use App\Repository\UserPreferenceRepository;
 use App\Repository\VrfRepository;
 use App\Service\IpAddressManager;
 use App\Service\KskRolloverService;
+use App\Service\SubnetAllocationService;
 use IPLib\Factory;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -157,13 +158,28 @@ class SubnetController extends AbstractController
     }
 
     #[Route('/new', name: 'subnet_new', methods: ['GET', 'POST'])]
-    public function new(Request $request, EntityManagerInterface $em, AppSettingRepository $settingRepo, SubnetRepository $subnetRepo): Response
+    public function new(Request $request, EntityManagerInterface $em, AppSettingRepository $settingRepo, SubnetRepository $subnetRepo, VrfRepository $vrfRepo): Response
     {
         $subnet = new Subnet();
         $defaultDays = $settingRepo->getInstance()?->getDefaultNewSubnetLeaseRetentionDays();
         if ($defaultDays !== null) {
             $subnet->setLeaseRetentionDays($defaultDays);
         }
+
+        if (!$request->isMethod('POST')) {
+            if ($ipv4Cidr = $request->query->get('ipv4Cidr')) {
+                $subnet->setIpv4Cidr($ipv4Cidr);
+            }
+            if ($ipv6Cidr = $request->query->get('ipv6Cidr')) {
+                $subnet->setIpv6Cidr($ipv6Cidr);
+            }
+            if ($vrfId = $request->query->get('vrf')) {
+                if ($vrf = $vrfRepo->find($vrfId)) {
+                    $subnet->setVrf($vrf);
+                }
+            }
+        }
+
         $form = $this->createForm(SubnetType::class, $subnet, ['embed_blocks' => true]);
         $form->handleRequest($request);
 
@@ -247,6 +263,70 @@ class SubnetController extends AbstractController
             'ipv6_addresses'  => $ipv6,
             'available_ipv4'  => $subnet->getIpv4Cidr() ? $manager->getAvailableIpv4($subnet, 255) : [],
             'available_ipv6'  => $subnet->getIpv6Cidr() ? $manager->getAvailableIpv6($subnet, 20) : [],
+        ]);
+    }
+
+    #[Route('/{id}/allocate', name: 'subnet_allocate', methods: ['GET', 'POST'])]
+    public function allocate(Request $request, Subnet $container, SubnetAllocationService $allocator): Response
+    {
+        if (!$container->isContainer()) {
+            throw $this->createNotFoundException('Subnet allocation is only available on container subnets.');
+        }
+
+        $hasV4 = (bool) $container->getIpv4Cidr();
+        $hasV6 = (bool) $container->getIpv6Cidr();
+
+        $v4PrefixLen = $request->request->getInt('ipv4_prefix', 24);
+        $v6PrefixLen = $request->request->getInt('ipv6_prefix', 64);
+        $pairV6      = $request->request->getBoolean('pair_ipv6', true);
+
+        if ($request->isMethod('POST')
+            && $this->isCsrfTokenValid('allocate_subnet_' . $container->getId(), $request->request->get('_token'))
+        ) {
+            $errors   = [];
+            $ipv4Cidr = null;
+            $ipv6Cidr = null;
+
+            if ($hasV4) {
+                $result = $allocator->findNextAvailableIpv4Cidr($container, $v4PrefixLen);
+                if ($result['cidr'] === null) {
+                    $errors[] = $result['error'];
+                } else {
+                    $ipv4Cidr = $result['cidr'];
+                }
+            } else {
+                $errors[] = 'This container has no IPv4 CIDR to allocate from.';
+            }
+
+            if ($ipv4Cidr !== null && $hasV6 && $pairV6) {
+                $result = $allocator->deriveCorrespondingIpv6Cidr($container, $ipv4Cidr, $v6PrefixLen);
+                if ($result['cidr'] === null) {
+                    $errors[] = $result['error'];
+                } else {
+                    $ipv6Cidr = $result['cidr'];
+                }
+            }
+
+            if ($errors) {
+                foreach ($errors as $error) {
+                    $this->addFlash('danger', $error);
+                }
+            } else {
+                return $this->redirectToRoute('subnet_new', array_filter([
+                    'ipv4Cidr' => $ipv4Cidr,
+                    'ipv6Cidr' => $ipv6Cidr,
+                    'vrf'      => $container->getVrf()?->getId(),
+                ]));
+            }
+        }
+
+        return $this->render('subnet/allocate.html.twig', [
+            'container'   => $container,
+            'hasV4'       => $hasV4,
+            'hasV6'       => $hasV6,
+            'v4PrefixLen' => $v4PrefixLen,
+            'v6PrefixLen' => $v6PrefixLen,
+            'pairV6'      => $pairV6,
         ]);
     }
 
