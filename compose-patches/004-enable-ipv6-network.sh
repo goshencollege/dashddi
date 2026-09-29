@@ -15,6 +15,7 @@ if yq '.networks.default.enable_ipv6' "$COMPOSE_FILE_PATH" | grep -q '^true$'; t
     exit 0
 fi
 
+subnet=$(random_ipv6_ula_subnet)
 yq_edit '.networks.default.enable_ipv6 = true' "$COMPOSE_FILE_PATH"
-yq_edit '.networks.default.ipam.config = [{"subnet": "fd00:dead:beef::/64"}]' "$COMPOSE_FILE_PATH"
-echo "    [done] Enabled IPv6 on the default network (recreate the stack for this to take effect: docker compose -f \"$COMPOSE_FILE_PATH\" down && docker compose -f \"$COMPOSE_FILE_PATH\" up -d)"
+yq_edit ".networks.default.ipam.config = [{\"subnet\": \"$subnet\"}]" "$COMPOSE_FILE_PATH"
+echo "    [done] Enabled IPv6 on the default network with subnet $subnet (recreate the stack for this to take effect: docker compose -f \"$COMPOSE_FILE_PATH\" down && docker compose -f \"$COMPOSE_FILE_PATH\" up -d)"

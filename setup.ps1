@@ -52,6 +52,14 @@ function RandBytes($count) {
 function RandHex($byteCount)    { [BitConverter]::ToString((RandBytes $byteCount)).Replace('-', '').ToLower() }
 function RandBase64($byteCount) { [Convert]::ToBase64String((RandBytes $byteCount)) }
 
+# A fixed ULA subnet would collide the moment two installs (e.g. dev + prod on
+# the same host, or two separate deployments) share a docker host, since
+# docker refuses to create a network whose IPv6 pool overlaps another one.
+function RandIpv6UlaSubnet() {
+    $hex = RandHex 5
+    return "fd$($hex.Substring(0,2)):$($hex.Substring(2,4)):$($hex.Substring(6,4))::/64"
+}
+
 Set-Location $ScriptDir
 
 # ── Environment ───────────────────────────────────────────────────────────────
@@ -318,7 +326,8 @@ if ($AppEnv -eq 'dev') {
 
     $dbServiceBlock = ''
     $dependsOnBlock = ''
-    $volumesBlock   = "volumes:`n  ssl_certs:`n  symfony_var:`n`nnetworks:`n  default:`n    enable_ipv6: true`n    ipam:`n      config:`n        - subnet: fd00:dead:beef::/64"
+    $ipv6Subnet     = RandIpv6UlaSubnet
+    $volumesBlock   = "volumes:`n  ssl_certs:`n  symfony_var:`n`nnetworks:`n  default:`n    enable_ipv6: true`n    ipam:`n      config:`n        - subnet: $ipv6Subnet"
 
     if ($UseContainerDb) {
         $dbServiceBlock = @"
@@ -363,7 +372,7 @@ networks:
     enable_ipv6: true
     ipam:
       config:
-        - subnet: fd00:dead:beef::/64
+        - subnet: $ipv6Subnet
 "@
     }
 

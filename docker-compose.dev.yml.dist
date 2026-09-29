@@ -134,4 +134,4 @@ networks:
     enable_ipv6: true
     ipam:
       config:
-        - subnet: fd00:dead:beef::/64
+        - subnet: replace_with_ipv6_subnet
