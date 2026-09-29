@@ -19,3 +19,12 @@ yq_edit() {
         yq -Yi "$expr" "$file"
     fi
 }
+
+# A fixed ULA subnet would collide the moment two installs (e.g. dev + prod on
+# the same host, or two separate deployments) share a docker host, since
+# docker refuses to create a network whose IPv6 pool overlaps another one.
+random_ipv6_ula_subnet() {
+    local b
+    b=$(od -An -N5 -tx1 /dev/urandom | tr -d ' \n')
+    printf 'fd%s:%s:%s::/64' "${b:0:2}" "${b:2:4}" "${b:6:4}"
+}

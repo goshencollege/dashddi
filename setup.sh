@@ -46,6 +46,15 @@ ask_yn() {
     [[ "${_val,,}" == y* ]]
 }
 
+# A fixed ULA subnet would collide the moment two installs (e.g. dev + prod on
+# the same host, or two separate deployments) share a docker host, since
+# docker refuses to create a network whose IPv6 pool overlaps another one.
+random_ipv6_ula_subnet() {
+    local b
+    b=$(od -An -N5 -tx1 /dev/urandom | tr -d ' \n')
+    printf 'fd%s:%s:%s::/64' "${b:0:2}" "${b:2:4}" "${b:6:4}"
+}
+
 cd "$SCRIPT_DIR"
 
 # ── Environment ───────────────────────────────────────────────────────────────
@@ -290,6 +299,8 @@ else
 fi
 
 # ── 6. Write compose file ─────────────────────────────────────────────────────
+IPV6_SUBNET=$(random_ipv6_ula_subnet)
+
 if [[ "$APP_ENV" == "dev" ]]; then
     header "Writing docker-compose.dev.yml"
 
@@ -302,6 +313,7 @@ if [[ "$APP_ENV" == "dev" ]]; then
         -e "s|root_password|${DB_ROOT_PASSWORD}|g" \
         -e "s|\"8080:80\"|\"${HTTP_PORT}:80\"|g" \
         -e "s|\"8443:443\"|\"${HTTPS_PORT}:443\"|g" \
+        -e "s|replace_with_ipv6_subnet|${IPV6_SUBNET}|g" \
         "$DIST_FILE" > "$COMPOSE_FILE"
 
     ok "docker-compose.dev.yml written"
@@ -354,7 +366,7 @@ networks:
     enable_ipv6: true
     ipam:
       config:
-        - subnet: fd00:dead:beef::/64
+        - subnet: ${IPV6_SUBNET}
 YAML
 
     else
@@ -370,7 +382,7 @@ networks:
     enable_ipv6: true
     ipam:
       config:
-        - subnet: fd00:dead:beef::/64
+        - subnet: ${IPV6_SUBNET}
 YAML
     fi
 
