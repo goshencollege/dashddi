@@ -174,23 +174,75 @@ class DhcpLeaseController extends AbstractController
 
     private function identifyServer(string $clientIp, DhcpServerRepository $dhcpServerRepo): ?DhcpServer
     {
-        if ($clientIp === '') {
+        $clientNorm = $this->normalizeIpForComparison($clientIp);
+        if ($clientNorm === null) {
             return null;
         }
 
         foreach ($dhcpServerRepo->findAll() as $server) {
             $hostname = $server->getHostname();
-            // Direct IP match first, then hostname resolution
-            if ($hostname === $clientIp) {
-                return $server;
+
+            // Hostname field holds a literal IP (common case): compare directly,
+            // normalized so IPv4, IPv6, and IPv4-mapped-IPv6 forms all line up.
+            $literalNorm = $this->normalizeIpForComparison($hostname);
+            if ($literalNorm !== null) {
+                if ($literalNorm === $clientNorm) {
+                    return $server;
+                }
+                continue;
             }
-            $resolved = gethostbyname($hostname);
-            if ($resolved !== $hostname && $resolved === $clientIp) {
-                return $server;
+
+            // Otherwise resolve both A and AAAA records, since leases can now
+            // arrive over either address family.
+            foreach ($this->resolveHostnameAddresses($hostname) as $resolved) {
+                if ($this->normalizeIpForComparison($resolved) === $clientNorm) {
+                    return $server;
+                }
             }
         }
 
         return null;
+    }
+
+    /**
+     * @return string[]
+     */
+    private function resolveHostnameAddresses(string $hostname): array
+    {
+        $records = @dns_get_record($hostname, DNS_A + DNS_AAAA);
+        if (!is_array($records)) {
+            return [];
+        }
+
+        $addresses = [];
+        foreach ($records as $record) {
+            if (isset($record['ip'])) {
+                $addresses[] = $record['ip'];
+            } elseif (isset($record['ipv6'])) {
+                $addresses[] = $record['ipv6'];
+            }
+        }
+
+        return $addresses;
+    }
+
+    private function normalizeIpForComparison(string $ip): ?string
+    {
+        $parsed = IpFactory::parseAddressString($ip);
+        if ($parsed === null) {
+            return null;
+        }
+
+        // Collapse IPv4-mapped IPv6 (e.g. ::ffff:10.0.0.1) down to the plain
+        // IPv4 form so it matches a server configured with the bare address.
+        if ($parsed instanceof IPv6) {
+            $asV4 = $parsed->toIPv4();
+            if ($asV4 !== null) {
+                $parsed = $asV4;
+            }
+        }
+
+        return $parsed->getComparableString();
     }
 
     private function findSubnetForIp(string $ipStr, SubnetRepository $subnetRepo): ?Subnet
