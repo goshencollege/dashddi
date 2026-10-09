@@ -3,32 +3,60 @@
 namespace App\Controller;
 
 use App\Security\SamlSettings;
+use App\Service\SamlReturnPathResolver;
 use OneLogin\Saml2\Auth;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
 
 class SamlController extends AbstractController
 {
-    public function __construct(private readonly SamlSettings $samlSettings) {}
+    public function __construct(
+        private readonly SamlSettings $samlSettings,
+        private readonly SamlReturnPathResolver $returnPathResolver,
+    ) {}
 
     /** Login page — shows "Sign in with Okta" button and any error flash messages. */
     #[Route('/saml/login', name: 'saml_login')]
-    public function login(): Response
+    public function login(Request $request): Response
     {
+        $returnTo = $this->returnPathResolver->sanitize($request->query->get('return_to'));
+
         if ($this->getUser()) {
-            return $this->redirectToRoute('host_index');
+            return $this->redirect($returnTo ?? $this->generateUrl('host_index'));
         }
 
-        return $this->render('saml/login.html.twig');
+        return $this->render('saml/login.html.twig', ['return_to' => $returnTo]);
+    }
+
+    /**
+     * Called by the client-side idle timer once a tab's session should be expired.
+     * Invalidates explicitly rather than relying on SessionExpirySubscriber, since
+     * /saml/* is excluded there to stop visiting it from extending the idle timer.
+     */
+    #[Route('/saml/expire', name: 'saml_expire')]
+    public function expire(Request $request, TokenStorageInterface $tokenStorage): Response
+    {
+        $returnTo = $this->returnPathResolver->sanitize($request->query->get('return_to'));
+
+        if ($request->hasSession()) {
+            $request->getSession()->invalidate();
+        }
+        $tokenStorage->setToken(null);
+
+        return $this->redirectToRoute('saml_login', $returnTo !== null ? ['return_to' => $returnTo] : []);
     }
 
     /** Initiates the SAML SSO flow by redirecting to the IdP. */
     #[Route('/saml/initiate', name: 'saml_initiate')]
-    public function initiate(): Response
+    public function initiate(Request $request): Response
     {
+        $returnTo = $this->returnPathResolver->sanitize($request->query->get('return_to'));
+
         $auth = new Auth($this->samlSettings->toArray());
-        $ssoUrl = $auth->login(returnTo: null, parameters: [], forceAuthn: false, isPassive: false, stay: true);
+        $ssoUrl = $auth->login(returnTo: $returnTo, parameters: [], forceAuthn: false, isPassive: false, stay: true);
 
         return $this->redirect($ssoUrl);
     }

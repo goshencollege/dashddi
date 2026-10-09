@@ -81,6 +81,13 @@ class SubnetController extends AbstractController
                     $criteria[$field] = $saved[$field];
                 }
             }
+
+            if ($query !== '' || !empty($criteria)) {
+                // Canonicalize: reflect the restored search in the URL so a bookmark,
+                // refresh, or return trip (e.g. after a SAML re-login) doesn't land
+                // back on a bare /subnets showing a search the address bar never named.
+                return $this->redirectToRoute('subnet_index', array_filter(['q' => $query] + $criteria, fn($v) => $v !== ''));
+            }
         }
 
         $isAdvanced  = !empty($criteria);

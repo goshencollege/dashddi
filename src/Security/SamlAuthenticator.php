@@ -2,6 +2,7 @@
 
 namespace App\Security;
 
+use App\Service\SamlReturnPathResolver;
 use OneLogin\Saml2\Auth;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\RedirectResponse;
@@ -15,16 +16,14 @@ use Symfony\Component\Security\Http\Authenticator\Passport\Badge\UserBadge;
 use Symfony\Component\Security\Http\Authenticator\Passport\Passport;
 use Symfony\Component\Security\Http\Authenticator\Passport\SelfValidatingPassport;
 use Symfony\Component\Security\Http\EntryPoint\AuthenticationEntryPointInterface;
-use Symfony\Component\Security\Http\Util\TargetPathTrait;
 
 class SamlAuthenticator extends AbstractAuthenticator implements AuthenticationEntryPointInterface
 {
-    use TargetPathTrait;
-
     public function __construct(
         private readonly SamlSettings $samlSettings,
         private readonly UrlGeneratorInterface $urlGenerator,
         private readonly LoggerInterface $logger,
+        private readonly SamlReturnPathResolver $returnPathResolver,
     ) {}
 
     public function supports(Request $request): ?bool
@@ -64,8 +63,11 @@ class SamlAuthenticator extends AbstractAuthenticator implements AuthenticationE
         $session->set('_session_lifetime', $lifetime);
         $session->set('_session_expires_at', time() + $lifetime);
 
-        $targetPath = $this->getTargetPath($session, $firewallName);
-        return new RedirectResponse($targetPath ?? $this->urlGenerator->generate('host_index'));
+        // RelayState rides the IdP round-trip tied to this specific login attempt, so
+        // concurrent tabs each authenticating independently never clobber each other's
+        // return path the way a shared session value would.
+        $returnTo = $this->returnPathResolver->sanitize($request->request->get('RelayState'));
+        return new RedirectResponse($returnTo ?? $this->urlGenerator->generate('host_index'));
     }
 
     public function onAuthenticationFailure(Request $request, AuthenticationException $exception): ?Response
@@ -77,9 +79,7 @@ class SamlAuthenticator extends AbstractAuthenticator implements AuthenticationE
     /** Called when an unauthenticated request hits a protected route. */
     public function start(Request $request, AuthenticationException $authException = null): Response
     {
-        if ($request->hasSession()) {
-            $this->saveTargetPath($request->getSession(), 'main', $request->getUri());
-        }
-        return new RedirectResponse($this->urlGenerator->generate('saml_login'));
+        $returnTo = $this->returnPathResolver->sanitize($request->getRequestUri());
+        return new RedirectResponse($this->urlGenerator->generate('saml_login', $returnTo !== null ? ['return_to' => $returnTo] : []));
     }
 }

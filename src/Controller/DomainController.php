@@ -130,6 +130,13 @@ class DomainController extends AbstractController
                 $q        = $saved['q'] ?? '';
                 $criteria = $saved['criteria'] ?? [];
             }
+
+            if ($q !== '' || !empty($criteria)) {
+                // Canonicalize: reflect the restored search in the URL so a bookmark,
+                // refresh, or return trip (e.g. after a SAML re-login) doesn't land
+                // back on a bare domain page showing a search the address bar never named.
+                return $this->redirectToRoute('domain_show', array_filter(['id' => $domain->getId(), 'q' => $q] + $criteria, fn($v) => $v !== ''));
+            }
         }
 
         $isAdvanced = !empty($criteria);

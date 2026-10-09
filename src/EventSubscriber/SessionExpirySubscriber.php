@@ -3,6 +3,7 @@
 namespace App\EventSubscriber;
 
 use App\Security\SamlSettings;
+use App\Service\SamlReturnPathResolver;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\RedirectResponse;
@@ -18,6 +19,7 @@ class SessionExpirySubscriber implements EventSubscriberInterface
         private readonly UrlGeneratorInterface $urlGenerator,
         private readonly TokenStorageInterface $tokenStorage,
         private readonly SamlSettings $samlSettings,
+        private readonly SamlReturnPathResolver $returnPathResolver,
     ) {}
 
     public static function getSubscribedEvents(): array
@@ -37,6 +39,13 @@ class SessionExpirySubscriber implements EventSubscriberInterface
 
         $request = $event->getRequest();
         if (!$request->hasSession()) {
+            return;
+        }
+
+        // The SAML flow (login/ACS/logout) is PUBLIC_ACCESS and already in-progress toward
+        // authentication — don't invalidate against it or capture its own URL as the
+        // post-login target path, which would clobber the real page the user was on.
+        if (str_starts_with($request->getPathInfo(), '/saml/')) {
             return;
         }
 
@@ -67,15 +76,26 @@ class SessionExpirySubscriber implements EventSubscriberInterface
             return;
         }
 
-        $session->invalidate();
-
         $isApiOrAjax = $request->isXmlHttpRequest()
             || str_starts_with($request->getPathInfo(), '/api/');
+
+        // Capture the page the user was on before invalidate() wipes the session. Carried
+        // as a query param (not session state) so concurrent tabs don't clobber each
+        // other's return path — see SamlAuthenticator::onAuthenticationSuccess().
+        $returnTo = $isApiOrAjax ? null : $this->returnPathResolver->sanitize($request->getRequestUri());
+
+        $session->invalidate();
+
+        // invalidate() only clears the session — TokenStorage still holds the token
+        // deserialized earlier this request, and ContextListener would otherwise
+        // re-persist it into the fresh session on kernel.response, undoing the logout.
+        $this->tokenStorage->setToken(null);
 
         if ($isApiOrAjax) {
             $event->setResponse(new JsonResponse(['error' => 'Session expired'], 401));
         } else {
-            $event->setResponse(new RedirectResponse($this->urlGenerator->generate('saml_login')));
+            $loginUrl = $this->urlGenerator->generate('saml_login', $returnTo !== null ? ['return_to' => $returnTo] : []);
+            $event->setResponse(new RedirectResponse($loginUrl));
         }
     }
 
