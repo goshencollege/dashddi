@@ -734,13 +734,14 @@
     var expiresAt    = {{ app.session.get('_session_expires_at') ?? 'null' }};
     var lifetime     = {{ app.session.get('_session_lifetime') ?? 1800 }};
     if (expiresAt) {
+        var loginUrl = '{{ path('saml_expire') }}?return_to=' + encodeURIComponent(window.location.pathname + window.location.search);
         // Fire 10% of the session lifetime AFTER the server-side expiry so the
         // subscriber has already invalidated the session when the redirect lands.
         var delay = (expiresAt * 1000 + lifetime * 100) - Date.now();
         if (delay > 0) {
-            setTimeout(function () { window.location.href = '{{ path('saml_login') }}'; }, delay);
+            setTimeout(function () { window.location.href = loginUrl; }, delay);
         } else {
-            window.location.href = '{{ path('saml_login') }}';
+            window.location.href = loginUrl;
         }
     }
 })();

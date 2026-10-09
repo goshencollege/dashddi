@@ -105,6 +105,13 @@ class HostController extends AbstractController
                 }
                 $query = implode(' AND ', $parts);
             }
+
+            if ($query !== '') {
+                // Canonicalize: reflect the restored search in the URL so a bookmark,
+                // refresh, or return trip (e.g. after a SAML re-login) doesn't land
+                // back on a bare /hosts showing a search the address bar never named.
+                return $this->redirectToRoute('host_index', ['q' => $query]);
+            }
         }
 
         $orGroups   = $this->queryParser->parse($query);

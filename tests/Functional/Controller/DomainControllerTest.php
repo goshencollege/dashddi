@@ -108,6 +108,8 @@ class DomainControllerTest extends AppWebTestCase
         $this->client->request('GET', "/domains/{$domainId}?q=web");
 
         $this->client->request('GET', "/domains/{$domainId}");
+        $this->assertResponseRedirects("/domains/{$domainId}?q=web");
+        $this->client->followRedirect();
         $this->assertResponseIsSuccessful();
         $this->assertStringContainsString('value="web"', $this->client->getResponse()->getContent());
     }
@@ -152,6 +154,8 @@ class DomainControllerTest extends AppWebTestCase
         $this->client->request('GET', "/domains/{$domainId}?hostname=web1");
 
         $this->client->request('GET', "/domains/{$domainId}");
+        $this->assertResponseRedirects("/domains/{$domainId}?hostname=web1");
+        $this->client->followRedirect();
         $this->assertResponseIsSuccessful();
         $this->assertStringContainsString('value="web1"', $this->client->getResponse()->getContent());
     }
