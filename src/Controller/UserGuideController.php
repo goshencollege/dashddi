@@ -2,8 +2,11 @@
 
 namespace App\Controller;
 
+use App\Service\UserGuideSearchService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\RedirectResponse;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
@@ -14,6 +17,18 @@ class UserGuideController extends AbstractController
     public function index(): Response
     {
         return $this->render('user_guide/index.html.twig');
+    }
+
+    #[Route('/search', name: 'search', methods: ['GET'])]
+    public function search(Request $request, UserGuideSearchService $searchService): JsonResponse
+    {
+        $results = $searchService->search((string) $request->query->get('q', ''));
+
+        foreach ($results as &$result) {
+            $result['url'] = $this->generateUrl($result['page']) . '#' . $result['sectionId'];
+        }
+
+        return $this->json(['results' => $results]);
     }
 
     #[Route('/hosts', name: 'hosts')]

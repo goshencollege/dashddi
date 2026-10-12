@@ -1,6 +1,11 @@
-<nav aria-label="breadcrumb" class="mb-4">
-    <ol class="breadcrumb">
-        <li class="breadcrumb-item"><a href="{{ path('user_guide_index') }}"><i class="bi bi-book me-1"></i>User Guide</a></li>
-        <li class="breadcrumb-item active">{{ section_title }}</li>
-    </ol>
-</nav>
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+    <nav aria-label="breadcrumb" class="mb-0">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="{{ path('user_guide_index') }}"><i class="bi bi-book me-1"></i>User Guide</a></li>
+            <li class="breadcrumb-item active">{{ section_title }}</li>
+        </ol>
+    </nav>
+    <div style="min-width: 260px; max-width: 360px; flex: 1 1 260px;">
+        {{ include('user_guide/_search.html.twig') }}
+    </div>
+</div>
