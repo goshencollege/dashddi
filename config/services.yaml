@@ -3,6 +3,14 @@
 parameters:
     app.reserved_tag_prefixes:
         - 'snipeit'
+    app.user_guide_pages:
+        'user_guide/hosts.html.twig': { route: user_guide_hosts, title: 'Hosts & Interfaces', icon: bi-pc-display }
+        'user_guide/subnets.html.twig': { route: user_guide_subnets, title: 'Subnets & IP Management', icon: bi-diagram-2 }
+        'user_guide/dns.html.twig': { route: user_guide_dns, title: 'DNS Management', icon: bi-globe }
+        'user_guide/dhcp.html.twig': { route: user_guide_dhcp, title: 'DHCP Management', icon: bi-hdd-network }
+        'user_guide/servers.html.twig': { route: user_guide_servers, title: 'Servers & Integrations', icon: bi-server }
+        'user_guide/recommendations.html.twig': { route: user_guide_recommendations, title: 'Recommendations', icon: bi-lightbulb }
+        'user_guide/settings.html.twig': { route: user_guide_settings, title: 'Settings & Administration', icon: bi-gear }
 
 services:
     _defaults:
@@ -42,6 +50,10 @@ services:
     App\Service\ReservedTagPrefixService:
         arguments:
             $prefixes: '%app.reserved_tag_prefixes%'
+
+    App\Service\UserGuideSearchService:
+        arguments:
+            $pages: '%app.user_guide_pages%'
 
     App\Service\OuiLookupService:
         arguments:
