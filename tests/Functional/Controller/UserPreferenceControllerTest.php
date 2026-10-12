@@ -7,6 +7,24 @@ use App\Tests\Functional\AppWebTestCase;
 
 class UserPreferenceControllerTest extends AppWebTestCase
 {
+    public function testSetThemeAcceptsLavender(): void
+    {
+        $data = $this->apiRequest('POST', '/api/preference/theme', ['theme' => 'lavender']);
+
+        $this->assertResponseIsSuccessful();
+        $this->assertSame(['theme' => 'lavender'], $data);
+
+        $pref = $this->em->getRepository(UserPreference::class)->findByIdentifier('test@example.com');
+        $this->assertSame('lavender', $pref->getTheme());
+    }
+
+    public function testSetThemeRejectsUnknownTheme(): void
+    {
+        $this->apiRequest('POST', '/api/preference/theme', ['theme' => 'sepia']);
+
+        $this->assertResponseStatusCodeSame(400);
+    }
+
     public function testSetHostCollapsedSectionsAddsSectionWhenCollapsed(): void
     {
         $data = $this->apiRequest('POST', '/api/preference/host-collapsed-sections', [
