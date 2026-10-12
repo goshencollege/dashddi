@@ -7,15 +7,15 @@ use App\Tests\Functional\AppWebTestCase;
 
 class UserPreferenceControllerTest extends AppWebTestCase
 {
-    public function testSetThemeAcceptsLavender(): void
+    public function testSetThemeAcceptsPurpleLight(): void
     {
-        $data = $this->apiRequest('POST', '/api/preference/theme', ['theme' => 'lavender']);
+        $data = $this->apiRequest('POST', '/api/preference/theme', ['theme' => 'purple-light']);
 
         $this->assertResponseIsSuccessful();
-        $this->assertSame(['theme' => 'lavender'], $data);
+        $this->assertSame(['theme' => 'purple-light'], $data);
 
         $pref = $this->em->getRepository(UserPreference::class)->findByIdentifier('test@example.com');
-        $this->assertSame('lavender', $pref->getTheme());
+        $this->assertSame('purple-light', $pref->getTheme());
     }
 
     public function testSetThemeRejectsUnknownTheme(): void

@@ -25,7 +25,7 @@ class UserPreferenceController extends AbstractController
 
         $data  = json_decode($request->getContent(), true);
         $theme = $data['theme'] ?? '';
-        if (!in_array($theme, ['light', 'dark', 'purple', 'lavender', 'green', 'rainbow'], true)) {
+        if (!in_array($theme, ['light', 'dark', 'purple', 'purple-light', 'green', 'rainbow'], true)) {
             return $this->json(['error' => 'Invalid theme'], 400);
         }
 
