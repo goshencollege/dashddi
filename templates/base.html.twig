@@ -82,6 +82,47 @@
             background-color: rgba(147,51,234,.12);
         }
 
+        /* ── Purple (Light) theme ───────────────────────────────── */
+        [data-theme="purple-light"] .navbar {
+            background-color: #3b0764 !important;
+        }
+        [data-theme="purple-light"] thead, [data-theme="purple-light"] .table-section-header {
+            background-color: #4c1d95 !important;
+            color: #fff;
+        }
+        [data-theme="purple-light"] {
+            --bs-primary:                #9333ea;
+            --bs-primary-rgb:            147, 51, 234;
+            --bs-link-color:             #c084fc;
+            --bs-link-color-rgb:         192, 132, 252;
+            --bs-link-hover-color:       #d8b4fe;
+        }
+        [data-theme="purple-light"] .btn-primary {
+            --bs-btn-bg:                 #7c3aed;
+            --bs-btn-border-color:       #7c3aed;
+            --bs-btn-hover-bg:           #6d28d9;
+            --bs-btn-hover-border-color: #6d28d9;
+            --bs-btn-active-bg:          #5b21b6;
+        }
+        [data-theme="purple-light"] .btn-outline-primary {
+            --bs-btn-color:              #c084fc;
+            --bs-btn-border-color:       #c084fc;
+            --bs-btn-hover-bg:           #7c3aed;
+            --bs-btn-hover-border-color: #7c3aed;
+            --bs-btn-hover-color:        #fff;
+        }
+        [data-theme="purple-light"] .bg-primary       { background-color: #7c3aed !important; }
+        [data-theme="purple-light"] .text-primary      { color: #c084fc !important; }
+        [data-theme="purple-light"] .nav-link.active   { color: #c084fc !important; }
+        [data-theme="purple-light"] .form-control:focus,
+        [data-theme="purple-light"] .form-select:focus {
+            border-color: #a855f7;
+            box-shadow: 0 0 0 .25rem rgba(168,85,247,.25);
+        }
+        [data-theme="purple-light"] .table-hover tbody tr:hover {
+            background-color: rgba(147,51,234,.12);
+        }
+
         /* ── Green theme ────────────────────────────────────────── */
         [data-theme="green"] .navbar {
             background-color: #064e3b !important;
@@ -576,6 +617,13 @@
                                 <span class="theme-swatch" style="background:#7c3aed;"></span>
                                 Purple
                                 {% if _theme == 'purple' %}<i class="bi bi-check ms-auto"></i>{% endif %}
+                            </button>
+                        </li>
+                        <li>
+                            <button class="dropdown-item d-flex align-items-center gap-2 theme-option {{ _theme == 'purple-light' ? 'active' }}" data-theme="purple-light">
+                                <span class="theme-swatch" style="background:#7c3aed;"></span>
+                                Purple (Light)
+                                {% if _theme == 'purple-light' %}<i class="bi bi-check ms-auto"></i>{% endif %}
                             </button>
                         </li>
                         <li>
