@@ -11,6 +11,7 @@ use App\Entity\Ipv6Address;
 use App\Entity\NetworkInterface;
 use App\Entity\Subnet;
 use App\Enum\BlockType;
+use App\Repository\DeniedMacAddressRepository;
 use App\Repository\SubnetRepository;
 use App\Service\DhcpConfigGenerator;
 use Doctrine\Common\Collections\ArrayCollection;
@@ -20,11 +21,13 @@ class DhcpConfigGeneratorTest extends TestCase
 {
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private function makeGenerator(array $subnets): DhcpConfigGenerator
+    private function makeGenerator(array $subnets, array $deniedMacs = []): DhcpConfigGenerator
     {
         $repo = $this->createStub(SubnetRepository::class);
         $repo->method('findAll')->willReturn($subnets);
-        return new DhcpConfigGenerator($repo);
+        $deniedRepo = $this->createStub(DeniedMacAddressRepository::class);
+        $deniedRepo->method('findAllMacAddresses')->willReturn($deniedMacs);
+        return new DhcpConfigGenerator($repo, $deniedRepo);
     }
 
     private function setCollection(object $entity, string $property, array $items): void
@@ -406,5 +409,55 @@ class DhcpConfigGeneratorTest extends TestCase
         $this->assertCount(1, $reservations);
         $this->assertSame('aa:bb:cc:dd:ee:06', $reservations[0]['hw-address']);
         $this->assertArrayNotHasKey('duid', $reservations[0]);
+    }
+
+    // ── Denied MAC addresses ─────────────────────────────────────────────────
+
+    public function testDeniedMacGetsGlobalDropReservationInIpv4(): void
+    {
+        $subnet = $this->makeSubnet(30);
+        $this->setCollection($subnet, 'interfaces', []);
+        $this->setCollection($subnet, 'addressBlocks', []);
+
+        $reservations = $this->makeGenerator([$subnet], ['aa:bb:cc:dd:ee:99'])
+            ->generateGlobalReservations4Config();
+
+        $this->assertSame([
+            ['hw-address' => 'aa:bb:cc:dd:ee:99', 'client-classes' => ['DROP']],
+        ], $reservations);
+    }
+
+    public function testDeniedMacGetsGlobalDropReservationInIpv6(): void
+    {
+        $subnet = (new Subnet())->setName('test')->setIpv6Cidr('2001:db8::/32');
+        $this->setId($subnet, 31);
+        $this->setCollection($subnet, 'interfaces', []);
+        $this->setCollection($subnet, 'addressBlocks', []);
+
+        $reservations = $this->makeGenerator([$subnet], ['aa:bb:cc:dd:ee:99'])
+            ->generateGlobalReservations6Config();
+
+        $this->assertSame([
+            ['hw-address' => 'aa:bb:cc:dd:ee:99', 'client-classes' => ['DROP']],
+        ], $reservations);
+    }
+
+    public function testDeniedMacWithDdnsHostnameOnlyGetsDropNotHostname(): void
+    {
+        $ddnsDomain = (new Domain())->setName('dyn.example.com')->setDdnsEnabled(true);
+        $iface      = (new NetworkInterface())->setMacAddress('aa:bb:cc:dd:ee:99');
+        $record     = (new DomainRecord())->setHostname('blockedhost')->setDomain($ddnsDomain);
+        $this->setCollection($iface, 'domainRecords', [$record]);
+
+        $subnet = $this->makeSubnet(32);
+        $this->setCollection($subnet, 'interfaces', [$iface]);
+        $this->setCollection($subnet, 'addressBlocks', []);
+
+        $reservations = $this->makeGenerator([$subnet], ['aa:bb:cc:dd:ee:99'])
+            ->generateGlobalReservations4Config();
+
+        $this->assertSame([
+            ['hw-address' => 'aa:bb:cc:dd:ee:99', 'client-classes' => ['DROP']],
+        ], $reservations);
     }
 }

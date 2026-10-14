@@ -155,6 +155,30 @@ Add `reservations-global: true` to `kea-dhcp4.conf` and include the global reser
 3. Redeploy the DHCP config. The device's MAC + label will appear in `global-reservations4.json`.
 4. When the device next gets a lease on any DDNS-enabled subnet, Kea registers `mylaptop.dyn.example.com` in DNS.
 
+### Denying a MAC address
+
+DashDDI can stop a specific device from getting a DHCP lease on **any** subnet or server. Add the MAC address under **DHCP → Denied MAC Addresses**; it's written into `global-reservations4.json` / `global-reservations6.json` as a global host reservation assigned to Kea's built-in `DROP` client class:
+
+```json
+{ "hw-address": "aa:bb:cc:dd:ee:ff", "client-classes": ["DROP"] }
+```
+
+Kea drops any packet classified into `DROP` before considering a lease, regardless of subnet or pool — no hook library is required (unlike `SKIP_DDNS` above).
+
+**One-time Kea configuration required:** Kea **1.9.0+**, and `reservations-global: true` in **both** `kea-dhcp4.conf` and `kea-dhcp6.conf` (the example above only shows v4 — add the same to `kea-dhcp6.conf` if you also want denial to apply to DHCPv6):
+
+```json
+{
+    "Dhcp6": {
+        "reservations-global": true,
+        "reservations": <?include "global-reservations6.json"?>,
+        ...
+    }
+}
+```
+
+The denial takes effect on the next DHCP config push — manual or scheduled.
+
 ## Console Command
 
 ```bash

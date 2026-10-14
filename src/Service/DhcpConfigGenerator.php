@@ -4,12 +4,14 @@ namespace App\Service;
 
 use App\Entity\NetworkInterface;
 use App\Enum\BlockType;
+use App\Repository\DeniedMacAddressRepository;
 use App\Repository\SubnetRepository;
 
 class DhcpConfigGenerator
 {
     public function __construct(
         private readonly SubnetRepository $subnetRepository,
+        private readonly DeniedMacAddressRepository $deniedMacAddressRepository,
     ) {}
 
     public function generateDhcp4Config(): array
@@ -129,11 +131,13 @@ class DhcpConfigGenerator
 
     public function generateGlobalReservations4Config(): array
     {
+        $denied       = $this->deniedMacAddressRepository->findAllMacAddresses();
         $reservations = [];
 
         foreach ($this->subnetRepository->findAll() as $subnet) {
             foreach ($subnet->getInterfaces() as $iface) {
-                if ($iface->isDeleted() || $iface->getIpAddress() || $iface->getMacAddress() === '00:00:00:00:00:00') {
+                if ($iface->isDeleted() || $iface->getIpAddress() || $iface->getMacAddress() === '00:00:00:00:00:00'
+                    || in_array($iface->getMacAddress(), $denied, true)) {
                     continue;
                 }
                 if ($label = $this->findAnyDdnsLabel($iface)) {
@@ -145,18 +149,24 @@ class DhcpConfigGenerator
             }
         }
 
+        foreach ($denied as $mac) {
+            $reservations[] = ['hw-address' => $mac, 'client-classes' => ['DROP']];
+        }
+
         return $reservations;
     }
 
     public function generateGlobalReservations6Config(): array
     {
+        $denied       = $this->deniedMacAddressRepository->findAllMacAddresses();
         $reservations = [];
 
         foreach ($this->subnetRepository->findAll() as $subnet) {
             foreach ($subnet->getInterfaces() as $iface) {
                 $duid = $iface->getHost()?->getDuid();
                 $mac  = $iface->getMacAddress();
-                if ($iface->isDeleted() || $iface->getIpv6Address() || (!$duid && $mac === '00:00:00:00:00:00')) {
+                if ($iface->isDeleted() || $iface->getIpv6Address() || (!$duid && $mac === '00:00:00:00:00:00')
+                    || (!$duid && in_array($mac, $denied, true))) {
                     continue;
                 }
                 if ($label = $this->findAnyDdnsLabel($iface)) {
@@ -165,6 +175,10 @@ class DhcpConfigGenerator
                         : ['hw-address' => $mac, 'hostname' => $label];
                 }
             }
+        }
+
+        foreach ($denied as $mac) {
+            $reservations[] = ['hw-address' => $mac, 'client-classes' => ['DROP']];
         }
 
         return $reservations;
