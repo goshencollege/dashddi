@@ -245,6 +245,16 @@ dashddi ALL=(bind) NOPASSWD: /usr/sbin/dnssec-dsfromkey, \
         <p class="text-muted small mb-3">Devices with no reservation receive an auto-generated hostname. Devices with a static IP reservation use their primary interface name for DDNS as usual.</p>
 
         <hr class="my-3">
+        <h6 id="denied-mac-addresses">Denying a MAC address</h6>
+        <p>DashDDI can stop a specific device from obtaining a DHCP lease on <strong>any</strong> subnet or server. Add the MAC address at <a href="{{ path('denied_mac_address_index') }}">DHCP → Denied MAC Addresses</a>; it's written into <code>global-reservations4.json</code> / <code>global-reservations6.json</code> as a global host reservation assigned to Kea's built-in <code>DROP</code> client class:</p>
+        <pre class="bg-body-secondary rounded p-3 small mb-3"><code>{ "hw-address": "aa:bb:cc:dd:ee:ff", "client-classes": ["DROP"] }</code></pre>
+        <p>Kea drops any packet classified into <code>DROP</code> before considering a lease, regardless of subnet or pool — no hook library is required, unlike <code>SKIP_DDNS</code> above.</p>
+        <p><strong>One-time Kea configuration:</strong> requires Kea <strong>1.9.0 or later</strong>, and <code>"reservations-global": true</code> in <strong>both</strong> <code>kea-dhcp4.conf</code> and <code>kea-dhcp6.conf</code> (only v4 is shown in the DDNS example above — add the same setting to <code>kea-dhcp6.conf</code> if you also want MAC denial to apply to DHCPv6):</p>
+        <pre class="bg-body-secondary rounded p-3 small mb-3"><code>"reservations-global": true,
+"reservations": &lt;?include "global-reservations6.json"?&gt;</code></pre>
+        <p class="mb-3">The denial takes effect on the next DHCP config push (manual or scheduled) — no reload-only action is needed beyond the normal push.</p>
+
+        <hr class="my-3">
         <h6 id="kea-lease-notifications">Configuring Kea to send lease notifications</h6>
         <p>Kea can POST lease events to DashDDI whenever an address is granted or renewed. This requires <strong>Kea 2.2 or later</strong> and uses the <code>run_script</code> hook library.</p>
 
@@ -880,6 +890,7 @@ systemctl restart pveproxy pvedaemon</code></pre>
             <a href="#dns-sudoers" class="list-group-item list-group-item-action py-1 ps-4">↳ Sudoers configuration</a>
             <a href="#dhcp-integration" class="list-group-item list-group-item-action py-1">DHCP / Kea</a>
             <a href="#kea-ddns" class="list-group-item list-group-item-action py-1 ps-4">↳ Dynamic DNS (D2)</a>
+            <a href="#denied-mac-addresses" class="list-group-item list-group-item-action py-1 ps-4">↳ Denying a MAC address</a>
             <a href="#kea-lease-notifications" class="list-group-item list-group-item-action py-1 ps-4">↳ Lease notifications</a>
             <a href="#clearpass" class="list-group-item list-group-item-action py-1">ClearPass</a>
             <a href="#snipeit" class="list-group-item list-group-item-action py-1">Snipe-IT</a>

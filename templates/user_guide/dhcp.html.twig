@@ -81,6 +81,15 @@
     </div>
 </div>
 
+<div class="card mb-4" id="denied-mac-addresses">
+    <div class="card-header fw-semibold"><i class="bi bi-shield-slash me-1"></i>Denied MAC Addresses</div>
+    <div class="card-body">
+        <p>To stop a specific device from getting a DHCP lease on <strong>any</strong> subnet or server, add its MAC address at <a href="{{ path('denied_mac_address_index') }}">DHCP → Denied MAC Addresses</a>, with an optional note on why it's blocked.</p>
+        <p>Denied MAC addresses are written into <code>global-reservations4.json</code> / <code>global-reservations6.json</code> as a Kea <strong>global host reservation</strong> assigned to Kea's built-in <code>DROP</code> client class, which causes Kea to silently drop the device's DHCP packets before any lease is considered — regardless of which subnet or pool it's on.</p>
+        <p class="mb-0 text-muted small">The denial takes effect the next time DHCP config is pushed (manually or on schedule — see <a href="#push-dhcp">Pushing DHCP Configuration</a> above). It requires Kea 1.9.0+ and <code>"reservations-global": true</code> in the server's <code>kea-dhcp4.conf</code>/<code>kea-dhcp6.conf</code> — see the <a href="{{ path('user_guide_servers') }}#dhcp-integration">Servers &amp; Integrations guide → DHCP / Kea</a> for the one-time setup.</p>
+    </div>
+</div>
+
 <div class="card mb-4" id="ddns">
     <div class="card-header fw-semibold"><i class="bi bi-arrow-repeat me-1"></i>Dynamic DNS (DDNS)</div>
     <div class="card-body">
@@ -147,6 +156,7 @@
             <a href="#dhcp-servers" class="list-group-item list-group-item-action py-1">DHCP Servers</a>
             <a href="#config-generation" class="list-group-item list-group-item-action py-1">Config Generation</a>
             <a href="#push-dhcp" class="list-group-item list-group-item-action py-1">Pushing Config</a>
+            <a href="#denied-mac-addresses" class="list-group-item list-group-item-action py-1">Denied MAC Addresses</a>
             <a href="#ddns" class="list-group-item list-group-item-action py-1">Dynamic DNS (DDNS)</a>
             <a href="#leases" class="list-group-item list-group-item-action py-1">DHCP Leases</a>
             <a href="#clearpass-auth-logs" class="list-group-item list-group-item-action py-1">Auth Logs</a>
