@@ -13,9 +13,9 @@
 </div>
 
 <p class="text-muted">
-    Devices with a MAC address listed here and marked <strong>Denied</strong> are refused a DHCP lease on every
-    subnet and server, as soon as the DHCP configuration is next pushed. Use the pause button to lift a block
-    while keeping a record that it was applied, instead of deleting it outright.
+    Devices with a MAC address listed here and marked <strong>MAC Denied</strong> are refused a DHCP lease on every
+    subnet and server, as soon as the DHCP configuration is next pushed. Use the pause button to switch an entry to
+    <strong>MAC Allowed</strong> while keeping a record that the block was applied, instead of deleting it outright.
 </p>
 
 {% if deniedMacAddresses is empty %}
@@ -43,9 +43,9 @@
                         <td class="fw-semibold font-monospace">{{ denied.macAddress }}</td>
                         <td>
                             {% if denied.enabled %}
-                                <span class="badge text-bg-danger">Denied</span>
+                                <span class="badge text-bg-danger">MAC Denied</span>
                             {% else %}
-                                <span class="badge text-bg-secondary">Disabled</span>
+                                <span class="badge text-bg-secondary">MAC Allowed</span>
                             {% endif %}
                         </td>
                         <td class="text-muted">{{ denied.reason ?: '—' }}</td>
@@ -56,7 +56,7 @@
                         <td class="text-end">
                             <form method="post" action="{{ path('denied_mac_address_toggle', {id: denied.id}) }}" class="d-inline">
                                 <input type="hidden" name="_token" value="{{ csrf_token('toggle_denied_mac_address_' ~ denied.id) }}">
-                                <button type="submit" class="btn btn-sm btn-outline-secondary me-1" title="{{ denied.enabled ? 'Disable (keep record)' : 'Re-enable' }}">
+                                <button type="submit" class="btn btn-sm btn-outline-secondary me-1" title="{{ denied.enabled ? 'Allow this MAC (keep record)' : 'Deny this MAC again' }}">
                                     <i class="bi {{ denied.enabled ? 'bi-pause-fill' : 'bi-play-fill' }}"></i>
                                 </button>
                             </form>
@@ -64,7 +64,7 @@
                                 <i class="bi bi-pencil"></i>
                             </a>
                             <form method="post" action="{{ path('denied_mac_address_delete', {id: denied.id}) }}" class="d-inline"
-                                  onsubmit="return confirm('Permanently delete the record for MAC address {{ denied.macAddress|e('js') }}? To keep a history of this block, disable it instead.')">
+                                  onsubmit="return confirm('Permanently delete the record for MAC address {{ denied.macAddress|e('js') }}? To keep a history of this block, mark it MAC Allowed instead.')">
                                 <input type="hidden" name="_token" value="{{ csrf_token('delete_denied_mac_address_' ~ denied.id) }}">
                                 <button type="submit" class="btn btn-sm btn-outline-danger">
                                     <i class="bi bi-trash"></i>

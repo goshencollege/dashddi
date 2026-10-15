@@ -20,10 +20,15 @@
                     {{ form_widget(form.macAddress, {attr: {class: 'form-control' ~ (form.macAddress.vars.errors|length ? ' is-invalid' : '')}}) }}
                     {{ form_errors(form.macAddress) }}
                 </div>
-                <div class="mb-4">
+                <div class="mb-3">
                     {{ form_label(form.reason, null, {label_attr: {class: 'form-label fw-semibold'}}) }}
                     {{ form_widget(form.reason, {attr: {class: 'form-control' ~ (form.reason.vars.errors|length ? ' is-invalid' : '')}}) }}
                     {{ form_errors(form.reason) }}
+                </div>
+                <div class="mb-4 form-check">
+                    {{ form_widget(form.enabled, {attr: {class: 'form-check-input'}}) }}
+                    {{ form_label(form.enabled, null, {label_attr: {class: 'form-check-label'}}) }}
+                    {{ form_errors(form.enabled) }}
                 </div>
                 <div class="d-flex gap-2">
                     <button type="submit" class="btn btn-primary">
