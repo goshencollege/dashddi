@@ -62,6 +62,17 @@ class DeniedMacAddressController extends AbstractController
         ]);
     }
 
+    #[Route('/{id}/toggle', name: 'denied_mac_address_toggle', methods: ['POST'])]
+    public function toggle(Request $request, DeniedMacAddress $deniedMacAddress, EntityManagerInterface $em): Response
+    {
+        if ($this->isCsrfTokenValid('toggle_denied_mac_address_' . $deniedMacAddress->getId(), $request->request->get('_token'))) {
+            $deniedMacAddress->setEnabled(!$deniedMacAddress->isEnabled());
+            $em->flush();
+            $this->addFlash('success', 'MAC address "' . $deniedMacAddress->getMacAddress() . '" is now ' . ($deniedMacAddress->isEnabled() ? 'denied' : 'disabled') . '.');
+        }
+        return $this->redirectToRoute('denied_mac_address_index');
+    }
+
     #[Route('/{id}/delete', name: 'denied_mac_address_delete', methods: ['POST'])]
     public function delete(Request $request, DeniedMacAddress $deniedMacAddress, EntityManagerInterface $em): Response
     {

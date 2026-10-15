@@ -163,6 +163,8 @@ DashDDI can stop a specific device from getting a DHCP lease on **any** subnet o
 { "hw-address": "aa:bb:cc:dd:ee:ff", "client-classes": ["DROP"] }
 ```
 
+Each entry has an **enabled** flag. Use the pause button to disable an entry instead of deleting it — the record (and its reason/audit trail) stays in place for history, and only `enabled` entries are included the next time config is generated. Re-enable with the same button.
+
 Kea drops any packet classified into `DROP` before considering a lease, regardless of subnet or pool — no hook library is required (unlike `SKIP_DDNS` above).
 
 **One-time Kea configuration required:** Kea **1.9.0+**, and `reservations-global: true` in **both** `kea-dhcp4.conf` and `kea-dhcp6.conf` (the example above only shows v4 — add the same to `kea-dhcp6.conf` if you also want denial to apply to DHCPv6):

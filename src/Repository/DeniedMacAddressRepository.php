@@ -14,12 +14,13 @@ class DeniedMacAddressRepository extends ServiceEntityRepository
         parent::__construct($registry, DeniedMacAddress::class);
     }
 
-    /** @return string[] */
+    /** @return string[] MAC addresses of currently-enabled deny entries */
     public function findAllMacAddresses(): array
     {
         return array_column(
             $this->createQueryBuilder('d')
                 ->select('d.macAddress')
+                ->andWhere('d.enabled = true')
                 ->getQuery()
                 ->getArrayResult(),
             'macAddress'

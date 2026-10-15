@@ -13,8 +13,9 @@
 </div>
 
 <p class="text-muted">
-    Devices with a MAC address listed here are refused a DHCP lease on every subnet and server, as soon as the
-    DHCP configuration is next pushed.
+    Devices with a MAC address listed here and marked <strong>Denied</strong> are refused a DHCP lease on every
+    subnet and server, as soon as the DHCP configuration is next pushed. Use the pause button to lift a block
+    while keeping a record that it was applied, instead of deleting it outright.
 </p>
 
 {% if deniedMacAddresses is empty %}
@@ -30,6 +31,7 @@
             <thead>
                 <tr>
                     <th>MAC Address</th>
+                    <th>Status</th>
                     <th>Reason</th>
                     <th>Added by</th>
                     <th class="text-end">Actions</th>
@@ -37,19 +39,32 @@
             </thead>
             <tbody>
                 {% for denied in deniedMacAddresses %}
-                    <tr>
+                    <tr class="{{ denied.enabled ? '' : 'opacity-50' }}">
                         <td class="fw-semibold font-monospace">{{ denied.macAddress }}</td>
+                        <td>
+                            {% if denied.enabled %}
+                                <span class="badge text-bg-danger">Denied</span>
+                            {% else %}
+                                <span class="badge text-bg-secondary">Disabled</span>
+                            {% endif %}
+                        </td>
                         <td class="text-muted">{{ denied.reason ?: '—' }}</td>
                         <td class="text-muted">
                             {{ denied.createdBy ?: '—' }}
                             <span class="d-block small">{{ denied.createdAt|date('Y-m-d H:i') }}</span>
                         </td>
                         <td class="text-end">
+                            <form method="post" action="{{ path('denied_mac_address_toggle', {id: denied.id}) }}" class="d-inline">
+                                <input type="hidden" name="_token" value="{{ csrf_token('toggle_denied_mac_address_' ~ denied.id) }}">
+                                <button type="submit" class="btn btn-sm btn-outline-secondary me-1" title="{{ denied.enabled ? 'Disable (keep record)' : 'Re-enable' }}">
+                                    <i class="bi {{ denied.enabled ? 'bi-pause-fill' : 'bi-play-fill' }}"></i>
+                                </button>
+                            </form>
                             <a href="{{ path('denied_mac_address_edit', {id: denied.id}) }}" class="btn btn-sm btn-outline-secondary me-1">
                                 <i class="bi bi-pencil"></i>
                             </a>
                             <form method="post" action="{{ path('denied_mac_address_delete', {id: denied.id}) }}" class="d-inline"
-                                  onsubmit="return confirm('Stop denying MAC address {{ denied.macAddress|e('js') }}?')">
+                                  onsubmit="return confirm('Permanently delete the record for MAC address {{ denied.macAddress|e('js') }}? To keep a history of this block, disable it instead.')">
                                 <input type="hidden" name="_token" value="{{ csrf_token('delete_denied_mac_address_' ~ denied.id) }}">
                                 <button type="submit" class="btn btn-sm btn-outline-danger">
                                     <i class="bi bi-trash"></i>
