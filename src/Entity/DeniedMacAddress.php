@@ -35,6 +35,9 @@ class DeniedMacAddress
     #[Assert\Length(max: 1000)]
     private ?string $reason = null;
 
+    #[ORM\Column]
+    private bool $enabled = true;
+
     public function getId(): ?int { return $this->id; }
 
     public function getMacAddress(): string { return $this->macAddress; }
@@ -49,6 +52,9 @@ class DeniedMacAddress
 
     public function getReason(): ?string { return $this->reason; }
     public function setReason(?string $reason): static { $this->reason = $reason; return $this; }
+
+    public function isEnabled(): bool { return $this->enabled; }
+    public function setEnabled(bool $enabled): static { $this->enabled = $enabled; return $this; }
 
     public function __toString(): string { return $this->macAddress; }
 }
