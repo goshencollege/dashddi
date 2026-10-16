@@ -20,7 +20,7 @@ final class PurgeInterfaceLeaseMessageHandler
 
     public function __invoke(PurgeInterfaceLeaseMessage $message): void
     {
-        if ($message->ipv4 === null && $message->ipv6 === null) {
+        if (empty($message->ipv4Addresses) && empty($message->ipv6Addresses)) {
             return;
         }
 
@@ -34,11 +34,15 @@ final class PurgeInterfaceLeaseMessageHandler
             $startedAt = new \DateTimeImmutable();
 
             try {
-                if ($message->ipv4 !== null && $scope !== 'v6') {
-                    $results['dhcp4'] = $this->deployer->deleteLease($server, 'dhcp4', $message->ipv4);
+                if ($scope !== 'v6') {
+                    foreach ($message->ipv4Addresses as $ip) {
+                        $results['dhcp4'][] = $this->deployer->deleteLease($server, 'dhcp4', $ip, $message->macAddress);
+                    }
                 }
-                if ($message->ipv6 !== null && $scope !== 'v4') {
-                    $results['dhcp6'] = $this->deployer->deleteLease($server, 'dhcp6', $message->ipv6);
+                if ($scope !== 'v4') {
+                    foreach ($message->ipv6Addresses as $ip) {
+                        $results['dhcp6'][] = $this->deployer->deleteLease($server, 'dhcp6', $ip, $message->macAddress);
+                    }
                 }
             } catch (\Throwable $e) {
                 $error = $e->getMessage();
@@ -48,7 +52,14 @@ final class PurgeInterfaceLeaseMessageHandler
                 continue;
             }
 
-            $success = $error === null && !array_filter($results, fn(array $r) => !$r['success']);
+            $success = $error === null;
+            foreach ($results as $perService) {
+                foreach ($perService as $r) {
+                    if (!$r['success']) {
+                        $success = false;
+                    }
+                }
+            }
 
             $log = new PushLog('dhcp-lease', $server->getName(), $success, $results, $startedAt, new \DateTimeImmutable(), $error);
             $this->em->clear();

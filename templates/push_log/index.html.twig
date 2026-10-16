@@ -245,13 +245,15 @@
 
 {% macro renderLeasePurgeResult(result) %}
 <ul class="zone-list">
-    {% for type, info in result %}
+    {% for type, entries in result %}
+        {% for info in entries %}
         <li class="d-flex align-items-start gap-2">
             <i class="bi {{ info.success ? 'bi-check-circle-fill text-success' : 'bi-x-circle-fill text-danger' }} mt-1 flex-shrink-0"></i>
             <span class="badge bg-secondary me-1">{{ type == 'dhcp4' ? 'DHCPv4' : 'DHCPv6' }}</span>
             {% if info.ip is defined %}<span class="font-monospace small fw-semibold me-1">{{ info.ip }}</span>{% endif %}
             <span class="font-monospace small">{{ info.response }}</span>
         </li>
+        {% endfor %}
     {% endfor %}
 </ul>
 {% endmacro %}

@@ -26,40 +26,42 @@ class InterfacePurgeServiceTest extends TestCase
         $this->service = new InterfacePurgeService($this->em, $this->bus);
     }
 
-    public function testPurgeManyDispatchesLeaseMessageWithBothAddressesAndRemovesInterface(): void
+    private function expectDispatch(NetworkInterface $iface, callable $assertion): void
     {
-        $iface = (new NetworkInterface())
-            ->setIpAddress((new IpAddress())->setAddress('10.0.0.5'))
-            ->setIpv6Address((new Ipv6Address())->setAddress('fd00::5'));
-
         $this->bus->expects($this->once())
             ->method('dispatch')
-            ->with($this->callback(function (PurgeInterfaceLeaseMessage $msg) {
-                return $msg->ipv4 === '10.0.0.5' && $msg->ipv6 === 'fd00::5';
-            }))
+            ->with($this->callback($assertion))
             ->willReturn(new Envelope(new \stdClass()));
 
         $this->em->expects($this->once())->method('remove')->with($iface);
         $this->em->expects($this->once())->method('flush');
+    }
+
+    public function testPurgeManyDispatchesBothStaticAddressesAndRemovesInterface(): void
+    {
+        $iface = (new NetworkInterface())
+            ->setMacAddress('aa:bb:cc:dd:ee:01')
+            ->setIpAddress((new IpAddress())->setAddress('10.0.0.5'))
+            ->setIpv6Address((new Ipv6Address())->setAddress('fd00::5'));
+
+        $this->expectDispatch($iface, function (PurgeInterfaceLeaseMessage $msg) {
+            return $msg->ipv4Addresses === ['10.0.0.5']
+                && $msg->ipv6Addresses === ['fd00::5']
+                && $msg->macAddress === 'aa:bb:cc:dd:ee:01';
+        });
 
         $count = $this->service->purgeMany([$iface]);
 
         $this->assertSame(1, $count);
     }
 
-    public function testPurgeManyDispatchesNullForMissingAddressFamily(): void
+    public function testPurgeManyDispatchesEmptyArrayForMissingAddressFamily(): void
     {
         $iface = (new NetworkInterface())->setIpAddress((new IpAddress())->setAddress('10.0.0.9'));
 
-        $this->bus->expects($this->once())
-            ->method('dispatch')
-            ->with($this->callback(function (PurgeInterfaceLeaseMessage $msg) {
-                return $msg->ipv4 === '10.0.0.9' && $msg->ipv6 === null;
-            }))
-            ->willReturn(new Envelope(new \stdClass()));
-
-        $this->em->expects($this->once())->method('remove')->with($iface);
-        $this->em->expects($this->once())->method('flush');
+        $this->expectDispatch($iface, function (PurgeInterfaceLeaseMessage $msg) {
+            return $msg->ipv4Addresses === ['10.0.0.9'] && $msg->ipv6Addresses === [];
+        });
 
         $this->service->purgeMany([$iface]);
     }
@@ -68,15 +70,9 @@ class InterfacePurgeServiceTest extends TestCase
     {
         $iface = (new NetworkInterface())->setLastDhcpIp('192.168.60.32');
 
-        $this->bus->expects($this->once())
-            ->method('dispatch')
-            ->with($this->callback(function (PurgeInterfaceLeaseMessage $msg) {
-                return $msg->ipv4 === '192.168.60.32' && $msg->ipv6 === null;
-            }))
-            ->willReturn(new Envelope(new \stdClass()));
-
-        $this->em->expects($this->once())->method('remove')->with($iface);
-        $this->em->expects($this->once())->method('flush');
+        $this->expectDispatch($iface, function (PurgeInterfaceLeaseMessage $msg) {
+            return $msg->ipv4Addresses === ['192.168.60.32'] && $msg->ipv6Addresses === [];
+        });
 
         $this->service->purgeMany([$iface]);
     }
@@ -85,34 +81,37 @@ class InterfacePurgeServiceTest extends TestCase
     {
         $iface = (new NetworkInterface())->setLastDhcpIp('fd00::abcd');
 
-        $this->bus->expects($this->once())
-            ->method('dispatch')
-            ->with($this->callback(function (PurgeInterfaceLeaseMessage $msg) {
-                return $msg->ipv4 === null && $msg->ipv6 === 'fd00::abcd';
-            }))
-            ->willReturn(new Envelope(new \stdClass()));
-
-        $this->em->expects($this->once())->method('remove')->with($iface);
-        $this->em->expects($this->once())->method('flush');
+        $this->expectDispatch($iface, function (PurgeInterfaceLeaseMessage $msg) {
+            return $msg->ipv4Addresses === [] && $msg->ipv6Addresses === ['fd00::abcd'];
+        });
 
         $this->service->purgeMany([$iface]);
     }
 
-    public function testPurgeManyPrefersStaticReservationOverLastDhcpIp(): void
+    public function testPurgeManyIncludesBothStaticAndLastDhcpIpv4WhenTheyDiffer(): void
     {
+        // A dynamic lease from before a static reservation was added, not yet
+        // renewed onto the new address — both could have an active Kea lease.
         $iface = (new NetworkInterface())
             ->setIpAddress((new IpAddress())->setAddress('10.0.0.5'))
             ->setLastDhcpIp('192.168.60.32');
 
-        $this->bus->expects($this->once())
-            ->method('dispatch')
-            ->with($this->callback(function (PurgeInterfaceLeaseMessage $msg) {
-                return $msg->ipv4 === '10.0.0.5';
-            }))
-            ->willReturn(new Envelope(new \stdClass()));
+        $this->expectDispatch($iface, function (PurgeInterfaceLeaseMessage $msg) {
+            return $msg->ipv4Addresses === ['10.0.0.5', '192.168.60.32'] && $msg->ipv6Addresses === [];
+        });
 
-        $this->em->expects($this->once())->method('remove')->with($iface);
-        $this->em->expects($this->once())->method('flush');
+        $this->service->purgeMany([$iface]);
+    }
+
+    public function testPurgeManyDedupesWhenStaticAndLastDhcpIpMatch(): void
+    {
+        $iface = (new NetworkInterface())
+            ->setIpAddress((new IpAddress())->setAddress('10.0.0.5'))
+            ->setLastDhcpIp('10.0.0.5');
+
+        $this->expectDispatch($iface, function (PurgeInterfaceLeaseMessage $msg) {
+            return $msg->ipv4Addresses === ['10.0.0.5'];
+        });
 
         $this->service->purgeMany([$iface]);
     }

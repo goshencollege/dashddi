@@ -184,19 +184,44 @@ class DhcpDeployService
 
     /**
      * Send a lease4-del/lease6-del command for a single IP to free it immediately,
-     * instead of waiting for Kea's own lease lifetime to expire it, then re-query the
-     * lease to confirm it actually took effect. Kea's own result code for lease4-del/
-     * lease6-del is not sufficient on its own to prove the lease is gone, so this
-     * follows up with a lease4-get/lease6-get and treats a still-present lease as a
-     * failure even if the delete command reported success. Requires the server's Kea
-     * config to have the lease_cmds hook loaded.
+     * instead of waiting for Kea's own lease lifetime to expire it. Requires the
+     * server's Kea config to have the lease_cmds hook loaded.
+     *
+     * Checks before and after the delete:
+     * - If no lease exists at the address, there's nothing to do.
+     * - If $expectedMac is given and a lease exists under a DIFFERENT hw-address,
+     *   the address is left alone rather than deleted — lease{4,6}-del matches
+     *   purely by IP, so blindly deleting here could kick an unrelated device off a
+     *   lease it currently holds (e.g. the address was reassigned after this
+     *   interface last used it, as can happen with a stale lastDhcpIp).
+     * - After deleting, the lease is re-queried to confirm it actually took effect.
+     *   Kea's own result code for lease4-del/lease6-del is not sufficient proof on
+     *   its own — a still-present lease here is reported as a failure even though
+     *   the delete command itself reported success.
      */
-    public function deleteLease(DhcpServer $server, string $service, string $ipAddress): array
+    public function deleteLease(DhcpServer $server, string $service, string $ipAddress, ?string $expectedMac = null): array
     {
-        $sftp        = $this->getSftp($server);
-        $deleteCmd   = $service === 'dhcp4' ? 'lease4-del' : 'lease6-del';
-        $getCmd      = $service === 'dhcp4' ? 'lease4-get' : 'lease6-get';
-        $arguments   = ['ip-address' => $ipAddress];
+        $sftp      = $this->getSftp($server);
+        $deleteCmd = $service === 'dhcp4' ? 'lease4-del' : 'lease6-del';
+        $getCmd    = $service === 'dhcp4' ? 'lease4-get' : 'lease6-get';
+        $arguments = ['ip-address' => $ipAddress];
+
+        $before = $this->controlCommand($getCmd, $service, $server, $sftp, $arguments);
+
+        if ($before['resultCode'] === 3) {
+            return ['ip' => $ipAddress, 'success' => true, 'response' => 'No lease found — nothing to delete.'];
+        }
+
+        if ($expectedMac !== null && $before['resultCode'] === 0) {
+            $leaseMac = $before['data']['hw-address'] ?? null;
+            if ($leaseMac !== null && strcasecmp($leaseMac, $expectedMac) !== 0) {
+                return [
+                    'ip'       => $ipAddress,
+                    'success'  => true,
+                    'response' => "Left alone — currently leased to a different device ($leaseMac).",
+                ];
+            }
+        }
 
         $delete = $this->controlCommand($deleteCmd, $service, $server, $sftp, $arguments);
         $verify = $this->controlCommand($getCmd, $service, $server, $sftp, $arguments);
@@ -230,7 +255,7 @@ class DhcpDeployService
         $output = $sftp->exec($cmd);
 
         if ($output === false) {
-            return ['success' => false, 'response' => 'SSH exec of curl failed', 'resultCode' => null];
+            return ['success' => false, 'response' => 'SSH exec of curl failed', 'resultCode' => null, 'data' => []];
         }
 
         $data       = json_decode($output, true);
@@ -242,6 +267,7 @@ class DhcpDeployService
             'success'    => in_array($resultCode, [0, 3], true),
             'response'   => $data[0]['text'] ?? $output,
             'resultCode' => $resultCode,
+            'data'       => $data[0]['arguments'] ?? [],
         ];
     }
 }
