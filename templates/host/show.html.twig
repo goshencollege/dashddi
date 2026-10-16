@@ -66,12 +66,23 @@
         <strong>This host was deleted</strong> on {{ host.deletedAt|date('Y-m-d H:i') }}.
         It is excluded from all DNS, DHCP, and ClearPass pushes.
     </div>
-    <form method="post" action="{{ path('host_restore', {id: host.id}) }}" class="ms-3 flex-shrink-0">
-        <input type="hidden" name="_token" value="{{ csrf_token('restore_host_' ~ host.id) }}">
-        <button type="submit" class="btn btn-warning btn-sm text-nowrap">
-            <i class="bi bi-arrow-counterclockwise me-1"></i>Restore Host &amp; Interfaces
-        </button>
-    </form>
+    <div class="ms-3 flex-shrink-0 d-flex gap-2">
+        <form method="post" action="{{ path('host_restore', {id: host.id}) }}">
+            <input type="hidden" name="_token" value="{{ csrf_token('restore_host_' ~ host.id) }}">
+            <button type="submit" class="btn btn-warning btn-sm text-nowrap">
+                <i class="bi bi-arrow-counterclockwise me-1"></i>Restore Host &amp; Interfaces
+            </button>
+        </form>
+        {% if host.hasOnlyDeletedInterfaces %}
+        <form method="post" action="{{ path('host_purge', {id: host.id}) }}"
+              onsubmit="return confirm('Permanently purge host {{ host.name|e('js') }} and tell DHCP servers to drop any leases on its interfaces? This cannot be undone.')">
+            <input type="hidden" name="_token" value="{{ csrf_token('purge_host_' ~ host.id) }}">
+            <button type="submit" class="btn btn-outline-danger btn-sm text-nowrap">
+                <i class="bi bi-trash3 me-1"></i>Purge Now
+            </button>
+        </form>
+        {% endif %}
+    </div>
 </div>
 {% endif %}
 
@@ -253,8 +264,15 @@
                                 {% if iface.deleted %}
                                     <form method="post" action="{{ path('interface_restore', {id: iface.id}) }}" class="d-inline">
                                         <input type="hidden" name="_token" value="{{ csrf_token('restore_interface_' ~ iface.id) }}">
-                                        <button type="submit" class="btn btn-sm btn-outline-warning">
+                                        <button type="submit" class="btn btn-sm btn-outline-warning" title="Restore">
                                             <i class="bi bi-arrow-counterclockwise"></i>
+                                        </button>
+                                    </form>
+                                    <form method="post" action="{{ path('interface_purge', {id: iface.id}) }}" class="d-inline"
+                                          onsubmit="return confirm('Permanently purge this interface and tell DHCP servers to drop the lease? This cannot be undone.')">
+                                        <input type="hidden" name="_token" value="{{ csrf_token('purge_interface_' ~ iface.id) }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Purge Now (frees DHCP lease)">
+                                            <i class="bi bi-trash3"></i>
                                         </button>
                                     </form>
                                 {% else %}

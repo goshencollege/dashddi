@@ -126,6 +126,100 @@ class InterfaceControllerTest extends AppWebTestCase
         $this->assertCount(0, $vip->getMemberInterfaces(), 'VIP should be unlinked by bulk subnet change when its IP is outside the new subnet');
     }
 
+    public function testBulkPurgeHardDeletesSoftDeletedInterface(): void
+    {
+        $subnet = $this->makeSubnet('10.56.0.0/24');
+        $iface  = $this->makeInterface($subnet, 'aa:bb:cc:dd:ee:02');
+        $id     = $iface->getId();
+        $iface->softDelete();
+        $this->em->flush();
+
+        $this->client->request('GET', '/hosts');
+        $html  = $this->client->getResponse()->getContent();
+        preg_match("/ifaceSelected\], _token: '([^']+)'/", $html, $m);
+        $token = $m[1] ?? '';
+
+        $this->client->request(
+            'POST',
+            '/interfaces/bulk',
+            [],
+            [],
+            ['CONTENT_TYPE' => 'application/json'],
+            json_encode([
+                '_token' => $token,
+                'action' => 'purge',
+                'ids'    => [$id],
+            ])
+        );
+        $this->assertSame(200, $this->client->getResponse()->getStatusCode());
+
+        $this->em->clear();
+        $this->assertNull($this->em->find(NetworkInterface::class, $id));
+    }
+
+    public function testBulkPurgeIgnoresInterfaceThatIsNotSoftDeleted(): void
+    {
+        $subnet = $this->makeSubnet('10.57.0.0/24');
+        $iface  = $this->makeInterface($subnet, 'aa:bb:cc:dd:ee:03');
+        $id     = $iface->getId();
+
+        $this->client->request('GET', '/hosts');
+        $html  = $this->client->getResponse()->getContent();
+        preg_match("/ifaceSelected\], _token: '([^']+)'/", $html, $m);
+        $token = $m[1] ?? '';
+
+        $this->client->request(
+            'POST',
+            '/interfaces/bulk',
+            [],
+            [],
+            ['CONTENT_TYPE' => 'application/json'],
+            json_encode([
+                '_token' => $token,
+                'action' => 'purge',
+                'ids'    => [$id],
+            ])
+        );
+        $this->assertSame(200, $this->client->getResponse()->getStatusCode());
+
+        $this->em->clear();
+        $this->assertNotNull($this->em->find(NetworkInterface::class, $id), 'An active (non-deleted) interface must not be purged.');
+    }
+
+    public function testPurgeHardDeletesSoftDeletedInterfaceAndRedirectsToHost(): void
+    {
+        $subnet = $this->makeSubnet('10.58.0.0/24');
+        $iface  = $this->makeInterface($subnet, 'aa:bb:cc:dd:ee:04');
+        $hostId = $iface->getHost()->getId();
+        $id     = $iface->getId();
+        $iface->softDelete();
+        $this->em->flush();
+
+        $crawler = $this->client->request('GET', "/interfaces/{$id}");
+        $this->client->submit(
+            $crawler->filter('form[action="/interfaces/' . $id . '/purge"]')->form()
+        );
+        $this->assertResponseRedirects("/hosts/{$hostId}");
+
+        $this->em->clear();
+        $this->assertNull($this->em->find(NetworkInterface::class, $id));
+    }
+
+    public function testPurgeRejectsInterfaceThatIsNotSoftDeleted(): void
+    {
+        $subnet = $this->makeSubnet('10.59.0.0/24');
+        $iface  = $this->makeInterface($subnet, 'aa:bb:cc:dd:ee:05');
+        $id     = $iface->getId();
+
+        // The controller rejects a non-deleted interface before even checking the
+        // CSRF token, so no real token is needed here.
+        $this->client->request('POST', "/interfaces/{$id}/purge");
+        $this->assertResponseRedirects();
+
+        $this->em->clear();
+        $this->assertNotNull($this->em->find(NetworkInterface::class, $id), 'An active (non-deleted) interface must not be purged.');
+    }
+
     public function testEditFormPrefillsDuidInNetworkctlFormat(): void
     {
         $subnet = $this->makeSubnet('10.56.0.0/24');

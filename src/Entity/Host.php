@@ -236,5 +236,20 @@ class Host
         return $this;
     }
 
+    /**
+     * True when the host has no interfaces, or every interface it has is already
+     * soft-deleted — the only state in which hard-purging the host can't silently
+     * take an active interface (and its DHCP lease) down with it.
+     */
+    public function hasOnlyDeletedInterfaces(): bool
+    {
+        foreach ($this->interfaces as $iface) {
+            if (!$iface->isDeleted()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     public function __toString(): string { return $this->name; }
 }

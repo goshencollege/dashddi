@@ -321,6 +321,8 @@
             <li><strong>Restore</strong> — click the restore icon (<i class="bi bi-arrow-counterclockwise"></i>) to bring the host back to active status</li>
         </ul>
         <p class="mt-2 mb-0 text-muted small">Deleted hosts are permanently purged automatically based on the <em>lease retention</em> setting configured on each subnet, or after a default period. Check <strong>Application Settings</strong> for the global default.</p>
+        <p class="mt-2 mb-0">Interfaces normally stay soft-deleted for the retention period so an in-progress DHCP lease isn't handed out again before it expires on its own. If you need an address back immediately — for example during a test deployment where a subnet is fully exhausted — click <strong>Purge Now</strong> on the interface (its own page, its host's page, or the deleted view on the Hosts page, single or bulk), or run <code>app:purge-deleted-hosts --now</code> from the server. This hard-deletes the interface right away <em>and</em> tells every configured DHCP server to drop the matching lease, so the address is free to reassign immediately. This requires the Kea <code>lease_cmds</code> hook library to be loaded on the DHCP server.</p>
+        <p class="mt-2 mb-0">A deleted host can be purged the same way, with a <strong>Purge Now</strong> button next to Restore — but only once all of its interfaces are themselves already soft-deleted (or it has none), so purging a host can never silently take an active interface, and its DHCP lease, down with it.</p>
     </div>
 </div>
 
