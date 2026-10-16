@@ -140,6 +140,32 @@
   no_log: true
   when: not _dashddi_credentials_stat.stat.exists or dashddi_force_token_regenerate
 
+# ── Disable OS-packaged certbot timer ─────────────────────────────────────────
+# Ubuntu's certbot apt/snap package ships its own certbot.timer/certbot.service,
+# enabled by default, which runs `certbot renew` against *every* renewal conf in
+# /etc/letsencrypt/renewal/ using the system-installed certbot — not the one in
+# dashddi_venv_path. That certbot has no idea the dns-dashddi plugin exists, so
+# it fails trying to restore dns_dashddi_credentials/dns_dashddi_propagation_seconds
+# onto its argparse Namespace ("'Namespace' object has no attribute ..."). Mask
+# (not just disable) both units so they stay off across future certbot package
+# upgrades — dashddi.timer below is the only renewal path that works.
+
+- name: Check for OS-packaged certbot systemd timer
+  ansible.builtin.stat:
+    path: /lib/systemd/system/certbot.timer
+  register: _os_certbot_timer_stat
+
+- name: Mask OS-packaged certbot timer and service
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    masked: true
+    enabled: false
+    state: stopped
+  loop:
+    - certbot.timer
+    - certbot.service
+  when: _os_certbot_timer_stat.stat.exists
+
 # ── Systemd renewal timer ─────────────────────────────────────────────────────
 
 - name: Deploy dashddi.service
