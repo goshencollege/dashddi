@@ -279,8 +279,21 @@ class HostController extends AbstractController
                 fn(Host $host) => $host->isDeleted() && $host->hasOnlyDeletedInterfaces(),
             );
             $skipped = count($hosts) - count($purgeable);
+
+            // Purge every interface across all purgeable hosts in one pass, and only
+            // then mark the hosts themselves for removal. Interleaving per-host
+            // flushes with other hosts already pending removal in the same unit of
+            // work confuses Doctrine's changeset computation for unrelated
+            // associations (e.g. a host-scoped ApiToken).
+            $interfaces = [];
             foreach ($purgeable as $host) {
-                $interfacePurgeService->purgeMany($host->getInterfaces()->toArray());
+                foreach ($host->getInterfaces() as $iface) {
+                    $interfaces[] = $iface;
+                }
+            }
+            $interfacePurgeService->purgeMany($interfaces);
+
+            foreach ($purgeable as $host) {
                 $em->remove($host);
             }
             $em->flush();

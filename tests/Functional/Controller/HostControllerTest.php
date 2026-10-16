@@ -216,6 +216,72 @@ class HostControllerTest extends AppWebTestCase
         $this->assertStringNotContainsString('duid-ip-guard-host', $this->client->getResponse()->getContent());
     }
 
+    public function testBulkPurgeHostsDoesNotErrorWhenAnotherPurgedHostHasAnApiToken(): void
+    {
+        // Regression test: bulk-purging a host with no interfaces (so
+        // InterfacePurgeService::purgeMany() is a no-op/doesn't flush) alongside a
+        // second host that DOES have an interface (so purgeMany() does flush) used to
+        // throw a Doctrine ORMInvalidArgumentException ("new entity found through
+        // ApiToken#host") once the first host carried a host-scoped ApiToken and was
+        // already $em->remove()-pending when the second host's interfaces were flushed.
+        $tokenHost = (new Host())->setName('token-host');
+        $ifaceHost = (new Host())->setName('iface-host');
+        $this->em->persist($tokenHost);
+        $this->em->persist($ifaceHost);
+        $this->em->flush();
+
+        $iface = (new NetworkInterface())->setHost($ifaceHost)->setMacAddress('aa:bb:cc:dd:ee:20');
+        $this->em->persist($iface);
+
+        $apiToken = (new ApiToken())
+            ->setName('token host token')
+            ->setOwnerIdentifier('test@example.com')
+            ->setTokenHash('hash')
+            ->setAllowedRoutes([])
+            ->setAllowedCidrs([])
+            ->setHost($tokenHost);
+        $this->em->persist($apiToken);
+        $this->em->flush();
+        $apiTokenId = $apiToken->getId();
+
+        $this->em->clear();
+        $tokenHost = $this->em->find(Host::class, $tokenHost->getId());
+        $ifaceHost = $this->em->find(Host::class, $ifaceHost->getId());
+        $tokenHost->softDeleteWithInterfaces();
+        $ifaceHost->softDeleteWithInterfaces();
+        $this->em->flush();
+        $tokenHostId = $tokenHost->getId();
+        $ifaceHostId = $ifaceHost->getId();
+
+        $this->client->request('GET', '/hosts');
+        $html = $this->client->getResponse()->getContent();
+        preg_match("/hostSelected\], _token: '([^']+)'/", $html, $m);
+        $csrfToken = $m[1] ?? '';
+
+        $this->client->request(
+            'POST',
+            '/hosts/bulk',
+            [],
+            [],
+            ['CONTENT_TYPE' => 'application/json'],
+            json_encode([
+                '_token' => $csrfToken,
+                'action' => 'purge',
+                'ids'    => [$tokenHostId, $ifaceHostId],
+            ])
+        );
+        $this->assertSame(200, $this->client->getResponse()->getStatusCode(), (string) $this->client->getResponse()->getContent());
+
+        $this->em->clear();
+        $this->assertNull($this->em->find(Host::class, $tokenHostId));
+        $this->assertNull($this->em->find(Host::class, $ifaceHostId));
+        $this->assertNull($this->em->find(NetworkInterface::class, $iface->getId()));
+
+        $survivingToken = $this->em->find(ApiToken::class, $apiTokenId);
+        $this->assertNotNull($survivingToken, 'Purging a host must not cascade-delete its API token.');
+        $this->assertNull($survivingToken->getHost(), 'The surviving token should no longer be host-scoped.');
+    }
+
     public function testDelete(): void
     {
         $host = (new Host())->setName('delete-host');
