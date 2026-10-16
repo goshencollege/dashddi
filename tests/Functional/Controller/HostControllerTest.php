@@ -254,6 +254,94 @@ class HostControllerTest extends AppWebTestCase
         $this->assertStringNotContainsString('soft-deleted-host', $this->client->getResponse()->getContent());
     }
 
+    public function testPurgeHardDeletesSoftDeletedHostWithNoInterfaces(): void
+    {
+        $host = (new Host())->setName('purge-host-no-ifaces');
+        $host->softDeleteWithInterfaces();
+        $this->em->persist($host);
+        $this->em->flush();
+
+        $id      = $host->getId();
+        $crawler = $this->client->request('GET', "/hosts/{$id}");
+        $this->client->submit(
+            $crawler->filter('form[action="/hosts/' . $id . '/purge"]')->form()
+        );
+        $this->assertResponseRedirects('/hosts');
+
+        $this->em->clear();
+        $this->assertNull($this->em->find(Host::class, $id));
+    }
+
+    public function testPurgeHardDeletesSoftDeletedHostAndItsDeletedInterfaces(): void
+    {
+        $host  = (new Host())->setName('purge-host-with-ifaces');
+        $this->em->persist($host);
+        $this->em->flush();
+
+        $iface = (new NetworkInterface())->setHost($host)->setMacAddress('aa:bb:cc:dd:ee:10');
+        $this->em->persist($iface);
+        $this->em->flush();
+        $ifaceId = $iface->getId();
+        $hostId  = $host->getId();
+
+        // Reload from the DB so $host->getInterfaces() is a freshly-queried
+        // collection that actually contains the interface persisted above.
+        $this->em->clear();
+        $host = $this->em->find(Host::class, $hostId);
+        $host->softDeleteWithInterfaces();
+        $this->em->flush();
+        $crawler = $this->client->request('GET', "/hosts/{$hostId}");
+        $this->client->submit(
+            $crawler->filter('form[action="/hosts/' . $hostId . '/purge"]')->form()
+        );
+        $this->assertResponseRedirects('/hosts');
+
+        $this->em->clear();
+        $this->assertNull($this->em->find(Host::class, $hostId));
+        $this->assertNull($this->em->find(NetworkInterface::class, $ifaceId));
+    }
+
+    public function testPurgeRejectsHostThatIsNotDeleted(): void
+    {
+        $host = (new Host())->setName('not-deleted-host');
+        $this->em->persist($host);
+        $this->em->flush();
+        $id = $host->getId();
+
+        $this->client->request('POST', "/hosts/{$id}/purge");
+        $this->assertResponseRedirects();
+
+        $this->em->clear();
+        $this->assertNotNull($this->em->find(Host::class, $id));
+    }
+
+    public function testPurgeRejectsHostWithAnActiveInterface(): void
+    {
+        $host = (new Host())->setName('host-with-active-iface');
+        $this->em->persist($host);
+        $this->em->flush();
+
+        $iface = (new NetworkInterface())->setHost($host)->setMacAddress('aa:bb:cc:dd:ee:11');
+        $this->em->persist($iface);
+        $host->softDelete(); // host deleted directly, interface left active
+        $this->em->flush();
+        $id = $host->getId();
+
+        // Clear the identity map so the controller re-fetches $host from the DB with
+        // a freshly-queried interfaces collection, instead of reusing the in-memory
+        // instance above (whose collection was never populated from the interface
+        // created after the host was persisted).
+        $this->em->clear();
+
+        // The controller rejects a host with an active interface before even
+        // checking the CSRF token, so no real token is needed here.
+        $this->client->request('POST', "/hosts/{$id}/purge");
+        $this->assertResponseRedirects();
+
+        $this->em->clear();
+        $this->assertNotNull($this->em->find(Host::class, $id), 'A host with an active interface must not be purged.');
+    }
+
     // -------------------------------------------------------------------------
     // Host token web routes (HostTokenController)
     // -------------------------------------------------------------------------

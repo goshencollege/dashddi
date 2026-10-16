@@ -211,6 +211,9 @@
                         <button type="button" class="btn btn-sm btn-outline-warning" id="host-restore-btn">
                             <i class="bi bi-arrow-counterclockwise me-1"></i>Restore Selected Hosts
                         </button>
+                        <button type="button" class="btn btn-sm btn-outline-danger" id="host-purge-btn">
+                            <i class="bi bi-trash3 me-1"></i>Purge Now
+                        </button>
                         {% else %}
                         <button type="button" class="btn btn-sm btn-outline-danger" id="host-delete-btn">
                             <i class="bi bi-trash me-1"></i>Delete Selected Hosts
@@ -318,6 +321,15 @@
                                                     <i class="bi bi-arrow-counterclockwise"></i>
                                                 </button>
                                             </form>
+                                            {% if host.hasOnlyDeletedInterfaces %}
+                                            <form method="post" action="{{ path('host_purge', {id: host.id}) }}"
+                                                  onsubmit="return confirm('Permanently purge host {{ host.name|e('js') }} and tell DHCP servers to drop any leases on its interfaces? This cannot be undone.')">
+                                                <input type="hidden" name="_token" value="{{ csrf_token('purge_host_' ~ host.id) }}">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Purge Now (frees DHCP leases)">
+                                                    <i class="bi bi-trash3"></i>
+                                                </button>
+                                            </form>
+                                            {% endif %}
                                         {% else %}
                                             <a href="{{ path('host_edit', {id: host.id}) }}" class="btn btn-sm btn-outline-secondary">
                                                 <i class="bi bi-pencil"></i>
@@ -1341,6 +1353,19 @@ document.getElementById('host-restore-btn')?.addEventListener('click', async fun
     });
     const data = await resp.json();
     if (resp.ok) { location.reload(); } else { alert(data.error ?? 'Error'); }
+});
+
+// --- Bulk host purge ---
+document.getElementById('host-purge-btn')?.addEventListener('click', async function () {
+    const count = hostSelected.size;
+    if (!confirm(`Permanently purge ${count} host${count !== 1 ? 's' : ''} and tell DHCP servers to drop any leases? Hosts that are not deleted or still have an active interface will be skipped. This cannot be undone.`)) return;
+    const resp = await fetch('{{ path('host_bulk') }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'purge', ids: [...hostSelected], _token: '{{ csrf_token('bulk_hosts') }}' }),
+    });
+    const data = await resp.json();
+    if (resp.ok) { alert(data.message); location.reload(); } else { alert(data.error ?? 'Error'); }
 });
 
 // --- Clear all selections ---

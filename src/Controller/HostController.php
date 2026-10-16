@@ -24,6 +24,7 @@ use App\Entity\SshHostKey;
 use App\Enum\RecordType;
 use App\Service\DnsViewResolver;
 use App\Service\HostQueryParser;
+use App\Service\InterfacePurgeService;
 use App\Service\IpAddressManager;
 use App\Service\ReservedTagPrefixService;
 use phpseclib3\Crypt\PublicKeyLoader;
@@ -247,7 +248,7 @@ class HostController extends AbstractController
     }
 
     #[Route('/bulk', name: 'host_bulk', methods: ['POST'])]
-    public function bulk(Request $request, HostRepository $repo, TagRepository $tagRepo, EntityManagerInterface $em): JsonResponse
+    public function bulk(Request $request, HostRepository $repo, TagRepository $tagRepo, EntityManagerInterface $em, InterfacePurgeService $interfacePurgeService): JsonResponse
     {
         $data   = json_decode($request->getContent(), true) ?? [];
         $action = $data['action'] ?? '';
@@ -281,6 +282,24 @@ class HostController extends AbstractController
             }
             $em->flush();
             return $this->json(['message' => $count . ' host(s) restored.']);
+        }
+
+        if ($action === 'purge') {
+            $purgeable = array_filter(
+                $hosts,
+                fn(Host $host) => $host->isDeleted() && $host->hasOnlyDeletedInterfaces(),
+            );
+            $skipped = count($hosts) - count($purgeable);
+            foreach ($purgeable as $host) {
+                $interfacePurgeService->purgeMany($host->getInterfaces()->toArray());
+                $em->remove($host);
+            }
+            $em->flush();
+            $message = count($purgeable) . ' host(s) purged.';
+            if ($skipped > 0) {
+                $message .= ' ' . $skipped . ' skipped (not deleted, or still has an active interface).';
+            }
+            return $this->json(['message' => $message]);
         }
 
         if ($action === 'add-tag' || $action === 'remove-tag') {
@@ -731,6 +750,29 @@ class HostController extends AbstractController
             $this->addFlash('success', 'Host deleted.');
         }
         return $this->redirectToRoute('host_index');
+    }
+
+    #[Route('/{id}/purge', name: 'host_purge', methods: ['POST'], requirements: ['id' => '\d+'])]
+    public function purge(Request $request, Host $host, InterfacePurgeService $interfacePurgeService, EntityManagerInterface $em): Response
+    {
+        if (!$host->isDeleted()) {
+            $this->addFlash('error', 'Only a soft-deleted host can be purged.');
+            return $this->redirectToRoute('host_show', ['id' => $host->getId()]);
+        }
+        if (!$host->hasOnlyDeletedInterfaces()) {
+            $this->addFlash('error', 'Host still has an active interface and cannot be purged.');
+            return $this->redirectToRoute('host_show', ['id' => $host->getId()]);
+        }
+
+        if ($this->isCsrfTokenValid('purge_host_' . $host->getId(), $request->request->get('_token'))) {
+            $interfacePurgeService->purgeMany($host->getInterfaces()->toArray());
+            $em->remove($host);
+            $em->flush();
+            $this->addFlash('success', 'Host purged. DHCP servers will be told to drop any leases.');
+            return $this->redirectToRoute('host_index');
+        }
+
+        return $this->redirectToRoute('host_show', ['id' => $host->getId()]);
     }
 
     /** Parse ssh-keyscan / bare-key text, upsert valid keys, return [saved, skipped]. Does NOT flush. */

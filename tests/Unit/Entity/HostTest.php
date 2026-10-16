@@ -3,10 +3,40 @@
 namespace App\Tests\Unit\Entity;
 
 use App\Entity\Host;
+use App\Entity\NetworkInterface;
 use PHPUnit\Framework\TestCase;
 
 class HostTest extends TestCase
 {
+    public function testHasOnlyDeletedInterfacesIsTrueWhenHostHasNoInterfaces(): void
+    {
+        $host = new Host();
+
+        $this->assertTrue($host->hasOnlyDeletedInterfaces());
+    }
+
+    public function testHasOnlyDeletedInterfacesIsTrueWhenAllInterfacesAreDeleted(): void
+    {
+        $host  = new Host();
+        $iface = (new NetworkInterface())->setMacAddress('aa:bb:cc:dd:ee:01');
+        $iface->softDelete();
+        $host->addInterface($iface);
+
+        $this->assertTrue($host->hasOnlyDeletedInterfaces());
+    }
+
+    public function testHasOnlyDeletedInterfacesIsFalseWhenOneInterfaceIsActive(): void
+    {
+        $host   = new Host();
+        $gone   = (new NetworkInterface())->setMacAddress('aa:bb:cc:dd:ee:02');
+        $gone->softDelete();
+        $active = (new NetworkInterface())->setMacAddress('aa:bb:cc:dd:ee:03');
+        $host->addInterface($gone);
+        $host->addInterface($active);
+
+        $this->assertFalse($host->hasOnlyDeletedInterfaces());
+    }
+
     public function testSetDuidNormalizesPlainHexToColonPairs(): void
     {
         $host = new Host();
