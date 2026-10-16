@@ -207,35 +207,29 @@
                         <button type="button" class="btn btn-sm btn-outline-secondary d-none" id="host-merge-btn">
                             <i class="bi bi-union me-1"></i>Merge Hosts
                         </button>
-                        {% if showDeleted %}
-                        <button type="button" class="btn btn-sm btn-outline-warning" id="host-restore-btn">
-                            <i class="bi bi-arrow-counterclockwise me-1"></i>Restore Selected Hosts
-                        </button>
-                        <button type="button" class="btn btn-sm btn-outline-danger" id="host-purge-btn">
-                            <i class="bi bi-trash3 me-1"></i>Purge Now
-                        </button>
-                        {% else %}
-                        <button type="button" class="btn btn-sm btn-outline-danger" id="host-delete-btn">
+                        <button type="button" class="btn btn-sm btn-outline-danger d-none" id="host-delete-btn">
                             <i class="bi bi-trash me-1"></i>Delete Selected Hosts
                         </button>
-                        {% endif %}
+                        <button type="button" class="btn btn-sm btn-outline-warning d-none" id="host-restore-btn">
+                            <i class="bi bi-arrow-counterclockwise me-1"></i>Restore Selected Hosts
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-danger d-none" id="host-purge-btn">
+                            <i class="bi bi-trash3 me-1"></i>Purge Now
+                        </button>
                     </div>
                     <div id="bulk-bar-separator" class="vr d-none mx-2"></div>
                     <div id="iface-bulk-section" class="d-none d-flex align-items-center gap-2">
                         <span id="iface-selected-count" class="text-muted small">0 interfaces selected</span>
-                        {% if showDeleted %}
-                        <button type="button" class="btn btn-sm btn-outline-danger" id="iface-purge-btn">
-                            <i class="bi bi-trash3 me-1"></i>Purge Now (frees DHCP lease)
-                        </button>
-                        {% else %}
-                        <button type="button" class="btn btn-sm btn-outline-secondary" id="iface-edit-btn"
+                        <button type="button" class="btn btn-sm btn-outline-secondary d-none" id="iface-edit-btn"
                                 data-bs-toggle="modal" data-bs-target="#bulk-iface-edit-modal">
                             <i class="bi bi-pencil me-1"></i>Edit Selected Interfaces
                         </button>
-                        <button type="button" class="btn btn-sm btn-outline-danger" id="iface-delete-btn">
+                        <button type="button" class="btn btn-sm btn-outline-danger d-none" id="iface-delete-btn">
                             <i class="bi bi-trash me-1"></i>Delete Selected Interfaces
                         </button>
-                        {% endif %}
+                        <button type="button" class="btn btn-sm btn-outline-danger d-none" id="iface-purge-btn">
+                            <i class="bi bi-trash3 me-1"></i>Purge Now (frees DHCP lease)
+                        </button>
                     </div>
                     <div class="flex-grow-1"></div>
                     <button type="button" class="btn btn-sm btn-outline-secondary d-none" id="bulk-clear-btn">
@@ -281,7 +275,7 @@
                                     {% endif %}
                                 </td>
                                 <td class="ps-2">
-                                    <input type="checkbox" class="form-check-input bulk-host-cb" value="{{ host.id }}">
+                                    <input type="checkbox" class="form-check-input bulk-host-cb" value="{{ host.id }}" data-deleted="{{ host.deleted ? '1' : '0' }}">
                                 </td>
                                 <td>
                                     <a href="{{ path('host_show', {id: host.id}) }}" class="fw-semibold text-decoration-none">
@@ -350,7 +344,7 @@
                                 <tr class="iface-row{{ row_deleted ? ' row-deleted' : '' }}" data-parent-host="{{ host.id }}">
                                     <td class="toggle-cell"></td>
                                     <td class="ps-2">
-                                        <input type="checkbox" class="form-check-input bulk-iface-cb" value="{{ iface.id }}">
+                                        <input type="checkbox" class="form-check-input bulk-iface-cb" value="{{ iface.id }}" data-deleted="{{ iface.deleted ? '1' : '0' }}">
                                     </td>
                                     <td class="iface-name-cell">
                                         {% set vendor = mac_vendor(iface.macAddress) %}
@@ -1251,6 +1245,20 @@ treeTable?.addEventListener('mouseleave', function () {
 const hostSelected = new Set();
 const ifaceSelected = new Set();
 
+// Returns 'none', 'active', 'deleted', or 'mixed' depending on the deleted-state
+// of the currently selected checkboxes, so the bulk bar can show the right actions
+// (Delete vs Restore/Purge) without a page-wide "viewing deleted" mode.
+function selectionDeletedState(selectedSet, cbSelector) {
+    if (selectedSet.size === 0) return 'none';
+    let hasActive = false, hasDeleted = false;
+    document.querySelectorAll(cbSelector).forEach(cb => {
+        if (!selectedSet.has(cb.value)) return;
+        cb.dataset.deleted === '1' ? hasDeleted = true : hasActive = true;
+    });
+    if (hasActive && hasDeleted) return 'mixed';
+    return hasDeleted ? 'deleted' : 'active';
+}
+
 function updateBulkBar() {
     const hCount = hostSelected.size;
     const iCount = ifaceSelected.size;
@@ -1260,6 +1268,17 @@ function updateBulkBar() {
     document.getElementById('bulk-bar-separator').classList.toggle('d-none', hCount === 0 || iCount === 0);
     document.getElementById('bulk-clear-btn').classList.toggle('d-none', !any);
     document.getElementById('host-merge-btn')?.classList.toggle('d-none', hCount < 2);
+
+    const hostState = selectionDeletedState(hostSelected, '.bulk-host-cb');
+    document.getElementById('host-delete-btn').classList.toggle('d-none', hostState !== 'active');
+    document.getElementById('host-restore-btn').classList.toggle('d-none', hostState !== 'deleted');
+    document.getElementById('host-purge-btn').classList.toggle('d-none', hostState !== 'deleted');
+
+    const ifaceState = selectionDeletedState(ifaceSelected, '.bulk-iface-cb');
+    document.getElementById('iface-edit-btn').classList.toggle('d-none', ifaceState !== 'active');
+    document.getElementById('iface-delete-btn').classList.toggle('d-none', ifaceState !== 'active');
+    document.getElementById('iface-purge-btn').classList.toggle('d-none', ifaceState !== 'deleted');
+
     document.getElementById('host-selected-count').textContent =
         hCount + ' host' + (hCount !== 1 ? 's' : '') + ' selected';
     document.getElementById('iface-selected-count').textContent =

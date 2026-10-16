@@ -122,16 +122,6 @@ class HostController extends AbstractController
             $em->flush();
         }
 
-        // Derive showDeleted for template display (controls buttons/restore UI)
-        $showDeleted = false;
-        foreach ($orGroups as $conditions) {
-            foreach ($conditions as [$field, $value, $negate]) {
-                if ($field === 'deleted' && $value === '1' && !$negate) {
-                    $showDeleted = true;
-                }
-            }
-        }
-
         if ($isAdvanced) {
             ['hosts' => $hosts, 'total' => $total] = $repo->structuredSearchPaginated($orGroups, $page, self::PER_PAGE, $sort, $dir);
         } elseif ($query !== '') {
@@ -165,7 +155,6 @@ class HostController extends AbstractController
             'query'              => $query,
             'searchHistory'      => $pref?->getHostSearchHistory() ?? [],
             'isAdvanced'         => $isAdvanced,
-            'showDeleted'        => $showDeleted,
             'sort'               => $sort,
             'dir'                => $dir,
             'subnets'            => $subnetRepo->findBy([], ['name' => 'ASC']),
