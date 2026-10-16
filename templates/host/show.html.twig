@@ -253,8 +253,15 @@
                                 {% if iface.deleted %}
                                     <form method="post" action="{{ path('interface_restore', {id: iface.id}) }}" class="d-inline">
                                         <input type="hidden" name="_token" value="{{ csrf_token('restore_interface_' ~ iface.id) }}">
-                                        <button type="submit" class="btn btn-sm btn-outline-warning">
+                                        <button type="submit" class="btn btn-sm btn-outline-warning" title="Restore">
                                             <i class="bi bi-arrow-counterclockwise"></i>
+                                        </button>
+                                    </form>
+                                    <form method="post" action="{{ path('interface_purge', {id: iface.id}) }}" class="d-inline"
+                                          onsubmit="return confirm('Permanently purge this interface and tell DHCP servers to drop the lease? This cannot be undone.')">
+                                        <input type="hidden" name="_token" value="{{ csrf_token('purge_interface_' ~ iface.id) }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Purge Now (frees DHCP lease)">
+                                            <i class="bi bi-trash3"></i>
                                         </button>
                                     </form>
                                 {% else %}

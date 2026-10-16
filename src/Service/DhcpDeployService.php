@@ -182,10 +182,27 @@ class DhcpDeployService
         return $this->sshKeys->connect($server->getHostname(), $server->getSshUser(), $server->getSshPrivateKey());
     }
 
-    private function controlCommand(string $command, string $service, DhcpServer $server, SFTP $sftp): array
+    /**
+     * Send a lease4-del/lease6-del command for a single IP to free it immediately,
+     * instead of waiting for Kea's own lease lifetime to expire it. Requires the
+     * server's Kea config to have the lease_cmds hook loaded.
+     */
+    public function deleteLease(DhcpServer $server, string $service, string $ipAddress): array
     {
-        $port    = $server->getControlPort() ?? 8000;
-        $payload = json_encode(['command' => $command, 'service' => [$service]]);
+        $sftp    = $this->getSftp($server);
+        $command = $service === 'dhcp4' ? 'lease4-del' : 'lease6-del';
+
+        return $this->controlCommand($command, $service, $server, $sftp, ['ip-address' => $ipAddress]);
+    }
+
+    private function controlCommand(string $command, string $service, DhcpServer $server, SFTP $sftp, array $arguments = []): array
+    {
+        $port = $server->getControlPort() ?? 8000;
+        $body = ['command' => $command, 'service' => [$service]];
+        if (!empty($arguments)) {
+            $body['arguments'] = $arguments;
+        }
+        $payload = json_encode($body);
 
         $cmd = 'curl -s -X POST ' . escapeshellarg('http://127.0.0.1:' . $port)
              . ' -H ' . escapeshellarg('Content-Type: application/json')
@@ -201,7 +218,9 @@ class DhcpDeployService
         $resultCode = $data[0]['result'] ?? -1;
 
         return [
-            'success'  => $resultCode === 0,
+            // result 3 = "empty" (no matching lease) — a normal outcome for lease
+            // deletion, not a failure.
+            'success'  => in_array($resultCode, [0, 3], true),
             'response' => $data[0]['text'] ?? $output,
         ];
     }

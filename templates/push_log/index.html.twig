@@ -59,6 +59,8 @@
                                     <span class="badge bg-primary">DNS</span>
                                 {% elseif log.type == 'dhcp' %}
                                     <span class="badge bg-success">DHCP</span>
+                                {% elseif log.type == 'dhcp-lease' %}
+                                    <span class="badge bg-success">DHCP Lease</span>
                                 {% elseif log.type == 'clearpass' %}
                                     <span class="badge bg-info text-dark">ClearPass</span>
                                 {% elseif log.type == 'snipeit' %}
@@ -94,6 +96,8 @@
                                     {{ _self.renderClearpassResult(log.result) }}
                                 {% elseif log.type == 'snipeit' %}
                                     {{ _self.renderSnipeItResult(log.result) }}
+                                {% elseif log.type == 'dhcp-lease' %}
+                                    {{ _self.renderLeasePurgeResult(log.result) }}
                                 {% else %}
                                     {{ _self.renderDhcpResult(log.result) }}
                                 {% endif %}
@@ -234,6 +238,18 @@
                     {% endif %}
                 {% endif %}
             </div>
+        </li>
+    {% endfor %}
+</ul>
+{% endmacro %}
+
+{% macro renderLeasePurgeResult(result) %}
+<ul class="zone-list">
+    {% for type, info in result %}
+        <li class="d-flex align-items-start gap-2">
+            <i class="bi {{ info.success ? 'bi-check-circle-fill text-success' : 'bi-x-circle-fill text-danger' }} mt-1 flex-shrink-0"></i>
+            <span class="badge bg-secondary me-1">{{ type == 'dhcp4' ? 'DHCPv4' : 'DHCPv6' }}</span>
+            <span class="font-monospace small">{{ info.response }}</span>
         </li>
     {% endfor %}
 </ul>

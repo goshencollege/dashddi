@@ -220,6 +220,11 @@
                     <div id="bulk-bar-separator" class="vr d-none mx-2"></div>
                     <div id="iface-bulk-section" class="d-none d-flex align-items-center gap-2">
                         <span id="iface-selected-count" class="text-muted small">0 interfaces selected</span>
+                        {% if showDeleted %}
+                        <button type="button" class="btn btn-sm btn-outline-danger" id="iface-purge-btn">
+                            <i class="bi bi-trash3 me-1"></i>Purge Now (frees DHCP lease)
+                        </button>
+                        {% else %}
                         <button type="button" class="btn btn-sm btn-outline-secondary" id="iface-edit-btn"
                                 data-bs-toggle="modal" data-bs-target="#bulk-iface-edit-modal">
                             <i class="bi bi-pencil me-1"></i>Edit Selected Interfaces
@@ -227,6 +232,7 @@
                         <button type="button" class="btn btn-sm btn-outline-danger" id="iface-delete-btn">
                             <i class="bi bi-trash me-1"></i>Delete Selected Interfaces
                         </button>
+                        {% endif %}
                     </div>
                     <div class="flex-grow-1"></div>
                     <button type="button" class="btn btn-sm btn-outline-secondary d-none" id="bulk-clear-btn">
@@ -409,6 +415,13 @@
                                                     <input type="hidden" name="_token" value="{{ csrf_token('restore_interface_' ~ iface.id) }}">
                                                     <button type="submit" class="btn btn-sm btn-outline-warning" title="Restore">
                                                         <i class="bi bi-arrow-counterclockwise"></i>
+                                                    </button>
+                                                </form>
+                                                <form method="post" action="{{ path('interface_purge', {id: iface.id}) }}"
+                                                      onsubmit="return confirm('Permanently purge this interface and tell DHCP servers to drop the lease? This cannot be undone.')">
+                                                    <input type="hidden" name="_token" value="{{ csrf_token('purge_interface_' ~ iface.id) }}">
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Purge Now (frees DHCP lease)">
+                                                        <i class="bi bi-trash3"></i>
                                                     </button>
                                                 </form>
                                             {% else %}
@@ -1347,6 +1360,18 @@ document.getElementById('iface-delete-btn')?.addEventListener('click', async fun
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'delete', ids: [...ifaceSelected], _token: '{{ csrf_token('bulk_interfaces') }}' }),
+    });
+    const data = await resp.json();
+    if (resp.ok) { location.reload(); } else { alert(data.error ?? 'Error'); }
+});
+
+document.getElementById('iface-purge-btn')?.addEventListener('click', async function () {
+    const count = ifaceSelected.size;
+    if (!confirm(`Permanently purge ${count} interface${count !== 1 ? 's' : ''} and tell DHCP servers to drop the lease? This cannot be undone.`)) return;
+    const resp = await fetch('{{ path('interface_bulk') }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'purge', ids: [...ifaceSelected], _token: '{{ csrf_token('bulk_interfaces') }}' }),
     });
     const data = await resp.json();
     if (resp.ok) { location.reload(); } else { alert(data.error ?? 'Error'); }

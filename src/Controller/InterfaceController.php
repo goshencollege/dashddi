@@ -17,6 +17,7 @@ use App\Repository\SubnetRepository;
 use App\Repository\VirtualIpRepository;
 use App\Repository\UserPreferenceRepository;
 use App\Service\DnsViewResolver;
+use App\Service\InterfacePurgeService;
 use App\Service\IpAddressManager;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -157,7 +158,7 @@ class InterfaceController extends AbstractController
     }
 
     #[Route('/interfaces/bulk', name: 'interface_bulk', methods: ['POST'])]
-    public function bulk(Request $request, NetworkInterfaceRepository $ifaceRepo, EntityManagerInterface $em): JsonResponse
+    public function bulk(Request $request, NetworkInterfaceRepository $ifaceRepo, EntityManagerInterface $em, InterfacePurgeService $interfacePurgeService): JsonResponse
     {
         $data   = json_decode($request->getContent(), true) ?? [];
         $action = $data['action'] ?? '';
@@ -202,6 +203,15 @@ class InterfaceController extends AbstractController
             return $this->bulkEdit($data, $ids, $ifaceRepo, $em);
         }
 
+        if ($action === 'purge') {
+            $interfaces = array_filter(
+                $ifaceRepo->findBy(['id' => $ids]),
+                fn(NetworkInterface $iface) => $iface->isDeleted(),
+            );
+            $count = $interfacePurgeService->purgeMany($interfaces);
+            return $this->json(['message' => $count . ' interface(s) purged and lease deletion queued.']);
+        }
+
         return $this->json(['error' => 'Unknown action'], 400);
     }
 
@@ -237,6 +247,24 @@ class InterfaceController extends AbstractController
             $this->addFlash('success', 'Interface restored.');
         }
         return $this->redirectToRoute('interface_show', ['id' => $interface->getId()]);
+    }
+
+    #[Route('/interfaces/{id}/purge', name: 'interface_purge', methods: ['POST'])]
+    public function purge(Request $request, NetworkInterface $interface, InterfacePurgeService $interfacePurgeService): Response
+    {
+        $hostId = $interface->getHost()?->getId();
+
+        if (!$interface->isDeleted()) {
+            $this->addFlash('error', 'Only a soft-deleted interface can be purged.');
+            return $this->redirectToRoute('host_show', ['id' => $hostId]);
+        }
+
+        if ($this->isCsrfTokenValid('purge_interface_' . $interface->getId(), $request->request->get('_token'))) {
+            $interfacePurgeService->purgeMany([$interface]);
+            $this->addFlash('success', 'Interface purged. DHCP servers will be told to drop the lease.');
+        }
+
+        return $this->redirectToRoute('host_show', ['id' => $hostId]);
     }
 
     /** JSON endpoint for the interface form to fetch available IPs when subnet changes. */
