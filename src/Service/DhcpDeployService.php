@@ -184,15 +184,34 @@ class DhcpDeployService
 
     /**
      * Send a lease4-del/lease6-del command for a single IP to free it immediately,
-     * instead of waiting for Kea's own lease lifetime to expire it. Requires the
-     * server's Kea config to have the lease_cmds hook loaded.
+     * instead of waiting for Kea's own lease lifetime to expire it, then re-query the
+     * lease to confirm it actually took effect. Kea's own result code for lease4-del/
+     * lease6-del is not sufficient on its own to prove the lease is gone, so this
+     * follows up with a lease4-get/lease6-get and treats a still-present lease as a
+     * failure even if the delete command reported success. Requires the server's Kea
+     * config to have the lease_cmds hook loaded.
      */
     public function deleteLease(DhcpServer $server, string $service, string $ipAddress): array
     {
-        $sftp    = $this->getSftp($server);
-        $command = $service === 'dhcp4' ? 'lease4-del' : 'lease6-del';
+        $sftp        = $this->getSftp($server);
+        $deleteCmd   = $service === 'dhcp4' ? 'lease4-del' : 'lease6-del';
+        $getCmd      = $service === 'dhcp4' ? 'lease4-get' : 'lease6-get';
+        $arguments   = ['ip-address' => $ipAddress];
 
-        return $this->controlCommand($command, $service, $server, $sftp, ['ip-address' => $ipAddress]);
+        $delete = $this->controlCommand($deleteCmd, $service, $server, $sftp, $arguments);
+        $verify = $this->controlCommand($getCmd, $service, $server, $sftp, $arguments);
+
+        // lease{4,6}-get result 0 = lease found, 3 = none found. If it's still found
+        // after a delete that itself reported success, the delete didn't really work.
+        $stillPresent = $verify['resultCode'] === 0;
+
+        return [
+            'ip'       => $ipAddress,
+            'success'  => $delete['success'] && !$stillPresent,
+            'response' => $stillPresent
+                ? $delete['response'] . ' (still present after delete — verification failed)'
+                : $delete['response'],
+        ];
     }
 
     private function controlCommand(string $command, string $service, DhcpServer $server, SFTP $sftp, array $arguments = []): array
@@ -211,7 +230,7 @@ class DhcpDeployService
         $output = $sftp->exec($cmd);
 
         if ($output === false) {
-            return ['success' => false, 'response' => 'SSH exec of curl failed'];
+            return ['success' => false, 'response' => 'SSH exec of curl failed', 'resultCode' => null];
         }
 
         $data       = json_decode($output, true);
@@ -220,8 +239,9 @@ class DhcpDeployService
         return [
             // result 3 = "empty" (no matching lease) — a normal outcome for lease
             // deletion, not a failure.
-            'success'  => in_array($resultCode, [0, 3], true),
-            'response' => $data[0]['text'] ?? $output,
+            'success'    => in_array($resultCode, [0, 3], true),
+            'response'   => $data[0]['text'] ?? $output,
+            'resultCode' => $resultCode,
         ];
     }
 }

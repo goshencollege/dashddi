@@ -64,6 +64,59 @@ class InterfacePurgeServiceTest extends TestCase
         $this->service->purgeMany([$iface]);
     }
 
+    public function testPurgeManyFallsBackToLastDhcpIpv4WhenNoStaticReservation(): void
+    {
+        $iface = (new NetworkInterface())->setLastDhcpIp('192.168.60.32');
+
+        $this->bus->expects($this->once())
+            ->method('dispatch')
+            ->with($this->callback(function (PurgeInterfaceLeaseMessage $msg) {
+                return $msg->ipv4 === '192.168.60.32' && $msg->ipv6 === null;
+            }))
+            ->willReturn(new Envelope(new \stdClass()));
+
+        $this->em->expects($this->once())->method('remove')->with($iface);
+        $this->em->expects($this->once())->method('flush');
+
+        $this->service->purgeMany([$iface]);
+    }
+
+    public function testPurgeManyFallsBackToLastDhcpIpv6WhenNoStaticReservation(): void
+    {
+        $iface = (new NetworkInterface())->setLastDhcpIp('fd00::abcd');
+
+        $this->bus->expects($this->once())
+            ->method('dispatch')
+            ->with($this->callback(function (PurgeInterfaceLeaseMessage $msg) {
+                return $msg->ipv4 === null && $msg->ipv6 === 'fd00::abcd';
+            }))
+            ->willReturn(new Envelope(new \stdClass()));
+
+        $this->em->expects($this->once())->method('remove')->with($iface);
+        $this->em->expects($this->once())->method('flush');
+
+        $this->service->purgeMany([$iface]);
+    }
+
+    public function testPurgeManyPrefersStaticReservationOverLastDhcpIp(): void
+    {
+        $iface = (new NetworkInterface())
+            ->setIpAddress((new IpAddress())->setAddress('10.0.0.5'))
+            ->setLastDhcpIp('192.168.60.32');
+
+        $this->bus->expects($this->once())
+            ->method('dispatch')
+            ->with($this->callback(function (PurgeInterfaceLeaseMessage $msg) {
+                return $msg->ipv4 === '10.0.0.5';
+            }))
+            ->willReturn(new Envelope(new \stdClass()));
+
+        $this->em->expects($this->once())->method('remove')->with($iface);
+        $this->em->expects($this->once())->method('flush');
+
+        $this->service->purgeMany([$iface]);
+    }
+
     public function testPurgeManyWithNoInterfacesDoesNotFlush(): void
     {
         $this->bus->expects($this->never())->method('dispatch');
