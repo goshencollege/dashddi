@@ -26,24 +26,26 @@ class DhcpDeployService
             'dhcp6'   => $outputDir . '/subnets6.json',
         ];
 
-        file_put_contents(
-            $files['global4'],
-            json_encode($this->generator->generateGlobalReservations4Config(), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . "\n"
-        );
-        file_put_contents(
-            $files['global6'],
-            json_encode($this->generator->generateGlobalReservations6Config(), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . "\n"
-        );
-        file_put_contents(
-            $files['dhcp4'],
-            json_encode($this->generator->generateDhcp4Config(), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . "\n"
-        );
-        file_put_contents(
-            $files['dhcp6'],
-            json_encode($this->generator->generateDhcp6Config(), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . "\n"
-        );
+        $flags = JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
+        $this->writeJsonFile($files['global4'], $this->generator->generateGlobalReservations4Config(), $flags);
+        $this->writeJsonFile($files['global6'], $this->generator->generateGlobalReservations6Config(), $flags);
+        $this->writeJsonFile($files['dhcp4'], $this->generator->generateDhcp4Config(), $flags);
+        $this->writeJsonFile($files['dhcp6'], $this->generator->generateDhcp6Config(), $flags);
 
         return $files;
+    }
+
+    /**
+     * Encodes and validates before writing, so a value that can't be encoded (e.g. invalid
+     * UTF-8) fails loudly here instead of silently producing a config a DHCP server then rejects.
+     */
+    private function writeJsonFile(string $path, array $data, int $flags): void
+    {
+        $json = json_encode($data, $flags);
+        if ($json === false) {
+            throw new \RuntimeException(sprintf('Failed to encode %s: %s', basename($path), json_last_error_msg()));
+        }
+        file_put_contents($path, $json . "\n");
     }
 
     public function deployToServer(DhcpServer $server, array $allFiles, bool $reload = true): array
@@ -61,7 +63,7 @@ class DhcpDeployService
         foreach ($globalTypes as $type) {
             $localFile  = $allFiles[$type];
             $remotePath = rtrim($server->getRemotePath(), '/') . '/' . basename($localFile);
-            $ok = $sftp->put($remotePath, (string) file_get_contents($localFile));
+            $ok = $this->uploadAtomic($sftp, $remotePath, (string) file_get_contents($localFile));
             $results[$type] = [
                 'success' => $ok,
                 'output'  => $ok ? '' : 'SFTP upload failed: ' . $sftp->getLastSFTPError(),
@@ -93,7 +95,7 @@ class DhcpDeployService
             }
 
             // Upload new file
-            $ok = $sftp->put($remotePath, (string) file_get_contents($localFile));
+            $ok = $this->uploadAtomic($sftp, $remotePath, (string) file_get_contents($localFile));
             $result = [
                 'success' => $ok,
                 'output'  => $ok ? '' : 'SFTP upload failed: ' . $sftp->getLastSFTPError(),
@@ -118,7 +120,7 @@ class DhcpDeployService
             ];
 
             if (!$reloadResult['success'] && $backupContent !== null) {
-                $restored = $sftp->put($remotePath, $backupContent);
+                $restored = $this->uploadAtomic($sftp, $remotePath, $backupContent);
                 if ($restored) {
                     $this->controlCommand('config-reload', $keaService, $server, $sftp);
                 }
@@ -143,14 +145,11 @@ class DhcpDeployService
         if (!is_dir($tmpDir)) {
             mkdir($tmpDir, 0755, true);
         }
-        file_put_contents(
-            $localFile,
-            json_encode($this->ddnsGenerator->generateConfig(), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n"
-        );
+        $this->writeJsonFile($localFile, $this->ddnsGenerator->generateConfig(), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
 
         $remotePath = rtrim($server->getRemotePath(), '/') . '/kea-dhcp-ddns.conf';
 
-        $ok     = $sftp->put($remotePath, (string) file_get_contents($localFile));
+        $ok     = $this->uploadAtomic($sftp, $remotePath, (string) file_get_contents($localFile));
         $result = [
             'success' => $ok,
             'output'  => $ok ? '' : 'SFTP upload failed: ' . $sftp->getLastSFTPError(),
@@ -171,6 +170,18 @@ class DhcpDeployService
         ];
 
         return $result;
+    }
+
+    /**
+     * Writes to a temp remote path and atomically renames it into place, so a reload
+     * triggered right after — by us or by anything else watching the file on the server —
+     * can never observe a partially-written config.
+     */
+    private function uploadAtomic(SFTP $sftp, string $remotePath, string $contents): bool
+    {
+        $tmpPath = $remotePath . '.tmp';
+
+        return $sftp->put($tmpPath, $contents) && $sftp->posix_rename($tmpPath, $remotePath);
     }
 
     private function getSftp(DhcpServer $server): SFTP
