@@ -24,13 +24,11 @@ class ApiTokenRepository extends ServiceEntityRepository
         return $this->findBy(['ownerIdentifier' => $identifier], ['createdAt' => 'DESC']);
     }
 
-    /** @return ApiToken[] General (non-host-scoped) tokens for the given owner */
-    public function findGeneralByOwner(string $identifier): array
+    /** @return ApiToken[] General (non-host-scoped) tokens (all owners), newest first */
+    public function findAllGeneral(): array
     {
         return $this->createQueryBuilder('t')
-            ->where('t.ownerIdentifier = :owner')
-            ->andWhere('t.host IS NULL')
-            ->setParameter('owner', $identifier)
+            ->where('t.host IS NULL')
             ->orderBy('t.createdAt', 'DESC')
             ->getQuery()
             ->getResult();

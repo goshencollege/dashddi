@@ -115,7 +115,7 @@
         </ul>
         <p>You can also generate and revoke host tokens via the API (<code>POST /api/hosts/{id}/token</code> and <code>DELETE /api/hosts/{id}/token</code>) — see the <a href="{{ path('user_guide_servers') }}#api">Servers &amp; Integrations guide → REST API</a> for details.</p>
 
-        <p class="mb-0 text-muted small">All tokens are used in the <code>Authorization: Bearer &lt;token&gt;</code> HTTP header. General tokens can be regenerated at any time by editing them from the API Tokens page. The API Tokens list shows general tokens first, followed by all host-scoped tokens grouped by host.</p>
+        <p class="mb-0 text-muted small">All tokens are used in the <code>Authorization: Bearer &lt;token&gt;</code> HTTP header. General tokens can be regenerated at any time by editing them from the API Tokens page. The API Tokens list shows general tokens first, followed by all host-scoped tokens grouped by host. All tokens are shared: every user can see, edit, regenerate, and revoke any token, regardless of who created it. The <strong>Owner</strong> column shows who created (or last regenerated) each token.</p>
     </div>
 </div>
 

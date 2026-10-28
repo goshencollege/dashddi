@@ -19,7 +19,7 @@ class ApiTokenController extends AbstractController
     public function index(ApiTokenRepository $repo): Response
     {
         return $this->render('api_token/index.html.twig', [
-            'generalTokens' => $repo->findGeneralByOwner($this->getUser()->getUserIdentifier()),
+            'generalTokens' => $repo->findAllGeneral(),
             'hostTokens'    => $repo->findAllHostScoped(),
         ]);
     }
@@ -64,10 +64,6 @@ class ApiTokenController extends AbstractController
     #[Route('/{id}/edit', name: 'api_token_edit', methods: ['GET', 'POST'])]
     public function edit(Request $request, ApiToken $token, EntityManagerInterface $em): Response
     {
-        if ($token->getOwnerIdentifier() !== $this->getUser()->getUserIdentifier()) {
-            throw $this->createAccessDeniedException();
-        }
-
         $form = $this->createForm(ApiTokenType::class, $token);
         $form->handleRequest($request);
 
@@ -86,10 +82,6 @@ class ApiTokenController extends AbstractController
     #[Route('/{id}/regenerate', name: 'api_token_regenerate', methods: ['POST'])]
     public function regenerate(Request $request, ApiToken $token, EntityManagerInterface $em): Response
     {
-        if ($token->getOwnerIdentifier() !== $this->getUser()->getUserIdentifier()) {
-            throw $this->createAccessDeniedException();
-        }
-
         if (!$this->isCsrfTokenValid('regenerate_api_token_' . $token->getId(), $request->request->get('_token'))) {
             $this->addFlash('danger', 'Invalid CSRF token.');
             return $this->redirectToRoute('api_token_index');
@@ -107,10 +99,6 @@ class ApiTokenController extends AbstractController
     #[Route('/{id}/delete', name: 'api_token_delete', methods: ['POST'])]
     public function delete(Request $request, ApiToken $token, EntityManagerInterface $em): Response
     {
-        if ($token->getOwnerIdentifier() !== $this->getUser()->getUserIdentifier()) {
-            throw $this->createAccessDeniedException();
-        }
-
         if ($this->isCsrfTokenValid('delete_api_token_' . $token->getId(), $request->request->get('_token'))) {
             $em->remove($token);
             $em->flush();
