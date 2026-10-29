@@ -58,7 +58,7 @@ class ApiToken
     private ?\DateTimeImmutable $lastUsedAt = null;
 
     #[ORM\OneToOne(targetEntity: Host::class, inversedBy: 'apiToken')]
-    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'CASCADE')]
     private ?Host $host = null;
 
     public function __construct()

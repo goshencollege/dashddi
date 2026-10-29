@@ -277,9 +277,10 @@ class HostControllerTest extends AppWebTestCase
         $this->assertNull($this->em->find(Host::class, $ifaceHostId));
         $this->assertNull($this->em->find(NetworkInterface::class, $iface->getId()));
 
-        $survivingToken = $this->em->find(ApiToken::class, $apiTokenId);
-        $this->assertNotNull($survivingToken, 'Purging a host must not cascade-delete its API token.');
-        $this->assertNull($survivingToken->getHost(), 'The surviving token should no longer be host-scoped.');
+        $this->assertNull(
+            $this->em->find(ApiToken::class, $apiTokenId),
+            'Purging a host must cascade-delete its host-scoped API token rather than orphan it as a general token.'
+        );
     }
 
     public function testDelete(): void
@@ -336,6 +337,31 @@ class HostControllerTest extends AppWebTestCase
 
         $this->em->clear();
         $this->assertNull($this->em->find(Host::class, $id));
+    }
+
+    public function testPurgeDeletesTheHostsApiToken(): void
+    {
+        $host = (new Host())->setName('purge-host-with-token');
+        $host->softDeleteWithInterfaces();
+        $this->em->persist($host);
+        $token = (new ApiToken())->setName('Host token: purge-host-with-token')
+            ->setOwnerIdentifier('test@example.com')->setTokenHash('purge-token-hash')
+            ->setAllowedRoutes([])->setAllowedCidrs([])->setHost($host);
+        $this->em->persist($token);
+        $this->em->flush();
+
+        $id      = $host->getId();
+        $tokenId = $token->getId();
+        $this->em->clear();
+        $crawler = $this->client->request('GET', "/hosts/{$id}");
+        $this->client->submit(
+            $crawler->filter('form[action="/hosts/' . $id . '/purge"]')->form()
+        );
+        $this->assertResponseRedirects('/hosts');
+
+        $this->em->clear();
+        $this->assertNull($this->em->find(Host::class, $id));
+        $this->assertNull($this->em->find(ApiToken::class, $tokenId));
     }
 
     public function testPurgeHardDeletesSoftDeletedHostAndItsDeletedInterfaces(): void
